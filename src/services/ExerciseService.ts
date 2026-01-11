@@ -43,5 +43,29 @@ export class ExerciseService {
         }
         await dbService.run('DELETE FROM exercises WHERE id = ?', [id]);
     }
+
+    static async search(query: string, categoryId?: string): Promise<(Exercise & { category_name: string; category_color: string })[]> {
+        let sql = `
+            SELECT e.*, c.name as category_name, c.color as category_color
+            FROM exercises e
+            LEFT JOIN categories c ON e.category_id = c.id
+            WHERE 1=1
+        `;
+        const params: any[] = [];
+
+        if (query) {
+            sql += ` AND e.name LIKE ?`;
+            params.push(`%${query}%`);
+        }
+
+        if (categoryId && categoryId !== 'all') {
+            sql += ` AND e.category_id = ?`;
+            params.push(categoryId);
+        }
+
+        sql += ` ORDER BY e.name ASC`;
+
+        return await dbService.getAll(sql, params);
+    }
 }
 

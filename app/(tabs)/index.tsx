@@ -3,6 +3,7 @@ import { DateStrip } from '@/components/DateStrip';
 import { ExerciseList } from '@/components/ExerciseList';
 import { HistoryModal } from '@/components/HistoryModal';
 import { IntervalTimerModal } from '@/components/IntervalTimerModal';
+import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { WorkoutLog } from '@/components/WorkoutLog';
 import { addDays, subDays } from 'date-fns';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -11,7 +12,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { workoutService } from '../../src/services/WorkoutService';
 import { Workout, WorkoutSet } from '../../src/types/db';
 
@@ -203,7 +203,7 @@ export default function DailyLogScreen() {
 
   return (
     <GestureDetector gesture={panGesture}>
-      <SafeAreaView className="flex-1 bg-iron-900" edges={['top']}>
+      <SafeAreaWrapper edges={['top']} className="bg-iron-900">
         <DateStrip selectedDate={selectedDate} onSelectDate={setSelectedDate} markedDates={markedDates} />
 
         {/* Workout Status Toggle */}
@@ -320,7 +320,7 @@ export default function DailyLogScreen() {
             <Timer color="#94a3b8" size={24} />
           </TouchableOpacity>
         )}
-      </SafeAreaView>
+      </SafeAreaWrapper>
     </GestureDetector>
   );
 }

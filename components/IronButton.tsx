@@ -27,9 +27,9 @@ export function IronButton({
     };
 
     const sizes = {
-        sm: "px-3 py-2",
-        md: "px-4 py-3 min-h-[48px]", // Touch target > 48px
-        lg: "px-6 py-4 min-h-[56px]"
+        sm: "px-3 py-2 max-h-[40px]",
+        md: "px-4 py-3 min-h-[48px] max-h-[56px]",
+        lg: "px-6 py-4 min-h-[56px] max-h-[64px]"
     };
 
     const textVariants = {

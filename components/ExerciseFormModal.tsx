@@ -2,7 +2,8 @@ import { Colors } from '@/src/theme';
 import { Check, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { dbService } from '../src/services/DatabaseService';
+import { CategoryService } from '../src/services/CategoryService';
+import { ExerciseService } from '../src/services/ExerciseService';
 import { Category, Exercise, ExerciseType } from '../src/types/db';
 
 interface ExerciseFormModalProps {
@@ -35,7 +36,7 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
     }, [visible, initialData]);
 
     const loadCategories = async () => {
-        const cats = await dbService.getCategories();
+        const cats = await CategoryService.getAll();
         setCategories(cats);
         // Default to first category if creating new
         if (!initialData && cats.length > 0 && !categoryId) {
@@ -48,9 +49,9 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
 
         try {
             if (initialData) {
-                await dbService.updateExercise(initialData.id, { name, category_id: categoryId, type });
+                await ExerciseService.update(initialData.id, { name, category_id: categoryId, type });
             } else {
-                await dbService.createExercise({ name, category_id: categoryId, type });
+                await ExerciseService.create({ name, category_id: categoryId, type });
             }
             onSave();
             onClose();

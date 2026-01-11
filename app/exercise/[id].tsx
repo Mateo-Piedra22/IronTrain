@@ -1,6 +1,7 @@
 import { IronButton } from '@/components/IronButton';
 import { IronCard } from '@/components/IronCard';
 import { SetRow } from '@/components/SetRow';
+import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { WarmupCalculatorModal } from '@/components/WarmupCalculatorModal';
 import { workoutService } from '@/src/services/WorkoutService';
 import { WorkoutSet } from '@/src/types/db';
@@ -218,8 +219,9 @@ export default function ExerciseDetailScreen() {
         </View>
     );
 
+    /* ... */
     return (
-        <View className="flex-1 bg-iron-950">
+        <SafeAreaWrapper className="flex-1 bg-iron-950" edges={['bottom', 'left', 'right']}>
             <Stack.Screen options={{
                 title: exerciseName || 'Exercise',
                 headerBackTitle: 'Log',
@@ -256,6 +258,6 @@ export default function ExerciseDetailScreen() {
                 {activeTab === 'history' && renderHistory()}
                 {activeTab === 'analysis' && renderAnalysis()}
             </ScrollView>
-        </View>
+        </SafeAreaWrapper>
     );
 }

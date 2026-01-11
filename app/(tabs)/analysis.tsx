@@ -2,6 +2,7 @@ import { CalculatorsModal } from '@/components/CalculatorsModal';
 import { ConsistencyHeatmap } from '@/components/ConsistencyHeatmap';
 import { GoalsWidget } from '@/components/GoalsWidget';
 import { PRCenter } from '@/components/PRCenter';
+import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { AnalysisService, OneRepMax } from '@/src/services/AnalysisService';
 import { backupService } from '@/src/services/BackupService';
 import { workoutService } from '@/src/services/WorkoutService';
@@ -11,7 +12,6 @@ import { LucideCalculator, LucideDatabase, LucideSettings } from 'lucide-react-n
 import { useCallback, useState } from 'react';
 import { Dimensions, Pressable, ScrollView, Text, View } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -52,7 +52,7 @@ export default function AnalysisScreen() {
     );
 
     return (
-        <SafeAreaView className="flex-1 bg-iron-900" edges={['top']}>
+        <SafeAreaWrapper className="flex-1 bg-iron-900" edges={['top']}>
             <ScrollView className=" px-4 pt-4">
                 <Text className="text-3xl font-bold text-white mb-6">Deep Analytics</Text>
 
@@ -187,7 +187,6 @@ export default function AnalysisScreen() {
             </ScrollView>
 
             <CalculatorsModal visible={calcVisible} onClose={() => setCalcVisible(false)} />
-        </SafeAreaView>
+        </SafeAreaWrapper>
     );
 }
-

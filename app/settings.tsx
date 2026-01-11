@@ -1,3 +1,4 @@
+import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { useColorScheme } from '@/components/useColorScheme';
 import { backupService } from '@/src/services/BackupService';
 import { dbService } from '@/src/services/DatabaseService';
@@ -5,7 +6,6 @@ import { Stack, useRouter } from 'expo-router';
 import { ChevronRight, Database, Disc, Timer, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SettingsScreen() {
     const router = useRouter();
@@ -86,10 +86,11 @@ export default function SettingsScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-iron-950" edges={['top']}>
+        <SafeAreaWrapper className="bg-iron-950" edges={['top']}>
             <Stack.Screen options={{ title: 'Settings', headerTitleStyle: { color: 'white' }, headerStyle: { backgroundColor: '#0f172a' }, headerTintColor: '#fb923c' }} />
 
             <ScrollView className="flex-1 px-4">
+                {/* ... existing content ... */}
                 <Text className="text-iron-500 font-bold uppercase mt-6 mb-2 text-xs">General Preferences</Text>
 
                 <View className="bg-iron-900 rounded-xl overflow-hidden">
@@ -166,6 +167,6 @@ export default function SettingsScreen() {
 
                 <Text className="text-center text-iron-700 mt-10 mb-10">IronTrain v1.0.0 (Build 2026)</Text>
             </ScrollView>
-        </SafeAreaView>
+        </SafeAreaWrapper>
     );
 }

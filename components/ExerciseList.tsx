@@ -4,7 +4,8 @@ import { FlashList } from '@shopify/flash-list';
 import { Plus, Search } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { dbService } from '../src/services/DatabaseService';
+import { CategoryService } from '../src/services/CategoryService';
+import { ExerciseService } from '../src/services/ExerciseService';
 import { Category, Exercise } from '../src/types/db';
 import { ExerciseFormModal } from './ExerciseFormModal';
 
@@ -30,8 +31,8 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
         setLoading(true);
         try {
             const [exs, cats] = await Promise.all([
-                dbService.searchExercises(searchQuery, selectedCategory),
-                dbService.getCategories()
+                ExerciseService.search(searchQuery, selectedCategory),
+                CategoryService.getAll()
             ]);
             setExercises(exs);
             setCategories(cats);
@@ -124,19 +125,21 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
                                     <Text className="text-iron-400 text-xs uppercase">{item.category_name}</Text>
                                 </View>
                             </View>
-                            {/* If in management mode, show edit icon? Or simple tap to edit */}
+                            {/* Visual indicator for edit mode could go here */}
                         </TouchableOpacity>
                     )}
                 />
             )}
 
-            {/* FAB for creation (Always visible) */}
-            <TouchableOpacity
-                onPress={handleCreate}
-                className="absolute bottom-6 right-6 w-14 h-14 bg-iron-700 rounded-full items-center justify-center shadow-lg border border-iron-600"
-            >
-                <Plus color="white" />
-            </TouchableOpacity>
+            {/* FAB for creation (Only visible in Management Mode) */}
+            {!onSelect && (
+                <TouchableOpacity
+                    onPress={handleCreate}
+                    className="absolute bottom-6 right-6 w-14 h-14 bg-iron-700 rounded-full items-center justify-center shadow-lg border border-iron-600"
+                >
+                    <Plus color="white" />
+                </TouchableOpacity>
+            )}
 
             <ExerciseFormModal
                 visible={isFormVisible}
