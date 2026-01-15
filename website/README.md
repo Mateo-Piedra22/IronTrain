@@ -15,6 +15,7 @@ Web estática/SSR para:
 Desde `website/`:
 
 - `npm install`
+- Copia variables: crea `website/.env.local` a partir de `website/.env.example`
 - `npm run dev`
 
 ## Deploy (Vercel)
@@ -23,4 +24,3 @@ Configura Root Directory = `website`.
 El contenido se actualiza automáticamente al hacer push, porque lee:
 - `../docs/CHANGELOG.md`
 - `../docs/DOWNLOADS.json`
-

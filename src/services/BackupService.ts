@@ -72,7 +72,7 @@ class BackupService {
             const goals = await this.safeGetAll('goals');
 
             const backup: BackupData = {
-                version: 3,
+                version: 4,
                 timestamp: Date.now(),
                 categories,
                 exercises,

@@ -1,7 +1,13 @@
 # Changelog
 
-## 1.1.1 (Unreleased)
+## 1.2.1 (Unreleased)
 - Placeholder: describir cambios nuevos antes del próximo release.
+
+## 1.2.0 (2026-01-15)
+- Rework settings: mejor organización y acceso rápido.
+- Backup v4: export/import con categorías incluidas y validación más robusta.
+- Sistema de actualizaciones: notificaciones automáticas y opción para desactivar.
+- Notificaciones: mejor gestión de permisos y prioridades.
 
 ## 1.1.0 (2026-01-15)
 - Backups v3: export/import con categorías incluidas y validación más robusta.

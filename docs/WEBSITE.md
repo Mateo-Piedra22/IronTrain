@@ -17,6 +17,7 @@ La web lee ambos archivos desde el repositorio en build/runtime (sin dependencia
 3. Build Command: `npm run build`
 4. Output: automático (Next.js)
 5. Dominio: `irontrain.motiona.xyz`
+6. Asegúrate de dejar **Output Directory vacío** en Project Settings (si está en `public`, falla).
 
 ## Integración opcional con GitHub Releases (recomendado)
 La web puede obtener automáticamente el APK desde el **último GitHub Release** si configuras variables de entorno en Vercel:

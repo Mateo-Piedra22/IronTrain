@@ -1,13 +1,24 @@
 {
-  "generatedAt": "2026-01-15T19:26:44.821Z",
+  "generatedAt": "2026-01-15T19:52:38.635Z",
   "source": "docs/CHANGELOG.md",
   "releases": [
     {
-      "version": "1.1.1",
+      "version": "1.2.1",
       "date": null,
       "unreleased": true,
       "items": [
         "Placeholder: describir cambios nuevos antes del próximo release."
+      ]
+    },
+    {
+      "version": "1.2.0",
+      "date": "2026-01-15",
+      "unreleased": false,
+      "items": [
+        "Rework settings: mejor organización y acceso rápido.",
+        "Backup v4: export/import con categorías incluidas y validación más robusta.",
+        "Sistema de actualizaciones: notificaciones automáticas y opción para desactivar.",
+        "Notificaciones: mejor gestión de permisos y prioridades."
       ]
     },
     {

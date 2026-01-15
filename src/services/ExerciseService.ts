@@ -1,4 +1,5 @@
 import { Exercise } from '../types/db';
+import { uuidV4 } from '../utils/uuid';
 import { dbService } from './DatabaseService';
 export { Exercise };
 
@@ -12,7 +13,7 @@ export class ExerciseService {
     }
 
     static async create(data: Omit<Exercise, 'id' | 'is_system'>): Promise<string> {
-        const id = crypto.randomUUID();
+        const id = uuidV4();
         await dbService.run(
             'INSERT INTO exercises (id, category_id, name, type, notes) VALUES (?, ?, ?, ?, ?)',
             [id, data.category_id, data.name, data.type, data.notes ?? null]

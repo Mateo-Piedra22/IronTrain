@@ -20,6 +20,7 @@ Al finalizar, vas a tener:
   - `GITHUB_RELEASES_OWNER`
   - `GITHUB_RELEASES_REPO`
   - `GITHUB_RELEASES_TOKEN` (opcional)
+- Importante: en Vercel, dejá **Output Directory vacío** (Next.js no usa `public` como output).
 
 ---
 
@@ -104,4 +105,3 @@ Cuando hacés push del tag:
 - Abrí la app:
   - si la versión instalada es menor, debería mostrar un alert “Actualización disponible”
   - tocá “Descargar” y debería abrir la web.
-

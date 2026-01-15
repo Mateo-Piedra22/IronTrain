@@ -1,4 +1,5 @@
 import { Goal } from '../types/db';
+import { uuidV4 } from '../utils/uuid';
 import { dbService } from './DatabaseService';
 
 export class GoalsService {
@@ -16,7 +17,7 @@ export class GoalsService {
         }
         const currentValue = Number.isFinite(data.currentValue ?? 0) ? (data.currentValue ?? 0) : 0;
 
-        const id = crypto.randomUUID();
+        const id = uuidV4();
         await dbService.run(
             'INSERT INTO goals (id, title, target_value, current_value, type, completed) VALUES (?, ?, ?, ?, ?, ?)',
             [id, title, data.targetValue, currentValue, 'exercise_weight', 0]
@@ -32,4 +33,3 @@ export class GoalsService {
         await dbService.run('UPDATE goals SET completed = 1 WHERE id = ?', [id]);
     }
 }
-
