@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import path from 'node:path';
+import { resolveRepoFile } from './repoFs';
 
 export type ChangelogRelease = {
   version: string;
@@ -42,7 +42,9 @@ function compareSemverDesc(a: ChangelogRelease, b: ChangelogRelease): number {
 }
 
 export async function getChangelog(): Promise<ChangelogPayload> {
-  const filePath = path.resolve(process.cwd(), '..', 'docs', 'CHANGELOG.md');
+  const filePath = await resolveRepoFile('docs/CHANGELOG.md');
+  if (!filePath) return { releases: [] };
+
   const md = await fs.readFile(filePath, 'utf8');
   const lines = md.split(/\r?\n/);
 
@@ -69,4 +71,3 @@ export async function getChangelog(): Promise<ChangelogPayload> {
   const normalized = releases.filter((r) => r.items.length > 0).sort(compareSemverDesc);
   return { releases: normalized };
 }
-

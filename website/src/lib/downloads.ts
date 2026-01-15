@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
-import path from 'node:path';
 import { getGitHubLatestRelease } from './githubReleases';
+import { resolveRepoFile } from './repoFs';
 
 type DownloadItem = {
   version: string;
@@ -15,9 +15,10 @@ export type DownloadsConfig = {
 };
 
 export async function getDownloads(): Promise<DownloadsConfig> {
-  const filePath = path.resolve(process.cwd(), '..', 'docs', 'DOWNLOADS.json');
   let local: DownloadsConfig = { downloadsPageUrl: 'https://irontrain.motiona.xyz/downloads', latest: undefined, previous: [] };
   try {
+    const filePath = await resolveRepoFile('docs/DOWNLOADS.json');
+    if (!filePath) throw new Error('DOWNLOADS.json not found');
     const raw = await fs.readFile(filePath, 'utf8');
     local = JSON.parse(raw) as DownloadsConfig;
   } catch {
