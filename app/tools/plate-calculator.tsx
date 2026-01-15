@@ -1,4 +1,6 @@
+import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { settingsService } from '@/src/services/SettingsService';
+import { Colors } from '@/src/theme';
 import { PlateInventory } from '@/src/types/db';
 import { Stack } from 'expo-router';
 import { Settings } from 'lucide-react-native';
@@ -84,133 +86,135 @@ export default function PlateCalculator() {
     }, [inventory]);
 
     return (
-        <ScrollView className="flex-1 bg-iron-900 px-4 pt-4">
-            <Stack.Screen options={{
-                headerTitle: 'Plate Calculator',
-                headerStyle: { backgroundColor: '#0f172a' },
-                headerTintColor: '#f97316',
-                headerRight: () => (
-                    <TouchableOpacity onPress={() => setIsSettingsVisible(true)}>
-                        <Settings color="#f97316" size={24} />
-                    </TouchableOpacity>
-                )
-            }} />
-
-            <View className="mb-6">
-                <Text className="text-white font-bold mb-2">Target Weight (kg)</Text>
-                <TextInput
-                    className="bg-iron-800 text-white text-3xl font-bold p-4 rounded-xl border border-iron-700 text-center"
-                    placeholder="e.g. 100"
-                    placeholderTextColor="#666"
-                    keyboardType="numeric"
-                    value={targetWeight}
-                    onChangeText={(t) => { setTargetWeight(t); }}
-                    onEndEditing={calculate}
-                />
-            </View>
-
-            <View className="mb-6">
-                <Text className="text-iron-400 mb-2">Bar Weight (kg)</Text>
-                <View className="flex-row gap-4 mb-2">
-                    {['20', '15', '10'].map(w => (
-                        <Pressable
-                            key={w}
-                            onPress={() => { setBarWeight(w); setTimeout(calculate, 0); }}
-                            className={`flex-1 p-3 rounded-lg border ${barWeight === w ? 'bg-primary border-primary' : 'bg-iron-800 border-iron-700'}`}
-                        >
-                            <Text className={`text-center font-bold ${barWeight === w ? 'text-white' : 'text-iron-400'}`}>{w}kg</Text>
-                        </Pressable>
-                    ))}
-                </View>
-                <TextInput
-                    className="bg-iron-800 text-white p-3 rounded-lg border border-iron-700 text-center"
-                    placeholder="Custom Bar Weight"
-                    placeholderTextColor="#666"
-                    keyboardType="numeric"
-                    value={barWeight}
-                    onChangeText={(t) => { setBarWeight(t); }}
-                    onEndEditing={calculate}
-                />
-            </View>
-
-            <Pressable
-                onPress={calculate}
-                className="bg-primary p-4 rounded-xl mb-8 active:bg-orange-700"
-            >
-                <Text className="text-white text-center font-bold text-lg uppercase">Calculate</Text>
-            </Pressable>
-
-            {results.length > 0 && (
-                <View className="bg-iron-800 p-6 rounded-xl border border-iron-700 items-center">
-                    <Text className="text-iron-400 mb-4">Plates per side</Text>
-                    <View className="flex-row flex-wrap justify-center gap-2">
-                        {results.map((r, idx) => (
-                            <View key={idx} className="items-center">
-                                <View className="w-16 h-16 rounded-full bg-iron-900 border-4 border-yellow-600 items-center justify-center mb-1">
-                                    <Text className="text-white font-bold">{r.plate}</Text>
-                                </View>
-                                <Text className="text-white font-bold">x{r.count}</Text>
-                            </View>
-                        ))}
-                    </View>
-                    <Text className="mt-6 text-2xl font-bold text-white">
-                        Total: {parseFloat(targetWeight)} kg
-                    </Text>
-                </View>
-            )}
-
-            <Modal visible={isSettingsVisible} animationType="slide" presentationStyle="formSheet">
-                <View className="flex-1 bg-iron-900 p-4">
-                    <View className="flex-row justify-between items-center mb-6 border-b border-iron-800 pb-4">
-                        <Text className="text-white text-xl font-bold">Plate Inventory</Text>
-                        <TouchableOpacity onPress={() => setIsSettingsVisible(false)}>
-                            <Text className="text-primary font-bold">Done</Text>
+        <SafeAreaWrapper className="bg-iron-900" edges={['left', 'right']}>
+            <ScrollView className="flex-1 px-4 pt-4">
+                <Stack.Screen options={{
+                    headerTitle: 'Plate Calculator',
+                    headerStyle: { backgroundColor: Colors.iron[900] },
+                    headerTintColor: Colors.primary.DEFAULT,
+                    headerRight: () => (
+                        <TouchableOpacity onPress={() => setIsSettingsVisible(true)}>
+                            <Settings color={Colors.primary.DEFAULT} size={24} />
                         </TouchableOpacity>
-                    </View>
+                    )
+                }} />
 
-                    <ScrollView>
-                        {inventory.map((p, idx) => (
-                            <View key={p.weight} className="flex-row items-center justify-between mb-4 bg-iron-800 p-3 rounded-xl border border-iron-700">
-                                <View>
-                                    <Text className="text-white font-bold text-lg">{p.weight} {p.unit}</Text>
-                                    <Text className="text-iron-500 text-xs">Total available</Text>
-                                </View>
-                                <View className="flex-row items-center gap-4">
-                                    <TouchableOpacity onPress={() => updateInventory(p.weight, -1)} className="w-10 h-10 bg-iron-700 rounded-full items-center justify-center">
-                                        <Text className="text-white font-bold text-xl">-</Text>
-                                    </TouchableOpacity>
-                                    <Text className="text-white font-bold text-xl w-6 text-center">{p.count}</Text>
-                                    <TouchableOpacity onPress={() => updateInventory(p.weight, 1)} className="w-10 h-10 bg-iron-700 rounded-full items-center justify-center">
-                                        <Text className="text-white font-bold text-xl">+</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        ))}
-
-                        {/* Add Custom Plate View */}
-                        <View className="mt-4 pt-4 border-t border-iron-800">
-                            <Text className="text-white font-bold mb-2">Add Custom Plate</Text>
-                            <View className="flex-row gap-2">
-                                <TextInput
-                                    className="flex-1 bg-iron-800 text-white p-3 rounded-lg border border-iron-700"
-                                    placeholder="Weight (kg)"
-                                    placeholderTextColor="#666"
-                                    keyboardType="numeric"
-                                    onSubmitEditing={(e) => {
-                                        const w = parseFloat(e.nativeEvent.text);
-                                        if (!isNaN(w) && w > 0) {
-                                            const newInv = [...inventory, { weight: w, count: 2, type: 'standard' as any, unit: 'kg' as const }].sort((a, b) => b.weight - a.weight);
-                                            setInventory(newInv);
-                                            settingsService.updatePlateInventory(newInv);
-                                        }
-                                    }}
-                                />
-                            </View>
-                            <Text className="text-iron-500 text-xs mt-2">Type weight and press return inventory.</Text>
-                        </View>
-                    </ScrollView>
+                <View className="mb-6">
+                    <Text className="text-iron-950 font-bold mb-2">Target Weight (kg)</Text>
+                    <TextInput
+                        className="bg-surface text-iron-950 text-3xl font-bold p-4 rounded-xl border border-iron-700 text-center elevation-1"
+                        placeholder="e.g. 100"
+                        placeholderTextColor={Colors.iron[400]}
+                        keyboardType="numeric"
+                        value={targetWeight}
+                        onChangeText={(t) => { setTargetWeight(t); }}
+                        onEndEditing={calculate}
+                    />
                 </View>
-            </Modal>
-        </ScrollView>
+
+                <View className="mb-6">
+                    <Text className="text-iron-950 mb-2 font-bold">Bar Weight (kg)</Text>
+                    <View className="flex-row gap-4 mb-2">
+                        {['20', '15', '10'].map(w => (
+                            <Pressable
+                                key={w}
+                                onPress={() => { setBarWeight(w); setTimeout(calculate, 0); }}
+                                className={`flex-1 p-3 rounded-lg border ${barWeight === w ? 'bg-primary border-primary' : 'bg-surface border-iron-700'}`}
+                            >
+                                <Text className={`text-center font-bold ${barWeight === w ? 'text-white' : 'text-iron-500'}`}>{w}kg</Text>
+                            </Pressable>
+                        ))}
+                    </View>
+                    <TextInput
+                        className="bg-surface text-iron-950 p-3 rounded-lg border border-iron-700 text-center elevation-1"
+                        placeholder="Custom Bar Weight"
+                        placeholderTextColor={Colors.iron[400]}
+                        keyboardType="numeric"
+                        value={barWeight}
+                        onChangeText={(t) => { setBarWeight(t); }}
+                        onEndEditing={calculate}
+                    />
+                </View>
+
+                <Pressable
+                    onPress={calculate}
+                    className="bg-primary p-4 rounded-xl mb-8 active:opacity-90 elevation-2"
+                >
+                    <Text className="text-white text-center font-bold text-lg uppercase">Calculate</Text>
+                </Pressable>
+
+                {results.length > 0 && (
+                    <View className="bg-surface p-6 rounded-xl border border-iron-700 items-center elevation-1">
+                        <Text className="text-iron-950 mb-4 font-bold">Plates per side</Text>
+                        <View className="flex-row flex-wrap justify-center gap-2">
+                            {results.map((r, idx) => (
+                                <View key={idx} className="items-center">
+                            <View className="w-16 h-16 rounded-full bg-white border-4 border-yellow-600 items-center justify-center mb-1 shadow-sm">
+                                <Text className="text-iron-950 font-bold">{r.plate}</Text>
+                                    </View>
+                                    <Text className="text-iron-950 font-bold">x{r.count}</Text>
+                                </View>
+                            ))}
+                        </View>
+                        <Text className="mt-6 text-2xl font-bold text-iron-950">
+                            Total: {parseFloat(targetWeight)} kg
+                        </Text>
+                    </View>
+                )}
+
+                <Modal visible={isSettingsVisible} animationType="slide" presentationStyle="formSheet">
+                    <View className="flex-1 bg-iron-900 p-4">
+                        <View className="flex-row justify-between items-center mb-6 border-b border-iron-200 pb-4">
+                            <Text className="text-iron-950 text-xl font-bold">Plate Inventory</Text>
+                            <TouchableOpacity onPress={() => setIsSettingsVisible(false)}>
+                                <Text className="text-primary font-bold">Done</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView>
+                            {inventory.map((p, idx) => (
+                                <View key={p.weight} className="flex-row items-center justify-between mb-4 bg-surface p-3 rounded-xl border border-iron-700 elevation-1">
+                                    <View>
+                                        <Text className="text-iron-950 font-bold text-lg">{p.weight} {p.unit}</Text>
+                                        <Text className="text-iron-500 text-xs">Total available</Text>
+                                    </View>
+                                    <View className="flex-row items-center gap-4">
+                                        <TouchableOpacity onPress={() => updateInventory(p.weight, -1)} className="w-10 h-10 bg-iron-200 rounded-full items-center justify-center">
+                                            <Text className="text-iron-950 font-bold text-xl">-</Text>
+                                        </TouchableOpacity>
+                                        <Text className="text-iron-950 font-bold text-xl w-6 text-center">{p.count}</Text>
+                                        <TouchableOpacity onPress={() => updateInventory(p.weight, 1)} className="w-10 h-10 bg-iron-200 rounded-full items-center justify-center">
+                                            <Text className="text-iron-950 font-bold text-xl">+</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            ))}
+
+                            {/* Add Custom Plate View */}
+                            <View className="mt-4 pt-4 border-t border-iron-200">
+                                <Text className="text-iron-950 font-bold mb-2">Add Custom Plate</Text>
+                                <View className="flex-row gap-2">
+                                    <TextInput
+                                        className="flex-1 bg-surface text-iron-950 p-3 rounded-lg border border-iron-700"
+                                        placeholder="Weight (kg)"
+                                        placeholderTextColor={Colors.iron[400]}
+                                        keyboardType="numeric"
+                                        onSubmitEditing={(e) => {
+                                            const w = parseFloat(e.nativeEvent.text);
+                                            if (!isNaN(w) && w > 0) {
+                                                const newInv = [...inventory, { weight: w, count: 2, type: 'standard' as any, unit: 'kg' as const }].sort((a, b) => b.weight - a.weight);
+                                                setInventory(newInv);
+                                                settingsService.updatePlateInventory(newInv);
+                                            }
+                                        }}
+                                    />
+                                </View>
+                                <Text className="text-iron-500 text-xs mt-2">Type weight and press return inventory.</Text>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </Modal>
+            </ScrollView>
+        </SafeAreaWrapper>
     );
 }

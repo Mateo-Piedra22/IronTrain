@@ -6,8 +6,8 @@ interface IronCardProps extends ViewProps {
 }
 
 export function IronCard({ children, style, onPress, className, variant = 'default', ...props }: IronCardProps) {
-    const baseClasses = "bg-surface rounded-xl p-4 shadow-sm";
-    const outlineClasses = "border border-iron-700 bg-transparent";
+    const baseClasses = "bg-surface rounded-xl p-4 elevation-1 border border-iron-700";
+    const outlineClasses = "border border-iron-400 bg-transparent elevation-none";
 
     const finalClass = `${variant === 'outline' ? outlineClasses : baseClasses} ${className || ''}`;
 

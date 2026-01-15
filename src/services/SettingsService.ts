@@ -28,15 +28,24 @@ export class SettingsService {
     }
 
     public async updatePlateInventory(plates: PlateInventory[]): Promise<void> {
-        // Clear and replace strategy for simplicity (inventory is small)
-        // Transaction would be best but simple approach:
-        await dbService.run('DELETE FROM plate_inventory');
+        try {
+            await dbService.run('BEGIN TRANSACTION');
 
-        for (const p of plates) {
-            await dbService.run(
-                'INSERT INTO plate_inventory (weight, count, type, unit) VALUES (?, ?, ?, ?)',
-                [p.weight, p.count, p.type, p.unit]
-            );
+            // Clear existing
+            await dbService.run('DELETE FROM plate_inventory');
+
+            // Insert new
+            for (const p of plates) {
+                await dbService.run(
+                    'INSERT INTO plate_inventory (weight, count, type, unit) VALUES (?, ?, ?, ?)',
+                    [p.weight, p.count, p.type, p.unit]
+                );
+            }
+
+            await dbService.run('COMMIT');
+        } catch (error) {
+            await dbService.run('ROLLBACK');
+            throw error;
         }
     }
 

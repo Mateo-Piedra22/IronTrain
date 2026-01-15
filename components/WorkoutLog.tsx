@@ -1,7 +1,11 @@
+import { dbService } from '@/src/services/DatabaseService';
+import { workoutService } from '@/src/services/WorkoutService';
 import { Colors } from '@/src/theme';
-import { Dumbbell } from 'lucide-react-native';
-import React, { useMemo } from 'react';
-import { FlatList, Text, View } from 'react-native';
+import { Dumbbell, Trash2 } from 'lucide-react-native';
+import React, { useMemo, useState } from 'react';
+import { Alert, Animated, Text, TouchableOpacity, View } from 'react-native';
+import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import { Swipeable } from 'react-native-gesture-handler';
 import { WorkoutSet } from '../src/types/db';
 import { ExerciseSummary } from './ExerciseSummary';
 
@@ -10,7 +14,9 @@ interface WorkoutLogProps {
     onAddSet: (exerciseId: string) => void;
     onFinish: () => void;
     isFinished: boolean;
-    onExercisePress: (exerciseId: string, exerciseName: string) => void; // New prop
+    onExercisePress: (exerciseId: string, exerciseName: string) => void;
+    onRefresh: () => void; // Need refresh to reload data after reorder/delete
+    workoutId: string;
 }
 
 interface GroupedExercise {
@@ -20,9 +26,12 @@ interface GroupedExercise {
     sets: WorkoutSet[];
 }
 
-export function WorkoutLog({ sets, onFinish, isFinished, onExercisePress }: WorkoutLogProps) {
+export function WorkoutLog({ sets, onFinish, isFinished, onExercisePress, onRefresh, workoutId }: WorkoutLogProps) {
+    const [localGroups, setLocalGroups] = useState<GroupedExercise[]>([]);
+
     // Group sets by exercise
-    const groupedData = useMemo(() => {
+    // We use useMemo but also sync to local state for Drag Optimistic UI
+    useMemo(() => {
         const groups: Record<string, GroupedExercise> = {};
         const orderedGroups: GroupedExercise[] = [];
 
@@ -40,10 +49,36 @@ export function WorkoutLog({ sets, onFinish, isFinished, onExercisePress }: Work
             groups[set.exercise_id].sets.push(set);
         });
 
-        return orderedGroups;
-    }, [sets]);
+        setLocalGroups(orderedGroups);
+    }, [sets]); // Sync when props change
 
-    if (groupedData.length === 0) {
+    const handleReorder = async (data: GroupedExercise[]) => {
+        setLocalGroups(data); // Optimistic
+        const newOrderIds = data.map(g => g.exercise_id);
+        await workoutService.reorderExercises(workoutId, newOrderIds);
+        // onRefresh(); // Optional if we trust optimistic. Better to silent sync.
+    };
+
+    const handleDeleteExercise = (exerciseId: string, exerciseName: string) => {
+        Alert.alert(
+            "Delete Exercise",
+            `Remove ${exerciseName} and all its sets?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        // Delete all sets for this exercise in this workout
+                        await dbService.run('DELETE FROM workout_sets WHERE workout_id = ? AND exercise_id = ?', [workoutId, exerciseId]);
+                        onRefresh();
+                    }
+                }
+            ]
+        );
+    };
+
+    if (localGroups.length === 0) {
         return (
             <View className="flex-1 items-center justify-center p-8">
                 <Dumbbell size={48} color={Colors.iron[600]} />
@@ -53,21 +88,72 @@ export function WorkoutLog({ sets, onFinish, isFinished, onExercisePress }: Work
         );
     }
 
+    const renderItem = ({ item: group, drag, isActive }: RenderItemParams<GroupedExercise>) => {
+        const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+            const trans = dragX.interpolate({
+                inputRange: [-100, 0],
+                outputRange: [0, 100],
+                extrapolate: 'clamp'
+            });
+
+            const scale = dragX.interpolate({
+                inputRange: [-100, -50, 0],
+                outputRange: [1, 0.5, 0],
+                extrapolate: 'clamp'
+            });
+
+            return (
+                <View className="flex-1 bg-red-600 justify-center items-end mb-3 rounded-r-xl overflow-hidden">
+                    <Animated.View
+                        className="w-[100px] h-full justify-center items-center pr-5"
+                        style={{
+                            transform: [{ translateX: trans }, { scale }],
+                        }}
+                    >
+                        <Trash2 size={28} color="white" />
+                    </Animated.View>
+                    {/* Invisible Touchable Overlay for Action */}
+                    <TouchableOpacity
+                        className="absolute inset-0"
+                        onPress={() => handleDeleteExercise(group.exercise_id, group.exercise_name)}
+                    />
+                </View>
+            );
+        };
+
+        return (
+            <ScaleDecorator>
+                <Swipeable
+                    renderRightActions={renderRightActions}
+                    overshootRight={false}
+                >
+                    <View className="flex-row items-center mb-3 bg-iron-900">
+                        <View className="flex-1">
+                            <ExerciseSummary
+                                exerciseName={group.exercise_name}
+                                sets={group.sets}
+                                categoryColor={group.category_color}
+                                onPress={() => onExercisePress(group.exercise_id, group.exercise_name)}
+                                onLongPress={drag}
+                                disabled={isActive}
+                            />
+                        </View>
+                    </View>
+                </Swipeable>
+            </ScaleDecorator>
+        );
+    };
+
     return (
         <View className="flex-1 px-4 pt-2">
-            <FlatList
-                data={groupedData}
+            <DraggableFlatList
+                data={localGroups}
+                onDragEnd={({ data }) => handleReorder(data)}
                 keyExtractor={(item) => item.exercise_id}
+                renderItem={renderItem}
                 contentContainerStyle={{ paddingBottom: 100 }}
-                renderItem={({ item: group }) => (
-                    <ExerciseSummary
-                        exerciseName={group.exercise_name}
-                        sets={group.sets}
-                        categoryColor={group.category_color}
-                        onPress={() => onExercisePress(group.exercise_id, group.exercise_name)}
-                    />
-                )}
                 ListFooterComponent={<View className="h-24" />}
+                activationDistance={20} // Delay drag to allow horizontal swipe
             />
         </View>
     );

@@ -106,6 +106,12 @@ export class DatabaseService {
         unit TEXT DEFAULT 'kg',
         PRIMARY KEY (weight, type)
       );
+
+      -- Indexes for performance
+      CREATE INDEX IF NOT EXISTS idx_exercises_category ON exercises(category_id);
+      CREATE INDEX IF NOT EXISTS idx_sets_exercise ON workout_sets(exercise_id);
+      CREATE INDEX IF NOT EXISTS idx_sets_workout ON workout_sets(workout_id);
+      CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
     `;
 
         await this.db.execAsync(schema);
@@ -194,21 +200,32 @@ export class DatabaseService {
             { name: 'Cardio', color: '#475569' } // Slate 600
         ];
 
-        for (const [index, cat] of categories.entries()) {
-            const catId = this.generateId();
-            await this.run(
-                'INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, ?, ?)',
-                [catId, cat.name, index, cat.color]
-            );
-
-            // Seed Basic Exercises for each category
-            const exercises = this.getInitialExercises(cat.name);
-            for (const ex of exercises) {
+        // Optimize seeding with a Transaction
+        try {
+            await this.run('BEGIN TRANSACTION');
+            
+            for (const [index, cat] of categories.entries()) {
+                const catId = this.generateId();
                 await this.run(
-                    'INSERT INTO exercises (id, category_id, name, type, is_system) VALUES (?, ?, ?, ?, 1)',
-                    [this.generateId(), catId, ex.name, ex.type]
+                    'INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, ?, ?)',
+                    [catId, cat.name, index, cat.color]
                 );
+
+                // Seed Basic Exercises for each category
+                const exercises = this.getInitialExercises(cat.name);
+                for (const ex of exercises) {
+                    await this.run(
+                        'INSERT INTO exercises (id, category_id, name, type, is_system) VALUES (?, ?, ?, ?, 1)',
+                        [this.generateId(), catId, ex.name, ex.type]
+                    );
+                }
             }
+
+            await this.run('COMMIT');
+        } catch (error) {
+            console.error('Seeding failed, rolling back', error);
+            await this.run('ROLLBACK');
+            throw error;
         }
     }
 
@@ -472,19 +489,24 @@ export class DatabaseService {
         });
     }
 
+    private normalizeParams(params: any[] = []): any[] {
+        if (!Array.isArray(params)) return [];
+        return params.map((p) => (p === undefined ? null : p));
+    }
+
     public async run(sql: string, params: any[] = []): Promise<SQLite.SQLiteRunResult> {
         const db = this.getDatabase();
-        return await db.runAsync(sql, params);
+        return await db.runAsync(sql, this.normalizeParams(params));
     }
 
     public async getAll<T>(sql: string, params: any[] = []): Promise<T[]> {
         const db = this.getDatabase();
-        return await db.getAllAsync<T>(sql, params);
+        return await db.getAllAsync<T>(sql, this.normalizeParams(params));
     }
 
     public async getFirst<T>(sql: string, params: any[] = []): Promise<T | null> {
         const db = this.getDatabase();
-        return await db.getFirstAsync<T>(sql, params);
+        return await db.getFirstAsync<T>(sql, this.normalizeParams(params));
     }
 }
 

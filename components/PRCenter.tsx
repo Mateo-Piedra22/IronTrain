@@ -57,19 +57,19 @@ export function PRCenter() {
             <View className="flex-row justify-between">
                 <View className="items-center flex-1">
                     <Text className="text-iron-500 text-xs font-bold mb-1">SQUAT</Text>
-                    <Text className="text-white text-xl font-black">{stats.squat}</Text>
+                    <Text className="text-iron-950 text-xl font-black">{stats.squat}</Text>
                     <Text className="text-iron-600 text-[10px]">kg</Text>
                 </View>
                 <View className="w-[1px] bg-iron-800 h-full mx-2" />
                 <View className="items-center flex-1">
                     <Text className="text-iron-500 text-xs font-bold mb-1">BENCH</Text>
-                    <Text className="text-white text-xl font-black">{stats.bench}</Text>
+                    <Text className="text-iron-950 text-xl font-black">{stats.bench}</Text>
                     <Text className="text-iron-600 text-[10px]">kg</Text>
                 </View>
                 <View className="w-[1px] bg-iron-800 h-full mx-2" />
                 <View className="items-center flex-1">
                     <Text className="text-iron-500 text-xs font-bold mb-1">DEADLIFT</Text>
-                    <Text className="text-white text-xl font-black">{stats.deadlift}</Text>
+                    <Text className="text-iron-950 text-xl font-black">{stats.deadlift}</Text>
                     <Text className="text-iron-600 text-[10px]">kg</Text>
                 </View>
             </View>

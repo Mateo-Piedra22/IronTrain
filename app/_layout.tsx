@@ -1,15 +1,16 @@
+import { Colors } from '@/src/theme';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
-import '../global.css';
-
-import { useFonts } from 'expo-font';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import '../components/TimerOverlay';
 import { TimerOverlay } from '../components/TimerOverlay';
+import '../global.css';
 import { dbService } from '../src/services/DatabaseService';
 
 /**
@@ -25,18 +26,18 @@ import { dbService } from '../src/services/DatabaseService';
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-// IronTrain Industrial Theme
-// Slate 900 Background, Orange 500 Primary
+// IronTrain Cream & Coffee Theme
+// Cream Background (#fff7f1), Coffee Primary (#5c2e2e), Dark Text (#321414)
 const IronTrainTheme = {
   ...DarkTheme,
   colors: {
     ...DarkTheme.colors,
-    primary: '#f97316', // Orange 500
-    background: '#0f172a', // Slate 900
-    card: '#1e293b', // Slate 800
-    text: '#f1f5f9', // Slate 100
-    border: '#334155', // Slate 700
-    notification: '#f97316',
+    primary: Colors.primary.DEFAULT, // Marrón Rojizo
+    background: Colors.iron[900], // Cream
+    card: Colors.iron[900], // Cream (Header)
+    text: Colors.iron[950], // Dark Coffee
+    border: Colors.iron[300], // Light Gray
+    notification: Colors.primary.DEFAULT,
   },
 };
 
@@ -80,20 +81,20 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider value={IronTrainTheme}>
-          <StatusBar style="light" backgroundColor="#0f172a" />
+          <StatusBar style="dark" backgroundColor={Colors.iron[900]} />
           <TimerOverlay />
           <Stack
             screenOptions={{
               headerStyle: {
-                backgroundColor: '#0f172a', // Slate 900
+                backgroundColor: Colors.iron[900], // Cream
               },
-              headerTintColor: '#f97316', // Orange 500
+              headerTintColor: Colors.primary.DEFAULT, // Primary
               headerTitleStyle: {
                 fontWeight: 'bold',
-                color: '#f1f5f9' // Slate 100
+                color: Colors.iron[950] // Dark Coffee
               },
               contentStyle: {
-                backgroundColor: '#0f172a'
+                backgroundColor: Colors.iron[900] // Cream Body
               },
               animation: 'slide_from_right' // Smooth native transition
             }}

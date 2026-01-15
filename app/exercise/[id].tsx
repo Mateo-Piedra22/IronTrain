@@ -1,12 +1,14 @@
+import { ExerciseFormModal } from '@/components/ExerciseFormModal';
 import { IronButton } from '@/components/IronButton';
 import { IronCard } from '@/components/IronCard';
 import { SetRow } from '@/components/SetRow';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { WarmupCalculatorModal } from '@/components/WarmupCalculatorModal';
 import { workoutService } from '@/src/services/WorkoutService';
-import { WorkoutSet } from '@/src/types/db';
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { Info, Zap } from 'lucide-react-native';
+import { Colors } from '@/src/theme';
+import { Exercise, WorkoutSet } from '@/src/types/db';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Info, Pencil, Zap } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { Dimensions, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { BarChart, LineChart } from 'react-native-gifted-charts';
@@ -15,86 +17,122 @@ type Tab = 'track' | 'history' | 'analysis';
 
 export default function ExerciseDetailScreen() {
     const { workoutId, exerciseId, exerciseName } = useLocalSearchParams<{ workoutId: string, exerciseId: string, exerciseName: string }>();
+    const router = useRouter();
     const [sets, setSets] = useState<WorkoutSet[]>([]);
     const [history, setHistory] = useState<{ date: number; sets: WorkoutSet[] }[]>([]);
-    const [activeTab, setActiveTab] = useState<Tab>('track');
+    const [activeTab, setActiveTab] = useState<Tab>(workoutId ? 'track' : 'history');
+
+
     const [loading, setLoading] = useState(true);
     const [warmupVisible, setWarmupVisible] = useState(false);
-    const [exerciseNotes, setExerciseNotes] = useState<string | null>(null);
+    const [notes, setNotes] = useState<string | null>(null);
+
+    // Config Modal
+    const [isConfigVisible, setIsConfigVisible] = useState(false);
+    const [currentExercise, setCurrentExercise] = useState<Exercise | null>(null);
 
     const screenWidth = Dimensions.get('window').width;
 
     useEffect(() => {
-        loadData();
+        loadTrackData();
+        loadHistoryData();
     }, [workoutId, exerciseId]);
 
-    const loadData = async () => {
-        setLoading(true);
+    // Added specific effect to refresh history when entering the tab
+    useEffect(() => {
+        if (activeTab === 'history') {
+            loadHistoryData();
+        }
+    }, [activeTab]);
+
+    const loadTrackData = async () => {
+        if (!workoutId) return;
         try {
             const allSets = await workoutService.getSets(workoutId);
             const exSets = allSets.filter(s => s.exercise_id === exerciseId);
             setSets(exSets);
-
-            const hist = await workoutService.getExerciseHistory(exerciseId, 20); // More history for graphs
-            setHistory(hist);
-
-            const exerciseDetails = await workoutService.getExercise(exerciseId);
-            setExerciseNotes(exerciseDetails?.notes || null);
         } catch (e) {
             console.error(e);
-        } finally {
-            setLoading(false);
         }
     };
 
+    const loadHistoryData = async () => {
+        try {
+            const hist = await workoutService.getExerciseHistory(exerciseId, 20);
+            setHistory(hist);
+            // Also load exercise details if needed
+            const exerciseDetails = await workoutService.getExercise(exerciseId);
+            setNotes(exerciseDetails?.notes || null);
+            setCurrentExercise(exerciseDetails || null);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const loadData = async () => {
+        setLoading(true);
+        await Promise.all([loadTrackData(), loadHistoryData()]);
+        setLoading(false);
+    };
+
     const handleUpdateSet = async (setId: string, updates: Partial<WorkoutSet>) => {
-        setSets(prev => prev.map(s => s.id === setId ? { ...s, ...updates } : s)); // Optimistic
+        // Optimistic update for UI
+        setSets(prev => prev.map(s => s.id === setId ? { ...s, ...updates } : s));
+
         await workoutService.updateSet(setId, updates);
+
+        // Refresh history in background to check for completion status changes
+        loadHistoryData();
     };
 
     const handleDeleteSet = async (setId: string) => {
         setSets(prev => prev.filter(s => s.id !== setId));
         await workoutService.deleteSet(setId);
+        loadHistoryData();
     };
 
     const handleAddSet = async () => {
+        if (!workoutId) return;
         const nextIndex = sets.length;
-        const newSetId = await workoutService.addSet(workoutId, exerciseId, 'normal', nextIndex);
+        const newSetId = await workoutService.addSet(workoutId, exerciseId, 'normal', { order_index: nextIndex });
         if (newSetId) {
-            // Reload to get properly formed set with ghost values
-            const all = await workoutService.getSets(workoutId);
-            setSets(all.filter(s => s.exercise_id === exerciseId));
+            loadTrackData();
         }
     };
 
     const copyFromHistory = async (histSets: WorkoutSet[]) => {
+        if (!workoutId) return;
         for (const s of histSets) {
-            await workoutService.addSet(workoutId, exerciseId, s.type as any, sets.length + 1, {
+            await workoutService.addSet(workoutId, exerciseId, s.type as any, {
                 weight: s.weight,
                 reps: s.reps,
-                notes: s.notes
-            } as any); // overload manual fix
+                notes: s.notes,
+                order_index: sets.length + 1
+            });
         }
-        loadData();
+        loadTrackData();
         setActiveTab('track');
     };
 
     const handleAddWarmupSets = async (newSets: Partial<WorkoutSet>[]) => {
+        if (!workoutId) return;
         for (const s of newSets) {
-            await workoutService.addSet(workoutId, exerciseId, 'warmup', sets.length + 1, {
+            await workoutService.addSet(workoutId, exerciseId, 'warmup', {
                 weight: s.weight,
                 reps: s.reps,
-                notes: s.notes
+                notes: s.notes,
+                order_index: sets.length + 1
             });
         }
-        loadData();
+        loadTrackData();
     };
-
 
     // --- GRAPHS DATA ---
     const maxWeightData = useMemo(() => {
         return [...history].reverse().map(h => {
-            const max = Math.max(...h.sets.map(s => s.weight || 0));
+            // Safe aggregation
+            const validSets = h.sets.filter(s => (s.weight || 0) > 0);
+            const max = validSets.length > 0 ? Math.max(...validSets.map(s => s.weight || 0)) : 0;
             return { value: max, label: new Date(h.date).getDate().toString(), dataPointText: max.toString() };
         });
     }, [history]);
@@ -108,156 +146,247 @@ export default function ExerciseDetailScreen() {
 
     const maxRepsData = useMemo(() => {
         return [...history].reverse().map(h => {
-            const max = Math.max(...h.sets.map(s => s.reps || 0));
+            const validSets = h.sets.filter(s => (s.reps || 0) > 0);
+            const max = validSets.length > 0 ? Math.max(...validSets.map(s => s.reps || 0)) : 0;
             return { value: max, label: new Date(h.date).getDate().toString() };
         });
     }, [history]);
 
     // --- RENDER CONTENT ---
-    const renderTrack = () => (
-        <IronCard className="mb-4">
-            <View className="flex-row items-center justify-between py-1 px-2 border-b border-iron-800 bg-iron-900/50 mb-2">
-                <Text className="w-8 text-center text-xs text-iron-500">SET</Text>
-                <Text className="w-16 text-center text-xs text-iron-500">PREV</Text>
-                <Text className="flex-1 text-center text-xs text-iron-500">KG</Text>
-                <Text className="flex-1 text-center text-xs text-iron-500">REPS</Text>
-                <View className="w-10" />
-                <View className="ml-2 w-5" />
-            </View>
+    const renderTrack = () => {
+        if (!workoutId) return <View><Text className="text-iron-950 text-center mt-10">No active workout</Text></View>;
 
-            {sets.map((set, idx) => (
-                <SetRow
-                    key={set.id}
-                    set={set}
-                    index={idx}
-                    onUpdate={handleUpdateSet}
-                    onDelete={handleDeleteSet}
+        return (
+            <IronCard className="mb-4">
+                {sets.map((set, idx) => (
+                    <SetRow
+                        key={set.id}
+                        set={set}
+                        index={idx}
+                        onUpdate={handleUpdateSet}
+                        onDelete={handleDeleteSet}
+                    />
+                ))}
+
+                <View className="mt-4">
+                    <IronButton label="ADD SET" onPress={handleAddSet} variant="outline" />
+                </View>
+
+                <WarmupCalculatorModal
+                    visible={warmupVisible}
+                    onClose={() => setWarmupVisible(false)}
+                    onAddSets={handleAddWarmupSets}
+                    defaultWeight={Math.max(...sets.map(s => s.weight || 0), 0) || 100}
                 />
-            ))}
-
-            <View className="mt-4">
-                <IronButton label="ADD SET" onPress={handleAddSet} variant="outline" />
-            </View>
-
-            <WarmupCalculatorModal
-                visible={warmupVisible}
-                onClose={() => setWarmupVisible(false)}
-                onAddSets={handleAddWarmupSets}
-                defaultWeight={Math.max(...sets.map(s => s.weight || 0), 0) || 100}
-            />
-        </IronCard>
-    );
+            </IronCard>
+        )
+    };
 
     const renderHistory = () => (
-        <View>
-            {history.map((h, i) => (
-                <IronCard key={i} className="mb-3">
-                    <View className="flex-row justify-between items-center mb-2 border-b border-iron-800 pb-2">
-                        <Text className="text-iron-300 font-bold">{new Date(h.date).toLocaleDateString()}</Text>
-                        <TouchableOpacity onPress={() => copyFromHistory(h.sets)} className="bg-iron-800 px-2 py-1 rounded">
-                            <Text className="text-primary text-xs font-bold">COPY</Text>
-                        </TouchableOpacity>
+        <View className="pb-8 px-1">
+            {(!history || history.length === 0) ? (
+                <View className="items-center justify-center py-10 bg-surface rounded-xl border border-iron-700 elevation-1 mt-4">
+                    <Info size={40} color={Colors.iron[300]} />
+                    <Text className="text-iron-950 text-center font-bold mt-2">No completed history available</Text>
+                    <Text className="text-iron-500 text-center text-xs mt-1 px-4">Detailed history will appear here once you complete sets for this exercise.</Text>
+                </View>
+            ) : history.map((h, i) => {
+                // Defensive Date Handling
+                let dateDisplay = { day: '?', month: '???' };
+                try {
+                    const d = new Date(h.date || Date.now());
+                    dateDisplay = {
+                        day: d.getDate().toString(),
+                        month: d.toLocaleString('default', { month: 'short' })
+                    };
+                } catch (e) { }
+
+                return (
+                    <View key={i} className="flex-row mb-4">
+                        {/* Left Date Column */}
+                        <View className="w-14 items-center mr-2 pt-1">
+                            <View className="bg-surface rounded-lg px-2 py-1 items-center w-full border border-iron-700 elevation-1">
+                                <Text className="font-black text-iron-950 text-lg">{dateDisplay.day}</Text>
+                                <Text className="text-iron-500 text-[10px] uppercase font-bold">{dateDisplay.month}</Text>
+                            </View>
+                            {/* Vertical Line */}
+                            <View className="flex-1 w-[2px] bg-iron-300 my-1 rounded-full opacity-30" />
+                        </View>
+
+                        {/* Right Content Card (Explicit View for styles) */}
+                        <View className="flex-1">
+                            <View className="p-3 bg-surface rounded-xl border border-iron-700 elevation-1">
+                                <View className="flex-row justify-between items-center mb-3 border-b border-iron-200 pb-2">
+                                    <Text className="text-xs text-iron-500 font-bold uppercase tracking-wider">Completed Workout</Text>
+                                    {workoutId && (
+                                        <TouchableOpacity
+                                            onPress={() => copyFromHistory(h.sets)}
+                                            className="bg-primary px-3 py-1.5 rounded-full shadow-sm active:bg-primary/80"
+                                        >
+                                            <Text className="text-white text-[10px] font-black tracking-wide">COPY SETS</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+
+                                <View className="gap-2">
+                                    {(h.sets && h.sets.length > 0) ? h.sets.map((s, idx) => (
+                                        <View key={idx} className="flex-row items-center justify-between bg-white p-2 rounded-lg border border-primary/40">
+                                            <View className="flex-row items-center gap-3">
+                                                <View className="w-6 h-6 rounded-full bg-white items-center justify-center border border-primary/50">
+                                                    <Text className="text-[10px] font-bold text-iron-950">{idx + 1}</Text>
+                                                </View>
+                                                <View className="items-start">
+                                                    <Text className="font-black text-iron-950 text-lg leading-tight">
+                                                        {s.weight !== undefined && s.weight !== null ? s.weight : 0}
+                                                        <Text className="text-xs font-bold text-iron-600">kg</Text>
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            <View className="flex-row items-center">
+                                                <Text className="font-black text-iron-950 text-lg leading-tight">
+                                                    {s.reps !== undefined && s.reps !== null ? s.reps : 0}
+                                                    <Text className="text-xs font-bold text-iron-600">reps</Text>
+                                                </Text>
+                                                {s.rpe ? <View className="bg-white px-1.5 py-0.5 rounded ml-2 border border-primary/40"><Text className="text-[10px] font-bold text-iron-950">@{s.rpe}</Text></View> : null}
+                                            </View>
+                                        </View>
+                                    )) : (
+                                        <View className="p-2 bg-red-50 rounded border border-red-100">
+                                            <Text className="text-red-500 font-bold text-xs text-center">No Data found in this session</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
+                        </View>
                     </View>
-                    {h.sets.map((s, idx) => (
-                        <Text key={idx} className="text-white mb-1">
-                            <Text className="text-iron-500 text-xs">#{idx + 1}</Text>  <Text className="font-bold">{s.weight}kg</Text> x {s.reps} {s.rpe ? `@${s.rpe}` : ''}
-                        </Text>
-                    ))}
-                </IronCard>
-            ))}
+                )
+            })}
         </View>
     );
 
     const renderAnalysis = () => (
         <View className="gap-6 pb-8">
-            <IronCard>
-                <Text className="text-white font-bold mb-4 text-center">Estimated 1RM History</Text>
-                <LineChart
-                    data={maxWeightData}
-                    color="#f97316"
-                    thickness={3}
-                    dataPointsColor="#f97316"
-                    hideRules
-                    height={200}
-                    width={screenWidth - 80}
-                    curved
-                    isAnimated
-                    yAxisTextStyle={{ color: '#94a3b8' }}
-                />
-            </IronCard>
+            <View className="rounded-xl overflow-hidden bg-surface border border-iron-700 elevation-1">
+                <View className="px-4 py-3 bg-iron-100 flex-row items-center gap-2 border-b border-iron-200">
+                    <View className="w-1.5 h-4 bg-primary rounded-full" />
+                    <Text className="text-iron-950 font-black tracking-tight text-sm uppercase">1RM Estimation</Text>
+                </View>
+                <View className="py-6 items-center bg-surface">
+                    <LineChart
+                        data={maxWeightData}
+                        color={Colors.primary.DEFAULT}
+                        thickness={3}
+                        dataPointsColor={Colors.primary.DEFAULT}
+                        hideRules
+                        height={200}
+                        width={screenWidth - 64}
+                        curved
+                        isAnimated
+                        startFillColor={Colors.primary.DEFAULT}
+                        endFillColor={Colors.primary.DEFAULT}
+                        startOpacity={0.2}
+                        endOpacity={0}
+                        areaChart
+                        yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                        xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                        initialSpacing={0}
+                        endSpacing={0}
+                    />
+                </View>
+            </View>
 
-            <IronCard>
-                <Text className="text-white font-bold mb-4 text-center">Volume (kg)</Text>
-                <BarChart
-                    data={volumeData}
-                    frontColor="#3b82f6"
-                    barWidth={12}
-                    spacing={14}
-                    roundedTop
-                    hideRules
-                    height={200}
-                    width={screenWidth - 80}
-                    yAxisTextStyle={{ color: '#94a3b8' }}
-                />
-            </IronCard>
-
-            <IronCard>
-                <Text className="text-white font-bold mb-4 text-center">Max Reps</Text>
-                <LineChart
-                    data={maxRepsData}
-                    color="#22c55e"
-                    thickness={3}
-                    dataPointsColor="#22c55e"
-                    hideRules
-                    height={150}
-                    width={screenWidth - 80}
-                    curved
-                    isAnimated
-                    yAxisTextStyle={{ color: '#94a3b8' }}
-                />
-            </IronCard>
+            <View className="rounded-xl overflow-hidden bg-surface border border-iron-700 elevation-1">
+                <View className="px-4 py-3 bg-iron-100 flex-row items-center gap-2 border-b border-iron-200">
+                    <View className="w-1.5 h-4 bg-iron-600 rounded-full" />
+                    <Text className="text-iron-950 font-black tracking-tight text-sm uppercase">Total Volume</Text>
+                </View>
+                <View className="py-6 items-center bg-surface">
+                    <BarChart
+                        data={volumeData}
+                        frontColor={Colors.primary.dark}
+                        barWidth={16}
+                        spacing={28}
+                        roundedTop
+                        hideRules
+                        height={200}
+                        width={screenWidth - 64}
+                        yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                        xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                        initialSpacing={0}
+                        endSpacing={0}
+                    />
+                </View>
+            </View>
         </View>
     );
 
-    /* ... */
+    const availableTabs: Tab[] = workoutId
+        ? ['track', 'history', 'analysis']
+        : ['history', 'analysis'];
+
     return (
-        <SafeAreaWrapper className="flex-1 bg-iron-950" edges={['bottom', 'left', 'right']}>
+        <SafeAreaWrapper className="flex-1 bg-iron-900" edges={['bottom', 'left', 'right']}>
             <Stack.Screen options={{
-                title: exerciseName || 'Exercise',
-                headerBackTitle: 'Log',
+                title: currentExercise?.name || exerciseName || 'Exercise',
+                headerBackTitle: 'Back',
                 headerRight: () => (
-                    <TouchableOpacity onPress={() => setWarmupVisible(true)} className="bg-iron-800 p-2 rounded-full">
-                        <Zap size={20} color="#fbbf24" fill="#fbbf24" />
-                    </TouchableOpacity>
+                    <View className="flex-row gap-2">
+                        {/* Edit Button (Library Mode) */}
+                        {!workoutId && (
+                            <TouchableOpacity onPress={() => setIsConfigVisible(true)} className="bg-iron-800 p-2 rounded-full border border-iron-700">
+                                <Pencil size={20} color={Colors.iron[400]} />
+                            </TouchableOpacity>
+                        )}
+
+                        {/* Warmup Calc (Workout Mode) */}
+                        {workoutId && (
+                            <TouchableOpacity onPress={() => setWarmupVisible(true)} className="bg-iron-800 p-2 rounded-full border border-iron-700">
+                                <Zap size={20} color="#fbbf24" fill="#fbbf24" />
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 )
             }} />
 
-            {exerciseNotes && (
+            {notes && (
                 <View className="bg-yellow-900/20 border-b border-yellow-700/50 p-3 flex-row items-start">
-                    <Info size={16} color="#fbbf24" style={{ marginTop: 2, marginRight: 8 }} />
-                    <Text className="text-yellow-500 font-bold flex-1 text-sm">{exerciseNotes}</Text>
+                    <Info size={16} color={Colors.yellow} style={{ marginTop: 2, marginRight: 8 }} />
+                    <Text className="text-yellow-500 font-bold flex-1 text-sm">{notes}</Text>
                 </View>
             )}
 
-            <View className="flex-row pt-2 bg-iron-900 border-b border-iron-800">
-                {(['track', 'history', 'analysis'] as Tab[]).map(tab => (
+            <View className="flex-row pt-2 bg-iron-900 border-b border-iron-700">
+                {availableTabs.map(tab => (
                     <TouchableOpacity
                         key={tab}
                         onPress={() => setActiveTab(tab)}
-                        className={`flex-1 py-4 items-center border-b-2 ${activeTab === tab ? 'border-primary' : 'border-transparent'}`}
+                        className={`flex-1 py-4 items-center border-b-4 ${activeTab === tab ? 'border-primary' : 'border-transparent'}`}
                     >
-                        <Text className={`font-bold uppercase ${activeTab === tab ? 'text-white' : 'text-iron-500'}`}>
+                        <Text className={`font-bold uppercase tracking-wider text-sm ${activeTab === tab ? 'text-primary' : 'text-iron-500'}`}>
                             {tab}
                         </Text>
                     </TouchableOpacity>
                 ))}
             </View>
 
-            <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 40 }}>
+            <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 100 }}>
                 {activeTab === 'track' && renderTrack()}
                 {activeTab === 'history' && renderHistory()}
                 {activeTab === 'analysis' && renderAnalysis()}
             </ScrollView>
+
+            <ExerciseFormModal
+                visible={isConfigVisible}
+                onClose={() => setIsConfigVisible(false)}
+                onSave={() => {
+                    loadData();
+                    if (currentExercise) {
+                        router.setParams({ exerciseName: currentExercise.name });
+                    }
+                }}
+                initialData={currentExercise}
+            />
         </SafeAreaWrapper>
     );
 }

@@ -11,7 +11,21 @@ interface BackupData {
     workout_sets: any[];
     body_metrics: any[];
     settings: any[];
+    measurements: any[];
+    plate_inventory: any[];
+    goals: any[];
 }
+
+export const TABLE_SCHEMAS: Record<string, string[]> = {
+    exercises: ['id', 'category_id', 'name', 'type', 'default_increment', 'notes', 'is_system'],
+    workouts: ['id', 'date', 'start_time', 'end_time', 'name', 'notes', 'status', 'is_template'],
+    workout_sets: ['id', 'workout_id', 'exercise_id', 'type', 'weight', 'reps', 'distance', 'time', 'rpe', 'order_index', 'completed', 'notes', 'superset_id'],
+    body_metrics: ['id', 'date', 'weight', 'body_fat', 'notes'], // Legacy table, keeping for compatibility
+    settings: ['key', 'value', 'description'],
+    measurements: ['id', 'date', 'type', 'value', 'unit', 'notes'],
+    plate_inventory: ['weight', 'count', 'type', 'unit'],
+    goals: ['id', 'title', 'target_value', 'current_value', 'deadline', 'type', 'reference_id', 'completed']
+};
 
 class BackupService {
     public async exportData(): Promise<void> {
@@ -20,17 +34,23 @@ class BackupService {
             const exercises = await dbService.getAll('SELECT * FROM exercises');
             const workouts = await dbService.getAll('SELECT * FROM workouts');
             const workout_sets = await dbService.getAll('SELECT * FROM workout_sets');
-            const body_metrics = await dbService.getAll('SELECT * FROM body_metrics');
+            const body_metrics = await dbService.getAll('SELECT * FROM body_metrics'); // Legacy
             const settings = await dbService.getAll('SELECT * FROM settings');
+            const measurements = await dbService.getAll('SELECT * FROM measurements');
+            const plate_inventory = await dbService.getAll('SELECT * FROM plate_inventory');
+            const goals = await dbService.getAll('SELECT * FROM goals');
 
             const backup: BackupData = {
-                version: 1,
+                version: 2, // Bump version
                 timestamp: Date.now(),
                 exercises,
                 workouts,
                 workout_sets,
                 body_metrics,
-                settings
+                settings,
+                measurements,
+                plate_inventory,
+                goals
             };
 
             // 2. Wrap in JSON
@@ -79,14 +99,27 @@ class BackupService {
             // 3. Import (Upsert Strategy)
             // Function to generate placemarkers (?, ?, ?)
             const upsert = async (table: string, rows: any[]) => {
-                if (rows.length === 0) return;
+                if (!rows || rows.length === 0) return;
 
-                // Get keys from first row
-                const keys = Object.keys(rows[0]);
+                // Validate Schema (Whitelist Check)
+                const allowedColumns = TABLE_SCHEMAS[table];
+                if (!allowedColumns) {
+                    console.warn(`Skipping unknown table: ${table}`);
+                    return;
+                }
+
+                // Get keys from first row and filter against allowed columns
+                const keys = Object.keys(rows[0]).filter(k => allowedColumns.includes(k));
+                
+                if (keys.length === 0) {
+                     console.warn(`No valid columns found for table: ${table}`);
+                     return;
+                }
+
                 const placeholders = keys.map(() => '?').join(',');
                 const columns = keys.join(',');
 
-                // Simple iterative upsert for specific SQLite compatibility safety
+                // Safe upsert
                 const sql = `INSERT OR REPLACE INTO ${table} (${columns}) VALUES (${placeholders})`;
 
                 for (const row of rows) {
@@ -99,6 +132,9 @@ class BackupService {
             await upsert('workouts', data.workouts);
             await upsert('workout_sets', data.workout_sets);
             await upsert('body_metrics', data.body_metrics);
+            await upsert('measurements', data.measurements);
+            await upsert('plate_inventory', data.plate_inventory);
+            await upsert('goals', data.goals);
             // settings usually better to manually merge or skip to avoid overwriting device specifics
             // ignoring settings for now to prevent weird state
 

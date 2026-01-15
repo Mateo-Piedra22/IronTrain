@@ -13,11 +13,19 @@ export interface VolumeData {
     volume: number;
 }
 
+interface RawAnalysisRow {
+    exerciseName: string;
+    weight: number;
+    reps: number;
+    date: number;
+}
+
 export class AnalysisService {
     // 1RM Calculation (Epley Formula)
     static async getTop1RMs(): Promise<OneRepMax[]> {
-        // Get generic results
-        const results = await dbService.getAll<any>(`
+        try {
+            // Get generic results
+            const results = await dbService.getAll<RawAnalysisRow>(`
             SELECT e.name as exerciseName, s.weight, s.reps, w.date
             FROM workout_sets s
             JOIN exercises e ON s.exercise_id = e.id
@@ -26,24 +34,28 @@ export class AnalysisService {
             ORDER BY s.weight DESC
         `);
 
-        // Process in JS to find max 1RM per exercise
-        const maxes: Record<string, OneRepMax> = {};
+            // Process in JS to find max 1RM per exercise
+            const maxes: Record<string, OneRepMax> = {};
 
-        results.forEach(r => {
-            // Epley: weight * (1 + reps/30)
-            const epley = Math.round(r.weight * (1 + r.reps / 30));
-            if (!maxes[r.exerciseName] || epley > maxes[r.exerciseName].estimated1RM) {
-                maxes[r.exerciseName] = {
-                    exerciseName: r.exerciseName,
-                    weight: r.weight,
-                    reps: r.reps,
-                    estimated1RM: epley,
-                    date: r.date
-                };
-            }
-        });
+            results.forEach(r => {
+                // Epley: weight * (1 + reps/30)
+                const epley = Math.round(r.weight * (1 + r.reps / 30));
+                if (!maxes[r.exerciseName] || epley > maxes[r.exerciseName].estimated1RM) {
+                    maxes[r.exerciseName] = {
+                        exerciseName: r.exerciseName,
+                        weight: r.weight,
+                        reps: r.reps,
+                        estimated1RM: epley,
+                        date: r.date
+                    };
+                }
+            });
 
-        return Object.values(maxes).slice(0, 5).sort((a, b) => b.estimated1RM - a.estimated1RM);
+            return Object.values(maxes).slice(0, 5).sort((a, b) => b.estimated1RM - a.estimated1RM);
+        } catch (error) {
+            console.error('Error calculating 1RMs:', error);
+            return [];
+        }
     }
 
     // Consistency Heatmap Data (Timestamps of completed workouts)

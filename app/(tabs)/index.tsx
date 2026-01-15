@@ -5,11 +5,13 @@ import { HistoryModal } from '@/components/HistoryModal';
 import { IntervalTimerModal } from '@/components/IntervalTimerModal';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { WorkoutLog } from '@/components/WorkoutLog';
+import { Colors } from '@/src/theme';
 import { addDays, subDays } from 'date-fns';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { Copy, Plus, Timer, X } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Switch, Text, TouchableOpacity, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { Link, useFocusEffect, useRouter } from 'expo-router';
+import { Copy, Info, Plus, Timer, X } from 'lucide-react-native';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, Image, Modal, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { workoutService } from '../../src/services/WorkoutService';
@@ -52,10 +54,6 @@ export default function DailyLogScreen() {
   };
 
   // Reload when date changes or screen comes into focus
-  useEffect(() => {
-    loadData();
-  }, [selectedDate]);
-
   useFocusEffect(
     useCallback(() => {
       loadData();
@@ -66,12 +64,7 @@ export default function DailyLogScreen() {
 
   const handleAddSet = async (exerciseId: string) => {
     if (!workout) return;
-
-    // Calculate next order index
-    const currentSetsForEx = sets.filter(s => s.exercise_id === exerciseId);
-    const nextIndex = currentSetsForEx.length;
-
-    await workoutService.addSet(workout.id, exerciseId, 'normal', nextIndex);
+    await workoutService.addSet(workout.id, exerciseId, 'normal');
     loadData(); // Refresh
     setIsPickerVisible(false); // Close picker if open
   };
@@ -80,22 +73,13 @@ export default function DailyLogScreen() {
     if (!workout) return;
     const originalSet = sets.find(s => s.id === originalSetId);
     if (!originalSet) return;
-
-    const currentSetsForEx = sets.filter(s => s.exercise_id === originalSet.exercise_id);
-    const nextIndex = currentSetsForEx.length;
-
-    // Add new set
-    const newSetId = await workoutService.addSet(workout.id, originalSet.exercise_id, originalSet.type, nextIndex);
-
-    // Update with copied values
-    if (newSetId) {
-      await workoutService.updateSet(newSetId, {
-        weight: originalSet.weight,
-        reps: originalSet.reps,
-        notes: originalSet.notes
-      });
-      loadData();
-    }
+    await workoutService.addSet(workout.id, originalSet.exercise_id, originalSet.type, {
+      weight: originalSet.weight,
+      reps: originalSet.reps,
+      notes: originalSet.notes,
+      rpe: originalSet.rpe
+    });
+    loadData();
   };
 
   const handleUpdateSet = async (setId: string, updates: Partial<WorkoutSet>) => {
@@ -184,9 +168,7 @@ export default function DailyLogScreen() {
 
   // Swipe Gesture
   const changeDate = (direction: 'next' | 'prev') => {
-    import('expo-haptics').then(Haptics => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const newDate = direction === 'next' ? addDays(selectedDate, 1) : subDays(selectedDate, 1);
     setSelectedDate(newDate);
   };
@@ -202,125 +184,148 @@ export default function DailyLogScreen() {
     });
 
   return (
-    <GestureDetector gesture={panGesture}>
-      <SafeAreaWrapper edges={['top']} className="bg-iron-900">
-        <DateStrip selectedDate={selectedDate} onSelectDate={setSelectedDate} markedDates={markedDates} />
-
-        {/* Workout Status Toggle */}
-        {workout && (
-          <View className="flex-row items-center justify-between px-4 py-3 bg-iron-900 border-b border-iron-800">
-            <Text className="text-iron-400 font-bold uppercase text-xs">Workout Status</Text>
-            <View className="flex-row items-center gap-3">
-              <Text className={`font-bold ${workout.status === 'completed' ? 'text-green-500' : 'text-iron-500'}`}>
-                {workout.status === 'completed' ? 'FINISHED' : 'ACTIVE'}
-              </Text>
-              <Switch
-                value={workout.status === 'completed'}
-                onValueChange={async (val) => {
-                  if (val) {
-                    await workoutService.finishWorkout(workout.id);
-                    import('expo-haptics').then(H => H.notificationAsync(H.NotificationFeedbackType.Success));
-                  } else {
-                    await workoutService.resumeWorkout(workout.id);
-                    import('expo-haptics').then(H => H.impactAsync(H.ImpactFeedbackStyle.Medium));
-                  }
-                  loadData();
-                }}
-                trackColor={{ false: '#334155', true: '#22c55e' }}
-                thumbColor={'#ffffff'}
+    <SafeAreaWrapper edges={['top', 'left', 'right']} className="bg-iron-900">
+      <GestureDetector gesture={panGesture}>
+        <View>
+          <View className="px-4 py-3 flex-row justify-between items-center bg-iron-900 border-b border-iron-700">
+            <View className="flex-row items-center">
+              <Text className="text-xl font-bold text-iron-950 mr-4">Daily Log</Text>
+            </View>
+            <View className="absolute inset-0 items-center justify-center pointer-events-none">
+              <Image
+                source={require('../../assets/images/icon.png')}
+                style={{ width: 60, height: 60, resizeMode: 'contain', transform: [{ scale: 1.2 }] }}
               />
             </View>
-          </View>
-        )}
-
-        {loading ? (
-          <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="#f97316" />
-          </View>
-        ) : (
-          <>
-            {/* Copy Option if empty */}
-            {sets.length === 0 && (
-              <View className="items-center mt-4 mb-2">
-                <TouchableOpacity
-                  onPress={() => setCopyModalVisible(true)}
-                  className="bg-iron-800 px-4 py-2 rounded-full border border-iron-700 flex-row items-center border-dashed"
-                >
-                  <Copy size={14} color="#64748b" />
-                  <Text className="text-iron-400 text-xs font-bold ml-2 uppercase">Copy from History</Text>
+            <View className="w-10 items-end">
+              <Link href="/modal" asChild>
+                <TouchableOpacity>
+                  <Info size={28} color={Colors.iron[950]} />
                 </TouchableOpacity>
-              </View>
-            )}
+              </Link>
+            </View>
+          </View>
+          <DateStrip selectedDate={selectedDate} onSelectDate={setSelectedDate} markedDates={markedDates} />
+        </View>
+      </GestureDetector>
 
-            <WorkoutLog
-              sets={sets}
-              onAddSet={(exId) => handleAddSet(exId)}
-              onFinish={handleFinishWorkout}
-              isFinished={workout?.status === 'completed'}
-              onExercisePress={(exId, exName) => {
-                router.push({
-                  pathname: '/exercise/[id]' as any,
-                  params: { id: exId, workoutId: workout?.id, exerciseId: exId, exerciseName: exName }
-                });
+      {/* Workout Status Toggle */}
+      {workout && (
+        <View className="flex-row items-center justify-between px-4 py-3 bg-iron-900 border-b border-iron-700">
+          <Text className="text-iron-950 font-bold uppercase text-xs">Workout Status</Text>
+          <View className="flex-row items-center gap-3">
+            <Text className={`font-bold ${workout.status === 'completed' ? 'text-green-600' : 'text-iron-950'}`}>
+              {workout.status === 'completed' ? 'FINISHED' : 'ACTIVE'}
+            </Text>
+            <Switch
+              value={workout.status === 'completed'}
+              onValueChange={async (val) => {
+                if (val) {
+                  await workoutService.finishWorkout(workout.id);
+                  import('expo-haptics').then(H => H.notificationAsync(H.NotificationFeedbackType.Success));
+                } else {
+                  await workoutService.resumeWorkout(workout.id);
+                  import('expo-haptics').then(H => H.impactAsync(H.ImpactFeedbackStyle.Medium));
+                }
+                loadData();
               }}
+              trackColor={{ false: Colors.iron[300], true: Colors.green }}
+              thumbColor={'#ffffff'}
             />
-          </>
-        )}
+          </View>
+        </View>
+      )}
 
-        {/* ... FAB ... */}
-        {!loading && (
-          <TouchableOpacity
-            onPress={handleAddButton}
-            className="absolute bottom-6 right-6 w-14 h-14 bg-primary rounded-full items-center justify-center shadow-lg border border-orange-400"
-          >
-            <Plus color="white" size={30} />
-          </TouchableOpacity>
-        )}
-
-        {/* ... Pickers ... */}
-        <Modal visible={isPickerVisible} animationType="slide" presentationStyle="pageSheet">
-          {/* ... */}
-          <View className="flex-1 bg-iron-900">
-            <View className="flex-row justify-between items-center p-4 border-b border-iron-800 bg-iron-800">
-              <Text className="text-white font-bold text-lg">Select Exercise</Text>
-              <TouchableOpacity onPress={() => setIsPickerVisible(false)}>
-                <X color="white" size={24} />
+      {loading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
+        </View>
+      ) : (
+        <>
+          {/* Copy Option if empty */}
+          {sets.length === 0 && (
+            <View className="items-center mt-4 mb-2">
+              <TouchableOpacity
+                onPress={() => setCopyModalVisible(true)}
+                className="bg-surface px-4 py-2 rounded-full border border-iron-700 flex-row items-center border-dashed active:bg-iron-200"
+              >
+                <Copy size={14} color={Colors.iron[500]} />
+                <Text className="text-iron-950 text-xs font-bold ml-2 uppercase">Copy from History</Text>
               </TouchableOpacity>
             </View>
-            <ExerciseList onSelect={handleAddSet} />
+          )}
+
+          <WorkoutLog
+            sets={sets}
+            onAddSet={(exId) => handleAddSet(exId)}
+            onFinish={handleFinishWorkout}
+            isFinished={workout?.status === 'completed'}
+            onExercisePress={(exId, exName) => {
+              router.push({
+                pathname: '/exercise/[id]' as any,
+                params: { id: exId, workoutId: workout?.id, exerciseId: exId, exerciseName: exName }
+              });
+            }}
+            workoutId={workout?.id || ''}
+            onRefresh={loadData}
+          />
+        </>
+      )}
+
+      {/* ... FAB ... */}
+      {!loading && (
+        <TouchableOpacity
+          onPress={handleAddButton}
+          className="absolute bottom-6 right-6 w-14 h-14 bg-primary rounded-full items-center justify-center elevation-3 active:scale-95"
+        >
+          <Plus color="white" size={30} />
+        </TouchableOpacity>
+      )}
+
+      {/* ... Pickers ... */}
+      <Modal visible={isPickerVisible} animationType="slide" presentationStyle="pageSheet">
+        {/* ... */}
+        <View className="flex-1 bg-iron-900">
+          <View className="flex-row justify-between items-center p-4 border-b border-iron-800 bg-iron-800">
+            <Text className="text-iron-950 font-bold text-lg">Select Exercise</Text>
+            <TouchableOpacity onPress={() => setIsPickerVisible(false)}>
+              <X color={Colors.iron[950]} size={24} />
+            </TouchableOpacity>
           </View>
-        </Modal>
+          <ExerciseList onSelect={handleAddSet} />
+        </View>
+      </Modal>
 
-        <HistoryModal
-          visible={historyVisible}
-          onClose={() => setHistoryVisible(false)}
-          history={historyData}
-          exerciseName={historyExerciseName}
-        />
+      <HistoryModal
+        visible={historyVisible}
+        onClose={() => setHistoryVisible(false)}
+        history={historyData}
+        exerciseName={historyExerciseName}
+      />
 
-        <CopyWorkoutModal
-          visible={copyModalVisible}
-          onClose={() => setCopyModalVisible(false)}
-          targetDate={selectedDate}
-          onCopyComplete={loadData}
-          markedDates={markedDates}
-        />
+      <CopyWorkoutModal
+        visible={copyModalVisible}
+        onClose={() => setCopyModalVisible(false)}
+        targetDate={selectedDate}
+        onCopyComplete={loadData}
+        markedDates={markedDates}
+      />
 
-        <IntervalTimerModal
-          visible={timerVisible}
-          onClose={() => setTimerVisible(false)}
-        />
+      <IntervalTimerModal
+        visible={timerVisible}
+        onClose={() => setTimerVisible(false)}
+      />
 
-        {/* Timer FAB (Left Side) */}
-        {!loading && (
-          <TouchableOpacity
-            onPress={() => setTimerVisible(true)}
-            className="absolute bottom-6 left-6 w-12 h-12 bg-iron-800 rounded-full items-center justify-center shadow-lg border border-iron-700"
-          >
-            <Timer color="#94a3b8" size={24} />
-          </TouchableOpacity>
-        )}
-      </SafeAreaWrapper>
-    </GestureDetector>
+      {/* Timer FAB (Left Side) */}
+      {!loading && (
+        <TouchableOpacity
+          onPress={() => setTimerVisible(true)}
+          className="absolute bottom-6 left-6 w-12 h-12 bg-iron-800 rounded-full items-center justify-center shadow-lg border border-iron-700"
+        >
+          <Timer color="#94a3b8" size={24} />
+        </TouchableOpacity>
+      )}
+    </SafeAreaWrapper>
+
   );
 }

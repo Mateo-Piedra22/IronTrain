@@ -49,7 +49,7 @@ export function RestTimer() {
 
     return (
         <View className="absolute bottom-6 left-6 bg-surface rounded-full px-6 h-14 flex-row items-center shadow-lg border border-primary">
-            <Text className="text-white font-mono text-lg font-bold mr-4">
+            <Text className="text-iron-950 font-mono text-lg font-bold mr-4">
                 {formatTime(seconds)}
             </Text>
             <Pressable onPress={() => { setIsActive(false); setSeconds(0); }}>

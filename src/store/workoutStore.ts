@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { dbService } from '../services/DatabaseService';
-import { GhostValueService } from '../services/GhostValues';
+import { workoutService } from '../services/WorkoutService';
 import { Exercise, Workout, WorkoutSet } from '../types/db';
 
 // Types for the active workout state
@@ -21,10 +21,10 @@ interface ActiveWorkoutState {
     tickTimer: () => void;
 
     addExercise: (exerciseId: string) => Promise<void>;
-    addSet: (exerciseId: string) => void;
-    updateSet: (setId: string, updates: Partial<WorkoutSet>) => void;
-    removeSet: (setId: string) => void;
-    toggleSetComplete: (setId: string) => void;
+    addSet: (exerciseId: string) => Promise<void>;
+    updateSet: (setId: string, updates: Partial<WorkoutSet>) => Promise<void>;
+    removeSet: (setId: string) => Promise<void>;
+    toggleSetComplete: (setId: string) => Promise<void>;
 
     loadSetsForWorkout: (workoutId: string) => Promise<void>;
 }
@@ -48,35 +48,26 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
     },
 
     startWorkout: async (name) => {
-        const now = Date.now();
-        // Create in DB first to get ID
-        const id = await dbService.createWorkout(now);
+        const now = new Date();
+        const workout = await workoutService.getActiveWorkout(now);
 
-        // If name provided, update it (createWorkout defaults to 'Workout')
         if (name) {
-            await dbService.run('UPDATE workouts SET name = ? WHERE id = ?', [name, id]);
+            await workoutService.update(workout.id, { name });
+            workout.name = name;
         }
 
-        // Fetch full object
-        const newWorkout = await dbService.getWorkoutById(id);
-
-        if (newWorkout) {
-            set({
-                activeWorkout: newWorkout,
-                activeSets: [],
-                workoutTimer: 0,
-                isTimerRunning: true
-            });
-        }
+        set({
+            activeWorkout: workout,
+            activeSets: [],
+            workoutTimer: 0,
+            isTimerRunning: true
+        });
+        
+        // Load sets if resuming or created
+        await get().loadSetsForWorkout(workout.id);
     },
 
     resumeWorkout: async (workout) => {
-        // Calculate elapsed time since start.
-        // If we want "Resumable" workouts that were "paused" for days, this simple diff is wrong.
-        // But for "App Crash" recovery, difference from Start Date is dangerous if user sleeps.
-        // Better: Just load the 'duration' saved in DB.
-        // And we need to ensure we SAVE the duration periodically.
-
         set({ activeWorkout: workout, workoutTimer: workout.duration || 0, isTimerRunning: true });
         await get().loadSetsForWorkout(workout.id);
     },
@@ -89,105 +80,74 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
 
             // Save every 10 seconds to avoid data loss on crash
             if (newTime % 10 === 0) {
-                dbService.run('UPDATE workouts SET duration = ? WHERE id = ?', [newTime, activeWorkout.id]);
+                workoutService.update(activeWorkout.id, { duration: newTime });
             }
         }
     },
 
     loadSetsForWorkout: async (workoutId) => {
-        const sets = await dbService.getAll<WorkoutSet>(
-            'SELECT * FROM workout_sets WHERE workout_id = ? ORDER BY order_index ASC',
-            [workoutId]
-        );
+        const sets = await workoutService.getSets(workoutId);
         set({ activeSets: sets });
     },
 
     finishWorkout: async () => {
-        const { activeWorkout, workoutTimer } = get();
+        const { activeWorkout } = get();
         if (!activeWorkout) return;
 
-        await dbService.run(
-            'UPDATE workouts SET status = ?, duration = ? WHERE id = ?',
-            ['completed', workoutTimer, activeWorkout.id]
-        );
-
+        await workoutService.finishWorkout(activeWorkout.id);
         set({ activeWorkout: null, activeSets: [], isTimerRunning: false });
     },
 
     cancelWorkout: async () => {
         const { activeWorkout } = get();
         if (activeWorkout) {
-            await dbService.run('DELETE FROM workouts WHERE id = ?', [activeWorkout.id]);
+            await workoutService.delete(activeWorkout.id);
         }
         set({ activeWorkout: null, activeSets: [], isTimerRunning: false });
     },
 
     addExercise: async (exerciseId) => {
-        get().addSet(exerciseId);
+        await get().addSet(exerciseId);
     },
 
     addSet: async (exerciseId) => {
-        const { activeWorkout, activeSets } = get();
+        const { activeWorkout } = get();
         if (!activeWorkout) return;
 
-        const currentSets = activeSets.filter(s => s.exercise_id === exerciseId);
-        let weight = 0;
-        let reps = 0;
-
-        if (currentSets.length > 0) {
-            // Copy from last set in this workout
-            const lastSet = currentSets[currentSets.length - 1];
-            weight = lastSet.weight || 0;
-            reps = lastSet.reps || 0;
-        } else {
-            // Fetch Ghost Value
-            const ghost = await GhostValueService.getLastSet(exerciseId);
-            if (ghost) {
-                weight = ghost.weight;
-                reps = ghost.reps;
-            }
-        }
-
-        const newSet: WorkoutSet = {
-            id: crypto.randomUUID(),
-            workout_id: activeWorkout.id,
-            exercise_id: exerciseId,
-            type: 'normal',
-            weight,
-            reps,
-            order_index: activeSets.length + 1,
-            completed: 0
-        };
-
-        await dbService.addSet(newSet);
-        set({ activeSets: [...activeSets, newSet] });
+        // Logic now delegated to Service
+        await workoutService.addSet(activeWorkout.id, exerciseId);
+        
+        // Refresh local state
+        await get().loadSetsForWorkout(activeWorkout.id);
     },
 
-    updateSet: (setId, updates) => {
+    updateSet: async (setId, updates) => {
+        // Optimistic update
         set(state => ({
             activeSets: state.activeSets.map(s => s.id === setId ? { ...s, ...updates } : s)
         }));
 
-        const s = get().activeSets.find(s => s.id === setId);
-        if (s) {
-            dbService.run(
-                'UPDATE workout_sets SET weight=?, reps=?, rpe=?, completed=?, type=? WHERE id=?',
-                [s.weight, s.reps, s.rpe ?? null, s.completed, s.type, setId]
-            );
+        try {
+            await workoutService.updateSet(setId, updates);
+        } catch (e) {
+            console.error('Failed to update set:', e);
+            // Revert on failure (could implement fetching fresh state)
+            const { activeWorkout } = get();
+            if (activeWorkout) await get().loadSetsForWorkout(activeWorkout.id);
         }
     },
 
     removeSet: async (setId) => {
-        await dbService.run('DELETE FROM workout_sets WHERE id = ?', [setId]);
+        await workoutService.deleteSet(setId);
         set(state => ({
             activeSets: state.activeSets.filter(s => s.id !== setId)
         }));
     },
 
-    toggleSetComplete: (setId) => {
+    toggleSetComplete: async (setId) => {
         const s = get().activeSets.find(s => s.id === setId);
         if (s) {
-            get().updateSet(setId, { completed: s.completed ? 0 : 1 });
+            await get().updateSet(setId, { completed: s.completed ? 0 : 1 });
         }
     }
 }));

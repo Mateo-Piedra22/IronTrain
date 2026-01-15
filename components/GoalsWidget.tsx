@@ -63,7 +63,7 @@ export function GoalsWidget() {
     return (
         <IronCard className="mb-8">
             <View className="flex-row justify-between items-center mb-4">
-                <Text className="text-white font-bold text-lg">Active Goals</Text>
+                <Text className="text-iron-950 font-bold text-lg">Active Goals</Text>
                 <TouchableOpacity onPress={() => setModalVisible(true)} className="bg-primary/20 p-2 rounded-full">
                     <Plus size={16} color={Colors.primary.dark} />
                 </TouchableOpacity>
@@ -74,12 +74,12 @@ export function GoalsWidget() {
             ) : (
                 <View className="gap-4">
                     {goals.map((g) => {
-                        const progress = Math.min((g.current_value / g.target_value) * 100, 100);
+                        const progress = g.target_value ? Math.min((g.current_value / g.target_value) * 100, 100) : 0;
                         return (
                             <View key={g.id}>
                                 <View className="flex-row justify-between mb-1">
-                                    <Text className="text-iron-300 font-bold">{g.title}</Text>
-                                    <Text className="text-iron-400 text-xs">{g.current_value} / {g.target_value} kg</Text>
+                                    <Text className="text-iron-500 font-bold">{g.title}</Text>
+                                    <Text className="text-iron-500 text-xs">{g.current_value} / {g.target_value} kg</Text>
                                 </View>
                                 {/* Progress Bar */}
                                 <View className="h-2 bg-iron-800 rounded-full overflow-hidden mb-2">
@@ -101,20 +101,20 @@ export function GoalsWidget() {
 
             {/* Add Goal Modal */}
             <Modal visible={modalVisible} transparent animationType="slide">
-                <View className="flex-1 justify-end bg-black/50">
+                <View className="flex-1 justify-end bg-iron-950/50">
                     <View className="bg-iron-900 p-6 rounded-t-3xl border-t border-iron-700">
-                        <Text className="text-white font-bold text-xl mb-4">New Goal</Text>
+                        <Text className="text-iron-950 font-bold text-xl mb-4">New Goal</Text>
 
-                        <Text className="text-iron-400 mb-1">Goal Title</Text>
+                        <Text className="text-iron-500 mb-1">Goal Title</Text>
                         <IronInput value={newTitle} onChangeText={setNewTitle} placeholder="e.g. 100kg Bench" />
 
                         <View className="flex-row gap-4 mt-2">
                             <View className="flex-1">
-                                <Text className="text-iron-400 mb-1">Target (kg)</Text>
+                                <Text className="text-iron-500 mb-1">Target (kg)</Text>
                                 <IronInput value={newTarget} onChangeText={setNewTarget} keyboardType="numeric" placeholder="100" />
                             </View>
                             <View className="flex-1">
-                                <Text className="text-iron-400 mb-1">Current (kg)</Text>
+                                <Text className="text-iron-500 mb-1">Current (kg)</Text>
                                 <IronInput value={newCurrent} onChangeText={setNewCurrent} keyboardType="numeric" placeholder="80" />
                             </View>
                         </View>

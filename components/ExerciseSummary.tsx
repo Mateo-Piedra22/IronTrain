@@ -9,10 +9,12 @@ interface ExerciseSummaryProps {
     sets: WorkoutSet[];
     categoryColor?: string;
     onPress: () => void;
+    onLongPress?: () => void;
+    disabled?: boolean;
 }
 
-export function ExerciseSummary({ exerciseName, sets, categoryColor = Colors.primary.dark, onPress }: ExerciseSummaryProps) {
-    const setCheck = sets.filter(s => s.completed).length; // Completed sets? Or just total? FitNotes shows total.
+export function ExerciseSummary({ exerciseName, sets, categoryColor = Colors.primary.dark, onPress, onLongPress, disabled }: ExerciseSummaryProps) {
+    const setCheck = sets.filter(s => s.completed).length;
     const totalSets = sets.length;
 
     // Calculate best set (max weight)
@@ -24,20 +26,22 @@ export function ExerciseSummary({ exerciseName, sets, categoryColor = Colors.pri
     return (
         <TouchableOpacity
             onPress={onPress}
-            className="flex-row items-center bg-iron-800 p-4 mb-3 rounded-xl border border-iron-700 active:bg-iron-700"
+            onLongPress={onLongPress}
+            disabled={disabled}
+            className="flex-row items-center bg-surface p-4 rounded-xl border border-iron-700 elevation-1 active:opacity-80 active:bg-iron-200"
         >
             {/* Color Indicator */}
             <View className="w-1.5 self-stretch rounded-full mr-4" style={{ backgroundColor: categoryColor }} />
 
             <View className="flex-1">
-                <Text className="text-white font-bold text-lg mb-1">{exerciseName}</Text>
+                <Text className="text-iron-950 font-bold text-lg mb-1">{exerciseName}</Text>
 
                 <View className="flex-row items-center gap-4">
-                    <Text className="text-iron-400 text-xs font-semibold">
+                    <Text className="text-iron-500 text-xs font-semibold">
                         {totalSets} sets
                     </Text>
                     <Text className="text-iron-500 text-xs">•</Text>
-                    <Text className="text-iron-400 text-xs font-semibold">
+                    <Text className="text-iron-500 text-xs font-semibold">
                         Vol: {(volume / 1000).toFixed(1)}k kg
                     </Text>
                 </View>
@@ -48,7 +52,7 @@ export function ExerciseSummary({ exerciseName, sets, categoryColor = Colors.pri
                 <View className="items-end mr-2">
                     <View className="flex-row items-center bg-iron-900/50 px-2 py-1 rounded">
                         <Trophy size={10} color={Colors.yellow} style={{ marginRight: 4 }} />
-                        <Text className="text-amber-400 text-xs font-bold">{maxWeight}kg</Text>
+                        <Text className="text-yellow-600 text-xs font-bold">{maxWeight}kg</Text>
                     </View>
                 </View>
             )}

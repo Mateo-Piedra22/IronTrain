@@ -1,78 +1,79 @@
-# IronTrain
+# IronTrain 🏋️‍♂️
 
-IronTrain is a premium, offline-first gym tracking application built with **React Native**, **Expo**, and **SQLite**. Designed with the "IronTrain Industrial" aesthetic, it focuses on efficiency, performance, and data ownership.
+**IronTrain** es una aplicación de entrenamiento de fuerza "Local-First" diseñada para levantadores serios. Ofrece un seguimiento detallado sin distracciones, garantizando la privacidad y propiedad total de los datos.
 
-![IronTrain Banner](https://via.placeholder.com/800x200.png?text=IronTrain+Industrial)
+## 🚀 Características Principales
 
-## 🚀 Features
+*   **100% Offline & Privada:** Todos los datos residen en tu dispositivo (SQLite). Sin nubes, sin cuentas, sin suscripciones.
+*   **Gestión de Entrenamientos:**
+    *   Registro de series con soporte para RPE, calentamiento, dropsets y fallo.
+    *   **Ghost Values:** Sugerencia inteligente de pesos basada en tu historial.
+    *   Cronómetro de descanso automático.
+*   **Análisis Avanzado:**
+    *   Estimación automática de **1RM** (Fórmula Epley).
+    *   Mapa de calor de consistencia (estilo GitHub).
+    *   Gráficos de volumen semanal.
+*   **Herramientas Útiles:**
+    *   Calculadora de Platos (Barra olímpica, calibrada, etc.).
+    *   Calculadora de 1RM inversa.
+*   **Seguridad de Datos:**
+    *   Exportación e Importación completa en formato JSON.
+    *   Validación estricta de esquemas para prevenir corrupción.
 
--   **Daily Workout Log**: Automatic workout creation based on selected dates.
--   **Smart Sets**: "Ghost Values" pre-fill your sets with data from your last successful session of that exercise.
--   **Exercise Database**: Manage your library with custom exercises, categories, and search.
--   **Analytics Engine**:
-    -   Visualize Volume trends (Last 7 workouts).
-    -   Consistency Heatmap (Last 30 days).
-    -   Estimated 1RM calculations.
--   **Tools**: Plate Calculator and Database Backup/Export.
--   **Offline First**: All data is stored locally in `irontrain_v1.db`.
+## 🛠️ Tecnologías
 
-## 🛠 Tech Stack
+*   **Core:** React Native (Expo SDK 52)
+*   **Navegación:** Expo Router (File-based routing)
+*   **Base de Datos:** `expo-sqlite` (Motor SQL local)
+*   **Estado:** Zustand (Gestión ligera y reactiva)
+*   **Estilos:** NativeWind (Tailwind CSS para RN)
+*   **Gráficos:** `react-native-gifted-charts`
 
--   **Framework**: [Expo](https://expo.dev/) (React Native) via `expo-router`.
--   **Database**: `expo-sqlite` (High-performance local SQL).
--   **Styling**: `nativewind` (TailwindCSS for React Native).
--   **Lists**: `@shopify/flash-list` (recycling views for speed).
--   **Charts**: `react-native-gifted-charts`.
+## 🏗️ Arquitectura
 
-## 📂 Project Structure
+El proyecto sigue una arquitectura de 3 capas estricta para garantizar mantenibilidad y testabilidad:
 
-```
-IronTrain/
-├── app/                  # Expo Router screens
-│   ├── (tabs)/           # Main Tabs: Index (Log), Library, Analysis
-│   ├── _layout.tsx       # Root layout & Theme provider
-│   └── ...
-├── components/           # Reusable UI components
-│   ├── WorkoutLog.tsx    # The core logging interface
-│   ├── SetRow.tsx        # Individual set interaction
-│   └── ...
-├── src/
-│   ├── services/         # Business Logic & DB Access
-│   │   ├── DatabaseService.ts # SQL Schema & Raw Queries
-│   │   ├── WorkoutService.ts  # Domain Logic
-│   │   └── ...
-│   └── types/            # TypeScript Interfaces
-└── assets/               # Icons and Fonts
-```
+1.  **UI Layer (`app/`, `components/`)**:
+    *   Componentes puramente visuales.
+    *   Manejo de estado efímero (formularios, modales).
+    *   Delega toda la lógica de negocio a los Stores/Servicios.
 
-## 🏗 Building the APK
+2.  **State Layer (`src/store/`)**:
+    *   **Zustand Stores** (`useWorkoutStore`): Orquesta la interacción entre la UI y los Servicios.
+    *   Mantiene el estado de la sesión activa (timer, sets actuales).
 
-This project is configured for **EAS Build** (Expo Application Services).
+3.  **Service Layer (`src/services/`)**:
+    *   **Lógica de Negocio Pura**: `WorkoutService`, `AnalysisService`.
+    *   Validaciones, cálculos complejos y reglas de integridad.
+    *   Único punto de acceso a la base de datos.
 
-### Prerequisites
--   Expo Account (Free)
--   EAS CLI installed: `npm install -g eas-cli`
+4.  **Data Layer (`src/services/DatabaseService.ts`)**:
+    *   Wrapper sobre SQLite.
+    *   Manejo de migraciones y consultas crudas.
 
-### Generate APK (Android)
-To build a side-loadable APK (installation file) for Android devices:
+## 🧪 Calidad y Pruebas
 
-```bash
-eas build -p android --profile preview
-```
+*   **Unit Testing:** Jest + React Test Renderer.
+*   **Cobertura:**
+    *   Servicios Críticos (`BackupService`, `WorkoutService`): 100% testados.
+    *   UI Components: Snapshot testing para prevenir regresiones visuales.
+*   **Seguridad:** Validación de "Whitelist" en importaciones para prevenir SQL Injection.
 
-1.  Select **Yes** when asked to generate a Keystore.
-2.  Wait for the build to finish in the cloud.
-3.  Download the `.apk` link provided at the end.
+## 🏁 Comenzar
 
-## 🏃 Running Locally
+1.  **Instalar dependencias:**
+    ```bash
+    npm install
+    ```
+2.  **Iniciar servidor de desarrollo:**
+    ```bash
+    npx expo start
+    ```
+3.  **Ejecutar pruebas:**
+    ```bash
+    npm test
+    ```
 
-```bash
-# Install dependencies
-npm install
+## 📄 Licencia
 
-# Start Metro Bundler
-npx expo start
-```
-
--   Press `a` to run on Android Emulator / Connected Device.
--   Press `i` to run on iOS Simulator.
+Este proyecto es de uso personal y educativo.

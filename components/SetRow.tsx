@@ -1,7 +1,8 @@
 import { Colors } from '@/src/theme';
+import * as Haptics from 'expo-haptics';
 import { Check, Copy, MessageSquare, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Animated, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { WorkoutSet } from '../src/types/db';
 
@@ -25,7 +26,7 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) 
         if (!set.weight && set.previous_weight) {
             setWeight(set.previous_weight.toString());
         }
-    }, [set.previous_weight]); // added dependency
+    }, [set.previous_weight]);
 
     const handleComplete = () => {
         onUpdate(set.id, {
@@ -48,26 +49,41 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) 
 
     const isCompleted = set.completed === 1;
 
+    // --- ANIMATION LOGIC FOR SWIPE ---
     const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
-        const trans = dragX.interpolate({
-            inputRange: [-100, 0],
-            outputRange: [0, 100],
+        // We use scale to "unveil" the icon without moving it
+        const scale = dragX.interpolate({
+            inputRange: [-100, -50, 0],
+            outputRange: [1.2, 0.8, 0],
+            extrapolate: 'clamp',
+        });
+
+        const opacity = dragX.interpolate({
+            inputRange: [-100, -20, 0],
+            outputRange: [1, 0, 0],
             extrapolate: 'clamp',
         });
 
         return (
-            <View className="justify-center items-end bg-red-600 w-24">
-                <Animated.View style={{ transform: [{ translateX: trans }] }}>
+            <View className="justify-center items-end bg-red-600 rounded-r-xl my-1 ml-[-20px] w-24">
+                <Animated.View style={{ transform: [{ scale }], opacity, width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', paddingLeft: 20 }}>
                     <TouchableOpacity
                         onPress={() => {
-                            import('expo-haptics').then(Haptics => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            });
+                            if (isCompleted) {
+                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                                Alert.alert(
+                                    "Set Locked 🔒",
+                                    "This set is marked as completed. Please uncheck it first to delete.",
+                                    [{ text: "Understood", style: "default" }]
+                                );
+                                return;
+                            }
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                             onDelete(set.id);
                         }}
-                        className="p-4 items-center justify-center h-full w-24"
+                        style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
                     >
-                        <Trash2 size={24} color="white" />
+                        <Trash2 size={28} color="white" />
                     </TouchableOpacity>
                 </Animated.View>
             </View>
@@ -75,25 +91,23 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) 
     };
 
     const renderLeftActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
-        const trans = dragX.interpolate({
-            inputRange: [0, 100],
-            outputRange: [-100, 0],
+        const scale = dragX.interpolate({
+            inputRange: [0, 50, 100],
+            outputRange: [0, 0.8, 1.2],
             extrapolate: 'clamp',
         });
 
         return (
-            <View className="justify-center items-start bg-blue-600 w-24">
-                <Animated.View style={{ transform: [{ translateX: trans }] }}>
+            <View className="justify-center items-start bg-primary w-24 rounded-l-xl my-1 mr-[-20px]">
+                <Animated.View style={{ transform: [{ scale }], width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', paddingRight: 20 }}>
                     <TouchableOpacity
                         onPress={() => {
-                            import('expo-haptics').then(Haptics => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            });
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                             if (onCopy) onCopy(set.id);
                         }}
-                        className="p-4 items-center justify-center h-full w-24"
+                        style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
                     >
-                        <Copy size={24} color="white" />
+                        <Copy size={28} color="white" />
                     </TouchableOpacity>
                 </Animated.View>
             </View>
@@ -101,117 +115,130 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) 
     };
 
     return (
-        <Swipeable renderRightActions={renderRightActions} renderLeftActions={renderLeftActions}>
-            <View className={`border-b border-iron-800 bg-iron-900 ${isCompleted ? 'bg-iron-800/50' : ''}`}>
-                <View className="flex-row items-center justify-between py-2 px-2">
-                    {/* Set Number / Type Indicator */}
-                    <View className="w-8 items-center justify-center">
-                        <View className={`w-6 h-6 rounded-full items-center justify-center ${set.type === 'warmup' ? 'bg-yellow-600' :
-                            set.type === 'failure' ? 'bg-red-600' :
-                                set.type === 'drop' ? 'bg-purple-600' : 'bg-iron-700'
-                            }`}>
-                            <Text className="text-xs text-white font-bold">{index + 1}</Text>
-                        </View>
-                    </View>
+        <Swipeable renderRightActions={renderRightActions} renderLeftActions={renderLeftActions} containerStyle={{ overflow: 'visible' }}>
+            <View className={`mb-3 rounded-xl border shadow-sm overflow-hidden ${isCompleted
+                ? 'border-primary bg-[#fffbf7]' // Solid Cream/Coffee-tinted background, no transparency but clear differentiation
+                : 'border-iron-200 bg-iron-800'
+                }`}>
 
-                    {/* Previous History (Ghost) - Small text */}
-                    <View className="w-16 items-center">
-                        <Text className="text-xs text-iron-500">
-                            {set.previous_weight ? `${set.previous_weight}kg` : '-'}
-                        </Text>
-                        <Text className="text-xs text-iron-500">
-                            {set.previous_reps ? `${set.previous_reps}r` : '-'}
-                        </Text>
-                        {set.previous_rpe && (
-                            <Text className="text-[10px] text-yellow-500/70">
-                                @{set.previous_rpe}
+                {/* Header */}
+                <View className={`flex-row items-center justify-between px-3 py-2 border-b ${isCompleted ? 'bg-primary/5 border-primary/20' : 'bg-iron-200 border-iron-100'
+                    }`}>
+                    <View className="flex-row items-center gap-2">
+                        <View className={`px-2 py-0.5 rounded-md ${set.type === 'warmup' ? 'bg-yellow-100' :
+                            set.type === 'failure' ? 'bg-red-100' :
+                                set.type === 'drop' ? 'bg-purple-100' : 'bg-iron-200'
+                            }`}>
+                            <Text className={`text-[10px] font-bold uppercase ${set.type === 'warmup' ? 'text-yellow-700' :
+                                set.type === 'failure' ? 'text-red-700' :
+                                    set.type === 'drop' ? 'text-purple-700' : 'text-iron-600'
+                                }`}>
+                                {set.type === 'normal' ? `SET ${index + 1}` : set.type}
+                            </Text>
+                        </View>
+                        {set.previous_weight && (
+                            <Text className="text-[10px] text-iron-400 font-medium">
+                                PREV: {set.previous_weight}kg x {set.previous_reps}
                             </Text>
                         )}
                     </View>
 
-                    {/* KG Input */}
-                    <View className="flex-1 px-2">
-                        <TextInput
-                            value={weight}
-                            onChangeText={setWeight}
-                            onBlur={handleBlur}
-                            keyboardType="numeric"
-                            placeholder={set.previous_weight?.toString() || "-"}
-                            placeholderTextColor={Colors.iron[400]}
-                            className={`bg-iron-800 text-white text-center py-2 rounded font-bold text-lg ${isCompleted ? 'text-iron-400' : ''}`}
-                            selectTextOnFocus
-                        />
-                    </View>
-
-                    {/* Reps Input */}
-                    <View className="flex-1 px-2">
-                        <TextInput
-                            value={reps}
-                            onChangeText={setReps}
-                            onBlur={handleBlur}
-                            keyboardType="numeric"
-                            placeholder={set.previous_reps?.toString() || "-"}
-                            placeholderTextColor={Colors.iron[400]}
-                            className={`bg-iron-800 text-white text-center py-2 rounded font-bold text-lg ${isCompleted ? 'text-iron-400' : ''}`}
-                            selectTextOnFocus
-                        />
-                    </View>
-
-                    {/* RPE Input */}
-                    <View className="w-14 px-1">
+                    <View className="flex-row items-center bg-iron-100 rounded px-1.5 py-0.5">
+                        <Text className="text-[9px] text-iron-500 font-bold mr-1">RPE</Text>
                         <TextInput
                             value={rpe}
                             onChangeText={setRpe}
                             onBlur={handleBlur}
                             keyboardType="numeric"
-                            placeholder="RPE"
+                            placeholder="-"
                             placeholderTextColor={Colors.iron[400]}
-                            className={`bg-iron-800 text-yellow-500 text-center py-2 rounded font-bold text-xs ${isCompleted ? 'opacity-50' : ''}`}
-                            selectTextOnFocus
+                            className="p-0 text-xs font-bold text-iron-700 text-center w-6 h-4"
                             maxLength={3}
                         />
                     </View>
+                </View>
 
-                    {/* Notes Toggle */}
-                    <TouchableOpacity
-                        onPress={() => setShowNotes(!showNotes)}
-                        className="p-2"
-                    >
-                        <MessageSquare size={20} color={notes ? Colors.primary.dark : Colors.iron[400]} />
-                    </TouchableOpacity>
+                {/* Main Content */}
+                <View className="flex-row items-center p-3 gap-3">
+                    {/* Weight Input */}
+                    <View className="flex-1 items-center">
+                        <TextInput
+                            value={weight}
+                            onChangeText={setWeight}
+                            onBlur={handleBlur}
+                            keyboardType="numeric"
+                            placeholder={set.previous_weight?.toString() || "0"}
+                            placeholderTextColor={Colors.iron[300]}
+                            // Removed /50 opacity variants. Used solid colors.
+                            className={`text-2xl font-bold text-center w-full p-2 rounded-lg ${isCompleted ? 'text-primary bg-primary/5' : 'text-iron-950 bg-iron-100'
+                                }`}
+                            selectTextOnFocus
+                        />
+                        <Text className="text-[10px] text-iron-400 font-bold mt-1 uppercase">KG</Text>
+                    </View>
 
-                    {/* Check Button */}
-                    <TouchableOpacity
-                        onPress={() => {
-                            import('expo-haptics').then(Haptics => {
+                    <Text className="text-iron-300 font-black text-xl">X</Text>
+
+                    {/* Reps Input */}
+                    <View className="flex-1 items-center">
+                        <TextInput
+                            value={reps}
+                            onChangeText={setReps}
+                            onBlur={handleBlur}
+                            keyboardType="numeric"
+                            placeholder={set.previous_reps?.toString() || "0"}
+                            placeholderTextColor={Colors.iron[300]}
+                            className={`text-2xl font-bold text-center w-full p-2 rounded-lg ${isCompleted ? 'text-primary bg-primary/5' : 'text-iron-950 bg-iron-100'
+                                }`}
+                            selectTextOnFocus
+                        />
+                        <Text className="text-[10px] text-iron-400 font-bold mt-1 uppercase">REPS</Text>
+                    </View>
+
+                    {/* Action Buttons */}
+                    <View className="flex-col gap-2 ml-2">
+                        <TouchableOpacity
+                            onPress={() => {
                                 if (isCompleted) {
                                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                 } else {
                                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                                 }
-                            });
-                            handleComplete();
-                        }}
-                        className={`w-10 h-10 items-center justify-center rounded-lg ml-2 ${isCompleted ? 'bg-primary' : 'bg-iron-700'
-                            }`}
-                    >
-                        <Check size={20} color={isCompleted ? Colors.white : Colors.iron[400]} />
-                    </TouchableOpacity>
+                                handleComplete();
+                            }}
+                            className={`w-12 h-12 rounded-xl items-center justify-center shadow-sm ${isCompleted ? 'bg-primary border border-primary' : 'bg-iron-200 border border-iron-200'
+                                }`}
+                        >
+                            <Check size={24} color={isCompleted ? 'white' : Colors.iron[400]} strokeWidth={3} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={() => setShowNotes(!showNotes)}
+                            className="items-center justify-center"
+                        >
+                            <MessageSquare
+                                size={16}
+                                color={notes ? Colors.primary.DEFAULT : Colors.iron[300]}
+                                fill={notes ? Colors.primary.DEFAULT : 'none'}
+                            />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* Notes Input */}
                 {showNotes && (
-                    <View className="px-12 pb-2">
+                    <View className="px-3 pb-3 pt-0">
                         <TextInput
                             value={notes}
                             onChangeText={setNotes}
                             onBlur={handleBlur}
-                            placeholder="Add notes (e.g. high RPE, pain...)"
-                            placeholderTextColor={Colors.iron[600]}
-                            className="text-iron-300 text-sm bg-iron-950/50 p-2 rounded border border-iron-800"
+                            placeholder="Add notes..."
+                            placeholderTextColor={Colors.iron[400]}
+                            className="text-sm bg-yellow-50 text-iron-700 p-2 rounded-lg border border-yellow-100/50"
                         />
                     </View>
                 )}
+
             </View>
         </Swipeable>
     );

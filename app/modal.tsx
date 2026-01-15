@@ -1,35 +1,25 @@
+import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, StyleSheet } from 'react-native';
-
-import EditScreenInfo from '@/components/EditScreenInfo';
-import { Text, View } from '@/components/Themed';
+import { Platform, Text, View } from 'react-native';
 
 export default function ModalScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Modal</Text>
-      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-      <EditScreenInfo path="app/modal.tsx" />
+    <SafeAreaWrapper className="flex-1 bg-iron-900 justify-center items-center p-8">
+      <View className="items-center mb-8">
+        <Text className="text-4xl font-black text-iron-950 mb-2 tracking-tighter uppercase">IronTrain</Text>
+        <Text className="text-iron-500 font-bold uppercase tracking-widest text-xs">Strength Evolved</Text>
+      </View>
 
-      {/* Use a light status bar on iOS to account for the black space above the modal */}
-      <StatusBar style={Platform.OS === 'ios' ? 'light' : 'auto'} />
-    </View>
+      <View className="bg-iron-800 p-6 rounded-2xl border border-iron-700 w-full mb-8">
+        <Text className="text-iron-950 text-center mb-4 font-semibold leading-6">
+          "IronTrain is designed for purists. No nonsense, just heavy Iron and progress."
+        </Text>
+        <Text className="text-iron-500 text-center text-xs italic">
+          - The IronTeam
+        </Text>
+      </View>
+
+      <StatusBar style={Platform.OS === 'ios' ? 'dark' : 'auto'} />
+    </SafeAreaWrapper>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  separator: {
-    marginVertical: 30,
-    height: 1,
-    width: '80%',
-  },
-});

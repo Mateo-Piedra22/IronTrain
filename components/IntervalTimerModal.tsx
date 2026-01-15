@@ -1,4 +1,5 @@
 import { IronButton } from '@/components/IronButton';
+import { Colors } from '@/src/theme';
 import { Pause, Play, RotateCcw, X } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -94,7 +95,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
         switch (status) {
             case 'work': return 'bg-green-600';
             case 'rest': return 'bg-red-600';
-            case 'finished': return 'bg-blue-600';
+            case 'finished': return 'bg-green-600';
             default: return 'bg-iron-900';
         }
     };
@@ -111,40 +112,40 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
             <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
                 <View className="flex-1 bg-iron-900 p-6">
                     <View className="flex-row justify-between items-center mb-8">
-                        <Text className="text-white font-bold text-2xl">Interval Timer</Text>
+                        <Text className="text-iron-950 font-bold text-2xl">Interval Timer</Text>
                         <TouchableOpacity onPress={onClose}>
-                            <X color="white" size={28} />
+                            <X color={Colors.iron[950]} size={28} />
                         </TouchableOpacity>
                     </View>
 
                     <View className="space-y-6">
                         <View>
-                            <Text className="text-iron-400 mb-2 uppercase font-bold text-xs">Work (seconds)</Text>
+                            <Text className="text-iron-500 mb-2 uppercase font-bold text-xs">Work (seconds)</Text>
                             <TextInput
                                 value={workDuration}
                                 onChangeText={setWorkDuration}
                                 keyboardType="numeric"
-                                className="bg-iron-800 text-white text-3xl font-bold p-4 rounded-xl text-center"
+                                className="bg-iron-800 text-iron-950 text-3xl font-bold p-4 rounded-xl text-center"
                             />
                         </View>
 
                         <View>
-                            <Text className="text-iron-400 mb-2 uppercase font-bold text-xs">Rest (seconds)</Text>
+                            <Text className="text-iron-500 mb-2 uppercase font-bold text-xs">Rest (seconds)</Text>
                             <TextInput
                                 value={restDuration}
                                 onChangeText={setRestDuration}
                                 keyboardType="numeric"
-                                className="bg-iron-800 text-white text-3xl font-bold p-4 rounded-xl text-center"
+                                className="bg-iron-800 text-iron-950 text-3xl font-bold p-4 rounded-xl text-center"
                             />
                         </View>
 
                         <View>
-                            <Text className="text-iron-400 mb-2 uppercase font-bold text-xs">Rounds</Text>
+                            <Text className="text-iron-500 mb-2 uppercase font-bold text-xs">Rounds</Text>
                             <TextInput
                                 value={rounds}
                                 onChangeText={setRounds}
                                 keyboardType="numeric"
-                                className="bg-iron-800 text-white text-3xl font-bold p-4 rounded-xl text-center"
+                                className="bg-iron-800 text-iron-950 text-3xl font-bold p-4 rounded-xl text-center"
                             />
                         </View>
                     </View>
@@ -161,20 +162,20 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
     return (
         <Modal visible={visible} animationType="fade">
             <View className={`flex-1 ${getBgColor()} justify-center items-center relative`}>
-                <TouchableOpacity onPress={onClose} className="absolute top-12 right-6 p-2 bg-black/20 rounded-full">
+                <TouchableOpacity onPress={onClose} className="absolute top-12 right-6 p-2 bg-iron-950/20 rounded-full">
                     <X color="white" size={28} />
                 </TouchableOpacity>
 
                 <View className="items-center">
-                    <Text className="text-white/80 font-bold text-2xl mb-4 uppercase tracking-widest">
+                    <Text className="text-iron-950/80 font-bold text-2xl mb-4 uppercase tracking-widest">
                         {status === 'work' ? 'WORK IT!' : status === 'rest' ? 'REST' : 'COMPLETE'}
                     </Text>
 
-                    <Text className="text-white font-black text-9xl">
+                    <Text className="text-iron-950 font-black text-9xl">
                         {status === 'finished' ? 'DONE' : formatTime(timeLeft)}
                     </Text>
 
-                    <Text className="text-white/60 text-xl font-bold mt-4">
+                    <Text className="text-iron-950/60 text-xl font-bold mt-4">
                         Round {currentRound} / {rounds}
                     </Text>
                 </View>

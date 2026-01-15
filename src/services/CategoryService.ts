@@ -11,17 +11,21 @@ export class CategoryService {
         return await dbService.getFirst<Category>('SELECT * FROM categories WHERE id = ?', [id]);
     }
 
-    static async create(name: string): Promise<string> {
+    static async create(name: string, color: string = '#3b82f6'): Promise<string> {
         const id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
             var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
             return v.toString(16);
         });
-        await dbService.run('INSERT INTO categories (id, name, is_system) VALUES (?, ?, 0)', [id, name]);
+        await dbService.run('INSERT INTO categories (id, name, color, is_system) VALUES (?, ?, ?, 0)', [id, name, color]);
         return id;
     }
 
-    static async update(id: string, name: string): Promise<void> {
-        await dbService.run('UPDATE categories SET name = ? WHERE id = ?', [name, id]);
+    static async update(id: string, name: string, color?: string): Promise<void> {
+        if (color) {
+            await dbService.run('UPDATE categories SET name = ?, color = ? WHERE id = ?', [name, color, id]);
+        } else {
+            await dbService.run('UPDATE categories SET name = ? WHERE id = ?', [name, id]);
+        }
     }
 
     static async delete(id: string): Promise<void> {

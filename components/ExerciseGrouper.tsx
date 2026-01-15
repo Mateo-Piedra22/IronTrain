@@ -79,7 +79,7 @@ export function ExerciseGrouper({
 
             <View className="flex-1">
                 <View className="flex-row justify-between items-center mb-2 bg-surface p-2 rounded-lg border border-border">
-                    <Text className="text-white text-lg font-bold flex-1">{exerciseName}</Text>
+                    <Text className="text-iron-950 text-lg font-bold flex-1">{exerciseName}</Text>
                     <IronButton label="Add Set" size="sm" onPress={onAddSet} />
                 </View>
 
@@ -167,11 +167,11 @@ export function ExerciseGrouper({
             </View>
 
             <Modal visible={commentModalVisible} transparent animationType="fade">
-                <View className="flex-1 bg-black/80 justify-center px-6">
+                <View className="flex-1 bg-iron-950/80 justify-center px-6">
                     <View className="bg-surface p-4 rounded-xl border border-border">
-                        <Text className="text-white font-bold mb-2">Set Note</Text>
+                        <Text className="text-iron-950 font-bold mb-2">Set Note</Text>
                         <TextInput
-                            className="bg-background text-white p-3 rounded-lg border border-border mb-4 h-24"
+                            className="bg-background text-iron-950 p-3 rounded-lg border border-border mb-4 h-24"
                             textAlignVertical="top"
                             multiline
                             value={currentComment}

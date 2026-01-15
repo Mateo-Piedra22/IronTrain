@@ -50,10 +50,10 @@ export function DateStrip({ selectedDate, onSelectDate, markedDates = {} }: Date
     };
 
     return (
-        <View className="bg-iron-800 border-b border-iron-700 z-10">
+        <View className="bg-iron-800 z-10">
             {/* Header / Toggle */}
             <View className="flex-row justify-between items-center px-4 py-2 bg-iron-800 border-b border-iron-700/50">
-                <Text className="text-white font-bold capitalize text-lg">
+                <Text className="text-iron-950 font-bold capitalize text-lg">
                     {format(selectedDate, 'MMMM yyyy', { locale: es })}
                 </Text>
                 <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)} className="p-1">
@@ -74,22 +74,24 @@ export function DateStrip({ selectedDate, onSelectDate, markedDates = {} }: Date
                         }}
                         markedDates={calendarMarks}
                         theme={{
-                            calendarBackground: Colors.iron[900],
+                            backgroundColor: Colors.white,
+                            calendarBackground: Colors.white,
                             textSectionTitleColor: Colors.iron[500],
-                            dayTextColor: Colors.white,
+                            dayTextColor: Colors.iron[950],
                             todayTextColor: Colors.primary.dark,
                             selectedDayBackgroundColor: Colors.primary.dark,
                             selectedDayTextColor: Colors.white,
-                            monthTextColor: Colors.white,
+                            monthTextColor: Colors.iron[950],
                             textMonthFontWeight: 'bold',
                             arrowColor: Colors.primary.dark,
                             dotColor: Colors.primary.dark,
-                            selectedDotColor: Colors.white
+                            selectedDotColor: Colors.white,
+                            textDisabledColor: Colors.iron[400],
                         }}
                     />
                 </View>
             ) : (
-                <View className="pb-3 pt-2">
+                <View className="pb-3">
                     <ScrollView
                         ref={scrollViewRef}
                         horizontal
@@ -109,11 +111,11 @@ export function DateStrip({ selectedDate, onSelectDate, markedDates = {} }: Date
                                         : 'bg-iron-900 border-iron-700'
                                         }`}
                                 >
-                                    <Text className={`text-xs font-semibold uppercase mb-1 ${isSelected ? 'text-white' : 'text-iron-500'
+                                    <Text className={`text-xs font-semibold uppercase mb-1 ${isSelected ? 'text-white' : 'text-iron-950'
                                         }`}>
                                         {format(date, 'EEE', { locale: es })}
                                     </Text>
-                                    <Text className={`text-xl font-bold ${isSelected ? 'text-white' : isToday ? 'text-primary' : 'text-white'
+                                    <Text className={`text-xl font-bold ${isSelected ? 'text-white' : isToday ? 'text-primary' : 'text-iron-950'
                                         }`}>
                                         {format(date, 'd')}
                                     </Text>

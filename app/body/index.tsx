@@ -1,14 +1,14 @@
-import { Ionicons } from '@expo/vector-icons';
+import { IronButton } from '@/components/IronButton';
+import { IronInput } from '@/components/IronInput';
+import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
+import { BodyMetric, bodyService } from '@/src/services/BodyService';
+import { Colors } from '@/src/theme';
 import { format } from 'date-fns';
 import { Stack, useFocusEffect } from 'expo-router';
+import { Trash2 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { Alert, Dimensions, Pressable, ScrollView, Text, View } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
-
-import { IronButton } from '@/components/IronButton';
-import { IronCard } from '@/components/IronCard';
-import { IronInput } from '@/components/IronInput';
-import { BodyMetric, bodyService } from '@/src/services/BodyService';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -75,70 +75,77 @@ export default function BodyTrackerScreen() {
         }));
 
     return (
-        <ScrollView className="flex-1 bg-background p-4">
-            <Stack.Screen options={{ title: 'Body Tracker', headerBackTitle: 'Analysis' }} />
+        <SafeAreaWrapper className="bg-iron-900" edges={['left', 'right']}>
+            <ScrollView className="flex-1 px-4 pt-4">
+                <Stack.Screen options={{
+                    title: 'Body Tracker',
+                    headerStyle: { backgroundColor: Colors.iron[900] },
+                    headerTintColor: Colors.primary.DEFAULT,
+                    headerShadowVisible: false
+                }} />
 
-            <View className="mb-6">
-                <Text className="text-white text-lg font-bold mb-4">Log Today</Text>
-                <View className="flex-row gap-4">
-                    <View className="flex-1">
-                        <IronInput
-                            placeholder="Weight (kg)"
-                            keyboardType="numeric"
-                            value={weight}
-                            onChangeText={setWeight}
-                        />
-                    </View>
-                    <View className="flex-1">
-                        <IronInput
-                            placeholder="Body Fat %"
-                            keyboardType="numeric"
-                            value={fat}
-                            onChangeText={setFat}
-                        />
-                    </View>
-                </View>
-                <View className="mt-4">
-                    <IronButton label="Log Entry" onPress={handleLog} />
-                </View>
-            </View>
-
-            {chartData.length > 1 && (
-                <View className="mb-8 items-center">
-                    <IronCard className="p-2 w-full">
-                        <Text className="text-primary font-bold mb-4">Weight Trend</Text>
-                        <LineChart
-                            data={chartData}
-                            color="#f97316"
-                            thickness={3}
-                            dataPointsColor="#f97316"
-                            textColor="white"
-                            yAxisTextStyle={{ color: '#94a3b8' }}
-                            width={screenWidth - 80}
-                            height={200}
-                            isAnimated
-                            curved
-                            hideRules
-                        />
-                    </IronCard>
-                </View>
-            )}
-
-            <Text className="text-white text-lg font-bold mb-4">History</Text>
-            {metrics.map(m => (
-                <IronCard key={m.id} className="mb-3 flex-row justify-between items-center">
-                    <View>
-                        <Text className="text-textMuted text-xs">{m.date}</Text>
-                        <View className="flex-row gap-4 mt-1">
-                            {m.weight && <Text className="text-white font-bold text-lg">{m.weight} kg</Text>}
-                            {m.body_fat && <Text className="text-primary font-bold text-lg">{m.body_fat}%</Text>}
+                <View className="mb-6">
+                    <Text className="text-iron-950 text-lg font-bold mb-4">Log Today</Text>
+                    <View className="flex-row gap-4">
+                        <View className="flex-1">
+                            <IronInput
+                                placeholder="Weight (kg)"
+                                keyboardType="numeric"
+                                value={weight}
+                                onChangeText={setWeight}
+                            />
+                        </View>
+                        <View className="flex-1">
+                            <IronInput
+                                placeholder="Body Fat %"
+                                keyboardType="numeric"
+                                value={fat}
+                                onChangeText={setFat}
+                            />
                         </View>
                     </View>
-                    <Pressable onPress={() => handleDelete(m.id)} className="p-2">
-                        <Ionicons name="trash-outline" size={20} color="#94a3b8" />
-                    </Pressable>
-                </IronCard>
-            ))}
-        </ScrollView>
+                    <View className="mt-2">
+                        <IronButton label="Log Entry" onPress={handleLog} />
+                    </View>
+                </View>
+
+                {chartData.length > 1 && (
+                    <View className="mb-8 items-center">
+                        <View className="p-4 w-full bg-surface rounded-xl border border-iron-700 elevation-1">
+                            <Text className="text-primary font-bold mb-4">Weight Trend</Text>
+                            <LineChart
+                                data={chartData}
+                                color={Colors.primary.DEFAULT}
+                                thickness={3}
+                                dataPointsColor={Colors.primary.DEFAULT}
+                                textColor={Colors.iron[500]}
+                                yAxisTextStyle={{ color: Colors.iron[400] }}
+                                width={screenWidth - 80}
+                                height={200}
+                                isAnimated
+                                curved
+                                hideRules
+                            />
+                        </View>
+                    </View>
+                )}
+
+                <Text className="text-iron-950 text-lg font-bold mb-4">History</Text>
+                {metrics.map(m => (
+                    <View key={m.id} className="mb-3 flex-row justify-between items-center bg-surface p-4 rounded-xl border border-iron-700 elevation-1">
+                        <View>
+                            <Text className="text-iron-500 text-xs font-bold uppercase tracking-wider">{m.date}</Text>
+                            <View className="flex-row gap-4 mt-1">
+                                {m.weight && <Text className="text-iron-950 font-bold text-lg">{m.weight} kg</Text>}
+                                {m.body_fat && <Text className="text-primary font-bold text-lg">{m.body_fat}%</Text>}
+                            </View>
+                        </View>
+                        <Pressable onPress={() => handleDelete(m.id)} className="p-2 active:opacity-50">
+                            <Trash2 size={20} color={Colors.iron[400]} />
+                        </Pressable>
+                    </View>
+                ))}
+            </ScrollView>
+        </SafeAreaWrapper>
     );
 }

@@ -1,3 +1,4 @@
+import { Colors } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { addDays, format, subDays } from 'date-fns';
 import { useState } from 'react';
@@ -22,23 +23,23 @@ export function DateHeader({ date, onChange }: DateHeaderProps) {
         <>
             <View className="flex-row items-center justify-between px-4 py-4 bg-background">
                 <Pressable onPress={prevDay} className="p-2">
-                    <Ionicons name="chevron-back" size={24} color="#f97316" />
+                    <Ionicons name="chevron-back" size={24} color={Colors.primary.dark} />
                 </Pressable>
 
                 <Pressable onPress={() => setShowCalendar(true)} className="items-center">
-                    <Text className="text-white text-xl font-bold">
-                        {isToday ? 'Today' : format(date, 'EEE, MMM do')} <Ionicons name="calendar-outline" size={16} color="#94a3b8" />
+                    <Text className="text-iron-950 text-xl font-bold">
+                        {isToday ? 'Today' : format(date, 'EEE, MMM do')} <Ionicons name="calendar-outline" size={16} color={Colors.iron[400]} />
                     </Text>
                     <Text className="text-textMuted text-xs">{format(date, 'yyyy')}</Text>
                 </Pressable>
 
                 <Pressable onPress={nextDay} className="p-2">
-                    <Ionicons name="chevron-forward" size={24} color="#f97316" />
+                    <Ionicons name="chevron-forward" size={24} color={Colors.primary.dark} />
                 </Pressable>
             </View>
 
             <Modal visible={showCalendar} animationType="fade" transparent>
-                <View className="flex-1 bg-black/80 justify-center px-4">
+                <View className="flex-1 bg-iron-950/80 justify-center px-4">
                     <View className="bg-surface rounded-xl overflow-hidden">
                         <Calendar
                             current={dateStr}
@@ -50,23 +51,23 @@ export function DateHeader({ date, onChange }: DateHeaderProps) {
                                 setShowCalendar(false);
                             }}
                             markedDates={{
-                                [dateStr]: { selected: true, selectedColor: '#f97316' }
+                                [dateStr]: { selected: true, selectedColor: Colors.primary.dark }
                             }}
                             theme={{
-                                backgroundColor: '#1e293b',
-                                calendarBackground: '#1e293b',
-                                textSectionTitleColor: '#94a3b8',
-                                selectedDayBackgroundColor: '#f97316',
-                                selectedDayTextColor: '#ffffff',
-                                todayTextColor: '#f97316',
-                                dayTextColor: '#ffffff',
-                                textDisabledColor: '#475569',
-                                arrowColor: '#f97316',
-                                monthTextColor: '#ffffff',
-                                indicatorColor: '#f97316',
+                                backgroundColor: Colors.white,
+                                calendarBackground: Colors.white,
+                                textSectionTitleColor: Colors.iron[500],
+                                selectedDayBackgroundColor: Colors.primary.dark,
+                                selectedDayTextColor: Colors.white,
+                                todayTextColor: Colors.primary.dark,
+                                dayTextColor: Colors.iron[950],
+                                textDisabledColor: Colors.iron[400],
+                                arrowColor: Colors.primary.dark,
+                                monthTextColor: Colors.iron[950],
+                                indicatorColor: Colors.primary.dark,
                             }}
                         />
-                        <TouchableOpacity onPress={() => setShowCalendar(false)} className="bg-background param-4 py-3 items-center">
+                        <TouchableOpacity onPress={() => setShowCalendar(false)} className="bg-surface p-4 pt-3 items-center border-t border-iron-700">
                             <Text className="text-primary font-bold">Close</Text>
                         </TouchableOpacity>
                     </View>

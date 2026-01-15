@@ -1,11 +1,8 @@
-import { Link, Tabs } from 'expo-router';
-import { BarChart2, Calendar, Dumbbell, Info } from 'lucide-react-native';
-import React from 'react';
-import { Pressable } from 'react-native';
-
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { useColorScheme } from '@/components/useColorScheme';
-import Colors from '@/constants/Colors';
+import { Colors } from '@/src/theme';
+import { Tabs } from 'expo-router';
+import { BarChart2, Calendar, Dumbbell } from 'lucide-react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 export default function TabLayout() {
@@ -15,7 +12,17 @@ export default function TabLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Tabs
         screenOptions={{
-          tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+          tabBarActiveTintColor: Colors.primary.DEFAULT,
+          tabBarInactiveTintColor: Colors.iron[400],
+          tabBarStyle: {
+            backgroundColor: Colors.iron[900], // Cream
+            borderTopColor: Colors.iron[700], // Consistent border
+            elevation: 8, // Add shadow for Android
+            shadowColor: '#000', // Shadow for iOS
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+          },
           // Disable the static render of the header on web
           // to prevent a hydration error in React Navigation v6.
           headerShown: useClientOnlyValue(false, true),
@@ -25,20 +32,9 @@ export default function TabLayout() {
           name="index"
           options={{
             title: 'Daily Log',
+            headerShown: false,
+            // Header components removed as they are now in index.tsx
             tabBarIcon: ({ color }) => <Calendar color={color} size={24} />,
-            headerRight: () => (
-              <Link href="/modal" asChild>
-                <Pressable>
-                  {({ pressed }) => (
-                    <Info
-                      size={25}
-                      color={Colors[colorScheme ?? 'light'].text}
-                      style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                    />
-                  )}
-                </Pressable>
-              </Link>
-            ),
           }}
         />
         <Tabs.Screen

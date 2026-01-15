@@ -106,19 +106,19 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
     return (
         <View className="bg-iron-900 border border-iron-800 p-4 rounded-xl">
             <View className="flex-row justify-between mb-4">
-                <Text className="text-white font-bold text-lg">Consistency (Year)</Text>
-                <Text className="text-iron-500 text-xs">{activeMap.size} workouts</Text>
+                <Text className="text-iron-950 font-bold text-lg">Consistency (Year)</Text>
+                <Text className="text-iron-950 text-xs text-bold">{activeMap.size} workouts</Text>
             </View>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-2 px-2">
                 <View className="flex-row">
                     {/* Day Labels (Mon, Wed, Fri) */}
                     <View className="justify-between mr-2 py-1">
-                        <Text className="text-[9px] text-iron-500 h-3">Mon</Text>
+                        <Text className="text-[9px] text-iron-950 h-3">Mon</Text>
                         <View className="h-3" />
-                        <Text className="text-[9px] text-iron-500 h-3">Wed</Text>
+                        <Text className="text-[9px] text-iron-950 h-3">Wed</Text>
                         <View className="h-3" />
-                        <Text className="text-[9px] text-iron-500 h-3">Fri</Text>
+                        <Text className="text-[9px] text-iron-950 h-3">Fri</Text>
                         <View className="h-3" />
                     </View>
 

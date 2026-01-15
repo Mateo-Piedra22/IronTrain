@@ -1,24 +1,33 @@
 import React from 'react';
-import { View, ViewProps } from 'react-native';
+import { View } from 'react-native';
 import { SafeAreaView, SafeAreaViewProps } from 'react-native-safe-area-context';
 
 interface SafeAreaWrapperProps extends SafeAreaViewProps {
   children: React.ReactNode;
   centered?: boolean;
+  className?: string;
+  contentClassName?: string;
 }
 
-export function SafeAreaWrapper({ children, style, edges = ['top', 'left', 'right'], centered = true, ...props }: SafeAreaWrapperProps) {
+export function SafeAreaWrapper({ children, style, edges = ['top', 'left', 'right'], centered = false, className, contentClassName, ...props }: SafeAreaWrapperProps) {
   return (
-    <SafeAreaView 
-      style={[{ flex: 1, backgroundColor: '#0a0a0a' }, style]} 
+    <SafeAreaView
+      className={`flex-1 ${className || 'bg-iron-900'}`}
+      style={style}
       edges={edges}
       {...props}
     >
-      <View className={`flex-1 w-full ${centered ? 'items-center' : ''}`}>
-        <View className="flex-1 w-full max-w-[600px]">
+      {centered ? (
+        <View className="flex-1 w-full items-center">
+          <View className={`flex-1 w-full max-w-[600px] ${contentClassName || ''}`}>
+            {children}
+          </View>
+        </View>
+      ) : (
+        <View className={`flex-1 w-full ${contentClassName || ''}`}>
           {children}
         </View>
-      </View>
+      )}
     </SafeAreaView>
   );
 }

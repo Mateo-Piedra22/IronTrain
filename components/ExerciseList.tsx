@@ -1,9 +1,9 @@
 // @ts-nocheck
 import { Colors } from '@/src/theme';
-import { FlashList } from '@shopify/flash-list';
+import { useRouter } from 'expo-router';
 import { Plus, Search } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CategoryService } from '../src/services/CategoryService';
 import { ExerciseService } from '../src/services/ExerciseService';
 import { Category, Exercise } from '../src/types/db';
@@ -43,21 +43,35 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
         }
     }, [searchQuery, selectedCategory]);
 
+    // Optimized Search with Debounce
     useEffect(() => {
-        const timeout = setTimeout(loadData, 300); // Debounce search
+        const timeout = setTimeout(loadData, 300);
         return () => clearTimeout(timeout);
     }, [loadData]);
 
+
+    const router = useRouter(); // Required
 
     const handleCreate = () => {
         setEditingExercise(null);
         setIsFormVisible(true);
     };
 
-    const handleEdit = (ex: Exercise) => {
-        if (onSelect) return; // Don't edit in picker mode
-        setEditingExercise(ex);
-        setIsFormVisible(true);
+    const handlePress = (ex: Exercise) => {
+        if (onSelect) {
+            onSelect(ex.id);
+        } else {
+            // Updated Navigation to Detail Screen
+            router.push({
+                pathname: '/exercise/[id]' as any,
+                params: {
+                    id: ex.id,
+                    exerciseId: ex.id,
+                    exerciseName: ex.name
+                    // NO workoutId passed -> View Mode
+                }
+            });
+        }
     };
 
     return (
@@ -65,11 +79,11 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
             {/* Search Header */}
             <View className="p-4 border-b border-iron-800">
                 <View className="flex-row items-center bg-iron-800 px-4 py-3 rounded-xl border border-iron-700">
-                    <Search size={20} color={Colors.iron[400]} />
+                    <Search size={20} color={Colors.iron[950]} />
                     <TextInput
-                        className="flex-1 ml-3 text-white text-base"
+                        className="flex-1 ml-3 text-iron-950 text-base"
                         placeholder="Search exercises..."
-                        placeholderTextColor={Colors.iron[400]}
+                        placeholderTextColor={Colors.iron[500]}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                     />
@@ -77,13 +91,12 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
 
                 {/* Category Tabs */}
                 <View className="mt-4">
-                    {/* @ts-ignore */}
-                    <FlashList<CategoryItem>
+                    <FlatList<CategoryItem>
                         horizontal
-                        data={[{ id: 'all', name: 'All', color: Colors.iron[400] }, ...categories]}
-                        estimatedItemSize={80}
+                        data={[{ id: 'all', name: 'All', color: Colors.iron[950] }, ...categories]}
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={{ paddingRight: 20 }}
+                        keyExtractor={(item) => item.id}
                         renderItem={({ item }) => (
                             <TouchableOpacity
                                 onPress={() => setSelectedCategory(item.id)}
@@ -92,7 +105,7 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
                                     : 'bg-transparent border-iron-700'
                                     }`}
                             >
-                                <Text className={`text-sm font-semibold ${selectedCategory === item.id ? 'text-primary' : 'text-iron-400'
+                                <Text className={`text-sm font-semibold ${selectedCategory === item.id ? 'text-primary' : 'text-iron-950'
                                     }`}>
                                     {item.name}
                                 </Text>
@@ -108,21 +121,22 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
                     <ActivityIndicator color={Colors.primary.dark} />
                 </View>
             ) : (
-                // @ts-ignore
-                <FlashList<ExerciseItem>
+                <FlatList<ExerciseItem>
                     data={exercises}
-                    estimatedItemSize={70}
                     contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                    // Lazy Loading Optimization
+                    onEndReachedThreshold={0.5} // Preload when halfway down
+                    keyExtractor={(item) => item.id}
                     renderItem={({ item }) => (
                         <TouchableOpacity
-                            onPress={() => onSelect ? onSelect(item.id) : handleEdit(item)}
-                            className="flex-row items-center justify-between p-4 mb-3 bg-iron-800/40 rounded-xl border border-iron-800"
+                            onPress={() => handlePress(item)}
+                            className="flex-row items-center justify-between p-4 mb-3 bg-surface rounded-xl border border-iron-700 elevation-1 active:opacity-70"
                         >
                             <View className="flex-1">
-                                <Text className="text-white font-bold text-base">{item.name}</Text>
+                                <Text className="text-iron-950 font-bold text-base">{item.name}</Text>
                                 <View className="flex-row items-center mt-1">
                                     <View className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: item.category_color || '#fff' }} />
-                                    <Text className="text-iron-400 text-xs uppercase">{item.category_name}</Text>
+                                    <Text className="text-iron-950/60 text-xs uppercase">{item.category_name}</Text>
                                 </View>
                             </View>
                             {/* Visual indicator for edit mode could go here */}
@@ -135,7 +149,7 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
             {!onSelect && (
                 <TouchableOpacity
                     onPress={handleCreate}
-                    className="absolute bottom-6 right-6 w-14 h-14 bg-iron-700 rounded-full items-center justify-center shadow-lg border border-iron-600"
+                    className="absolute bottom-6 right-6 w-14 h-14 bg-primary rounded-full items-center justify-center shadow-lg border border-iron-700 active:opacity-90"
                 >
                     <Plus color="white" />
                 </TouchableOpacity>

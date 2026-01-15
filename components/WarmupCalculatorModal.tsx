@@ -40,16 +40,16 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
 
     return (
         <Modal visible={visible} transparent animationType="fade">
-            <View className="flex-1 bg-black/80 justify-center items-center p-4">
+            <View className="flex-1 bg-iron-950/80 justify-center items-center p-4">
                 <View className="bg-iron-900 w-full max-w-sm rounded-2xl border border-iron-700 p-4">
                     <View className="flex-row justify-between items-center mb-4">
-                        <Text className="text-white font-bold text-xl">Warm-up Calculator</Text>
+                        <Text className="text-iron-950 font-bold text-xl">Warm-up Calculator</Text>
                         <TouchableOpacity onPress={onClose}>
                             <X color={Colors.iron[400]} size={24} />
                         </TouchableOpacity>
                     </View>
 
-                    <Text className="text-iron-400 mb-2">Target Working Weight (kg)</Text>
+                    <Text className="text-iron-500 mb-2">Target Working Weight (kg)</Text>
                     <IronInput
                         value={targetWeight}
                         onChangeText={setTargetWeight}
@@ -60,14 +60,14 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
 
                     {calculatedSets.length > 0 && (
                         <View className="mt-4 mb-6">
-                            <Text className="text-iron-300 font-bold mb-2">Suggested Warm-up:</Text>
+                            <Text className="text-iron-500 font-bold mb-2">Suggested Warm-up:</Text>
                             {calculatedSets.map((set, idx) => (
                                 <View key={idx} className="flex-row justify-between items-center py-2 border-b border-iron-800">
                                     <View className="flex-row items-center">
                                         <View className="w-2 h-2 rounded-full bg-yellow-500 mr-2" />
-                                        <Text className="text-white font-bold">{set.weight}kg</Text>
+                                        <Text className="text-iron-950 font-bold">{set.weight}kg</Text>
                                     </View>
-                                    <Text className="text-iron-400">{set.reps} reps</Text>
+                                    <Text className="text-iron-500">{set.reps} reps</Text>
                                 </View>
                             ))}
                         </View>

@@ -1,18 +1,24 @@
-import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Alert, FlatList, Pressable, Text, View } from 'react-native';
-
 import { IronButton } from '@/components/IronButton';
-import { IronCard } from '@/components/IronCard';
+import { IronInput } from '@/components/IronInput';
+import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { workoutService } from '@/src/services/WorkoutService';
+import { Colors } from '@/src/theme';
 import { Workout } from '@/src/types/db';
+import { FlashList } from '@shopify/flash-list';
+import { format } from 'date-fns';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { Dumbbell, Play, Plus, Trash2 } from 'lucide-react-native';
+import { useCallback, useState } from 'react';
+import { Alert, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
+
+const FlashListAny = FlashList as any;
 
 export default function TemplatesScreen() {
     const router = useRouter();
     const [templates, setTemplates] = useState<Workout[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isCreating, setIsCreating] = useState(false);
+    const [newTemplateName, setNewTemplateName] = useState('');
 
     const loadTemplates = useCallback(async () => {
         setLoading(true);
@@ -32,17 +38,28 @@ export default function TemplatesScreen() {
         }, [loadTemplates])
     );
 
+    const handleCreate = async () => {
+        if (!newTemplateName.trim()) return;
+        try {
+            const id = await workoutService.createTemplate(newTemplateName);
+            setNewTemplateName('');
+            setIsCreating(false);
+            router.push({ pathname: '/workout/[id]', params: { id } });
+        } catch (e) {
+            Alert.alert('Error', 'Failed to create template');
+        }
+    };
+
     const handleLoad = (templateId: string) => {
-        Alert.alert('Load Template', 'Load this workout to Today?', [
+        Alert.alert('Start Workout', 'Use this template for today\'s session?', [
             { text: 'Cancel', style: 'cancel' },
             {
-                text: 'Load',
+                text: 'Start',
                 onPress: async () => {
                     try {
                         const today = format(new Date(), 'yyyy-MM-dd');
-                        await workoutService.loadTemplate(templateId, today);
-                        Alert.alert('Success', 'Template loaded!');
-                        router.push('/(tabs)');
+                        const newId = await workoutService.loadTemplate(templateId, today);
+                        router.push({ pathname: '/workout/[id]', params: { id: newId } });
                     } catch (e) {
                         Alert.alert('Error', (e as Error).message);
                     }
@@ -52,7 +69,7 @@ export default function TemplatesScreen() {
     };
 
     const handleDelete = (id: string) => {
-        Alert.alert('Delete', 'Delete this template?', [
+        Alert.alert('Delete', 'Delete this template permanently?', [
             { text: 'Cancel' },
             {
                 text: 'Delete',
@@ -66,39 +83,88 @@ export default function TemplatesScreen() {
     };
 
     return (
-        <View className="flex-1 bg-background p-4 pt-12">
-            <View className="flex-row items-center mb-6">
-                <Pressable onPress={() => router.back()} className="mr-4">
-                    <Ionicons name="arrow-back" size={24} color="white" />
-                </Pressable>
-                <Text className="text-2xl font-bold text-white">Templates</Text>
+        <SafeAreaWrapper className="bg-iron-900" edges={['left', 'right']}>
+            <Stack.Screen options={{ headerShown: false }} />
+            
+            <View className="pt-4 px-4 pb-4 border-b border-iron-200 flex-row justify-between items-center bg-iron-900">
+                <Text className="text-3xl font-bold text-iron-950">Templates</Text>
+                <TouchableOpacity 
+                    onPress={() => setIsCreating(true)}
+                    className="bg-surface p-2 rounded-lg border border-iron-700 elevation-1 active:bg-iron-200"
+                >
+                    <Plus size={24} color={Colors.primary.DEFAULT} />
+                </TouchableOpacity>
             </View>
 
-            <FlatList
+            <FlashListAny
                 data={templates}
-                keyExtractor={item => item.id}
-                renderItem={({ item }) => (
-                    <IronCard className="mb-4 flex-row justify-between items-center">
-                        <View>
-                            <Text className="text-white text-lg font-bold">{item.name}</Text>
-                            <Text className="text-textMuted text-xs">ID: {item.id.slice(0, 8)}...</Text>
-                        </View>
-                        <View className="flex-row gap-2">
-                            <IronButton
-                                label="Load"
-                                size="sm"
+                estimatedItemSize={100}
+                contentContainerStyle={{ padding: 16 }}
+                renderItem={({ item }: { item: Workout }) => (
+                    <View className="bg-surface p-4 rounded-xl mb-4 border border-iron-700 elevation-1 flex-row items-center justify-between">
+                        <Pressable 
+                            className="flex-1 flex-row items-center gap-4"
+                            onPress={() => router.push({ pathname: '/workout/[id]', params: { id: item.id } })}
+                        >
+                            <View className="w-12 h-12 bg-iron-100 rounded-lg items-center justify-center border border-iron-200">
+                                <Dumbbell size={24} color={Colors.primary.DEFAULT} />
+                            </View>
+                            <View>
+                                <Text className="text-iron-950 font-bold text-lg">{item.name}</Text>
+                                <Text className="text-iron-500 text-xs">Tap to edit</Text>
+                            </View>
+                        </Pressable>
+
+                        <View className="flex-row items-center gap-2">
+                            <TouchableOpacity 
                                 onPress={() => handleLoad(item.id)}
-                            />
-                            <Pressable onPress={() => handleDelete(item.id)} className="justify-center px-2">
-                                <Ionicons name="trash-outline" size={20} color="#94a3b8" />
-                            </Pressable>
+                                className="w-10 h-10 bg-primary rounded-full items-center justify-center shadow-sm active:opacity-80"
+                            >
+                                <Play size={20} color="white" fill="white" />
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                onPress={() => handleDelete(item.id)}
+                                className="w-10 h-10 bg-iron-200 rounded-full items-center justify-center active:bg-red-100"
+                            >
+                                <Trash2 size={20} color={Colors.red} />
+                            </TouchableOpacity>
                         </View>
-                    </IronCard>
+                    </View>
                 )}
                 ListEmptyComponent={
-                    <Text className="text-textMuted text-center mt-10">No templates saved.</Text>
+                    <View className="items-center justify-center mt-20">
+                        <Text className="text-iron-500 text-center mb-4">No templates found.</Text>
+                        <IronButton label="Create First Template" onPress={() => setIsCreating(true)} />
+                    </View>
                 }
             />
-        </View>
+
+            <Modal
+                transparent
+                visible={isCreating}
+                animationType="fade"
+                onRequestClose={() => setIsCreating(false)}
+            >
+                <View className="flex-1 bg-black/50 justify-center items-center p-4">
+                    <View className="bg-surface w-full max-w-sm rounded-2xl p-6 border border-iron-700 elevation-2">
+                        <Text className="text-xl font-bold text-iron-950 mb-6">New Template</Text>
+                        <IronInput
+                            placeholder="Template Name (e.g. Leg Day)"
+                            value={newTemplateName}
+                            onChangeText={setNewTemplateName}
+                            autoFocus
+                        />
+                        <View className="flex-row gap-3 mt-4">
+                            <View className="flex-1">
+                                <IronButton label="Cancel" variant="ghost" onPress={() => setIsCreating(false)} />
+                            </View>
+                            <View className="flex-1">
+                                <IronButton label="Create" onPress={handleCreate} />
+                            </View>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+        </SafeAreaWrapper>
     );
 }

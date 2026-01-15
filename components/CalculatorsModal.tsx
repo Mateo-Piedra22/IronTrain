@@ -28,8 +28,8 @@ export function CalculatorsModal({ visible, onClose }: CalculatorsModalProps) {
         <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
             <View className="flex-1 bg-iron-900 p-4">
                 <View className="flex-row justify-between items-center mb-6 mt-4">
-                    <Text className="text-white font-bold text-lg">Tools & Calculators</Text>
-                    <TouchableOpacity onPress={onClose} className="p-2 bg-iron-800 rounded-full">
+                    <Text className="text-iron-950 font-bold text-lg">Tools & Calculators</Text>
+                    <TouchableOpacity onPress={onClose} className="p-2 bg-primary rounded-full active:opacity-80">
                         <X color="white" size={24} />
                     </TouchableOpacity>
                 </View>
@@ -40,20 +40,20 @@ export function CalculatorsModal({ visible, onClose }: CalculatorsModalProps) {
                         className={`flex-1 py-2 rounded-md ${activeTab === 'percent' ? 'bg-iron-700' : ''}`}
                         onPress={() => setActiveTab('percent')}
                     >
-                        <Text className={`text-center font-bold ${activeTab === 'percent' ? 'text-white' : 'text-iron-500'}`}>% 1RM</Text>
+                        <Text className={`text-center font-bold ${activeTab === 'percent' ? 'text-iron-950' : 'text-iron-500'}`}>% 1RM</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         className={`flex-1 py-2 rounded-md ${activeTab === 'power' ? 'bg-iron-700' : ''}`}
                         onPress={() => setActiveTab('power')}
                     >
-                        <Text className={`text-center font-bold ${activeTab === 'power' ? 'text-white' : 'text-iron-500'}`}>Powerlifting</Text>
+                        <Text className={`text-center font-bold ${activeTab === 'power' ? 'text-iron-950' : 'text-iron-500'}`}>Powerlifting</Text>
                     </TouchableOpacity>
                 </View>
 
                 <ScrollView>
                     {activeTab === 'percent' ? (
                         <View>
-                            <Text className="text-iron-400 mb-2">Enter your 1 Rep Max (kg)</Text>
+                            <Text className="text-iron-500 mb-2">Enter your 1 Rep Max (kg)</Text>
                             <IronInput
                                 value={oneRm}
                                 onChangeText={setOneRm}
@@ -64,8 +64,8 @@ export function CalculatorsModal({ visible, onClose }: CalculatorsModalProps) {
                             <View className="bg-iron-800 rounded-xl overflow-hidden border border-iron-700">
                                 {percentages.map((pct) => (
                                     <View key={pct} className="flex-row justify-between p-4 border-b border-iron-700">
-                                        <Text className="text-iron-300 font-bold">{(pct * 100)}%</Text>
-                                        <Text className="text-white font-bold text-lg">
+                                        <Text className="text-iron-500 font-bold">{(pct * 100)}%</Text>
+                                        <Text className="text-iron-950 font-bold text-lg">
                                             {Math.round((parseFloat(oneRm) || 0) * pct)} kg
                                         </Text>
                                     </View>
@@ -76,23 +76,23 @@ export function CalculatorsModal({ visible, onClose }: CalculatorsModalProps) {
                         <View>
                             <View className="flex-row gap-4 mb-6">
                                 <View className="flex-1">
-                                    <Text className="text-iron-400 mb-2">Body Weight</Text>
+                                    <Text className="text-iron-500 mb-2">Body Weight</Text>
                                     <IronInput value={bw} onChangeText={setBw} keyboardType="numeric" placeholder="80" />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="text-iron-400 mb-2">Total (SBD)</Text>
+                                    <Text className="text-iron-500 mb-2">Total (SBD)</Text>
                                     <IronInput value={total} onChangeText={setTotal} keyboardType="numeric" placeholder="500" />
                                 </View>
                             </View>
 
                             <View className="flex-row gap-4">
-                                <View className="flex-1 bg-blue-900/20 p-4 rounded-xl border border-blue-500/30 items-center">
-                                    <Text className="text-blue-500 font-bold text-xs uppercase mb-1">Wilks Score</Text>
-                                    <Text className="text-white font-black text-2xl">{wilks.toFixed(2)}</Text>
+                                <View className="flex-1 bg-iron-200 p-4 rounded-xl border border-iron-300 items-center">
+                                    <Text className="text-iron-950 font-bold text-xs uppercase mb-1">Wilks Score</Text>
+                                    <Text className="text-iron-950 font-black text-2xl">{wilks.toFixed(2)}</Text>
                                 </View>
-                                <View className="flex-1 bg-purple-900/20 p-4 rounded-xl border border-purple-500/30 items-center">
-                                    <Text className="text-purple-500 font-bold text-xs uppercase mb-1">DOTS Score</Text>
-                                    <Text className="text-white font-black text-2xl">{dots.toFixed(2)}</Text>
+                                <View className="flex-1 bg-iron-200 p-4 rounded-xl border border-iron-300 items-center">
+                                    <Text className="text-iron-950 font-bold text-xs uppercase mb-1">DOTS Score</Text>
+                                    <Text className="text-iron-950 font-black text-2xl">{dots.toFixed(2)}</Text>
                                 </View>
                             </View>
 

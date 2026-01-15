@@ -40,7 +40,7 @@ export function ReorderModal({ visible, onClose, items, onSave }: ReorderModalPr
                     className={`flex-row items-center p-4 mb-2 rounded-lg border border-border ${isActive ? 'bg-primary/20' : 'bg-surface'}`}
                 >
                     <Ionicons name="menu" size={24} color="#94a3b8" style={{ marginRight: 12 }} />
-                    <Text className="text-white text-lg font-bold">{item.exerciseName}</Text>
+                    <Text className="text-iron-950 text-lg font-bold">{item.exerciseName}</Text>
                 </TouchableOpacity>
             </ScaleDecorator>
         );
@@ -50,7 +50,7 @@ export function ReorderModal({ visible, onClose, items, onSave }: ReorderModalPr
         <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
             <View className="flex-1 bg-background pt-10 px-4">
                 <View className="flex-row justify-between items-center mb-6">
-                    <Text className="text-2xl font-bold text-white">Reorder Exercises</Text>
+                    <Text className="text-2xl font-bold text-iron-950">Reorder Exercises</Text>
                     <IronButton label="Close" variant="ghost" size="sm" onPress={onClose} />
                 </View>
 
