@@ -61,10 +61,10 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
     };
 
     const EXERCISE_TYPES: { id: ExerciseType; label: string }[] = [
-        { id: 'weight_reps', label: 'Weight & Reps' },
-        { id: 'reps_only', label: 'Reps Only' },
-        { id: 'distance_time', label: 'Distance & Time' },
-        { id: 'weight_only', label: 'Weight Only' },
+        { id: 'weight_reps', label: 'Peso + reps' },
+        { id: 'reps_only', label: 'Solo reps' },
+        { id: 'distance_time', label: 'Distancia + tiempo' },
+        { id: 'weight_only', label: 'Solo peso' },
     ];
 
     return (
@@ -81,7 +81,7 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
                             <X color={Colors.iron[400]} />
                         </TouchableOpacity>
                         <Text className="text-iron-950 text-lg font-bold">
-                            {initialData ? 'Edit Exercise' : 'New Exercise'}
+                            {initialData ? 'Editar ejercicio' : 'Nuevo ejercicio'}
                         </Text>
                         <TouchableOpacity onPress={handleSave} className="p-2">
                             <Check color={Colors.primary.dark} />
@@ -90,17 +90,17 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
 
                     <ScrollView className="flex-1 p-4">
                         {/* Name Input */}
-                        <Text className="text-iron-950 text-xs font-bold uppercase mb-2">Name</Text>
+                        <Text className="text-iron-950 text-xs font-bold uppercase mb-2">Nombre</Text>
                         <TextInput
                             value={name}
                             onChangeText={setName}
-                            placeholder="e.g. Bench Press"
+                            placeholder="Ej: Press de banca"
                             placeholderTextColor={Colors.iron[400]}
                             className="bg-iron-800 text-iron-950 p-4 rounded-xl text-lg mb-6 border border-iron-700"
                         />
 
                         {/* Category Picker */}
-                        <Text className="text-iron-950 text-xs font-bold uppercase mb-2">Category</Text>
+                        <Text className="text-iron-950 text-xs font-bold uppercase mb-2">Categoría</Text>
                         <View className="flex-row flex-wrap mb-6">
                             {categories.map(cat => (
                                 <TouchableOpacity
@@ -119,7 +119,7 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
                         </View>
 
                         {/* Type Picker */}
-                        <Text className="text-iron-950 text-xs font-bold uppercase mb-2">Tracking Type</Text>
+                        <Text className="text-iron-950 text-xs font-bold uppercase mb-2">Tipo de registro</Text>
                         <View className="mb-6">
                             {EXERCISE_TYPES.map(t => (
                                 <TouchableOpacity
@@ -141,7 +141,7 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
                             onPress={handleSave}
                             className="bg-primary p-4 rounded-xl items-center border border-iron-950/10"
                         >
-                            <Text className="text-white font-bold text-lg">Save Exercise</Text>
+                            <Text className="text-white font-bold text-lg">Guardar ejercicio</Text>
                         </TouchableOpacity>
                     </View>
 

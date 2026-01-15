@@ -1,4 +1,5 @@
 import { Colors } from '@/src/theme';
+import { configService } from '@/src/services/ConfigService';
 import { format } from 'date-fns';
 import { X } from 'lucide-react-native';
 import React, { useMemo } from 'react';
@@ -15,6 +16,7 @@ interface HistoryModalProps {
 
 export function HistoryModal({ visible, onClose, history, exerciseName }: HistoryModalProps) {
     const screenWidth = Dimensions.get('window').width;
+    const unit = configService.get('weightUnit') === 'kg' ? 'kg' : 'lb';
 
     const chartData = useMemo(() => {
         // Create a copy and sort ASC for chart
@@ -43,7 +45,7 @@ export function HistoryModal({ visible, onClose, history, exerciseName }: Histor
                     <View className="flex-row justify-between items-center p-4 border-b border-iron-800 bg-iron-800">
                         <View>
                             <Text className="text-iron-950 font-bold text-lg">{exerciseName}</Text>
-                            <Text className="text-iron-500 text-xs">Progress History</Text>
+                            <Text className="text-iron-500 text-xs">Historial de progreso</Text>
                         </View>
                         <TouchableOpacity onPress={onClose} className="p-2 bg-primary rounded-full active:opacity-80">
                             <X size={20} color="white" />
@@ -84,7 +86,7 @@ export function HistoryModal({ visible, onClose, history, exerciseName }: Histor
                                     </View>
                                 ) : (
                                     <View className="h-40 items-center justify-center">
-                                        <Text className="text-iron-500">Not enough data for chart</Text>
+                                        <Text className="text-iron-500">No hay suficientes datos para el gráfico</Text>
                                     </View>
                                 )}
                             </View>
@@ -104,7 +106,7 @@ export function HistoryModal({ visible, onClose, history, exerciseName }: Histor
                                                 {set.type === 'pr' && <Text className="text-[10px] text-yellow-500 font-bold ml-1">PR</Text>}
                                             </View>
                                             <Text className="text-iron-950 font-bold text-sm flex-1 text-center">
-                                                {set.weight || 0} <Text className="text-iron-500 font-normal">kg</Text>  ×  {set.reps || 0}
+                                                {set.weight || 0} <Text className="text-iron-500 font-normal">{unit}</Text>  ×  {set.reps || 0}
                                             </Text>
                                             <Text className="text-iron-500 text-xs w-16 text-right">
                                                 {set.type !== 'normal' ? set.type.toUpperCase() : '1RM: ' + Math.round((set.weight || 0) * (1 + (set.reps || 0) / 30))}
@@ -115,7 +117,7 @@ export function HistoryModal({ visible, onClose, history, exerciseName }: Histor
                             </View>
                         )}
                         ListEmptyComponent={
-                            <Text className="text-iron-500 text-center py-8">No history found.</Text>
+                            <Text className="text-iron-500 text-center py-8">No hay historial.</Text>
                         }
                     />
                 </View>

@@ -3,19 +3,41 @@ import { dbService } from './DatabaseService';
 export interface AppConfig {
     weightUnit: 'kg' | 'lbs';
     defaultRestTimer: number;
+    autoStartRestTimerOnSetComplete: boolean;
     themeMode: 'light' | 'dark' | 'system';
     language: 'en' | 'es';
     showGhostValues: boolean;
     autoFinishWorkout: boolean;
+
+    analyticsDefaultRangeDays: 7 | 30 | 90 | 365;
+
+    plateCalculatorDefaultBarWeightKg: number;
+    plateCalculatorDefaultBarWeightLbs: number;
+    plateCalculatorPreferFewerPlates: boolean;
+
+    calculatorsDefault1RMFormula: 'epley' | 'brzycki' | 'lombardi';
+    calculatorsRoundingKg: number;
+    calculatorsRoundingLbs: number;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
     weightUnit: 'kg',
     defaultRestTimer: 90,
+    autoStartRestTimerOnSetComplete: true,
     themeMode: 'system',
-    language: 'en',
+    language: 'es',
     showGhostValues: true,
     autoFinishWorkout: false,
+
+    analyticsDefaultRangeDays: 30,
+
+    plateCalculatorDefaultBarWeightKg: 20,
+    plateCalculatorDefaultBarWeightLbs: 45,
+    plateCalculatorPreferFewerPlates: true,
+
+    calculatorsDefault1RMFormula: 'epley',
+    calculatorsRoundingKg: 2.5,
+    calculatorsRoundingLbs: 5,
 };
 
 class ConfigService {
@@ -37,12 +59,41 @@ class ConfigService {
                 try {
                     // Try parsing JSON if value is complex, otherwise use raw string or number conversion
                     if (s.key === 'defaultRestTimer') loadedConfig[s.key] = parseInt(s.value);
-                    else if (s.key === 'showGhostValues' || s.key === 'autoFinishWorkout') loadedConfig[s.key] = s.value === 'true';
+                    else if (
+                        s.key === 'showGhostValues' ||
+                        s.key === 'autoFinishWorkout' ||
+                        s.key === 'autoStartRestTimerOnSetComplete' ||
+                        s.key === 'plateCalculatorPreferFewerPlates'
+                    ) loadedConfig[s.key] = s.value === 'true';
+                    else if (
+                        s.key === 'analyticsDefaultRangeDays' ||
+                        s.key === 'plateCalculatorDefaultBarWeightKg' ||
+                        s.key === 'plateCalculatorDefaultBarWeightLbs' ||
+                        s.key === 'calculatorsRoundingKg' ||
+                        s.key === 'calculatorsRoundingLbs'
+                    ) loadedConfig[s.key] = parseFloat(s.value);
                     else loadedConfig[s.key] = s.value;
                 } catch (e) {
                     console.warn(`Failed to parse setting ${s.key}`, e);
                 }
             });
+
+            const allowedRanges = new Set([7, 30, 90, 365]);
+            if (!allowedRanges.has(loadedConfig.analyticsDefaultRangeDays)) {
+                loadedConfig.analyticsDefaultRangeDays = DEFAULT_CONFIG.analyticsDefaultRangeDays;
+            }
+
+            const sanitizeNumber = (v: any, fallback: number) => {
+                const n = typeof v === 'number' ? v : parseFloat(String(v));
+                if (!Number.isFinite(n)) return fallback;
+                return n;
+            };
+
+            loadedConfig.defaultRestTimer = Math.max(0, Math.round(sanitizeNumber(loadedConfig.defaultRestTimer, DEFAULT_CONFIG.defaultRestTimer)));
+            loadedConfig.plateCalculatorDefaultBarWeightKg = Math.max(0, sanitizeNumber(loadedConfig.plateCalculatorDefaultBarWeightKg, DEFAULT_CONFIG.plateCalculatorDefaultBarWeightKg));
+            loadedConfig.plateCalculatorDefaultBarWeightLbs = Math.max(0, sanitizeNumber(loadedConfig.plateCalculatorDefaultBarWeightLbs, DEFAULT_CONFIG.plateCalculatorDefaultBarWeightLbs));
+            loadedConfig.calculatorsRoundingKg = Math.max(0.25, sanitizeNumber(loadedConfig.calculatorsRoundingKg, DEFAULT_CONFIG.calculatorsRoundingKg));
+            loadedConfig.calculatorsRoundingLbs = Math.max(0.5, sanitizeNumber(loadedConfig.calculatorsRoundingLbs, DEFAULT_CONFIG.calculatorsRoundingLbs));
 
             this.cache = loadedConfig;
             return loadedConfig;

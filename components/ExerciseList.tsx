@@ -1,9 +1,9 @@
 // @ts-nocheck
 import { Colors } from '@/src/theme';
 import { useRouter } from 'expo-router';
-import { Plus, Search } from 'lucide-react-native';
+import { Pencil, Plus, Search, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CategoryService } from '../src/services/CategoryService';
 import { ExerciseService } from '../src/services/ExerciseService';
 import { Category, Exercise } from '../src/types/db';
@@ -55,6 +55,29 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
     const handleCreate = () => {
         setEditingExercise(null);
         setIsFormVisible(true);
+    };
+
+    const handleEdit = (ex: Exercise) => {
+        setEditingExercise(ex);
+        setIsFormVisible(true);
+    };
+
+    const handleDelete = (ex: Exercise) => {
+        Alert.alert('Eliminar ejercicio', `¿Eliminar "${ex.name}"?`, [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+                text: 'Eliminar',
+                style: 'destructive',
+                onPress: async () => {
+                    try {
+                        await ExerciseService.delete(ex.id);
+                        await loadData();
+                    } catch (e: any) {
+                        Alert.alert('No se pudo eliminar', e?.message ?? 'Error');
+                    }
+                }
+            }
+        ]);
     };
 
     const handlePress = (ex: Exercise) => {
@@ -131,6 +154,8 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
                         <TouchableOpacity
                             onPress={() => handlePress(item)}
                             className="flex-row items-center justify-between p-4 mb-3 bg-surface rounded-xl border border-iron-700 elevation-1 active:opacity-70"
+                            accessibilityRole="button"
+                            accessibilityLabel={`Abrir ejercicio ${item.name}`}
                         >
                             <View className="flex-1">
                                 <Text className="text-iron-950 font-bold text-base">{item.name}</Text>
@@ -139,7 +164,29 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
                                     <Text className="text-iron-950/60 text-xs uppercase">{item.category_name}</Text>
                                 </View>
                             </View>
-                            {/* Visual indicator for edit mode could go here */}
+                            {!onSelect && (
+                                <View className="flex-row items-center gap-2">
+                                    <TouchableOpacity
+                                        onPress={() => handleEdit(item)}
+                                        className="p-2 bg-iron-200 rounded-lg active:opacity-50"
+                                        accessibilityRole="button"
+                                        accessibilityLabel={`Editar ejercicio ${item.name}`}
+                                    >
+                                        <Pencil size={18} color={Colors.iron[500]} />
+                                    </TouchableOpacity>
+
+                                    {!item.is_system && (
+                                        <TouchableOpacity
+                                            onPress={() => handleDelete(item)}
+                                            className="p-2 bg-red-100 rounded-lg active:opacity-50"
+                                            accessibilityRole="button"
+                                            accessibilityLabel={`Eliminar ejercicio ${item.name}`}
+                                        >
+                                            <Trash2 size={18} color={Colors.red} />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            )}
                         </TouchableOpacity>
                     )}
                 />
@@ -150,6 +197,8 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
                 <TouchableOpacity
                     onPress={handleCreate}
                     className="absolute bottom-6 right-6 w-14 h-14 bg-primary rounded-full items-center justify-center shadow-lg border border-iron-700 active:opacity-90"
+                    accessibilityRole="button"
+                    accessibilityLabel="Crear ejercicio"
                 >
                     <Plus color="white" />
                 </TouchableOpacity>

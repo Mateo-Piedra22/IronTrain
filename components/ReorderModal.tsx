@@ -25,7 +25,7 @@ export function ReorderModal({ visible, onClose, items, onSave }: ReorderModalPr
             await onSave(data.map(d => d.key)); // Passing Keys (ExID-Name) is fine, we just need order
             onClose();
         } catch (e) {
-            Alert.alert('Error', 'Failed to save order');
+            Alert.alert('Error', 'No se pudo guardar el orden.');
         } finally {
             setLoading(false);
         }
@@ -50,11 +50,11 @@ export function ReorderModal({ visible, onClose, items, onSave }: ReorderModalPr
         <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
             <View className="flex-1 bg-background pt-10 px-4">
                 <View className="flex-row justify-between items-center mb-6">
-                    <Text className="text-2xl font-bold text-iron-950">Reorder Exercises</Text>
-                    <IronButton label="Close" variant="ghost" size="sm" onPress={onClose} />
+                    <Text className="text-2xl font-bold text-iron-950">Reordenar ejercicios</Text>
+                    <IronButton label="Cerrar" variant="ghost" size="sm" onPress={onClose} />
                 </View>
 
-                <Text className="text-textMuted mb-4">Long press and drag to reorder.</Text>
+                <Text className="text-textMuted mb-4">Mantén presionado y arrastra para reordenar.</Text>
 
                 <DraggableFlatList
                     data={data}
@@ -65,7 +65,7 @@ export function ReorderModal({ visible, onClose, items, onSave }: ReorderModalPr
                 />
 
                 <View className="py-6">
-                    <IronButton label="Save Order" onPress={handleSave} loading={loading} />
+                    <IronButton label="Guardar orden" onPress={handleSave} loading={loading} />
                 </View>
             </View>
         </Modal>

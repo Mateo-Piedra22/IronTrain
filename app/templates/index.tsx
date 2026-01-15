@@ -46,15 +46,15 @@ export default function TemplatesScreen() {
             setIsCreating(false);
             router.push({ pathname: '/workout/[id]', params: { id } });
         } catch (e) {
-            Alert.alert('Error', 'Failed to create template');
+            Alert.alert('Error', 'No se pudo crear la plantilla.');
         }
     };
 
     const handleLoad = (templateId: string) => {
-        Alert.alert('Start Workout', 'Use this template for today\'s session?', [
-            { text: 'Cancel', style: 'cancel' },
+        Alert.alert('Iniciar entrenamiento', '¿Usar esta plantilla para la sesión de hoy?', [
+            { text: 'Cancelar', style: 'cancel' },
             {
-                text: 'Start',
+                text: 'Iniciar',
                 onPress: async () => {
                     try {
                         const today = format(new Date(), 'yyyy-MM-dd');
@@ -69,10 +69,10 @@ export default function TemplatesScreen() {
     };
 
     const handleDelete = (id: string) => {
-        Alert.alert('Delete', 'Delete this template permanently?', [
-            { text: 'Cancel' },
+        Alert.alert('Eliminar', '¿Eliminar esta plantilla permanentemente?', [
+            { text: 'Cancelar' },
             {
-                text: 'Delete',
+                text: 'Eliminar',
                 style: 'destructive',
                 onPress: async () => {
                     await workoutService.delete(id);
@@ -87,7 +87,7 @@ export default function TemplatesScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             
             <View className="pt-4 px-4 pb-4 border-b border-iron-200 flex-row justify-between items-center bg-iron-900">
-                <Text className="text-3xl font-bold text-iron-950">Templates</Text>
+                <Text className="text-3xl font-bold text-iron-950">Plantillas</Text>
                 <TouchableOpacity 
                     onPress={() => setIsCreating(true)}
                     className="bg-surface p-2 rounded-lg border border-iron-700 elevation-1 active:bg-iron-200"
@@ -111,7 +111,7 @@ export default function TemplatesScreen() {
                             </View>
                             <View>
                                 <Text className="text-iron-950 font-bold text-lg">{item.name}</Text>
-                                <Text className="text-iron-500 text-xs">Tap to edit</Text>
+                                <Text className="text-iron-500 text-xs">Toca para editar</Text>
                             </View>
                         </Pressable>
 
@@ -133,8 +133,8 @@ export default function TemplatesScreen() {
                 )}
                 ListEmptyComponent={
                     <View className="items-center justify-center mt-20">
-                        <Text className="text-iron-500 text-center mb-4">No templates found.</Text>
-                        <IronButton label="Create First Template" onPress={() => setIsCreating(true)} />
+                        <Text className="text-iron-500 text-center mb-4">Todavía no hay plantillas.</Text>
+                        <IronButton label="Crear primera plantilla" onPress={() => setIsCreating(true)} />
                     </View>
                 }
             />
@@ -147,19 +147,19 @@ export default function TemplatesScreen() {
             >
                 <View className="flex-1 bg-black/50 justify-center items-center p-4">
                     <View className="bg-surface w-full max-w-sm rounded-2xl p-6 border border-iron-700 elevation-2">
-                        <Text className="text-xl font-bold text-iron-950 mb-6">New Template</Text>
+                        <Text className="text-xl font-bold text-iron-950 mb-6">Nueva plantilla</Text>
                         <IronInput
-                            placeholder="Template Name (e.g. Leg Day)"
+                            placeholder="Nombre de plantilla (ej: Piernas)"
                             value={newTemplateName}
                             onChangeText={setNewTemplateName}
                             autoFocus
                         />
                         <View className="flex-row gap-3 mt-4">
                             <View className="flex-1">
-                                <IronButton label="Cancel" variant="ghost" onPress={() => setIsCreating(false)} />
+                                <IronButton label="Cancelar" variant="ghost" onPress={() => setIsCreating(false)} />
                             </View>
                             <View className="flex-1">
-                                <IronButton label="Create" onPress={handleCreate} />
+                                <IronButton label="Crear" onPress={handleCreate} />
                             </View>
                         </View>
                     </View>

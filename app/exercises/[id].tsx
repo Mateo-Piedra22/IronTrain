@@ -1,21 +1,24 @@
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
+import { CategoryService } from '@/src/services/CategoryService';
 import { Exercise, ExerciseService } from '@/src/services/ExerciseService';
 import { Colors } from '@/src/theme';
 import { ExerciseType } from '@/src/types/db';
 import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { LucidePlus, LucideTrash2 } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { LucidePlus, LucideSearch, LucideTrash2 } from 'lucide-react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 
 export default function CategoryDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const [exercises, setExercises] = useState<Exercise[]>([]);
-    const [categoryName, setCategoryName] = useState('Category');
+    const [categoryName, setCategoryName] = useState('Ejercicios');
     const [isAdding, setIsAdding] = useState(false);
+    const [search, setSearch] = useState('');
+    const [typeFilter, setTypeFilter] = useState<ExerciseType | 'all'>('all');
 
     // New Exercise Form
     const [newName, setNewName] = useState('');
@@ -25,29 +28,35 @@ export default function CategoryDetailScreen() {
         if (id) {
             loadData();
         }
-    }, [id]);
+    }, [id, search, typeFilter]);
 
     const loadData = async () => {
         try {
-            // Sadly my CategoryService doesn't have getById. I should add it.
-            // Or just filter from list effectively. 
-            // I'll add getById to CategoryService for correctness.
-            // For now, I'll fetch exercises.
             if (!id) return;
-            const ex = await ExerciseService.getByCategory(id);
-            setExercises(ex);
+            const [ex, cat] = await Promise.all([
+                ExerciseService.getByCategory(id),
+                CategoryService.getById(id)
+            ]);
+            setCategoryName(cat?.name ?? 'Ejercicios');
 
-            // Hack to get name if service missing getById
-            // const cats = await CategoryService.getAll();
-            // const c = cats.find(c => c.id === id);
-            // if (c) setCategoryName(c.name);
+            const normalized = (search || '').trim().toLowerCase();
+            const filtered = ex.filter((e) => {
+                const matchesSearch = normalized.length === 0 ? true : (e.name || '').toLowerCase().includes(normalized);
+                const matchesType = typeFilter === 'all' ? true : e.type === typeFilter;
+                return matchesSearch && matchesType;
+            });
+
+            setExercises(filtered);
         } catch (e) {
             console.error(e);
         }
     };
 
     const handleCreate = async () => {
-        if (!newName.trim() || !id) return;
+        if (!newName.trim() || !id) {
+            Alert.alert('Falta información', 'Escribe un nombre para el ejercicio.');
+            return;
+        }
         try {
             await ExerciseService.create({
                 category_id: id,
@@ -64,46 +73,106 @@ export default function CategoryDetailScreen() {
     };
 
     const handleDelete = async (exId: string, name: string) => {
-        Alert.alert('Delete Exercise', `Delete "${name}"?`, [
-            { text: 'Cancel', style: 'cancel' },
+        Alert.alert('Eliminar ejercicio', `¿Eliminar "${name}"?`, [
+            { text: 'Cancelar', style: 'cancel' },
             {
-                text: 'Delete',
+                text: 'Eliminar',
                 style: 'destructive',
                 onPress: async () => {
                     try {
                         await ExerciseService.delete(exId);
                         loadData();
                     } catch (e) {
-                        Alert.alert('Cannot delete', (e as Error).message);
+                        Alert.alert('No se pudo eliminar', (e as Error).message);
                     }
                 }
             }
         ]);
     };
 
+    const typeLabel = (t: ExerciseType) => {
+        if (t === 'weight_reps') return 'Peso + reps';
+        if (t === 'distance_time') return 'Distancia + tiempo';
+        if (t === 'weight_only') return 'Solo peso';
+        return 'Solo reps';
+    };
+
+    const emptyText = useMemo(() => {
+        if ((search || '').trim().length > 0 || typeFilter !== 'all') return 'No hay resultados con estos filtros.';
+        return 'No hay ejercicios en esta categoría.';
+    }, [search, typeFilter]);
+
     return (
         <SafeAreaWrapper className="flex-1 bg-iron-900" edges={['top', 'left', 'right']}>
             <View className="flex-row justify-between items-center mb-6 px-4 pt-4">
-                <Text className="text-2xl font-bold text-iron-950">Exercises</Text>
+                <View>
+                    <Text className="text-2xl font-bold text-iron-950">{categoryName}</Text>
+                    <Text className="text-iron-500 text-xs font-bold mt-1">Gestiona y abre el historial de tus ejercicios</Text>
+                </View>
                 <Pressable
                     onPress={() => setIsAdding(!isAdding)}
                     className="bg-surface p-2 rounded-lg border border-iron-700 elevation-1 active:bg-iron-200"
+                    accessibilityRole="button"
+                    accessibilityLabel={isAdding ? 'Cerrar formulario' : 'Crear ejercicio'}
                 >
                     <LucidePlus size={24} color={Colors.primary.DEFAULT} />
                 </Pressable>
             </View>
 
+            <View className="px-4 mb-4">
+                <View className="flex-row items-center bg-surface px-4 py-3 rounded-xl border border-iron-700">
+                    <LucideSearch size={18} color={Colors.iron[500]} />
+                    <TextInput
+                        className="flex-1 ml-3 text-iron-950"
+                        placeholder="Buscar ejercicio…"
+                        placeholderTextColor={Colors.iron[400]}
+                        value={search}
+                        onChangeText={setSearch}
+                        accessibilityLabel="Buscar ejercicio"
+                    />
+                </View>
+
+                <View className="flex-row gap-2 mt-3 flex-wrap">
+                    {(['all', 'weight_reps', 'weight_only', 'reps_only', 'distance_time'] as const).map((t) => (
+                        <Pressable
+                            key={t}
+                            onPress={() => setTypeFilter(t as any)}
+                            className={`px-3 py-2 rounded-full border ${typeFilter === t ? 'bg-surface border-primary' : 'bg-transparent border-iron-700'}`}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Filtrar por ${t === 'all' ? 'todo' : typeLabel(t as any)}`}
+                        >
+                            <Text className={`font-bold text-xs ${typeFilter === t ? 'text-primary' : 'text-iron-950'}`}>
+                                {t === 'all' ? 'Todos' : typeLabel(t as any)}
+                            </Text>
+                        </Pressable>
+                    ))}
+                </View>
+            </View>
+
             {isAdding && (
                 <View className="bg-surface mx-4 p-4 rounded-xl border border-iron-700 elevation-2 mb-4">
-                    <Text className="text-iron-950 font-bold mb-4 text-lg">New Exercise</Text>
+                    <Text className="text-iron-950 font-bold mb-4 text-lg">Nuevo ejercicio</Text>
                     <IronInput
-                        placeholder="Exercise Name"
+                        placeholder="Nombre del ejercicio"
                         value={newName}
                         onChangeText={setNewName}
                         autoFocus
                     />
+                    <View className="flex-row gap-2 mb-4 flex-wrap">
+                        {(['weight_reps', 'weight_only', 'reps_only', 'distance_time'] as const).map((t) => (
+                            <Pressable
+                                key={t}
+                                onPress={() => setNewType(t)}
+                                className={`px-3 py-2 rounded-full border ${newType === t ? 'bg-primary border-primary' : 'bg-white border-iron-200'}`}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Seleccionar tipo ${typeLabel(t)}`}
+                            >
+                                <Text className={`font-bold text-xs ${newType === t ? 'text-white' : 'text-iron-950'}`}>{typeLabel(t)}</Text>
+                            </Pressable>
+                        ))}
+                    </View>
                     <IronButton
-                        label="CREATE"
+                        label="CREAR"
                         onPress={handleCreate}
                         variant="solid"
                     />
@@ -116,18 +185,37 @@ export default function CategoryDetailScreen() {
                 estimatedItemSize={70}
                 contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
                 renderItem={({ item }) => (
-                    <View className="bg-surface p-4 rounded-xl mb-3 border border-iron-700 elevation-1 flex-row justify-between items-center">
-                        <View>
+                    <Pressable
+                        onPress={() =>
+                            router.push({
+                                pathname: '/exercise/[id]' as any,
+                                params: { id: item.id, exerciseId: item.id, exerciseName: item.name }
+                            })
+                        }
+                        className="bg-surface p-4 rounded-xl mb-3 border border-iron-700 elevation-1 flex-row justify-between items-center active:bg-iron-200"
+                        accessibilityRole="button"
+                        accessibilityLabel={`Abrir ejercicio ${item.name}`}
+                    >
+                        <View className="flex-1 pr-3">
                             <Text className="text-iron-950 font-bold text-lg">{item.name}</Text>
-                            <Text className="text-iron-500 text-xs font-bold uppercase tracking-wider">{item.type}</Text>
+                            <Text className="text-iron-500 text-xs font-bold uppercase tracking-wider">{typeLabel(item.type)}</Text>
                         </View>
-                        <Pressable onPress={() => handleDelete(item.id, item.name)} className="p-3 -mr-2 active:opacity-50">
-                            <LucideTrash2 size={20} color={Colors.iron[400]} />
-                        </Pressable>
-                    </View>
+                        <View className="flex-row items-center">
+                            {!item.is_system && (
+                                <Pressable
+                                    onPress={() => handleDelete(item.id, item.name)}
+                                    className="p-3 -mr-2 active:opacity-50"
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`Eliminar ejercicio ${item.name}`}
+                                >
+                                    <LucideTrash2 size={20} color={Colors.iron[400]} />
+                                </Pressable>
+                            )}
+                        </View>
+                    </Pressable>
                 )}
                 ListEmptyComponent={
-                    <Text className="text-iron-500 text-center mt-10">No exercises in this category.</Text>
+                    <Text className="text-iron-500 text-center mt-10">{emptyText}</Text>
                 }
             />
         </SafeAreaWrapper>

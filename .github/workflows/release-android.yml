@@ -1,0 +1,89 @@
+name: Release Android APK
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate changelog JSON
+        run: npm run generate-changelog
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build Android (EAS preview APK)
+        run: eas build --platform android --profile preview --non-interactive --wait --json > eas-build.json
+
+      - name: Extract artifact URL
+        id: artifact
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const raw = fs.readFileSync('eas-build.json', 'utf8').trim();
+          let data;
+          try {
+            data = JSON.parse(raw);
+          } catch {
+            console.error('Failed to parse eas-build.json');
+            process.exit(1);
+          }
+          const search = (value) => {
+            if (typeof value === 'string') return value.includes('.apk') ? value : null;
+            if (!value || typeof value !== 'object') return null;
+            if (Array.isArray(value)) {
+              for (const v of value) {
+                const found = search(v);
+                if (found) return found;
+              }
+              return null;
+            }
+            for (const k of Object.keys(value)) {
+              const found = search(value[k]);
+              if (found) return found;
+            }
+            return null;
+          };
+          const apkUrl = search(data);
+          if (!apkUrl) {
+            console.error('No APK URL found in EAS JSON output');
+            process.exit(1);
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `apk_url=${apkUrl}\n`);
+          NODE
+
+      - name: Download APK
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          apk="IronTrain-${tag}.apk"
+          curl -L "${{ steps.artifact.outputs.apk_url }}" -o "${apk}"
+          sha256sum "${apk}" | awk '{print $1}' > "IronTrain-${tag}.sha256.txt"
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            IronTrain-${{ github.ref_name }}.apk
+            IronTrain-${{ github.ref_name }}.sha256.txt

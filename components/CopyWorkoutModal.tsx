@@ -39,7 +39,7 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, onCopyComplete,
                 setSourceWorkout(null);
             }
         } catch (e) {
-            console.log("No workout found or error", e);
+            console.log('No se encontró entrenamiento para esa fecha');
             setSourceWorkout(null);
         } finally {
             setLoading(false);
@@ -50,12 +50,12 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, onCopyComplete,
         if (!sourceWorkout) return;
 
         Alert.alert(
-            "Copy Workout",
-            `Copy workout from ${format(new Date(selectedDateStr), 'd MMM')} to ${format(targetDate, 'd MMM')}?`,
+            "Copiar entrenamiento",
+            `¿Copiar el entrenamiento del ${format(new Date(selectedDateStr), 'd MMM')} al ${format(targetDate, 'd MMM')}?`,
             [
-                { text: "Cancel", style: "cancel" },
+                { text: "Cancelar", style: "cancel" },
                 {
-                    text: "Copy",
+                    text: "Copiar",
                     onPress: async () => {
                         try {
                             setLoading(true);
@@ -78,7 +78,7 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, onCopyComplete,
         <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
             <View className="flex-1 bg-iron-900">
                 <View className="flex-row justify-between items-center p-4 border-b border-iron-800 bg-iron-800">
-                    <Text className="text-iron-950 font-bold text-lg">Copy from Date</Text>
+                    <Text className="text-iron-950 font-bold text-lg">Copiar desde fecha</Text>
                     <TouchableOpacity onPress={onClose}>
                         <X color={Colors.iron[950]} size={24} />
                     </TouchableOpacity>
@@ -108,13 +108,13 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, onCopyComplete,
                     />
 
                     <View className="p-4">
-                        <Text className="text-iron-950 text-sm mb-2 uppercase font-bold">Selected Workout</Text>
+                        <Text className="text-iron-950 text-sm mb-2 uppercase font-bold">Entrenamiento seleccionado</Text>
 
                         {loading ? (
-                            <Text className="text-iron-950 italic">Checking history...</Text>
+                            <Text className="text-iron-950 italic">Buscando en el historial...</Text>
                         ) : sourceWorkout ? (
                             <View className="bg-iron-800 p-4 rounded-xl border border-iron-700">
-                                <Text className="text-iron-950 font-bold text-lg mb-1">{sourceWorkout.name || 'Workout'}</Text>
+                                <Text className="text-iron-950 font-bold text-lg mb-1">{sourceWorkout.name || 'Entrenamiento'}</Text>
                                 <Text className="text-iron-950 text-xs mb-4">
                                     {format(new Date(selectedDateStr), 'EEEE, d MMMM yyyy', { locale: es })}
                                 </Text>
@@ -124,15 +124,15 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, onCopyComplete,
                                     className="bg-primary p-3 rounded-lg flex-row justify-center items-center active:opacity-90"
                                 >
                                     <Copy color="white" size={18} />
-                                    <Text className="text-white font-bold ml-2 uppercase">Copy to Today</Text>
+                                    <Text className="text-white font-bold ml-2 uppercase">Copiar a este día</Text>
                                 </TouchableOpacity>
                             </View>
                         ) : selectedDateStr ? (
                             <View className="bg-iron-800/50 p-4 rounded-xl border border-iron-800 border-dashed items-center">
-                                <Text className="text-iron-950">No workout data found for this date.</Text>
+                                <Text className="text-iron-950">No hay datos de entrenamiento para esa fecha.</Text>
                             </View>
                         ) : (
-                            <Text className="text-iron-950">Select a date to preview.</Text>
+                            <Text className="text-iron-950">Selecciona una fecha para previsualizar.</Text>
                         )}
                     </View>
                 </ScrollView>

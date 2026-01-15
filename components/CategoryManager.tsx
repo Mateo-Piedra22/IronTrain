@@ -47,7 +47,7 @@ export function CategoryManager() {
             setCategoryName('');
             loadData();
         } catch (e) {
-            Alert.alert('Error', 'Failed to save category');
+            Alert.alert('Error', (e as Error)?.message || 'No se pudo guardar la categoría');
         }
     };
 
@@ -57,25 +57,37 @@ export function CategoryManager() {
             return;
         }
 
-        Alert.alert(
-            'Delete Category',
-            `Are you sure you want to delete "${category.name}"?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await CategoryService.delete(category.id);
-                            loadData();
-                        } catch (e: any) {
-                            Alert.alert('Error', e.message || 'Failed to delete');
+        try {
+            const impact = await CategoryService.getDeletionImpact(category.id);
+            const movedMsg = impact.exerciseCount > 0
+                ? `\n\nEjercicios afectados: ${impact.exerciseCount}\nSe moverán a "${CategoryService.UNCATEGORIZED_NAME}".`
+                : '';
+            const examples = impact.sampleExerciseNames.length > 0
+                ? `\n\nEjemplos:\n- ${impact.sampleExerciseNames.slice(0, 6).join('\n- ')}${impact.sampleExerciseNames.length > 6 ? '\n- ...' : ''}`
+                : '';
+
+            Alert.alert(
+                'Eliminar categoría',
+                `¿Eliminar "${category.name}"?${movedMsg}${examples}`,
+                [
+                    { text: 'Cancelar', style: 'cancel' },
+                    {
+                        text: 'Eliminar',
+                        style: 'destructive',
+                        onPress: async () => {
+                            try {
+                                await CategoryService.deleteAndReassignExercises(category.id);
+                                loadData();
+                            } catch (e: any) {
+                                Alert.alert('Error', e?.message || 'No se pudo eliminar.');
+                            }
                         }
                     }
-                }
-            ]
-        );
+                ]
+            );
+        } catch (e: any) {
+            Alert.alert('Error', e?.message || 'No se pudo eliminar.');
+        }
     };
 
     const openModal = (category?: Category) => {
@@ -113,15 +125,26 @@ export function CategoryManager() {
                             </View>
 
                             <View className="flex-row items-center gap-2">
+                                {item.id !== CategoryService.UNCATEGORIZED_ID && (
+                                    <TouchableOpacity
+                                        onPress={() => openModal(item)}
+                                        className="p-2 bg-iron-200 rounded-lg active:opacity-50"
+                                        accessibilityRole="button"
+                                        accessibilityLabel={`Editar categoría ${item.name}`}
+                                    >
+                                        <Pencil size={18} color={Colors.iron[500]} />
+                                    </TouchableOpacity>
+                                )}
+
                                 {!item.is_system && (
-                                    <>
-                                        <TouchableOpacity onPress={() => openModal(item)} className="p-2 bg-iron-200 rounded-lg active:opacity-50">
-                                            <Pencil size={18} color={Colors.iron[500]} />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={() => handleDelete(item)} className="p-2 bg-red-100 rounded-lg active:opacity-50">
-                                            <Trash2 size={18} color={Colors.red} />
-                                        </TouchableOpacity>
-                                    </>
+                                    <TouchableOpacity
+                                        onPress={() => handleDelete(item)}
+                                        className="p-2 bg-red-100 rounded-lg active:opacity-50"
+                                        accessibilityRole="button"
+                                        accessibilityLabel={`Eliminar categoría ${item.name}`}
+                                    >
+                                        <Trash2 size={18} color={Colors.red} />
+                                    </TouchableOpacity>
                                 )}
                             </View>
                         </View>
@@ -132,6 +155,8 @@ export function CategoryManager() {
             <TouchableOpacity
                 onPress={() => openModal()}
                 className="absolute bottom-6 right-6 w-14 h-14 bg-primary rounded-full items-center justify-center elevation-3 border border-orange-400 active:scale-95"
+                accessibilityRole="button"
+                accessibilityLabel="Crear categoría"
             >
                 <Plus color="white" size={30} />
             </TouchableOpacity>
@@ -146,11 +171,11 @@ export function CategoryManager() {
                     <View className="flex-1 bg-black/50 justify-center items-center p-4">
                         <View className="bg-surface w-full max-w-sm rounded-2xl p-6 border border-iron-700 elevation-2">
                             <Text className="text-xl font-bold text-iron-950 mb-6">
-                                {editingCategory ? 'Edit Category' : 'New Category'}
+                                {editingCategory ? 'Editar categoría' : 'Nueva categoría'}
                             </Text>
 
                             <IronInput
-                                label="Name"
+                                label="Nombre"
                                 value={categoryName}
                                 onChangeText={setCategoryName}
                                 autoFocus
@@ -162,7 +187,7 @@ export function CategoryManager() {
                                 onPress={() => setShowColorPicker(true)}
                                 className="flex-row items-center bg-white p-4 rounded-xl border border-iron-500 mb-6 justify-between active:bg-iron-200"
                             >
-                                <Text className="text-iron-950 font-semibold">Selected Color</Text>
+                                <Text className="text-iron-950 font-semibold">Color seleccionado</Text>
                                 <View className="flex-row items-center gap-3">
                                     <Text className="text-iron-500 uppercase font-mono">{selectedColor}</Text>
                                     <View className="w-8 h-8 rounded-full border border-iron-200 shadow-sm" style={{ backgroundColor: selectedColor }} />
@@ -171,10 +196,10 @@ export function CategoryManager() {
 
                             <View className="flex-row gap-3">
                                 <View className="flex-1">
-                                    <IronButton label="Cancel" variant="ghost" onPress={() => setModalVisible(false)} />
+                                    <IronButton label="Cancelar" variant="ghost" onPress={() => setModalVisible(false)} />
                                 </View>
                                 <View className="flex-1">
-                                    <IronButton label="Save" onPress={handleSave} />
+                                    <IronButton label="Guardar" onPress={handleSave} />
                                 </View>
                             </View>
                         </View>

@@ -1,5 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { backupService } from '../BackupService';
 import { dbService } from '../DatabaseService';
 
@@ -8,13 +8,17 @@ jest.mock('../DatabaseService', () => ({
   dbService: {
     run: jest.fn(),
     getAll: jest.fn(),
+    getFirst: jest.fn(),
   },
 }));
 
-jest.mock('expo-file-system', () => ({
+jest.mock('expo-file-system/legacy', () => ({
   readAsStringAsync: jest.fn(),
   writeAsStringAsync: jest.fn(),
   documentDirectory: 'file:///test/',
+  cacheDirectory: 'file:///cache/',
+  EncodingType: { UTF8: 'utf8' },
+  getContentUriAsync: jest.fn(),
 }));
 
 jest.mock('expo-document-picker', () => ({
@@ -29,6 +33,7 @@ jest.mock('expo-sharing', () => ({
 describe('BackupService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (dbService.getFirst as jest.Mock).mockResolvedValue({ count: 1 });
   });
 
   describe('importData', () => {
@@ -64,7 +69,7 @@ describe('BackupService', () => {
 
       // Verify the specific SQL query structure
       const calls = (dbService.run as jest.Mock).mock.calls;
-      const exerciseCall = calls.find(call => call[0].includes('exercises'));
+      const exerciseCall = calls.find(call => String(call[0]).includes('INSERT OR REPLACE INTO exercises'));
       
       expect(exerciseCall).toBeDefined();
       const executedSql = exerciseCall[0];
@@ -80,7 +85,6 @@ describe('BackupService', () => {
       
       // Should look like: INSERT OR REPLACE INTO exercises (id,name,category_id) ...
       // The exact order depends on Object.keys but the malicious one must be gone
-      console.log('Sanitized SQL:', executedSql);
     });
 
     it('should skip tables not in the whitelist', async () => {
@@ -91,7 +95,7 @@ describe('BackupService', () => {
       });
 
       const unknownTableData = {
-        exercises: [],
+        exercises: [{ id: '1', name: 'X', category_id: 'c1' }],
         workouts: [],
         // UNKNOWN TABLE
         hack_table: [{ id: 1, admin: true }]

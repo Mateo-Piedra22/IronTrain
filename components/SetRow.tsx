@@ -4,6 +4,8 @@ import { Check, Copy, MessageSquare, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Alert, Animated, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
+import { configService } from '../src/services/ConfigService';
+import { UnitService } from '../src/services/UnitService';
 import { WorkoutSet } from '../src/types/db';
 
 interface SetRowProps {
@@ -12,10 +14,26 @@ interface SetRowProps {
     onUpdate: (id: string, updates: Partial<WorkoutSet>) => void;
     onDelete: (id: string) => void;
     onCopy?: (id: string) => void;
+    disabled?: boolean;
 }
 
-export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) {
-    const [weight, setWeight] = useState(set.weight?.toString() || '');
+export function SetRow({ set, index, onUpdate, onDelete, onCopy, disabled }: SetRowProps) {
+    const unit = configService.get('weightUnit');
+    const toDisplayWeight = (kgValue: number) => unit === 'kg' ? kgValue : UnitService.kgToLbs(kgValue);
+    const toKg = (displayValue: number) => unit === 'kg' ? displayValue : UnitService.lbsToKg(displayValue);
+    const normalize = (n: number) => (Math.round(n * 100) / 100);
+    const typeLabel =
+        set.type === 'normal'
+            ? `SERIE ${index + 1}`
+            : set.type === 'warmup'
+                ? 'CALENT'
+                : set.type === 'failure'
+                    ? 'FALLO'
+                    : set.type === 'drop'
+                        ? 'DROP'
+                        : 'PR';
+
+    const [weight, setWeight] = useState(set.weight != null ? normalize(toDisplayWeight(set.weight)).toString() : '');
     const [reps, setReps] = useState(set.reps?.toString() || '');
     const [rpe, setRpe] = useState(set.rpe?.toString() || '');
     const [notes, setNotes] = useState(set.notes || '');
@@ -23,15 +41,24 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) 
 
     // Ghost Logic
     useEffect(() => {
-        if (!set.weight && set.previous_weight) {
-            setWeight(set.previous_weight.toString());
+        if (set.weight != null) {
+            setWeight(normalize(toDisplayWeight(set.weight)).toString());
+            return;
         }
-    }, [set.previous_weight]);
+        if (!set.weight && set.previous_weight) {
+            setWeight(normalize(toDisplayWeight(set.previous_weight)).toString());
+        }
+    }, [set.weight, set.previous_weight, unit]);
 
     const handleComplete = () => {
+        if (disabled) {
+            Alert.alert('Entrenamiento finalizado', 'Este entrenamiento está finalizado y no se puede editar.');
+            return;
+        }
+        const w = weight ? parseFloat(weight) : undefined;
         onUpdate(set.id, {
             completed: set.completed ? 0 : 1,
-            weight: weight ? parseFloat(weight) : undefined,
+            weight: w != null && Number.isFinite(w) ? toKg(w) : undefined,
             reps: reps ? parseInt(reps) : undefined,
             rpe: rpe ? parseFloat(rpe) : undefined,
             notes: notes
@@ -39,8 +66,10 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) 
     };
 
     const handleBlur = () => {
+        if (disabled) return;
+        const w = weight ? parseFloat(weight) : undefined;
         onUpdate(set.id, {
-            weight: weight ? parseFloat(weight) : undefined,
+            weight: w != null && Number.isFinite(w) ? toKg(w) : undefined,
             reps: reps ? parseInt(reps) : undefined,
             rpe: rpe ? parseFloat(rpe) : undefined,
             notes: notes
@@ -48,6 +77,7 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) 
     };
 
     const isCompleted = set.completed === 1;
+    const canSwipe = !disabled;
 
     // --- ANIMATION LOGIC FOR SWIPE ---
     const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
@@ -69,12 +99,16 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) 
                 <Animated.View style={{ transform: [{ scale }], opacity, width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', paddingLeft: 20 }}>
                     <TouchableOpacity
                         onPress={() => {
+                            if (disabled) {
+                                Alert.alert('Entrenamiento finalizado', 'Este entrenamiento está finalizado y no se puede editar.');
+                                return;
+                            }
                             if (isCompleted) {
                                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                                 Alert.alert(
-                                    "Set Locked 🔒",
-                                    "This set is marked as completed. Please uncheck it first to delete.",
-                                    [{ text: "Understood", style: "default" }]
+                                    "Serie bloqueada",
+                                    "Esta serie está marcada como completada. Desmárcala para poder eliminarla.",
+                                    [{ text: "Entendido", style: "default" }]
                                 );
                                 return;
                             }
@@ -102,6 +136,10 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) 
                 <Animated.View style={{ transform: [{ scale }], width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', paddingRight: 20 }}>
                     <TouchableOpacity
                         onPress={() => {
+                            if (disabled) {
+                                Alert.alert('Entrenamiento finalizado', 'Este entrenamiento está finalizado y no se puede editar.');
+                                return;
+                            }
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                             if (onCopy) onCopy(set.id);
                         }}
@@ -115,7 +153,11 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) 
     };
 
     return (
-        <Swipeable renderRightActions={renderRightActions} renderLeftActions={renderLeftActions} containerStyle={{ overflow: 'visible' }}>
+        <Swipeable
+            renderRightActions={canSwipe ? renderRightActions : undefined}
+            renderLeftActions={canSwipe ? renderLeftActions : undefined}
+            containerStyle={{ overflow: 'visible' }}
+        >
             <View className={`mb-3 rounded-xl border shadow-sm overflow-hidden ${isCompleted
                 ? 'border-primary bg-[#fffbf7]' // Solid Cream/Coffee-tinted background, no transparency but clear differentiation
                 : 'border-iron-200 bg-iron-800'
@@ -133,12 +175,12 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) 
                                 set.type === 'failure' ? 'text-red-700' :
                                     set.type === 'drop' ? 'text-purple-700' : 'text-iron-600'
                                 }`}>
-                                {set.type === 'normal' ? `SET ${index + 1}` : set.type}
+                                {typeLabel}
                             </Text>
                         </View>
                         {set.previous_weight && (
                             <Text className="text-[10px] text-iron-400 font-medium">
-                                PREV: {set.previous_weight}kg x {set.previous_reps}
+                                ANT: {normalize(toDisplayWeight(set.previous_weight))}{unit} x {set.previous_reps}
                             </Text>
                         )}
                     </View>
@@ -167,14 +209,15 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) 
                             onChangeText={setWeight}
                             onBlur={handleBlur}
                             keyboardType="numeric"
-                            placeholder={set.previous_weight?.toString() || "0"}
+                            placeholder={set.previous_weight != null ? normalize(toDisplayWeight(set.previous_weight)).toString() : "0"}
                             placeholderTextColor={Colors.iron[300]}
                             // Removed /50 opacity variants. Used solid colors.
                             className={`text-2xl font-bold text-center w-full p-2 rounded-lg ${isCompleted ? 'text-primary bg-primary/5' : 'text-iron-950 bg-iron-100'
                                 }`}
+                            editable={!disabled}
                             selectTextOnFocus
                         />
-                        <Text className="text-[10px] text-iron-400 font-bold mt-1 uppercase">KG</Text>
+                        <Text className="text-[10px] text-iron-400 font-bold mt-1 uppercase">{unit.toUpperCase()}</Text>
                     </View>
 
                     <Text className="text-iron-300 font-black text-xl">X</Text>
@@ -190,6 +233,7 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) 
                             placeholderTextColor={Colors.iron[300]}
                             className={`text-2xl font-bold text-center w-full p-2 rounded-lg ${isCompleted ? 'text-primary bg-primary/5' : 'text-iron-950 bg-iron-100'
                                 }`}
+                            editable={!disabled}
                             selectTextOnFocus
                         />
                         <Text className="text-[10px] text-iron-400 font-bold mt-1 uppercase">REPS</Text>
@@ -199,6 +243,10 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) 
                     <View className="flex-col gap-2 ml-2">
                         <TouchableOpacity
                             onPress={() => {
+                                if (disabled) {
+                                    Alert.alert('Entrenamiento finalizado', 'Este entrenamiento está finalizado y no se puede editar.');
+                                    return;
+                                }
                                 if (isCompleted) {
                                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                 } else {
@@ -232,9 +280,10 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy }: SetRowProps) 
                             value={notes}
                             onChangeText={setNotes}
                             onBlur={handleBlur}
-                            placeholder="Add notes..."
+                            placeholder="Agregar notas..."
                             placeholderTextColor={Colors.iron[400]}
                             className="text-sm bg-yellow-50 text-iron-700 p-2 rounded-lg border border-yellow-100/50"
+                            editable={!disabled}
                         />
                     </View>
                 )}

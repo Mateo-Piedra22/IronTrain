@@ -31,7 +31,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: 'Daily Log',
+            title: 'Diario',
             headerShown: false,
             // Header components removed as they are now in index.tsx
             tabBarIcon: ({ color }) => <Calendar color={color} size={24} />,
@@ -40,14 +40,14 @@ export default function TabLayout() {
         <Tabs.Screen
           name="exercises"
           options={{
-            title: 'Library',
+            title: 'Biblioteca',
             tabBarIcon: ({ color }) => <Dumbbell color={color} size={24} />,
           }}
         />
         <Tabs.Screen
           name="analysis"
           options={{
-            title: 'Analysis',
+            title: 'Análisis',
             tabBarIcon: ({ color }) => <BarChart2 color={color} size={24} />,
           }}
         />

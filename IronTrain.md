@@ -1,8 +1,12 @@
-# **Especificación Funcional Completa: IronTrain (v1.0)**
+# Especificación funcional (visión)
 
-### **Sucesor Espiritual de FitNotes | Rebranding "Industrial Dark"**
+Este documento describe la visión funcional de IronTrain. Algunas secciones pueden estar parcialmente implementadas; la referencia técnica real está en `docs/`.
 
-Este documento detalla la totalidad de las funcionalidades requeridas para la aplicación "IronTrain". El objetivo es replicar la utilidad y la filosofía "sin distracciones" de FitNotes, pero con una identidad visual renovada (Gris Pizarra/Naranja) y una arquitectura robusta.
+## Identidad visual (actual)
+- Fondo principal: `#fff7f1` (iron-900)
+- Superficie/tarjeta: `#ffffff` (iron-800)
+- Texto principal: `#321414` (iron-950)
+- Primario: `#5c2e2e` (primary)
 
 ## **1\. El Diario de Entrenamiento (Pantalla Principal)**
 
@@ -88,7 +92,7 @@ El "cerebro" de la aplicación. Todo debe ser visualizable mediante gráficos.
   * *Manual:* Tocar el reloj para iniciar.  
   * *Automático:* Iniciar cuenta atrás automáticamente al completar (check) una serie.  
 * **Feedback:** Vibración y sonido (configurable: Bip, Campana, Silencio) al terminar.  
-* **Mini-player:** El temporizador debe flotar o ser visible mientras se navega por la app.
+* **Mini-player:** El temporizador flota mientras se navega por la app.
 
 ### **4.2. Calculadora de Platos (Plate Calculator)**
 
@@ -98,7 +102,7 @@ El "cerebro" de la aplicación. Todo debe ser visualizable mediante gráficos.
 
 ### **4.3. Tracker de Peso Corporal (Body Tracker)**
 
-* Registro de peso corporal diario.  
+* Registro de peso corporal diario (kg interno, display kg/lbs).  
 * Registro de porcentaje de grasa corporal.  
 * Gráfico de evolución de peso corporal.  
 * Posibilidad de establecer un "Peso Objetivo".
@@ -119,9 +123,8 @@ El "cerebro" de la aplicación. Todo debe ser visualizable mediante gráficos.
 
 ### **6.1. Copia de Seguridad (Backup)**
 
-* **Exportar:** Generar archivo CSV completo (compatible con Excel/Sheets).  
-* **Base de Datos:** Exportar/Importar archivo .db o .json propietario para restauración completa.  
-* **Nube:** Integración opcional con Google Drive / Dropbox para backup automático (Feature Premium en original, Standard en IronTrain).
+* **Exportar/Importar:** JSON para restauración completa.
+* **Nube:** fuera de alcance en la versión actual.
 
 ### **6.2. Preferencias Generales**
 
@@ -133,13 +136,7 @@ El "cerebro" de la aplicación. Todo debe ser visualizable mediante gráficos.
 
 ### **7.1. Paleta de Colores**
 
-A diferencia del azul/blanco clínico de FitNotes, IronTrain usa un esquema de alto contraste para gimnasios con poca luz.
-
-* **Fondo:** \#0f172a (Slate 900\) \- Oscuro profundo.  
-* **Tarjetas/Superficies:** \#1e293b (Slate 800).  
-* **Primario/Acción:** \#f97316 (Orange 500\) \- Botones principales, checks activos.  
-* **Texto Principal:** \#f1f5f9 (Slate 100).  
-* **Texto Secundario:** \#94a3b8 (Slate 400).
+La app utiliza una paleta industrial clara (crema/blanco) con texto oscuro y primario marrón/rojo.
 
 ### **7.2. Interacciones**
 

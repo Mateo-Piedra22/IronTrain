@@ -1,14 +1,15 @@
 import { SetRowInput } from '@/components/SetRowInput';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
+import { configService } from '@/src/services/ConfigService';
 import { useWorkoutStore } from '@/src/store/workoutStore';
 import { Colors } from '@/src/theme';
 import { WorkoutSet } from '@/src/types/db';
 import { FlashList } from '@shopify/flash-list';
 import { clsx } from 'clsx';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { LucideClock, LucideMoreVertical } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, AppState, KeyboardAvoidingView, Platform, Pressable, Switch, Text, View } from 'react-native';
 
 export default function ActiveWorkoutScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -18,11 +19,16 @@ export default function ActiveWorkoutScreen() {
         activeSets,
         isTimerRunning,
         workoutTimer,
-        finishWorkout,
+        tickTimer,
+        setWorkoutStatus,
         updateSet,
         addSet,
         toggleSetComplete,
+        loadWorkoutById,
+        exerciseNames,
     } = useWorkoutStore();
+
+    const [unit, setUnit] = useState(configService.get('weightUnit'));
 
     // Optimize callbacks for memoized child
     const handleUpdateSet = useCallback((setId: string, updates: Partial<WorkoutSet>) => {
@@ -34,22 +40,35 @@ export default function ActiveWorkoutScreen() {
     }, [toggleSetComplete]);
 
 
+    useFocusEffect(
+        useCallback(() => {
+            setUnit(configService.get('weightUnit'));
+        }, [])
+    );
+
     useEffect(() => {
-        if (!activeWorkout && id) {
-            // Store hydration check
+        if (!id) return;
+        if (!activeWorkout || activeWorkout.id !== id) {
+            loadWorkoutById(id);
         }
-    }, [id, activeWorkout]);
+    }, [id, activeWorkout?.id, loadWorkoutById]);
 
     // Timer effect
     useEffect(() => {
         let interval: any;
         if (isTimerRunning) {
-            interval = setInterval(() => {
-                useWorkoutStore.setState(state => ({ workoutTimer: state.workoutTimer + 1 }));
-            }, 1000);
+            tickTimer();
+            interval = setInterval(tickTimer, 1000);
         }
         return () => clearInterval(interval);
-    }, [isTimerRunning]);
+    }, [isTimerRunning, tickTimer]);
+
+    useEffect(() => {
+        const sub = AppState.addEventListener('change', (s) => {
+            if (s === 'active') tickTimer();
+        });
+        return () => sub.remove();
+    }, [tickTimer]);
 
     const formatTime = (sec: number) => {
         const m = Math.floor(sec / 60);
@@ -57,15 +76,32 @@ export default function ActiveWorkoutScreen() {
         return `${m}:${s.toString().padStart(2, '0')}`;
     };
 
-    const handleFinish = async () => {
-        Alert.alert('Finish Workout', 'Are you sure?', [
-            { text: 'Cancel', style: 'cancel' },
+    const isTemplate = activeWorkout?.is_template === 1;
+    const isFinished = activeWorkout?.status === 'completed';
+    const isEditable = !!activeWorkout && (!isFinished || isTemplate);
+
+    const requestToggleStatus = (nextActive: boolean) => {
+        if (!activeWorkout || isTemplate) return;
+        if (!nextActive) {
+            Alert.alert('Finalizar entrenamiento', '¿Marcar este entrenamiento como finalizado? (se bloquea la edición)', [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Finalizar',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await setWorkoutStatus('completed');
+                    }
+                }
+            ]);
+            return;
+        }
+
+        Alert.alert('Reabrir entrenamiento', '¿Volver a marcarlo como activo? (podrás editar y seguir registrando)', [
+            { text: 'Cancelar', style: 'cancel' },
             {
-                text: 'Finish',
-                style: 'default',
+                text: 'Reabrir',
                 onPress: async () => {
-                    await finishWorkout();
-                    router.replace('/(tabs)');
+                    await setWorkoutStatus('in_progress');
                 }
             }
         ]);
@@ -79,29 +115,11 @@ export default function ActiveWorkoutScreen() {
     }, {} as Record<string, WorkoutSet[]>);
 
     const exerciseIds = Object.keys(groupedSets);
-
-    // Resolve Exercise Names
-    const [exerciseNames, setExerciseNames] = useState<Record<string, string>>({});
-
-    useEffect(() => {
-        const loadNames = async () => {
-            if (exerciseIds.length === 0) return;
-            try {
-                // @ts-ignore
-                const placeholders = exerciseIds.map(() => '?').join(',');
-                const query = `SELECT id, name FROM exercises WHERE id IN (${placeholders})`;
-                // @ts-ignore
-                const results = await import('@/src/services/DatabaseService').then(m => m.dbService.getAll<{ id: string, name: string }>(query, exerciseIds));
-
-                const map: Record<string, string> = {};
-                results.forEach(r => map[r.id] = r.name);
-                setExerciseNames(map);
-            } catch (e) {
-                console.error(e);
-            }
-        };
-        loadNames();
-    }, [exerciseIds.length]);
+    const emptyState = useMemo(() => {
+        if (!activeWorkout) return 'No se encontró el entrenamiento.';
+        if (activeSets.length === 0) return 'Todavía no hay ejercicios en este entrenamiento.';
+        return null;
+    }, [activeWorkout, activeSets.length]);
 
     return (
         <SafeAreaWrapper edges={['top', 'left', 'right']} className="bg-iron-900">
@@ -111,49 +129,48 @@ export default function ActiveWorkoutScreen() {
                 {/* Header */}
                 <View className="px-4 pb-4 pt-2 bg-iron-900 border-b border-iron-700 flex-row justify-between items-center">
                     <View className="flex-1 mr-4">
-                        <Text className="text-iron-950 font-bold text-lg" numberOfLines={1}>{activeWorkout?.name || 'Workout'}</Text>
+                        <Text className="text-iron-950 font-bold text-lg" numberOfLines={1}>{activeWorkout?.name || 'Entrenamiento'}</Text>
+                        {activeWorkout?.date ? (
+                            <Text className="text-iron-500 text-xs font-bold mt-0.5">
+                                {isTemplate ? 'Plantilla' : (isFinished ? 'Finalizado' : 'Activo')}
+                            </Text>
+                        ) : null}
                     </View>
 
                     <View className="flex-row items-center gap-3">
                         {/* Timer */}
-                        {activeWorkout?.status !== 'completed' && (
+                        {!isTemplate && (
                             <View className="flex-row items-center bg-surface px-3 py-1.5 rounded-lg border border-iron-700 shadow-sm">
                                 <LucideClock size={14} color={Colors.primary.DEFAULT} />
                                 <Text className="text-primary ml-1.5 font-mono text-sm font-bold tracking-tight">{formatTime(workoutTimer)}</Text>
                             </View>
                         )}
 
-                        {/* Status Toggle */}
-                        <Pressable
-                            onPress={activeWorkout?.status === 'completed'
-                                ? async () => {
-                                    // Resume
-                                    if (!activeWorkout) return;
-                                    await import('@/src/services/WorkoutService').then(m => m.workoutService.update(activeWorkout.id, { status: 'in_progress' }));
-                                    useWorkoutStore.setState({ activeWorkout: { ...activeWorkout, status: 'in_progress' }, isTimerRunning: true });
-                                }
-                                : handleFinish
-                            }
-                            className={clsx(
-                                "px-3 py-1.5 rounded-full flex-row items-center border shadow-sm",
-                                activeWorkout?.status === 'completed'
-                                    ? "bg-green-100 border-green-500"
-                                    : "bg-surface border-iron-700"
-                            )}
-                        >
+                        {!isTemplate && activeWorkout && (
                             <View className={clsx(
-                                "w-2 h-2 rounded-full mr-2",
-                                activeWorkout?.status === 'completed' ? "bg-green-500" : "bg-primary"
-                            )} />
-                            <Text className={clsx(
-                                "text-xs font-bold uppercase tracking-wider",
-                                activeWorkout?.status === 'completed' ? "text-green-700" : "text-iron-950"
+                                "px-3 py-1.5 rounded-full flex-row items-center border shadow-sm",
+                                isFinished ? "bg-green-100 border-green-500" : "bg-surface border-iron-700"
                             )}>
-                                {activeWorkout?.status === 'completed' ? "Finished" : "Active"}
-                            </Text>
-                        </Pressable>
+                                <Text className={clsx(
+                                    "text-xs font-bold uppercase tracking-wider mr-2",
+                                    isFinished ? "text-green-700" : "text-iron-950"
+                                )}>
+                                    {isFinished ? 'Finalizado' : 'Activo'}
+                                </Text>
+                                <Switch
+                                    value={!isFinished}
+                                    onValueChange={(v) => requestToggleStatus(v)}
+                                />
+                            </View>
+                        )}
                     </View>
                 </View>
+
+                {emptyState && (
+                    <View className="px-4 py-6">
+                        <Text className="text-iron-500 font-bold text-center">{emptyState}</Text>
+                    </View>
+                )}
 
                 <FlashList
                     data={exerciseIds}
@@ -170,7 +187,7 @@ export default function ActiveWorkoutScreen() {
                             {/* Sets Header */}
                             <View className="flex-row mb-2 px-2">
                                 <View className="w-8"></View>
-                                <View className="flex-1"><Text className="text-center text-iron-500 text-xs font-bold tracking-wider">KG</Text></View>
+                                <View className="flex-1"><Text className="text-center text-iron-500 text-xs font-bold tracking-wider">{unit.toUpperCase()}</Text></View>
                                 <View className="flex-1"><Text className="text-center text-iron-500 text-xs font-bold tracking-wider">REPS</Text></View>
                                 <View className="flex-1"><Text className="text-center text-iron-500 text-xs font-bold tracking-wider">RPE</Text></View>
                                 <View className="w-12"></View>
@@ -184,25 +201,43 @@ export default function ActiveWorkoutScreen() {
                                     set={set}
                                     onUpdate={handleUpdateSet}
                                     onToggleComplete={handleToggleComplete}
+                                    disabled={!isEditable}
                                 />
                             ))}
 
                             {/* Add Set Button */}
-                            <Pressable
-                                onPress={() => addSet(exId)}
-                                className="bg-surface py-3 rounded-xl items-center mt-2 border border-iron-400 border-dashed active:bg-iron-200"
-                            >
-                                <Text className="text-iron-950 text-xs font-bold uppercase">+ Add Set</Text>
-                            </Pressable>
+                            {isEditable && (
+                                <Pressable
+                                    onPress={() => addSet(exId)}
+                                    className="bg-surface py-3 rounded-xl items-center mt-2 border border-iron-400 border-dashed active:bg-iron-200"
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Agregar serie"
+                                >
+                                    <Text className="text-iron-950 text-xs font-bold uppercase">+ Agregar serie</Text>
+                                </Pressable>
+                            )}
                         </View>
                     )}
                     ListFooterComponent={
-                        <Pressable
-                            onPress={() => router.push('/(tabs)/exercises')} // Assuming library handles 'select' mode or we just add from there
-                            className="bg-surface py-4 rounded-xl items-center border border-primary border-dashed mb-8 active:bg-iron-200"
-                        >
-                            <Text className="text-primary font-bold uppercase">+ Add Exercise</Text>
-                        </Pressable>
+                        isEditable ? (
+                            <Pressable
+                                onPress={() => router.push('/(tabs)/exercises')}
+                                className="bg-surface py-4 rounded-xl items-center border border-primary border-dashed mb-8 active:bg-iron-200"
+                                accessibilityRole="button"
+                                accessibilityLabel="Agregar ejercicio"
+                            >
+                                <Text className="text-primary font-bold uppercase">+ Agregar ejercicio</Text>
+                            </Pressable>
+                        ) : (
+                            <Pressable
+                                onPress={() => router.replace('/(tabs)')}
+                                className="bg-surface py-4 rounded-xl items-center border border-iron-700 mb-8 active:bg-iron-200"
+                                accessibilityRole="button"
+                                accessibilityLabel="Volver"
+                            >
+                                <Text className="text-iron-950 font-bold uppercase">Volver</Text>
+                            </Pressable>
+                        )
                     }
                 />
             </KeyboardAvoidingView>

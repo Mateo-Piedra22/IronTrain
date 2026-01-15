@@ -2,7 +2,7 @@
   "expo": {
     "name": "IronTrain",
     "slug": "irontrain",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "irontrain",
@@ -47,6 +47,7 @@
     },
     "extra": {
       "router": {},
+      "updateFeedUrl": "https://irontrain.motiona.xyz/releases.json",
       "eas": {
         "projectId": "76d89df6-9ab1-4903-af08-64d0bc630646"
       }

@@ -165,4 +165,19 @@ describe('WorkoutService', () => {
       expect(dbService.run).not.toHaveBeenCalled();
     });
   });
+
+  describe('getExerciseHistory', () => {
+    it('should include cutoff when days is provided', async () => {
+      jest.spyOn(Date, 'now').mockReturnValue(new Date(2026, 0, 15, 12, 0, 0).getTime());
+      (dbService.getAll as jest.Mock).mockResolvedValueOnce([{ id: 'w1', date: Date.now() - 1000 }]);
+      (dbService.getAll as jest.Mock).mockResolvedValueOnce([]);
+
+      await workoutService.getExerciseHistory('e1', 10, 30);
+
+      expect(dbService.getAll).toHaveBeenCalledWith(
+        expect.stringContaining('AND w.date > ?'),
+        expect.arrayContaining(['e1'])
+      );
+    });
+  });
 });

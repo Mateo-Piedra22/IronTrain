@@ -104,7 +104,7 @@ export class DatabaseService {
         count INTEGER DEFAULT 0,
         type TEXT DEFAULT 'standard', -- 'standard', 'bumper', 'calibrated'
         unit TEXT DEFAULT 'kg',
-        PRIMARY KEY (weight, type)
+        PRIMARY KEY (weight, type, unit)
       );
 
       -- Indexes for performance
@@ -174,6 +174,63 @@ export class DatabaseService {
             `);
         } catch (e) {
             console.log('Migration check failed (goals table):', e);
+        }
+
+        // Migration 4: Ensure "Sin categoría" exists for safe reassignment
+        try {
+            const existing = await this.db?.getFirstAsync<{ count: number }>(
+                "SELECT COUNT(*) as count FROM categories WHERE id = ? OR name = ?",
+                ['uncategorized', 'Sin categoría']
+            );
+            if (!existing || existing.count === 0) {
+                await this.db?.runAsync(
+                    'INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, ?, ?)',
+                    ['uncategorized', 'Sin categoría', 9999, '#94a3b8']
+                );
+            }
+        } catch (e) {
+            console.log('Migration check failed (uncategorized category):', e);
+        }
+
+        // Migration 5: Fix plate_inventory PK to include unit (weight,type,unit)
+        try {
+            const pragma = await this.db?.getAllAsync<{ name: string }>("PRAGMA table_info('plate_inventory')");
+            const hasUnitColumn = (pragma ?? []).some((c) => c.name === 'unit');
+            if (!hasUnitColumn) {
+                await this.db?.execAsync("ALTER TABLE plate_inventory ADD COLUMN unit TEXT DEFAULT 'kg'");
+            }
+
+            const createSql = await this.db?.getAllAsync<{ sql: string | null }>(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='plate_inventory'"
+            );
+            const sqlText = createSql?.[0]?.sql ?? '';
+            const pkHasUnit = /PRIMARY KEY\s*\(\s*weight\s*,\s*type\s*,\s*unit\s*\)/i.test(sqlText);
+
+            if (!pkHasUnit) {
+                await this.db?.execAsync('BEGIN TRANSACTION');
+                await this.db?.execAsync(`
+                    CREATE TABLE IF NOT EXISTS plate_inventory_new (
+                        weight REAL NOT NULL,
+                        count INTEGER DEFAULT 0,
+                        type TEXT DEFAULT 'standard',
+                        unit TEXT DEFAULT 'kg',
+                        PRIMARY KEY (weight, type, unit)
+                    );
+                `);
+                await this.db?.execAsync(`
+                    INSERT OR REPLACE INTO plate_inventory_new (weight, count, type, unit)
+                    SELECT weight, count, type, COALESCE(unit, 'kg') as unit
+                    FROM plate_inventory;
+                `);
+                await this.db?.execAsync('DROP TABLE plate_inventory;');
+                await this.db?.execAsync('ALTER TABLE plate_inventory_new RENAME TO plate_inventory;');
+                await this.db?.execAsync('COMMIT');
+            }
+        } catch (e) {
+            try {
+                await this.db?.execAsync('ROLLBACK');
+            } catch { }
+            console.log('Migration check failed (plate_inventory pk/unit):', e);
         }
     }
 
@@ -400,11 +457,11 @@ export class DatabaseService {
 
     // --- SETS ---
 
-    public async getSetsForWorkout(workoutId: string): Promise<(WorkoutSet & { exercise_name: string; category_color: string })[]> {
+    public async getSetsForWorkout(workoutId: string): Promise<(WorkoutSet & { exercise_name: string; category_color: string; exercise_type: ExerciseType })[]> {
         const db = this.getDatabase();
         // Join with exercises to get names for the UI
         return await db.getAllAsync(
-            `SELECT ws.*, e.name as exercise_name, c.color as category_color 
+            `SELECT ws.*, e.name as exercise_name, e.type as exercise_type, c.color as category_color 
        FROM workout_sets ws
        JOIN exercises e ON ws.exercise_id = e.id
        LEFT JOIN categories c ON e.category_id = c.id
@@ -456,6 +513,32 @@ export class DatabaseService {
 
     public async deleteSet(id: string): Promise<void> {
         await this.run('DELETE FROM workout_sets WHERE id = ?', [id]);
+    }
+
+    public async factoryReset(): Promise<void> {
+        try {
+            await this.run('BEGIN TRANSACTION');
+
+            await this.run('DELETE FROM workout_sets');
+            await this.run('DELETE FROM workouts');
+
+            await this.run('DELETE FROM measurements');
+            await this.run('DELETE FROM goals');
+            await this.run('DELETE FROM plate_inventory');
+            await this.run('DELETE FROM settings');
+
+            await this.run('DELETE FROM exercises');
+            await this.run('DELETE FROM categories');
+
+            await this.run('COMMIT');
+        } catch (e) {
+            try {
+                await this.run('ROLLBACK');
+            } catch { }
+            throw e;
+        }
+
+        await this.seedDatabase();
     }
 
     // --- GHOST VALUES / HISTORY ---

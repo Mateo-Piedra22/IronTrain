@@ -286,12 +286,17 @@ class WorkoutService {
         return result.map(r => r.date);
     }
 
-    public async getExerciseHistory(exerciseId: string, limit: number = 5): Promise<{ date: number; sets: WorkoutSet[] }[]> {
+    public async getExerciseHistory(exerciseId: string, limit: number = 5, days?: number): Promise<{ date: number; sets: WorkoutSet[] }[]> {
         const cached = this.exerciseHistoryCache.get(exerciseId);
         const now = Date.now();
         if (cached && now - cached.ts < 30_000 && cached.data.length > 0) {
-            return cached.data.slice(0, limit);
+            const cutoff = days ? now - (days * 86400 * 1000) : null;
+            const filtered = cutoff ? cached.data.filter((h) => (h.date ?? 0) > cutoff) : cached.data;
+            return filtered.slice(0, limit);
         }
+
+        const cutoff = days ? now - (days * 86400 * 1000) : null;
+        const params: any[] = [exerciseId];
 
         // Get workouts that have at least one completed set for this exercise
         const sql = `
@@ -300,10 +305,14 @@ class WorkoutService {
             JOIN workout_sets s ON w.id = s.workout_id 
             WHERE s.exercise_id = ? 
             AND s.completed = 1
+            ${cutoff ? 'AND w.date > ?' : ''}
             ORDER BY w.date DESC 
             LIMIT ?
         `;
-        const workouts = await dbService.getAll<{ id: string; date: number }>(sql, [exerciseId, limit]);
+        if (cutoff) params.push(cutoff);
+        params.push(Math.max(limit, 20));
+
+        const workouts = await dbService.getAll<{ id: string; date: number }>(sql, params);
 
         const history = await Promise.all(workouts.map(async (w) => {
             const sets = await dbService.getAll<WorkoutSet>(
@@ -314,7 +323,7 @@ class WorkoutService {
         }));
 
         this.exerciseHistoryCache.set(exerciseId, { ts: now, data: history });
-        return history;
+        return history.slice(0, limit);
     }
 
     public async update(id: string, updates: Partial<Workout>): Promise<void> {

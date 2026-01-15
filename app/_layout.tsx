@@ -1,17 +1,21 @@
 import { Colors } from '@/src/theme';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
+import * as Linking from 'expo-linking';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Alert } from 'react-native';
 import '../components/TimerOverlay';
 import { TimerOverlay } from '../components/TimerOverlay';
 import '../global.css';
+import { configService } from '../src/services/ConfigService';
 import { dbService } from '../src/services/DatabaseService';
+import { UpdateService } from '../src/services/UpdateService';
 
 /**
  * IronTrain Entry Point
@@ -43,6 +47,7 @@ const IronTrainTheme = {
 
 export default function RootLayout() {
   const [dbInitialized, setDbInitialized] = useState(false);
+  const updatePromptShown = useRef(false);
   const [fontsLoaded, fontError] = useFonts({
     // Add custom fonts here if required (e.g., Inter/Roboto)
   });
@@ -52,6 +57,7 @@ export default function RootLayout() {
     async function initInfo() {
       try {
         await dbService.init();
+        await configService.init();
         setDbInitialized(true);
       } catch (e) {
         console.error('CRITICAL: Database init failed:', e);
@@ -69,6 +75,42 @@ export default function RootLayout() {
       }
     }
     hideSplash();
+  }, [fontsLoaded, fontError, dbInitialized]);
+
+  useEffect(() => {
+    const ready = (fontsLoaded || !!fontError) && dbInitialized;
+    if (!ready) return;
+    if (updatePromptShown.current) return;
+    updatePromptShown.current = true;
+
+    const timeoutId = setTimeout(() => {
+      void (async () => {
+        const result = await UpdateService.checkForUpdate();
+        if (result.status !== 'update_available') return;
+
+        Alert.alert(
+          'Actualización disponible',
+          `Hay una nueva versión (v${result.latestVersion}).`,
+          [
+            { text: 'Más tarde', style: 'cancel' },
+            {
+              text: 'Descargar',
+              onPress: async () => {
+                const url = result.downloadUrl ?? result.downloadsPageUrl ?? result.notesUrl;
+                if (!url) return;
+                try {
+                  await Linking.openURL(url);
+                } catch {
+                  Alert.alert('Error', 'No se pudo abrir el enlace.');
+                }
+              }
+            }
+          ]
+        );
+      })();
+    }, 900);
+
+    return () => clearTimeout(timeoutId);
   }, [fontsLoaded, fontError, dbInitialized]);
 
   // Render Loading Fallback (shouldn't be visible due to Splash Screen, but safe guard)
@@ -107,12 +149,19 @@ export default function RootLayout() {
                 title: 'IronTrain'
               }}
             />
+            <Stack.Screen
+              name="changelog"
+              options={{
+                presentation: 'modal',
+                title: 'Novedades'
+              }}
+            />
             {/* Dynamic workout screen */}
             <Stack.Screen
               name="workout/[id]"
               options={{
-                title: 'Session',
-                headerBackTitle: 'Back'
+                title: 'Sesión',
+                headerBackTitle: 'Atrás'
               }}
             />
           </Stack>

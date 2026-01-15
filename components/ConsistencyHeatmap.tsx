@@ -1,4 +1,5 @@
 import { eachDayOfInterval, format, getDay, subDays } from 'date-fns';
+import { Colors } from '@/src/theme';
 import React, { useMemo } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
@@ -16,46 +17,22 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
         });
     }, []);
 
-    // Group by weeks for the grid
-    // We want 7 rows (Sun-Sat or Mon-Sun). Let's do Mon-Sun (ISO).
-    // But standard heatmap is usually Columns = Weeks.
-
-    // Structure: Array of Weeks. Each Week has 7 days (or nulls if padding).
-    const weeks = useMemo(() => {
-        const weeksArray: (Date | null)[][] = [];
-        let currentWeek: (Date | null)[] = [];
-
-        days.forEach((day, index) => {
-            const dayOfWeek = getDay(day); // 0 = Sun, 1 = Mon...
-
-            // Adjust to Monday start (0=Mon, 6=Sun)
-            // date-fns getDay returns 0 for Sunday.
-            // visual row: Mon, Tue, Wed, Thu, Fri, Sat, Sun
-
-            // Actually, we just push days into the array.
-            // The rendering will handle X/Y placement.
-        });
-
-        // Easier approach: Just 53 columns.
-        // We know the start date.
-        // We render Column by Column.
-
-        return days;
-
-    }, [days]);
-
-    // Optimize: Map of 'YYYY-MM-DD' -> boolean
-    const activeMap = useMemo(() => {
-        const map = new Set<string>();
-        timestamps.forEach(ts => {
-            map.add(format(new Date(ts), 'yyyy-MM-dd'));
+    const countMap = useMemo(() => {
+        const map = new Map<string, number>();
+        timestamps.forEach((ts) => {
+            const key = format(new Date(ts), 'yyyy-MM-dd');
+            map.set(key, (map.get(key) ?? 0) + 1);
         });
         return map;
     }, [timestamps]);
 
-    const getColor = (date: Date) => {
+    const getCellColor = (date: Date) => {
         const key = format(date, 'yyyy-MM-dd');
-        return activeMap.has(key) ? 'bg-primary' : 'bg-iron-800';
+        const count = countMap.get(key) ?? 0;
+        if (count <= 0) return Colors.iron[700];
+        if (count === 1) return Colors.primary.light;
+        if (count === 2) return Colors.primary.DEFAULT;
+        return Colors.primary.dark;
     };
 
     // We render 53 columns.
@@ -94,7 +71,10 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
                         {week.map((day, dIndex) => (
                             <View
                                 key={dIndex}
-                                className={`w-3 h-3 rounded-sm ${day ? getColor(day) : 'bg-transparent'}`}
+                                className="w-3 h-3 rounded-sm"
+                                style={{
+                                    backgroundColor: day ? getCellColor(day) : 'transparent'
+                                }}
                             />
                         ))}
                     </View>
@@ -104,27 +84,38 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
     };
 
     return (
-        <View className="bg-iron-900 border border-iron-800 p-4 rounded-xl">
+        <View className="bg-surface border border-iron-700 p-4 rounded-xl">
             <View className="flex-row justify-between mb-4">
-                <Text className="text-iron-950 font-bold text-lg">Consistency (Year)</Text>
-                <Text className="text-iron-950 text-xs text-bold">{activeMap.size} workouts</Text>
+                <Text className="text-iron-950 font-bold text-lg">Consistencia (1 año)</Text>
+                <Text className="text-iron-500 text-xs font-bold">{timestamps.length} entrenamientos · {countMap.size} días</Text>
             </View>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-2 px-2">
                 <View className="flex-row">
                     {/* Day Labels (Mon, Wed, Fri) */}
                     <View className="justify-between mr-2 py-1">
-                        <Text className="text-[9px] text-iron-950 h-3">Mon</Text>
+                        <Text className="text-[9px] text-iron-500 h-3">Lun</Text>
                         <View className="h-3" />
-                        <Text className="text-[9px] text-iron-950 h-3">Wed</Text>
+                        <Text className="text-[9px] text-iron-500 h-3">Mié</Text>
                         <View className="h-3" />
-                        <Text className="text-[9px] text-iron-950 h-3">Fri</Text>
+                        <Text className="text-[9px] text-iron-500 h-3">Vie</Text>
                         <View className="h-3" />
                     </View>
 
                     <Grid />
                 </View>
             </ScrollView>
+
+            <View className="flex-row items-center justify-between mt-4">
+                <Text className="text-iron-500 text-xs font-bold">Menos</Text>
+                <View className="flex-row items-center gap-2">
+                    <View className="w-3 h-3 rounded-sm" style={{ backgroundColor: Colors.iron[700] }} />
+                    <View className="w-3 h-3 rounded-sm" style={{ backgroundColor: Colors.primary.light }} />
+                    <View className="w-3 h-3 rounded-sm" style={{ backgroundColor: Colors.primary.DEFAULT }} />
+                    <View className="w-3 h-3 rounded-sm" style={{ backgroundColor: Colors.primary.dark }} />
+                </View>
+                <Text className="text-iron-500 text-xs font-bold">Más</Text>
+            </View>
         </View>
     );
 }

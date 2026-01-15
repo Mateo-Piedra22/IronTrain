@@ -1,13 +1,17 @@
 {
   "name": "temp_init",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
-    "postinstall": "node scripts/patch-css-interop.js",
+    "start": "node scripts/dev.js",
+    "android": "node scripts/dev.js --android",
+    "ios": "node scripts/dev.js --ios",
+    "web": "node scripts/dev.js --web",
+    "generate-changelog": "node scripts/generate-changelog.js",
+    "release:prepare": "node scripts/release-prepare.js",
+    "release:finalize": "node scripts/release-finalize.js",
+    "postinstall": "node scripts/patch-css-interop.js && node scripts/generate-changelog.js",
+    "pretest": "node scripts/generate-changelog.js",
     "test": "jest"
   },
   "jest": {

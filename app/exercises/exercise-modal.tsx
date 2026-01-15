@@ -40,7 +40,7 @@ export default function ExerciseModal() {
 
     const handleSave = async () => {
         if (!name.trim()) {
-            Alert.alert('Validation', 'Name is required');
+            Alert.alert('Validación', 'El nombre es obligatorio.');
             return;
         }
 
@@ -68,24 +68,32 @@ export default function ExerciseModal() {
     return (
         <View className="flex-1 bg-iron-900 p-4">
             <Stack.Screen options={{
-                title: exerciseId ? 'Edit Exercise' : 'New Exercise',
+                title: exerciseId ? 'Editar ejercicio' : 'Nuevo ejercicio',
                 presentation: 'modal'
             }} />
 
             <IronInput
-                label="Exercise Name"
-                placeholder="e.g. Bench Press"
+                label="Nombre del ejercicio"
+                placeholder="Ej: Press de banca"
                 value={name}
                 onChangeText={setName}
             />
 
             <View className="mb-4">
-                <Text className="text-textMuted mb-2 text-sm font-medium">Type</Text>
+                <Text className="text-textMuted mb-2 text-sm font-medium">Tipo</Text>
                 <View className="flex-row flex-wrap gap-2">
                     {(['weight_reps', 'distance_time', 'weight_only', 'reps_only'] as ExerciseType[]).map((t) => (
                         <IronButton
                             key={t}
-                            label={t.replace('_', ' + ')}
+                            label={
+                                t === 'weight_reps'
+                                    ? 'Peso + reps'
+                                    : t === 'distance_time'
+                                        ? 'Distancia + tiempo'
+                                        : t === 'weight_only'
+                                            ? 'Solo peso'
+                                            : 'Solo reps'
+                            }
                             variant={type === t ? 'solid' : 'outline'}
                             size="sm"
                             onPress={() => setType(t)}
@@ -95,8 +103,8 @@ export default function ExerciseModal() {
             </View>
 
             <IronInput
-                label="Notes (Optional)"
-                placeholder="e.g. Grip width..."
+                label="Notas (opcional)"
+                placeholder="Ej: ancho de agarre..."
                 value={notes}
                 onChangeText={setNotes}
                 multiline
@@ -104,7 +112,7 @@ export default function ExerciseModal() {
             />
 
             <IronButton
-                label={exerciseId ? "Update Exercise" : "Create Exercise"}
+                label={exerciseId ? "Actualizar ejercicio" : "Crear ejercicio"}
                 onPress={handleSave}
                 loading={loading}
                 className="mt-4"

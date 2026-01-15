@@ -55,19 +55,19 @@ export function ExerciseGrouper({
         if (isDistTime) {
             return (
                 <View className="flex-row bg-slate-700/50 p-2 border-b border-border">
-                    <Text className="text-textMuted text-xs w-8 text-center">Set</Text>
+                    <Text className="text-textMuted text-xs w-8 text-center">#</Text>
                     <Text className="text-textMuted text-xs flex-1 text-center">{unitSystem === 'metric' ? 'km' : 'mi'}</Text>
-                    <Text className="text-textMuted text-xs flex-1 text-center">Time (s)</Text>
-                    <Text className="text-textMuted text-xs w-16 text-center">Actions</Text>
+                    <Text className="text-textMuted text-xs flex-1 text-center">Tiempo (s)</Text>
+                    <Text className="text-textMuted text-xs w-16 text-center">Acciones</Text>
                 </View>
             );
         }
         return (
             <View className="flex-row bg-slate-700/50 p-2 border-b border-border">
-                <Text className="text-textMuted text-xs w-8 text-center">Set</Text>
+                <Text className="text-textMuted text-xs w-8 text-center">#</Text>
                 <Text className="text-textMuted text-xs flex-1 text-center">{unitSystem === 'metric' ? 'kg' : 'lbs'}</Text>
                 <Text className="text-textMuted text-xs flex-1 text-center">Reps</Text>
-                <Text className="text-textMuted text-xs w-16 text-center">Actions</Text>
+                <Text className="text-textMuted text-xs w-16 text-center">Acciones</Text>
             </View>
         );
     };
@@ -80,7 +80,7 @@ export function ExerciseGrouper({
             <View className="flex-1">
                 <View className="flex-row justify-between items-center mb-2 bg-surface p-2 rounded-lg border border-border">
                     <Text className="text-iron-950 text-lg font-bold flex-1">{exerciseName}</Text>
-                    <IronButton label="Add Set" size="sm" onPress={onAddSet} />
+                    <IronButton label="Añadir serie" size="sm" onPress={onAddSet} />
                 </View>
 
                 <View className="bg-surface rounded-lg border border-border overflow-hidden">
@@ -150,7 +150,7 @@ export function ExerciseGrouper({
                                             color={set.completed ? Colors.green : Colors.iron[600]}
                                         />
                                     </Pressable>
-                                    <Pressable onPress={() => Alert.alert('Delete', 'Delete set?', [{ text: 'Cancel' }, { text: 'Del', onPress: () => onDeleteSet(set.id) }])}>
+                                    <Pressable onPress={() => Alert.alert('Eliminar', '¿Eliminar serie?', [{ text: 'Cancelar' }, { text: 'Eliminar', style: 'destructive', onPress: () => onDeleteSet(set.id) }])}>
                                         <Ionicons name="close" size={16} color={Colors.red} />
                                     </Pressable>
                                 </View>
@@ -169,19 +169,19 @@ export function ExerciseGrouper({
             <Modal visible={commentModalVisible} transparent animationType="fade">
                 <View className="flex-1 bg-iron-950/80 justify-center px-6">
                     <View className="bg-surface p-4 rounded-xl border border-border">
-                        <Text className="text-iron-950 font-bold mb-2">Set Note</Text>
+                        <Text className="text-iron-950 font-bold mb-2">Nota de la serie</Text>
                         <TextInput
                             className="bg-background text-iron-950 p-3 rounded-lg border border-border mb-4 h-24"
                             textAlignVertical="top"
                             multiline
                             value={currentComment}
                             onChangeText={setCurrentComment}
-                            placeholder="RPE 8, felt heavy..."
+                            placeholder="Ej: RPE 8, se sintió pesado..."
                             placeholderTextColor={Colors.iron[500]}
                         />
                         <View className="flex-row justify-end gap-2">
-                            <IronButton label="Cancel" variant="outline" size="sm" onPress={() => setCommentModalVisible(false)} />
-                            <IronButton label="Save" size="sm" onPress={saveComment} />
+                            <IronButton label="Cancelar" variant="outline" size="sm" onPress={() => setCommentModalVisible(false)} />
+                            <IronButton label="Guardar" size="sm" onPress={saveComment} />
                         </View>
                     </View>
                 </View>

@@ -124,7 +124,7 @@ export function ColorPicker({ visible, initialColor = '#3b82f6', onClose, onSele
                     </View>
 
                     {/* Lightness Slider */}
-                    <Text className="text-iron-500 text-xs font-bold mb-2 uppercase">Lightness</Text>
+                    <Text className="text-iron-500 text-xs font-bold mb-2 uppercase">Luminosidad</Text>
                     <View className="h-10 mb-6 rounded-full overflow-hidden relative justify-center bg-iron-800">
                         <LinearGradient
                             colors={['#000000', hslToHex(hue, sat, 50), '#ffffff']}
@@ -150,13 +150,13 @@ export function ColorPicker({ visible, initialColor = '#3b82f6', onClose, onSele
                             onPress={onClose}
                             className="flex-1 py-4 bg-iron-800 rounded-xl items-center"
                         >
-                            <Text className="text-iron-500 font-bold">Cancel</Text>
+                            <Text className="text-iron-500 font-bold">Cancelar</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             onPress={() => onSelect(hex)}
                             className="flex-1 py-4 bg-primary rounded-xl items-center"
                         >
-                            <Text className="text-white font-bold">Select Clean Color</Text>
+                            <Text className="text-white font-bold">Elegir color</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

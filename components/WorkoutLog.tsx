@@ -2,18 +2,16 @@ import { dbService } from '@/src/services/DatabaseService';
 import { workoutService } from '@/src/services/WorkoutService';
 import { Colors } from '@/src/theme';
 import { Dumbbell, Trash2 } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Animated, Text, TouchableOpacity, View } from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { Swipeable } from 'react-native-gesture-handler';
+import type { ExerciseType } from '../src/types/db';
 import { WorkoutSet } from '../src/types/db';
 import { ExerciseSummary } from './ExerciseSummary';
 
 interface WorkoutLogProps {
-    sets: (WorkoutSet & { exercise_name: string; category_color: string })[];
-    onAddSet: (exerciseId: string) => void;
-    onFinish: () => void;
-    isFinished: boolean;
+    sets: (WorkoutSet & { exercise_name: string; category_color: string; exercise_type: ExerciseType })[];
     onExercisePress: (exerciseId: string, exerciseName: string) => void;
     onRefresh: () => void; // Need refresh to reload data after reorder/delete
     workoutId: string;
@@ -23,24 +21,24 @@ interface GroupedExercise {
     exercise_id: string;
     exercise_name: string;
     category_color: string;
+    exercise_type: ExerciseType;
     sets: WorkoutSet[];
 }
 
-export function WorkoutLog({ sets, onFinish, isFinished, onExercisePress, onRefresh, workoutId }: WorkoutLogProps) {
+export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId }: WorkoutLogProps) {
     const [localGroups, setLocalGroups] = useState<GroupedExercise[]>([]);
 
-    // Group sets by exercise
-    // We use useMemo but also sync to local state for Drag Optimistic UI
-    useMemo(() => {
+    const grouped = useMemo(() => {
         const groups: Record<string, GroupedExercise> = {};
         const orderedGroups: GroupedExercise[] = [];
 
-        sets.forEach(set => {
+        sets.forEach((set) => {
             if (!groups[set.exercise_id]) {
-                const group = {
+                const group: GroupedExercise = {
                     exercise_id: set.exercise_id,
                     exercise_name: set.exercise_name,
                     category_color: set.category_color,
+                    exercise_type: set.exercise_type,
                     sets: []
                 };
                 groups[set.exercise_id] = group;
@@ -49,29 +47,41 @@ export function WorkoutLog({ sets, onFinish, isFinished, onExercisePress, onRefr
             groups[set.exercise_id].sets.push(set);
         });
 
-        setLocalGroups(orderedGroups);
-    }, [sets]); // Sync when props change
+        return orderedGroups;
+    }, [sets]);
+
+    useEffect(() => {
+        setLocalGroups(grouped);
+    }, [grouped]);
 
     const handleReorder = async (data: GroupedExercise[]) => {
-        setLocalGroups(data); // Optimistic
-        const newOrderIds = data.map(g => g.exercise_id);
-        await workoutService.reorderExercises(workoutId, newOrderIds);
-        // onRefresh(); // Optional if we trust optimistic. Better to silent sync.
+        const snapshot = localGroups;
+        setLocalGroups(data);
+        const newOrderIds = data.map((g) => g.exercise_id);
+        try {
+            await workoutService.reorderExercises(workoutId, newOrderIds);
+        } catch (e) {
+            setLocalGroups(snapshot);
+            Alert.alert('Error', 'No se pudo reordenar. Intenta de nuevo.');
+        }
     };
 
     const handleDeleteExercise = (exerciseId: string, exerciseName: string) => {
         Alert.alert(
-            "Delete Exercise",
-            `Remove ${exerciseName} and all its sets?`,
+            "Eliminar ejercicio",
+            `¿Quitar ${exerciseName} y todas sus series?`,
             [
-                { text: "Cancel", style: "cancel" },
+                { text: "Cancelar", style: "cancel" },
                 {
-                    text: "Delete",
+                    text: "Eliminar",
                     style: "destructive",
                     onPress: async () => {
-                        // Delete all sets for this exercise in this workout
-                        await dbService.run('DELETE FROM workout_sets WHERE workout_id = ? AND exercise_id = ?', [workoutId, exerciseId]);
-                        onRefresh();
+                        try {
+                            await dbService.run('DELETE FROM workout_sets WHERE workout_id = ? AND exercise_id = ?', [workoutId, exerciseId]);
+                            onRefresh();
+                        } catch (e) {
+                            Alert.alert('Error', 'No se pudo eliminar el ejercicio.');
+                        }
                     }
                 }
             ]
@@ -82,8 +92,8 @@ export function WorkoutLog({ sets, onFinish, isFinished, onExercisePress, onRefr
         return (
             <View className="flex-1 items-center justify-center p-8">
                 <Dumbbell size={48} color={Colors.iron[600]} />
-                <Text className="text-iron-500 text-center text-lg mt-4">No exercises logged yet.</Text>
-                <Text className="text-iron-600 text-center mt-2">Tap "+" to add an exercise.</Text>
+                <Text className="text-iron-500 text-center text-lg mt-4">Todavía no registraste ejercicios.</Text>
+                <Text className="text-iron-600 text-center mt-2">Toca “+” para agregar uno.</Text>
             </View>
         );
     }
@@ -116,6 +126,8 @@ export function WorkoutLog({ sets, onFinish, isFinished, onExercisePress, onRefr
                     <TouchableOpacity
                         className="absolute inset-0"
                         onPress={() => handleDeleteExercise(group.exercise_id, group.exercise_name)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Eliminar ${group.exercise_name}`}
                     />
                 </View>
             );
@@ -131,6 +143,7 @@ export function WorkoutLog({ sets, onFinish, isFinished, onExercisePress, onRefr
                         <View className="flex-1">
                             <ExerciseSummary
                                 exerciseName={group.exercise_name}
+                                exerciseType={group.exercise_type}
                                 sets={group.sets}
                                 categoryColor={group.category_color}
                                 onPress={() => onExercisePress(group.exercise_id, group.exercise_name)}

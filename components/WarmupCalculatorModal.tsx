@@ -1,5 +1,7 @@
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
+import { CalculatorService } from '@/src/services/CalculatorService';
+import { configService } from '@/src/services/ConfigService';
 import { Colors } from '@/src/theme';
 import { WorkoutSet } from '@/src/types/db';
 import { X } from 'lucide-react-native';
@@ -14,26 +16,31 @@ interface WarmupCalculatorModalProps {
 }
 
 export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeight = 0 }: WarmupCalculatorModalProps) {
+    const unit = configService.get('weightUnit');
+    const rounding = unit === 'kg' ? configService.get('calculatorsRoundingKg') : configService.get('calculatorsRoundingLbs');
+    const defaultBar = unit === 'kg'
+        ? configService.get('plateCalculatorDefaultBarWeightKg')
+        : configService.get('plateCalculatorDefaultBarWeightLbs');
+
     const [targetWeight, setTargetWeight] = useState(defaultWeight > 0 ? defaultWeight.toString() : '');
 
     const calculateSets = () => {
         const weight = parseFloat(targetWeight);
         if (isNaN(weight) || weight <= 0) return [];
 
-        // Simple 3-set default warmup
-        // 1. Empty Bar (20kg) x 15 - usually just type 'warmup'
-        // 2. 50% x 10
-        // 3. 75% x 5
-        // 4. 90% x 2
+        const suggestions = CalculatorService.warmupSuggestions({
+            workingWeight: weight,
+            barWeight: defaultBar,
+            rounding
+        });
 
-        const sets: Partial<WorkoutSet>[] = [
-            { type: 'warmup', weight: 20, reps: 15, completed: 0, notes: 'Bar only' },
-            { type: 'warmup', weight: Math.round((weight * 0.5) / 2.5) * 2.5, reps: 10, completed: 0 },
-            { type: 'warmup', weight: Math.round((weight * 0.75) / 2.5) * 2.5, reps: 5, completed: 0 },
-            { type: 'warmup', weight: Math.round((weight * 0.9) / 2.5) * 2.5, reps: 2, completed: 0 },
-        ];
-
-        return sets.filter(s => (s.weight || 0) < weight); // Don't suggest warmups heavier than target
+        return suggestions.map((s) => ({
+            type: 'warmup',
+            weight: s.weight,
+            reps: s.reps,
+            completed: 0,
+            notes: s.note
+        })) as Partial<WorkoutSet>[];
     };
 
     const calculatedSets = calculateSets();
@@ -43,29 +50,29 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
             <View className="flex-1 bg-iron-950/80 justify-center items-center p-4">
                 <View className="bg-iron-900 w-full max-w-sm rounded-2xl border border-iron-700 p-4">
                     <View className="flex-row justify-between items-center mb-4">
-                        <Text className="text-iron-950 font-bold text-xl">Warm-up Calculator</Text>
-                        <TouchableOpacity onPress={onClose}>
+                        <Text className="text-iron-950 font-bold text-xl">Warm-up</Text>
+                        <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Cerrar warm-up">
                             <X color={Colors.iron[400]} size={24} />
                         </TouchableOpacity>
                     </View>
 
-                    <Text className="text-iron-500 mb-2">Target Working Weight (kg)</Text>
+                    <Text className="text-iron-500 mb-2">Peso de trabajo ({unit})</Text>
                     <IronInput
                         value={targetWeight}
                         onChangeText={setTargetWeight}
-                        placeholder="e.g. 100"
+                        placeholder={unit === 'kg' ? 'p. ej. 100' : 'p. ej. 225'}
                         keyboardType="numeric"
                         autoFocus
                     />
 
                     {calculatedSets.length > 0 && (
                         <View className="mt-4 mb-6">
-                            <Text className="text-iron-500 font-bold mb-2">Suggested Warm-up:</Text>
+                            <Text className="text-iron-500 font-bold mb-2">Sugerencia:</Text>
                             {calculatedSets.map((set, idx) => (
                                 <View key={idx} className="flex-row justify-between items-center py-2 border-b border-iron-800">
                                     <View className="flex-row items-center">
                                         <View className="w-2 h-2 rounded-full bg-yellow-500 mr-2" />
-                                        <Text className="text-iron-950 font-bold">{set.weight}kg</Text>
+                                        <Text className="text-iron-950 font-bold">{set.weight}{unit}</Text>
                                     </View>
                                     <Text className="text-iron-500">{set.reps} reps</Text>
                                 </View>
@@ -74,7 +81,7 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
                     )}
 
                     <IronButton
-                        label="Add Exercises to Log"
+                        label="Agregar al log"
                         onPress={() => {
                             if (calculatedSets.length > 0) {
                                 onAddSets(calculatedSets);

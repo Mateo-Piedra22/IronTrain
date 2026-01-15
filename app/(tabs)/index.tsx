@@ -5,23 +5,25 @@ import { HistoryModal } from '@/components/HistoryModal';
 import { IntervalTimerModal } from '@/components/IntervalTimerModal';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { WorkoutLog } from '@/components/WorkoutLog';
+import { configService } from '@/src/services/ConfigService';
+import { useTimerStore } from '@/src/store/timerStore';
 import { Colors } from '@/src/theme';
 import { addDays, subDays } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
 import { Copy, Info, Plus, Timer, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { workoutService } from '../../src/services/WorkoutService';
-import { Workout, WorkoutSet } from '../../src/types/db';
+import { ExerciseType, Workout, WorkoutSet } from '../../src/types/db';
 
 export default function DailyLogScreen() {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [workout, setWorkout] = useState<Workout | null>(null);
-  const [sets, setSets] = useState<(WorkoutSet & { exercise_name: string; category_color: string })[]>([]);
+  const [sets, setSets] = useState<(WorkoutSet & { exercise_name: string; category_color: string; exercise_type: ExerciseType })[]>([]);
   const [loading, setLoading] = useState(true);
   const [markedDates, setMarkedDates] = useState<Record<string, any>>({});
   const [copyModalVisible, setCopyModalVisible] = useState(false);
@@ -83,17 +85,25 @@ export default function DailyLogScreen() {
   };
 
   const handleUpdateSet = async (setId: string, updates: Partial<WorkoutSet>) => {
+    const prevSet = sets.find(s => s.id === setId);
+    const prevSetsSnapshot = sets;
+    const shouldAutoRest =
+      updates.completed === 1 &&
+      prevSet?.completed !== 1 &&
+      configService.get('autoStartRestTimerOnSetComplete');
+
     // Optimistic update
     setSets(prev => prev.map(s => s.id === setId ? { ...s, ...updates } : s));
 
-    // Timer Logic
-    if (updates.completed === 1) {
-      // Auto-start timer (90s default)
-      const { startTimer } = require('../../src/store/timerStore').useTimerStore.getState();
-      startTimer(90);
+    try {
+      await workoutService.updateSet(setId, updates);
+      if (shouldAutoRest) {
+        useTimerStore.getState().startTimer(configService.get('defaultRestTimer'));
+      }
+    } catch (e: any) {
+      setSets(prevSetsSnapshot);
+      Alert.alert('Error', e?.message ?? 'No se pudo actualizar la serie');
     }
-
-    await workoutService.updateSet(setId, updates);
   };
 
   const handleDeleteSet = async (setId: string) => {
@@ -115,7 +125,7 @@ export default function DailyLogScreen() {
     const currentIndex = uniqueExercises.indexOf(exerciseId);
 
     if (currentIndex === -1 || currentIndex >= uniqueExercises.length - 1) {
-      alert("No exercise below to link with.");
+      Alert.alert('Aviso', 'No hay un ejercicio debajo para enlazar.');
       return;
     }
 
@@ -128,7 +138,7 @@ export default function DailyLogScreen() {
     if (!currentSet || !nextSet) return;
 
     if (currentSet.superset_id && nextSet.superset_id && currentSet.superset_id === nextSet.superset_id) {
-      alert("Already linked.");
+      Alert.alert('Aviso', 'Ya están enlazados.');
       return;
     }
 
@@ -153,7 +163,7 @@ export default function DailyLogScreen() {
 
   const handleViewHistory = async (exerciseId: string) => {
     const exSet = sets.find(s => s.exercise_id === exerciseId);
-    const name = exSet?.exercise_name || 'Exercise';
+    const name = exSet?.exercise_name || 'Ejercicio';
     setHistoryExerciseName(name);
 
     // Fetch
@@ -189,7 +199,7 @@ export default function DailyLogScreen() {
         <View>
           <View className="px-4 py-3 flex-row justify-between items-center bg-iron-900 border-b border-iron-700">
             <View className="flex-row items-center">
-              <Text className="text-xl font-bold text-iron-950 mr-4">Daily Log</Text>
+              <Text className="text-xl font-bold text-iron-950 mr-4">Registro diario</Text>
             </View>
             <View className="absolute inset-0 items-center justify-center pointer-events-none">
               <Image
@@ -198,7 +208,7 @@ export default function DailyLogScreen() {
               />
             </View>
             <View className="w-10 items-end">
-              <Link href="/modal" asChild>
+              <Link href="/changelog" asChild>
                 <TouchableOpacity>
                   <Info size={28} color={Colors.iron[950]} />
                 </TouchableOpacity>
@@ -212,10 +222,10 @@ export default function DailyLogScreen() {
       {/* Workout Status Toggle */}
       {workout && (
         <View className="flex-row items-center justify-between px-4 py-3 bg-iron-900 border-b border-iron-700">
-          <Text className="text-iron-950 font-bold uppercase text-xs">Workout Status</Text>
+          <Text className="text-iron-950 font-bold uppercase text-xs">Estado del entrenamiento</Text>
           <View className="flex-row items-center gap-3">
             <Text className={`font-bold ${workout.status === 'completed' ? 'text-green-600' : 'text-iron-950'}`}>
-              {workout.status === 'completed' ? 'FINISHED' : 'ACTIVE'}
+              {workout.status === 'completed' ? 'FINALIZADO' : 'ACTIVO'}
             </Text>
             <Switch
               value={workout.status === 'completed'}
@@ -250,16 +260,13 @@ export default function DailyLogScreen() {
                 className="bg-surface px-4 py-2 rounded-full border border-iron-700 flex-row items-center border-dashed active:bg-iron-200"
               >
                 <Copy size={14} color={Colors.iron[500]} />
-                <Text className="text-iron-950 text-xs font-bold ml-2 uppercase">Copy from History</Text>
+                <Text className="text-iron-950 text-xs font-bold ml-2 uppercase">Copiar del historial</Text>
               </TouchableOpacity>
             </View>
           )}
 
           <WorkoutLog
             sets={sets}
-            onAddSet={(exId) => handleAddSet(exId)}
-            onFinish={handleFinishWorkout}
-            isFinished={workout?.status === 'completed'}
             onExercisePress={(exId, exName) => {
               router.push({
                 pathname: '/exercise/[id]' as any,
@@ -287,7 +294,7 @@ export default function DailyLogScreen() {
         {/* ... */}
         <View className="flex-1 bg-iron-900">
           <View className="flex-row justify-between items-center p-4 border-b border-iron-800 bg-iron-800">
-            <Text className="text-iron-950 font-bold text-lg">Select Exercise</Text>
+            <Text className="text-iron-950 font-bold text-lg">Seleccionar ejercicio</Text>
             <TouchableOpacity onPress={() => setIsPickerVisible(false)}>
               <X color={Colors.iron[950]} size={24} />
             </TouchableOpacity>

@@ -36,6 +36,14 @@ export class ExerciseService {
     }
 
     static async delete(id: string): Promise<void> {
+        const exercise = await dbService.getFirst<Pick<Exercise, 'is_system'>>('SELECT is_system FROM exercises WHERE id = ?', [id]);
+        if (!exercise) {
+            throw new Error('Exercise not found');
+        }
+        if (exercise.is_system) {
+            throw new Error('Cannot delete system exercise');
+        }
+
         // Safe delete check
         const setsCount = await dbService.getFirst<{ count: number }>('SELECT COUNT(*) as count FROM workout_sets WHERE exercise_id = ?', [id]);
         if (setsCount && setsCount.count > 0) {

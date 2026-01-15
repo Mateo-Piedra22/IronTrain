@@ -3,6 +3,9 @@
 # dependencies
 node_modules/
 
+# trae
+.trae
+
 # Expo
 .expo/
 dist/
@@ -32,6 +35,8 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
+.env.*
 .env*.local
 
 # typescript
@@ -40,4 +45,3 @@ yarn-error.*
 # generated native folders
 /ios
 /android
-
