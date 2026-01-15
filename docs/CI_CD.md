@@ -13,6 +13,7 @@ Con un tag `vX.Y.Z`, generar un APK (EAS), publicar un GitHub Release con assets
 ## Requisitos (GitHub)
 ### Secrets
 - `EXPO_TOKEN`: token de Expo con permiso para ejecutar `eas build`
+  - Crear token: Expo Dashboard → Settings → Access Tokens
 
 ## Requisitos (Vercel)
 ### Environment Variables
@@ -39,4 +40,3 @@ Con un tag `vX.Y.Z`, generar un APK (EAS), publicar un GitHub Release con assets
 ## Notas operativas
 - Las env vars de Vercel **no** construyen APK. Solo consumen releases ya publicados.
 - El pipeline de GitHub es el que automatiza build + release.
-

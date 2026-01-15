@@ -11,12 +11,24 @@ permissions:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
+      - name: Check EXPO_TOKEN
+        shell: bash
+        run: |
+          if [ -z "${EXPO_TOKEN}" ]; then
+            echo "Missing EXPO_TOKEN GitHub secret."
+            echo "Create it in: Expo dashboard -> Settings -> Access Tokens, then add it in:"
+            echo "GitHub repo -> Settings -> Secrets and variables -> Actions -> New repository secret (EXPO_TOKEN)."
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies

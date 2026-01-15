@@ -13,6 +13,8 @@ Al finalizar, vas a tener:
 ## Paso 0 — Requisitos (una sola vez)
 ### En GitHub (Repo)
 - Configurá el secret `EXPO_TOKEN` (para que GitHub Actions pueda buildear con EAS).
+  - Crear token: Expo Dashboard → Settings → Access Tokens → Create token
+  - Guardar en GitHub: Repo → Settings → Secrets and variables → Actions → New repository secret → `EXPO_TOKEN`
 
 ### En Vercel (Website)
 - Root Directory: `website`
