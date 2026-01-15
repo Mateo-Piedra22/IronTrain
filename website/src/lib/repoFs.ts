@@ -38,6 +38,8 @@ export async function resolveRepoFile(relativePath: string): Promise<string | nu
 
   candidates.add('/vercel/path0');
   candidates.add('/vercel/path0/website');
+  candidates.add('/vercel/path1');
+  candidates.add('/vercel/path1/website');
 
   for (const base of candidates) {
     const abs = path.join(base, rel);
@@ -46,4 +48,3 @@ export async function resolveRepoFile(relativePath: string): Promise<string | nu
 
   return null;
 }
-
