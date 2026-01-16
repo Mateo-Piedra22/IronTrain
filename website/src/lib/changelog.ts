@@ -42,7 +42,10 @@ function compareSemverDesc(a: ChangelogRelease, b: ChangelogRelease): number {
 }
 
 export async function getChangelog(): Promise<ChangelogPayload> {
-  const filePath = await resolveRepoFile('docs/CHANGELOG.md');
+  const filePath =
+    (await resolveRepoFile('website/content/CHANGELOG.md')) ??
+    (await resolveRepoFile('content/CHANGELOG.md')) ??
+    (await resolveRepoFile('docs/CHANGELOG.md'));
   if (!filePath) return { releases: [] };
 
   const md = await fs.readFile(filePath, 'utf8');

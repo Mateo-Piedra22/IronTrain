@@ -6,7 +6,8 @@ import { Alert, Animated, Text, TextInput, TouchableOpacity, View } from 'react-
 import { Swipeable } from 'react-native-gesture-handler';
 import { configService } from '../src/services/ConfigService';
 import { UnitService } from '../src/services/UnitService';
-import { WorkoutSet } from '../src/types/db';
+import { ExerciseType, WorkoutSet } from '../src/types/db';
+import { formatTimeSeconds, parseFlexibleTimeToSeconds } from '../src/utils/time';
 
 interface SetRowProps {
     set: WorkoutSet;
@@ -14,10 +15,11 @@ interface SetRowProps {
     onUpdate: (id: string, updates: Partial<WorkoutSet>) => void;
     onDelete: (id: string) => void;
     onCopy?: (id: string) => void;
+    exerciseType?: ExerciseType;
     disabled?: boolean;
 }
 
-export function SetRow({ set, index, onUpdate, onDelete, onCopy, disabled }: SetRowProps) {
+export function SetRow({ set, index, onUpdate, onDelete, onCopy, exerciseType = 'weight_reps', disabled }: SetRowProps) {
     const unit = configService.get('weightUnit');
     const toDisplayWeight = (kgValue: number) => unit === 'kg' ? kgValue : UnitService.kgToLbs(kgValue);
     const toKg = (displayValue: number) => unit === 'kg' ? displayValue : UnitService.lbsToKg(displayValue);
@@ -33,11 +35,21 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy, disabled }: Set
                         ? 'DROP'
                         : 'PR';
 
+    const formatTimeInput = formatTimeSeconds;
+
     const [weight, setWeight] = useState(set.weight != null ? normalize(toDisplayWeight(set.weight)).toString() : '');
     const [reps, setReps] = useState(set.reps?.toString() || '');
+    const [distanceKm, setDistanceKm] = useState(set.distance != null ? normalize((set.distance ?? 0) / 1000).toString() : '');
+    const [timeText, setTimeText] = useState(set.time != null ? formatTimeInput(set.time ?? 0) : '');
     const [rpe, setRpe] = useState(set.rpe?.toString() || '');
     const [notes, setNotes] = useState(set.notes || '');
     const [showNotes, setShowNotes] = useState(!!set.notes);
+
+    function parseTimeToSeconds(text: string): number | null {
+        const r = parseFlexibleTimeToSeconds(text);
+        if (!r.ok) return null;
+        return r.seconds;
+    }
 
     // Ghost Logic
     useEffect(() => {
@@ -50,16 +62,34 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy, disabled }: Set
         }
     }, [set.weight, set.previous_weight, unit]);
 
+    useEffect(() => {
+        if (set.distance != null) {
+            setDistanceKm(normalize((set.distance ?? 0) / 1000).toString());
+        }
+        if (set.time != null) {
+            setTimeText(formatTimeInput(set.time ?? 0));
+        }
+    }, [set.distance, set.time]);
+
     const handleComplete = () => {
         if (disabled) {
             Alert.alert('Entrenamiento finalizado', 'Este entrenamiento está finalizado y no se puede editar.');
             return;
         }
         const w = weight ? parseFloat(weight) : undefined;
+        const dKm = distanceKm ? parseFloat(distanceKm) : undefined;
+        const t = parseTimeToSeconds(timeText);
+        if (exerciseType === 'distance_time' && timeText.trim() && t == null) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            Alert.alert('Tiempo inválido', 'Usa mm:ss, hh:mm:ss o sufijos: 90s, 10m, 1h.');
+            return;
+        }
         onUpdate(set.id, {
             completed: set.completed ? 0 : 1,
-            weight: w != null && Number.isFinite(w) ? toKg(w) : undefined,
-            reps: reps ? parseInt(reps) : undefined,
+            weight: (exerciseType === 'weight_reps' || exerciseType === 'weight_only') && w != null && Number.isFinite(w) ? toKg(w) : undefined,
+            reps: (exerciseType === 'weight_reps' || exerciseType === 'reps_only') ? (reps ? parseInt(reps) : undefined) : undefined,
+            distance: exerciseType === 'distance_time' && dKm != null && Number.isFinite(dKm) ? Math.max(0, dKm) * 1000 : undefined,
+            time: exerciseType === 'distance_time' ? t ?? undefined : undefined,
             rpe: rpe ? parseFloat(rpe) : undefined,
             notes: notes
         });
@@ -68,9 +98,18 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy, disabled }: Set
     const handleBlur = () => {
         if (disabled) return;
         const w = weight ? parseFloat(weight) : undefined;
+        const dKm = distanceKm ? parseFloat(distanceKm) : undefined;
+        const t = parseTimeToSeconds(timeText);
+        if (exerciseType === 'distance_time' && timeText.trim() && t == null) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            Alert.alert('Tiempo inválido', 'Usa mm:ss, hh:mm:ss o sufijos: 90s, 10m, 1h.');
+            return;
+        }
         onUpdate(set.id, {
-            weight: w != null && Number.isFinite(w) ? toKg(w) : undefined,
-            reps: reps ? parseInt(reps) : undefined,
+            weight: (exerciseType === 'weight_reps' || exerciseType === 'weight_only') && w != null && Number.isFinite(w) ? toKg(w) : undefined,
+            reps: (exerciseType === 'weight_reps' || exerciseType === 'reps_only') ? (reps ? parseInt(reps) : undefined) : undefined,
+            distance: exerciseType === 'distance_time' && dKm != null && Number.isFinite(dKm) ? Math.max(0, dKm) * 1000 : undefined,
+            time: exerciseType === 'distance_time' ? t ?? undefined : undefined,
             rpe: rpe ? parseFloat(rpe) : undefined,
             notes: notes
         });
@@ -95,8 +134,8 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy, disabled }: Set
         });
 
         return (
-            <View className="justify-center items-end bg-red-600 rounded-r-xl my-1 ml-[-20px] w-24">
-                <Animated.View style={{ transform: [{ scale }], opacity, width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', paddingLeft: 20 }}>
+            <View className="justify-center items-end rounded-r-xl ml-[-16px] w-24" style={{ backgroundColor: Colors.red }}>
+                <Animated.View style={{ transform: [{ scale }], opacity, width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', paddingLeft: 16 }}>
                     <TouchableOpacity
                         onPress={() => {
                             if (disabled) {
@@ -116,8 +155,11 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy, disabled }: Set
                             onDelete(set.id);
                         }}
                         style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Eliminar serie ${index + 1}`}
                     >
-                        <Trash2 size={28} color="white" />
+                        <Trash2 size={24} color="white" />
+                        <Text className="text-white text-[10px] font-bold mt-1">BORRAR</Text>
                     </TouchableOpacity>
                 </Animated.View>
             </View>
@@ -132,20 +174,28 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy, disabled }: Set
         });
 
         return (
-            <View className="justify-center items-start bg-primary w-24 rounded-l-xl my-1 mr-[-20px]">
-                <Animated.View style={{ transform: [{ scale }], width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', paddingRight: 20 }}>
+            <View className="justify-center items-start w-24 rounded-l-xl mr-[-16px]" style={{ backgroundColor: Colors.primary.dark }}>
+                <Animated.View style={{ transform: [{ scale }], width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', paddingRight: 16 }}>
                     <TouchableOpacity
                         onPress={() => {
                             if (disabled) {
                                 Alert.alert('Entrenamiento finalizado', 'Este entrenamiento está finalizado y no se puede editar.');
                                 return;
                             }
+                            if (!onCopy) {
+                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                                Alert.alert('No disponible', 'No se pudo copiar esta serie.');
+                                return;
+                            }
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            if (onCopy) onCopy(set.id);
+                            onCopy(set.id);
                         }}
                         style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Copiar serie ${index + 1}`}
                     >
-                        <Copy size={28} color="white" />
+                        <Copy size={24} color="white" />
+                        <Text className="text-white text-[10px] font-bold mt-1">COPIAR</Text>
                     </TouchableOpacity>
                 </Animated.View>
             </View>
@@ -153,91 +203,133 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy, disabled }: Set
     };
 
     return (
-        <Swipeable
-            renderRightActions={canSwipe ? renderRightActions : undefined}
-            renderLeftActions={canSwipe ? renderLeftActions : undefined}
-            containerStyle={{ overflow: 'visible' }}
-        >
-            <View className={`mb-3 rounded-xl border shadow-sm overflow-hidden ${isCompleted
-                ? 'border-primary bg-[#fffbf7]' // Solid Cream/Coffee-tinted background, no transparency but clear differentiation
-                : 'border-iron-200 bg-iron-800'
-                }`}>
-
-                {/* Header */}
-                <View className={`flex-row items-center justify-between px-3 py-2 border-b ${isCompleted ? 'bg-primary/5 border-primary/20' : 'bg-iron-200 border-iron-100'
+        <View className="mb-3">
+            <Swipeable
+                renderRightActions={canSwipe ? renderRightActions : undefined}
+                renderLeftActions={canSwipe ? renderLeftActions : undefined}
+                containerStyle={{ overflow: 'visible' }}
+                leftThreshold={40}
+                rightThreshold={40}
+            >
+                <View className={`rounded-xl border shadow-sm overflow-hidden ${isCompleted
+                    ? 'border-primary bg-[#fffbf7]' // Solid Cream/Coffee-tinted background, no transparency but clear differentiation
+                    : 'border-iron-200 bg-iron-800'
                     }`}>
-                    <View className="flex-row items-center gap-2">
-                        <View className={`px-2 py-0.5 rounded-md ${set.type === 'warmup' ? 'bg-yellow-100' :
-                            set.type === 'failure' ? 'bg-red-100' :
-                                set.type === 'drop' ? 'bg-purple-100' : 'bg-iron-200'
-                            }`}>
-                            <Text className={`text-[10px] font-bold uppercase ${set.type === 'warmup' ? 'text-yellow-700' :
-                                set.type === 'failure' ? 'text-red-700' :
-                                    set.type === 'drop' ? 'text-purple-700' : 'text-iron-600'
-                                }`}>
-                                {typeLabel}
-                            </Text>
-                        </View>
-                        {set.previous_weight && (
-                            <Text className="text-[10px] text-iron-400 font-medium">
-                                ANT: {normalize(toDisplayWeight(set.previous_weight))}{unit} x {set.previous_reps}
-                            </Text>
-                        )}
-                    </View>
 
-                    <View className="flex-row items-center bg-iron-100 rounded px-1.5 py-0.5">
-                        <Text className="text-[9px] text-iron-500 font-bold mr-1">RPE</Text>
-                        <TextInput
-                            value={rpe}
-                            onChangeText={setRpe}
-                            onBlur={handleBlur}
-                            keyboardType="numeric"
-                            placeholder="-"
-                            placeholderTextColor={Colors.iron[400]}
-                            className="p-0 text-xs font-bold text-iron-700 text-center w-6 h-4"
-                            maxLength={3}
-                        />
+                    {/* Header */}
+                    <View className={`flex-row items-center justify-between px-3 py-2 border-b ${isCompleted ? 'bg-primary/5 border-primary/20' : 'bg-iron-200 border-iron-100'
+                        }`}>
+                        <View className="flex-row items-center gap-2">
+                            <View className={`px-2 py-0.5 rounded-md ${set.type === 'warmup' ? 'bg-yellow-100' :
+                                set.type === 'failure' ? 'bg-red-100' :
+                                    set.type === 'drop' ? 'bg-purple-100' : 'bg-iron-200'
+                                }`}>
+                                <Text className={`text-[10px] font-bold uppercase ${set.type === 'warmup' ? 'text-yellow-700' :
+                                    set.type === 'failure' ? 'text-red-700' :
+                                        set.type === 'drop' ? 'text-purple-700' : 'text-iron-600'
+                                    }`}>
+                                    {typeLabel}
+                                </Text>
+                            </View>
+                            {set.previous_weight && (
+                                <Text className="text-[10px] text-iron-400 font-medium">
+                                    ANT: {normalize(toDisplayWeight(set.previous_weight))}{unit} x {set.previous_reps}
+                                </Text>
+                            )}
+                        </View>
+
+                        <View className="flex-row items-center bg-iron-100 rounded px-1.5 py-0.5">
+                            <Text className="text-[9px] text-iron-500 font-bold mr-1">RPE</Text>
+                            <TextInput
+                                value={rpe}
+                                onChangeText={setRpe}
+                                onBlur={handleBlur}
+                                keyboardType="numeric"
+                                placeholder="-"
+                                placeholderTextColor={Colors.iron[400]}
+                                className="p-0 text-xs font-bold text-iron-700 text-center w-6 h-4"
+                                maxLength={3}
+                            />
+                        </View>
                     </View>
-                </View>
 
                 {/* Main Content */}
                 <View className="flex-row items-center p-3 gap-3">
-                    {/* Weight Input */}
-                    <View className="flex-1 items-center">
-                        <TextInput
-                            value={weight}
-                            onChangeText={setWeight}
-                            onBlur={handleBlur}
-                            keyboardType="numeric"
-                            placeholder={set.previous_weight != null ? normalize(toDisplayWeight(set.previous_weight)).toString() : "0"}
-                            placeholderTextColor={Colors.iron[300]}
-                            // Removed /50 opacity variants. Used solid colors.
-                            className={`text-2xl font-bold text-center w-full p-2 rounded-lg ${isCompleted ? 'text-primary bg-primary/5' : 'text-iron-950 bg-iron-100'
-                                }`}
-                            editable={!disabled}
-                            selectTextOnFocus
-                        />
-                        <Text className="text-[10px] text-iron-400 font-bold mt-1 uppercase">{unit.toUpperCase()}</Text>
-                    </View>
+                    {exerciseType === 'distance_time' ? (
+                        <>
+                            <View className="flex-1 items-center">
+                                <TextInput
+                                    value={distanceKm}
+                                    onChangeText={setDistanceKm}
+                                    onBlur={handleBlur}
+                                    keyboardType="numeric"
+                                    placeholder="0"
+                                    placeholderTextColor={Colors.iron[300]}
+                                    className={`text-2xl font-bold text-center w-full p-2 rounded-lg ${isCompleted ? 'text-primary bg-primary/5' : 'text-iron-950 bg-iron-100'}`}
+                                    editable={!disabled}
+                                    selectTextOnFocus
+                                />
+                                <Text className="text-[10px] text-iron-400 font-bold mt-1 uppercase">KM</Text>
+                            </View>
 
-                    <Text className="text-iron-300 font-black text-xl">X</Text>
+                            <Text className="text-iron-300 font-black text-xl">/</Text>
 
-                    {/* Reps Input */}
-                    <View className="flex-1 items-center">
-                        <TextInput
-                            value={reps}
-                            onChangeText={setReps}
-                            onBlur={handleBlur}
-                            keyboardType="numeric"
-                            placeholder={set.previous_reps?.toString() || "0"}
-                            placeholderTextColor={Colors.iron[300]}
-                            className={`text-2xl font-bold text-center w-full p-2 rounded-lg ${isCompleted ? 'text-primary bg-primary/5' : 'text-iron-950 bg-iron-100'
-                                }`}
-                            editable={!disabled}
-                            selectTextOnFocus
-                        />
-                        <Text className="text-[10px] text-iron-400 font-bold mt-1 uppercase">REPS</Text>
-                    </View>
+                            <View className="flex-1 items-center">
+                                <TextInput
+                                    value={timeText}
+                                    onChangeText={setTimeText}
+                                    onBlur={handleBlur}
+                                    keyboardType="default"
+                                    placeholder="mm:ss ó 10m"
+                                    placeholderTextColor={Colors.iron[300]}
+                                    className={`text-2xl font-bold text-center w-full p-2 rounded-lg ${isCompleted ? 'text-primary bg-primary/5' : 'text-iron-950 bg-iron-100'}`}
+                                    editable={!disabled}
+                                    selectTextOnFocus
+                                />
+                                <Text className="text-[10px] text-iron-400 font-bold mt-1 uppercase">MM:SS</Text>
+                            </View>
+                        </>
+                    ) : (
+                        <>
+                            {(exerciseType === 'weight_reps' || exerciseType === 'weight_only') && (
+                                <View className="flex-1 items-center">
+                                    <TextInput
+                                        value={weight}
+                                        onChangeText={setWeight}
+                                        onBlur={handleBlur}
+                                        keyboardType="numeric"
+                                        placeholder={set.previous_weight != null ? normalize(toDisplayWeight(set.previous_weight)).toString() : "0"}
+                                        placeholderTextColor={Colors.iron[300]}
+                                        className={`text-2xl font-bold text-center w-full p-2 rounded-lg ${isCompleted ? 'text-primary bg-primary/5' : 'text-iron-950 bg-iron-100'}`}
+                                        editable={!disabled}
+                                        selectTextOnFocus
+                                    />
+                                    <Text className="text-[10px] text-iron-400 font-bold mt-1 uppercase">{unit.toUpperCase()}</Text>
+                                </View>
+                            )}
+
+                            {exerciseType === 'weight_reps' && (
+                                <Text className="text-iron-300 font-black text-xl">X</Text>
+                            )}
+
+                            {(exerciseType === 'weight_reps' || exerciseType === 'reps_only') && (
+                                <View className="flex-1 items-center">
+                                    <TextInput
+                                        value={reps}
+                                        onChangeText={setReps}
+                                        onBlur={handleBlur}
+                                        keyboardType="numeric"
+                                        placeholder={set.previous_reps?.toString() || "0"}
+                                        placeholderTextColor={Colors.iron[300]}
+                                        className={`text-2xl font-bold text-center w-full p-2 rounded-lg ${isCompleted ? 'text-primary bg-primary/5' : 'text-iron-950 bg-iron-100'}`}
+                                        editable={!disabled}
+                                        selectTextOnFocus
+                                    />
+                                    <Text className="text-[10px] text-iron-400 font-bold mt-1 uppercase">REPS</Text>
+                                </View>
+                            )}
+                        </>
+                    )}
 
                     {/* Action Buttons */}
                     <View className="flex-col gap-2 ml-2">
@@ -288,7 +380,8 @@ export function SetRow({ set, index, onUpdate, onDelete, onCopy, disabled }: Set
                     </View>
                 )}
 
-            </View>
-        </Swipeable>
+                </View>
+            </Swipeable>
+        </View>
     );
 }

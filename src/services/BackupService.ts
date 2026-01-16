@@ -222,6 +222,57 @@ class BackupService {
                 await upsert('settings', data.settings);
                 await upsert('body_metrics', data.body_metrics);
 
+                if (await this.tableExists('workout_sets')) {
+                    await dbService.run(
+                        `DELETE FROM workout_sets
+                         WHERE exercise_id NOT IN (SELECT id FROM exercises)`
+                    );
+
+                    await dbService.run(
+                        `UPDATE workout_sets
+                         SET
+                           type = CASE
+                             WHEN type IN ('normal','warmup','failure','drop','pr') THEN type
+                             ELSE 'normal'
+                           END,
+                           completed = CASE WHEN completed = 1 THEN 1 ELSE 0 END,
+                           order_index = CASE
+                             WHEN order_index IS NULL OR order_index < 0 THEN 0
+                             ELSE CAST(order_index AS INTEGER)
+                           END,
+                           rpe = CASE
+                             WHEN rpe IS NULL THEN NULL
+                             WHEN rpe < 0 OR rpe > 10 THEN NULL
+                             ELSE rpe
+                           END,
+                           weight = CASE
+                             WHEN (SELECT type FROM exercises e WHERE e.id = workout_sets.exercise_id) IN ('distance_time','reps_only') THEN NULL
+                             WHEN weight IS NULL THEN NULL
+                             WHEN weight < 0 THEN NULL
+                             ELSE weight
+                           END,
+                           reps = CASE
+                             WHEN (SELECT type FROM exercises e WHERE e.id = workout_sets.exercise_id) IN ('distance_time','weight_only') THEN NULL
+                             WHEN reps IS NULL THEN NULL
+                             WHEN reps < 0 THEN NULL
+                             ELSE reps
+                           END,
+                           distance = CASE
+                             WHEN (SELECT type FROM exercises e WHERE e.id = workout_sets.exercise_id) != 'distance_time' THEN NULL
+                             WHEN distance IS NULL THEN NULL
+                             WHEN distance < 0 THEN NULL
+                             ELSE distance
+                           END,
+                           time = CASE
+                             WHEN (SELECT type FROM exercises e WHERE e.id = workout_sets.exercise_id) != 'distance_time' THEN NULL
+                             WHEN time IS NULL THEN NULL
+                             WHEN time < 0 THEN NULL
+                             ELSE CAST(time AS INTEGER)
+                           END
+                         WHERE EXISTS (SELECT 1 FROM exercises e WHERE e.id = workout_sets.exercise_id)`
+                    );
+                }
+
                 await dbService.run('COMMIT');
             } catch (e) {
                 try {

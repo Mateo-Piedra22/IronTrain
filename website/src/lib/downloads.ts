@@ -17,7 +17,10 @@ export type DownloadsConfig = {
 export async function getDownloads(): Promise<DownloadsConfig> {
   let local: DownloadsConfig = { downloadsPageUrl: 'https://irontrain.motiona.xyz/downloads', latest: undefined, previous: [] };
   try {
-    const filePath = await resolveRepoFile('docs/DOWNLOADS.json');
+    const filePath =
+      (await resolveRepoFile('website/content/DOWNLOADS.json')) ??
+      (await resolveRepoFile('content/DOWNLOADS.json')) ??
+      (await resolveRepoFile('docs/DOWNLOADS.json'));
     if (!filePath) throw new Error('DOWNLOADS.json not found');
     const raw = await fs.readFile(filePath, 'utf8');
     local = JSON.parse(raw) as DownloadsConfig;

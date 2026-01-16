@@ -1,42 +1,56 @@
-import { Colors } from '@/src/theme';
 import { configService } from '@/src/services/ConfigService';
+import { UnitService } from '@/src/services/UnitService';
+import { Colors } from '@/src/theme';
+import { formatTimeSeconds } from '@/src/utils/time';
 import { format } from 'date-fns';
 import { X } from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import { Dimensions, FlatList, Modal, Text, TouchableOpacity, View } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
-import { WorkoutSet } from '../src/types/db';
+import { ExerciseType, WorkoutSet } from '../src/types/db';
 
 interface HistoryModalProps {
     visible: boolean;
     onClose: () => void;
     history: { date: number; sets: WorkoutSet[] }[];
     exerciseName: string;
+    exerciseType?: ExerciseType;
 }
 
-export function HistoryModal({ visible, onClose, history, exerciseName }: HistoryModalProps) {
+export function HistoryModal({ visible, onClose, history, exerciseName, exerciseType = 'weight_reps' }: HistoryModalProps) {
     const screenWidth = Dimensions.get('window').width;
     const unit = configService.get('weightUnit') === 'kg' ? 'kg' : 'lb';
+    const displayWeight = (kgValue: number) => unit === 'kg' ? kgValue : UnitService.kgToLbs(kgValue);
 
     const chartData = useMemo(() => {
         // Create a copy and sort ASC for chart
         const sorted = [...history].sort((a, b) => a.date - b.date);
 
         return sorted.map(h => {
-            // Safety check for empty sets
-            const validSets = h.sets.filter(s => s.weight !== null && s.weight !== undefined);
-            const maxWeight = validSets.length > 0 ? Math.max(...validSets.map(s => s.weight || 0)) : 0;
+            let value = 0;
+            if (exerciseType === 'distance_time') {
+                const valid = h.sets.filter(s => (s.distance ?? 0) > 0);
+                const maxDist = valid.length > 0 ? Math.max(...valid.map(s => s.distance || 0)) : 0;
+                value = Math.round((maxDist / 1000) * 100) / 100;
+            } else if (exerciseType === 'reps_only') {
+                const valid = h.sets.filter(s => (s.reps ?? 0) > 0);
+                value = valid.length > 0 ? Math.max(...valid.map(s => s.reps || 0)) : 0;
+            } else {
+                const valid = h.sets.filter(s => (s.weight ?? 0) > 0);
+                const maxW = valid.length > 0 ? Math.max(...valid.map(s => s.weight || 0)) : 0;
+                value = Math.round(displayWeight(maxW) * 10) / 10;
+            }
 
             return {
-                value: maxWeight,
+                value,
                 label: format(new Date(h.date), 'd/MM'),
                 labelTextStyle: { color: Colors.iron[400], fontSize: 10 },
-                dataPointText: maxWeight.toString(),
+                dataPointText: value.toString(),
                 dataPointTextColor: 'white',
                 dataPointTextShiftY: -10
             };
         });
-    }, [history]);
+    }, [history, exerciseType, unit]);
 
     return (
         <Modal visible={visible} animationType="fade" transparent>
@@ -106,10 +120,30 @@ export function HistoryModal({ visible, onClose, history, exerciseName }: Histor
                                                 {set.type === 'pr' && <Text className="text-[10px] text-yellow-500 font-bold ml-1">PR</Text>}
                                             </View>
                                             <Text className="text-iron-950 font-bold text-sm flex-1 text-center">
-                                                {set.weight || 0} <Text className="text-iron-500 font-normal">{unit}</Text>  ×  {set.reps || 0}
+                                                {exerciseType === 'distance_time'
+                                                    ? `${Math.round(((set.distance || 0) / 1000) * 100) / 100} km  •  ${formatTimeSeconds(set.time || 0)}`
+                                                    : exerciseType === 'reps_only'
+                                                        ? `${set.reps || 0} reps`
+                                                        : exerciseType === 'weight_only'
+                                                            ? `${Math.round(displayWeight(set.weight || 0) * 10) / 10} ${unit}`
+                                                            : `${Math.round(displayWeight(set.weight || 0) * 10) / 10} ${unit}  ×  ${set.reps || 0}`
+                                                }
                                             </Text>
-                                            <Text className="text-iron-500 text-xs w-16 text-right">
-                                                {set.type !== 'normal' ? set.type.toUpperCase() : '1RM: ' + Math.round((set.weight || 0) * (1 + (set.reps || 0) / 30))}
+                                            <Text className="text-iron-500 text-xs w-24 text-right">
+                                                {set.type !== 'normal'
+                                                    ? set.type.toUpperCase()
+                                                    : exerciseType === 'weight_reps'
+                                                        ? `1RM: ${Math.round(displayWeight((set.weight || 0) * (1 + (set.reps || 0) / 30)))}`
+                                                        : exerciseType === 'distance_time'
+                                                            ? (() => {
+                                                                const d = (set.distance || 0) / 1000;
+                                                                const t = set.time || 0;
+                                                                if (d <= 0 || t <= 0) return '—';
+                                                                const pace = t / d;
+                                                                return `${formatTimeSeconds(pace)}/km`;
+                                                            })()
+                                                            : '—'
+                                                }
                                             </Text>
                                         </View>
                                     ))}

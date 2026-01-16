@@ -12,11 +12,12 @@ interface CopyWorkoutModalProps {
     visible: boolean;
     onClose: () => void;
     targetDate: Date;
+    targetWorkoutId: string;
     onCopyComplete: () => void;
     markedDates: Record<string, any>;
 }
 
-export function CopyWorkoutModal({ visible, onClose, targetDate, onCopyComplete, markedDates }: CopyWorkoutModalProps) {
+export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId, onCopyComplete, markedDates }: CopyWorkoutModalProps) {
     const [selectedDateStr, setSelectedDateStr] = useState('');
     const [sourceWorkout, setSourceWorkout] = useState<Workout | null>(null);
     const [loading, setLoading] = useState(false);
@@ -30,14 +31,8 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, onCopyComplete,
             const parts = day.dateString.split('-');
             const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
 
-            const workout = await workoutService.getActiveWorkout(d);
-            // Check if it's a real workout (has sets?)
-            const sets = await workoutService.getSets(workout.id);
-            if (sets.length > 0) {
-                setSourceWorkout(workout);
-            } else {
-                setSourceWorkout(null);
-            }
+            const workout = await workoutService.getWorkoutWithSetsForDate(d);
+            setSourceWorkout(workout);
         } catch (e) {
             console.log('No se encontró entrenamiento para esa fecha');
             setSourceWorkout(null);
@@ -48,30 +43,121 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, onCopyComplete,
 
     const handleCopy = async () => {
         if (!sourceWorkout) return;
+        if (!targetWorkoutId) {
+            Alert.alert('Error', 'No se pudo identificar el entrenamiento destino.');
+            return;
+        }
 
-        Alert.alert(
-            "Copiar entrenamiento",
-            `¿Copiar el entrenamiento del ${format(new Date(selectedDateStr), 'd MMM')} al ${format(targetDate, 'd MMM')}?`,
-            [
-                { text: "Cancelar", style: "cancel" },
-                {
-                    text: "Copiar",
-                    onPress: async () => {
-                        try {
-                            setLoading(true);
-                            // Use loadTemplate logic to copy workout
-                            await workoutService.loadTemplate(sourceWorkout.id, format(targetDate, 'yyyy-MM-dd'));
-                            onCopyComplete();
-                            onClose();
-                        } catch (e) {
-                            Alert.alert("Error", (e as Error).message);
-                        } finally {
-                            setLoading(false);
+        const doCopy = async (
+            mode: 'replace' | 'append',
+            content: 'full' | 'structure' | 'exercises_only',
+            dedupeByExercise: boolean,
+            resumeTargetIfCompleted: boolean
+        ) => {
+            try {
+                setLoading(true);
+                const result = await workoutService.copyWorkoutToWorkoutAdvanced(sourceWorkout.id, targetWorkoutId, {
+                    mode,
+                    content,
+                    dedupeByExercise,
+                    resumeTargetIfCompleted,
+                    copyName: mode === 'replace' ? 'always' : 'if_empty',
+                });
+                onCopyComplete();
+                onClose();
+                const skipped = (result.skippedMissingExercises ?? 0) + (result.skippedExistingExercises ?? 0);
+                Alert.alert(
+                    'Copiado',
+                    [
+                        `Copiados: ${result.copied} set(s).`,
+                        skipped ? `Omitidos: ${skipped} set(s).` : null,
+                        result.skippedExistingExercises ? `- ${result.skippedExistingExercises} por ejercicios ya existentes en el destino.` : null,
+                        result.skippedMissingExercises ? `- ${result.skippedMissingExercises} por ejercicios faltantes en la biblioteca.` : null,
+                    ].filter(Boolean).join('\n')
+                );
+            } catch (e) {
+                Alert.alert('Error', (e as Error).message);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const targetWorkout = await workoutService.getWorkout(targetWorkoutId);
+        if (!targetWorkout) {
+            Alert.alert('Error', 'No se encontró el entrenamiento destino.');
+            return;
+        }
+
+        const targetSets = await workoutService.getSets(targetWorkoutId);
+        const targetHasSets = targetSets.length > 0;
+
+        const sourceLabel = format(new Date(selectedDateStr), 'd MMM');
+        const targetLabel = format(targetDate, 'd MMM');
+
+        const askContent = (mode: 'replace' | 'append', dedupeByExercise: boolean, resumeTargetIfCompleted: boolean) => {
+            Alert.alert(
+                '¿Qué querés copiar?',
+                'Elegí el nivel de copiado:',
+                [
+                    { text: 'Cancelar', style: 'cancel' },
+                    { text: 'Completo (valores)', onPress: () => doCopy(mode, 'full', dedupeByExercise, resumeTargetIfCompleted) },
+                    { text: 'Estructura (vacío)', onPress: () => doCopy(mode, 'structure', dedupeByExercise, resumeTargetIfCompleted) },
+                    { text: 'Solo ejercicios (1 set)', onPress: () => doCopy(mode, 'exercises_only', dedupeByExercise, resumeTargetIfCompleted) },
+                ]
+            );
+        };
+
+        const askMode = (resumeTargetIfCompleted: boolean) => {
+            if (!targetHasSets) {
+                Alert.alert(
+                    'Copiar entrenamiento',
+                    `¿Copiar el entrenamiento del ${sourceLabel} al ${targetLabel}?`,
+                    [
+                        { text: 'Cancelar', style: 'cancel' },
+                        { text: 'Continuar', onPress: () => askContent('replace', false, resumeTargetIfCompleted) },
+                    ]
+                );
+                return;
+            }
+
+            Alert.alert(
+                'Este día ya tiene ejercicios',
+                `El día ${targetLabel} tiene ${targetSets.length} set(s). ¿Qué querés hacer?`,
+                [
+                    { text: 'Cancelar', style: 'cancel' },
+                    { text: 'Agregar al final', onPress: () => askContent('append', false, resumeTargetIfCompleted) },
+                    { text: 'Agregar sin duplicar ejercicios', onPress: () => askContent('append', true, resumeTargetIfCompleted) },
+                    {
+                        text: 'Reemplazar todo',
+                        style: 'destructive',
+                        onPress: () => {
+                            Alert.alert(
+                                'Confirmar reemplazo',
+                                `Esto eliminará ${targetSets.length} set(s) del ${targetLabel}.`,
+                                [
+                                    { text: 'Cancelar', style: 'cancel' },
+                                    { text: 'Reemplazar', style: 'destructive', onPress: () => askContent('replace', false, resumeTargetIfCompleted) },
+                                ]
+                            );
                         }
-                    }
-                }
-            ]
-        );
+                    },
+                ]
+            );
+        };
+
+        if (targetWorkout.status === 'completed') {
+            Alert.alert(
+                'Día finalizado',
+                `El día ${targetLabel} está marcado como FINALIZADO. Para copiar, hay que reanudarlo.`,
+                [
+                    { text: 'Cancelar', style: 'cancel' },
+                    { text: 'Reanudar y continuar', onPress: () => askMode(true) },
+                ]
+            );
+            return;
+        }
+
+        askMode(false);
     };
 
     return (

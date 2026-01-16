@@ -7,6 +7,11 @@ export default async function DownloadsPage() {
   const changelog = await getChangelog();
   const latestChangelog = changelog.releases.find((r) => r.unreleased !== true) ?? null;
   const latestDownloads = downloads.latest ?? null;
+  const downloadMap = new Map<string, { url?: string; sha256?: string }>();
+  if (downloads.latest?.version) downloadMap.set(downloads.latest.version, downloads.latest.apk ?? {});
+  for (const r of downloads.previous ?? []) {
+    if (r?.version) downloadMap.set(r.version, r.apk ?? {});
+  }
 
   const latest =
     latestChangelog && latestDownloads && isSemver(latestChangelog.version) && isSemver(latestDownloads.version)
@@ -16,6 +21,8 @@ export default async function DownloadsPage() {
       : (latestChangelog
           ? { version: latestChangelog.version, date: latestChangelog.date ?? null }
           : (latestDownloads ? { version: latestDownloads.version, date: latestDownloads.date ?? null } : null));
+
+  const published = changelog.releases.filter((r) => r.unreleased !== true);
 
   return (
     <div className="space-y-6">
@@ -75,28 +82,37 @@ export default async function DownloadsPage() {
         </div>
       </section>
 
-      {downloads.previous?.length ? (
-        <section className="rounded-2xl border border-iron-200 bg-white p-6">
-          <h2 className="text-xl font-black text-slate-900">Versiones anteriores</h2>
-          <div className="mt-4 space-y-3">
-            {downloads.previous.map((r) => (
-              <div key={r.version} className="flex flex-col gap-2 rounded-xl border border-iron-200 p-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="font-black text-slate-900">v{r.version}</div>
-                  <div className="text-sm text-slate-500">{r.date ?? '—'}</div>
+      <section className="rounded-2xl border border-iron-200 bg-white p-6">
+        <h2 className="text-xl font-black text-slate-900">Versiones</h2>
+        <p className="mt-2 text-slate-600">Listado en orden por changelog. Solo algunas versiones pueden tener APK disponible.</p>
+        <div className="mt-4 space-y-3">
+          {published.length ? (
+            published.map((r) => {
+              const apk = downloadMap.get(r.version);
+              const url = apk?.url;
+              return (
+                <div key={r.version} className="flex flex-col gap-2 rounded-xl border border-iron-200 p-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="font-black text-slate-900">v{r.version}</div>
+                    <div className="text-sm text-slate-500">{r.date ?? '—'}</div>
+                  </div>
+                  {url ? (
+                    <a href={url} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">
+                      Descargar APK
+                    </a>
+                  ) : (
+                    <span className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-500">Sin APK</span>
+                  )}
                 </div>
-                {r.apk?.url ? (
-                  <a href={r.apk.url} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">
-                    APK
-                  </a>
-                ) : (
-                  <span className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-500">—</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
+              );
+            })
+          ) : (
+            <div className="rounded-xl border border-iron-200 bg-iron-50 p-4 text-slate-700">
+              No hay releases publicados todavía.
+            </div>
+          )}
+        </div>
+      </section>
 
       <section className="rounded-2xl border border-iron-200 bg-white p-6">
         <h2 className="text-xl font-black text-slate-900">Notas</h2>

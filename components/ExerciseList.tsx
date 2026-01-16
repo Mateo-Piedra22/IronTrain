@@ -2,8 +2,10 @@
 import { Colors } from '@/src/theme';
 import { useRouter } from 'expo-router';
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { CategoryService } from '../src/services/CategoryService';
 import { ExerciseService } from '../src/services/ExerciseService';
 import { Category, Exercise } from '../src/types/db';
@@ -26,6 +28,9 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
     // Form Modal
     const [isFormVisible, setIsFormVisible] = useState(false);
     const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
+    const insets = useSafeAreaInsets();
+    const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
+    const bottomOffset = (tabBarHeight ? tabBarHeight : insets.bottom) + 12;
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -196,7 +201,8 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
             {!onSelect && (
                 <TouchableOpacity
                     onPress={handleCreate}
-                    className="absolute bottom-6 right-6 w-14 h-14 bg-primary rounded-full items-center justify-center shadow-lg border border-iron-700 active:opacity-90"
+                    className="absolute w-14 h-14 bg-primary rounded-full items-center justify-center shadow-lg border border-iron-700 active:opacity-90"
+                    style={{ right: 24, bottom: bottomOffset }}
                     accessibilityRole="button"
                     accessibilityLabel="Crear ejercicio"
                 >

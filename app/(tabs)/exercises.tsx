@@ -8,7 +8,7 @@ export default function LibraryScreen() {
     const [mode, setMode] = useState<'exercises' | 'categories'>('exercises');
 
     return (
-        <SafeAreaWrapper className="bg-iron-900" edges={['left', 'right']}>
+        <SafeAreaWrapper className="bg-iron-900" edges={['top', 'left', 'right']}>
             {/* Custom Tab Segment */}
             <View className="px-4 mb-3 mt-3">
                 <View className="flex-row bg-surface p-1 rounded-xl border border-iron-700 elevation-1">

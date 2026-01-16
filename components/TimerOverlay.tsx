@@ -1,11 +1,16 @@
 import { useTimerStore } from '@/src/store/timerStore';
 import { Colors } from '@/src/theme';
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { Pause, Play, RotateCcw, X } from 'lucide-react-native';
-import React, { useEffect } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { AppState, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export function TimerOverlay() {
     const { timeLeft, isRunning, duration, stopTimer, pauseTimer, resumeTimer, restartTimer, addTime, tick } = useTimerStore();
+    const insets = useSafeAreaInsets();
+    const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
+    const bottomOffset = (tabBarHeight ? tabBarHeight : insets.bottom) + 12;
 
     useEffect(() => {
         let interval: any;
@@ -32,7 +37,10 @@ export function TimerOverlay() {
     };
 
     return (
-        <View className="absolute bottom-24 right-4 bg-iron-950 border border-iron-600 rounded-2xl flex-row items-center p-3 shadow-xl z-50">
+        <View
+            className="absolute bg-iron-950 border border-iron-600 rounded-2xl flex-row items-center p-3 shadow-xl z-50"
+            style={{ right: 16, bottom: bottomOffset }}
+        >
             <View className="pr-3">
                 <Text className="text-iron-300 text-[10px] font-bold uppercase">Descanso</Text>
                 <Text className="text-iron-100 font-black text-2xl">{formatTime(Math.max(0, timeLeft))}</Text>

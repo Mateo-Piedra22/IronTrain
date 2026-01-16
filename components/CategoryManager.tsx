@@ -1,9 +1,11 @@
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
 import { Colors } from '@/src/theme';
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { Pencil, Plus, Trash2 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Modal, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CategoryService } from '../src/services/CategoryService';
 import { Category } from '../src/types/db';
 
@@ -17,6 +19,9 @@ export function CategoryManager() {
     const [categoryName, setCategoryName] = useState('');
     const [selectedColor, setSelectedColor] = useState('#3b82f6');
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+    const insets = useSafeAreaInsets();
+    const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
+    const bottomOffset = (tabBarHeight ? tabBarHeight : insets.bottom) + 12;
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -154,7 +159,8 @@ export function CategoryManager() {
 
             <TouchableOpacity
                 onPress={() => openModal()}
-                className="absolute bottom-6 right-6 w-14 h-14 bg-primary rounded-full items-center justify-center elevation-3 border border-orange-400 active:scale-95"
+                className="absolute w-14 h-14 bg-primary rounded-full items-center justify-center elevation-3 border border-orange-400 active:scale-95"
+                style={{ right: 24, bottom: bottomOffset }}
                 accessibilityRole="button"
                 accessibilityLabel="Crear categoría"
             >
@@ -168,7 +174,7 @@ export function CategoryManager() {
                     animationType="fade"
                     onRequestClose={() => setModalVisible(false)}
                 >
-                    <View className="flex-1 bg-black/50 justify-center items-center p-4">
+                    <SafeAreaView className="flex-1 bg-black/50 justify-center items-center p-4" edges={['top', 'bottom', 'left', 'right']}>
                         <View className="bg-surface w-full max-w-sm rounded-2xl p-6 border border-iron-700 elevation-2">
                             <Text className="text-xl font-bold text-iron-950 mb-6">
                                 {editingCategory ? 'Editar categoría' : 'Nueva categoría'}
@@ -203,7 +209,7 @@ export function CategoryManager() {
                                 </View>
                             </View>
                         </View>
-                    </View>
+                    </SafeAreaView>
                 </Modal>
             )}
 

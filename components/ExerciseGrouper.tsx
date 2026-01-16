@@ -1,14 +1,16 @@
 import { Colors } from '@/src/theme';
-import { WorkoutSet } from '@/src/types/db';
+import { UnitService } from '@/src/services/UnitService';
+import { ExerciseType, WorkoutSet } from '@/src/types/db';
+import { formatTimeSeconds, parseFlexibleTimeToSeconds } from '@/src/utils/time';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, Text, TextInput, View } from 'react-native';
 import { IronButton } from './IronButton';
 import { IronInput } from './IronInput';
 
 interface ExerciseGrouperProps {
     exerciseName: string;
-    exerciseType: string; // 'weight_reps' | 'distance_time' etc
+    exerciseType: ExerciseType;
     sets: WorkoutSet[];
     onAddSet: () => void;
     onUpdateSet: (id: string, data: Partial<WorkoutSet>) => void;
@@ -29,6 +31,39 @@ export function ExerciseGrouper({
     const [commentModalVisible, setCommentModalVisible] = useState(false);
     const [currentSetId, setCurrentSetId] = useState<string | null>(null);
     const [currentComment, setCurrentComment] = useState('');
+
+    const distanceUnitLabel = unitSystem === 'metric' ? 'km' : 'mi';
+    const displayDistance = useMemo(() => {
+        return (meters: number) => unitSystem === 'metric' ? (meters / 1000) : (meters / 1609.34);
+    }, [unitSystem]);
+    const toMeters = useMemo(() => {
+        return (d: number) => unitSystem === 'metric' ? (d * 1000) : (d * 1609.34);
+    }, [unitSystem]);
+    const displayWeight = useMemo(() => {
+        return (kg: number) => unitSystem === 'metric' ? kg : UnitService.kgToLbs(kg);
+    }, [unitSystem]);
+    const toKg = useMemo(() => {
+        return (w: number) => unitSystem === 'metric' ? w : UnitService.lbsToKg(w);
+    }, [unitSystem]);
+
+    type Draft = { distance: string; time: string; weight: string; reps: string };
+    const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+
+    useEffect(() => {
+        setDrafts((prev) => {
+            const next = { ...prev };
+            for (const s of sets) {
+                if (next[s.id]) continue;
+                next[s.id] = {
+                    distance: s.distance != null ? String(Math.round(displayDistance(s.distance) * 100) / 100) : '',
+                    time: s.time != null ? formatTimeSeconds(s.time) : '',
+                    weight: s.weight != null ? String(Math.round(displayWeight(s.weight) * 100) / 100) : '',
+                    reps: s.reps != null ? String(s.reps) : '',
+                };
+            }
+            return next;
+        });
+    }, [sets, displayDistance, displayWeight]);
 
     const handleToggleComplete = (set: WorkoutSet) => {
         onUpdateSet(set.id, { completed: set.completed ? 0 : 1 });
@@ -56,8 +91,8 @@ export function ExerciseGrouper({
             return (
                 <View className="flex-row bg-slate-700/50 p-2 border-b border-border">
                     <Text className="text-textMuted text-xs w-8 text-center">#</Text>
-                    <Text className="text-textMuted text-xs flex-1 text-center">{unitSystem === 'metric' ? 'km' : 'mi'}</Text>
-                    <Text className="text-textMuted text-xs flex-1 text-center">Tiempo (s)</Text>
+                    <Text className="text-textMuted text-xs flex-1 text-center">{distanceUnitLabel}</Text>
+                    <Text className="text-textMuted text-xs flex-1 text-center">Tiempo</Text>
                     <Text className="text-textMuted text-xs w-16 text-center">Acciones</Text>
                 </View>
             );
@@ -65,7 +100,7 @@ export function ExerciseGrouper({
         return (
             <View className="flex-row bg-slate-700/50 p-2 border-b border-border">
                 <Text className="text-textMuted text-xs w-8 text-center">#</Text>
-                <Text className="text-textMuted text-xs flex-1 text-center">{unitSystem === 'metric' ? 'kg' : 'lbs'}</Text>
+                <Text className="text-textMuted text-xs flex-1 text-center">{unitSystem === 'metric' ? 'kg' : 'lb'}</Text>
                 <Text className="text-textMuted text-xs flex-1 text-center">Reps</Text>
                 <Text className="text-textMuted text-xs w-16 text-center">Acciones</Text>
             </View>
@@ -96,18 +131,47 @@ export function ExerciseGrouper({
                                         <View className="flex-1 px-1">
                                             <IronInput
                                                 placeholder="0.0"
-                                                value={set.distance?.toString() || ''}
-                                                onChangeText={(val) => onUpdateSet(set.id, { distance: parseFloat(val) || 0 })}
+                                                value={drafts[set.id]?.distance ?? ''}
+                                                onChangeText={(val) => setDrafts((prev) => ({ ...prev, [set.id]: { ...(prev[set.id] || { distance: '', time: '', weight: '', reps: '' }), distance: val } }))}
+                                                onBlur={() => {
+                                                    const raw = (drafts[set.id]?.distance ?? '').trim();
+                                                    if (!raw) {
+                                                        onUpdateSet(set.id, { distance: null as any });
+                                                        return;
+                                                    }
+                                                    const n = Number(raw);
+                                                    if (!Number.isFinite(n) || n < 0) {
+                                                        Alert.alert('Distancia inválida', `Usa un número válido en ${distanceUnitLabel}.`);
+                                                        return;
+                                                    }
+                                                    const meters = toMeters(n);
+                                                    onUpdateSet(set.id, { distance: Math.round(meters) });
+                                                    setDrafts((prev) => ({ ...prev, [set.id]: { ...(prev[set.id] || { distance: '', time: '', weight: '', reps: '' }), distance: String(Math.round(n * 100) / 100) } }));
+                                                }}
                                                 keyboardType="numeric"
                                                 className="h-8 text-center"
                                             />
                                         </View>
                                         <View className="flex-1 px-1">
                                             <IronInput
-                                                placeholder="00:00"
-                                                value={set.time?.toString() || ''}
-                                                onChangeText={(val) => onUpdateSet(set.id, { time: parseInt(val) || 0 })}
-                                                keyboardType="numeric"
+                                                placeholder="mm:ss ó 10m"
+                                                value={drafts[set.id]?.time ?? ''}
+                                                onChangeText={(val) => setDrafts((prev) => ({ ...prev, [set.id]: { ...(prev[set.id] || { distance: '', time: '', weight: '', reps: '' }), time: val } }))}
+                                                onBlur={() => {
+                                                    const raw = (drafts[set.id]?.time ?? '').trim();
+                                                    const parsed = parseFlexibleTimeToSeconds(raw);
+                                                    if (!raw) {
+                                                        onUpdateSet(set.id, { time: null as any });
+                                                        return;
+                                                    }
+                                                    if (!parsed.ok || parsed.seconds == null) {
+                                                        Alert.alert('Tiempo inválido', 'Usa mm:ss, hh:mm:ss o sufijos: 90s, 10m, 1h.');
+                                                        return;
+                                                    }
+                                                    onUpdateSet(set.id, { time: parsed.seconds });
+                                                    setDrafts((prev) => ({ ...prev, [set.id]: { ...(prev[set.id] || { distance: '', time: '', weight: '', reps: '' }), time: formatTimeSeconds(parsed.seconds) } }));
+                                                }}
+                                                keyboardType="default"
                                                 className="h-8 text-center"
                                             />
                                         </View>
@@ -118,8 +182,23 @@ export function ExerciseGrouper({
                                             {!isRepsOnly && (
                                                 <IronInput
                                                     placeholder="-"
-                                                    value={set.weight?.toString() || ''}
-                                                    onChangeText={(val) => onUpdateSet(set.id, { weight: parseFloat(val) || 0 })}
+                                                    value={drafts[set.id]?.weight ?? ''}
+                                                    onChangeText={(val) => setDrafts((prev) => ({ ...prev, [set.id]: { ...(prev[set.id] || { distance: '', time: '', weight: '', reps: '' }), weight: val } }))}
+                                                    onBlur={() => {
+                                                        const raw = (drafts[set.id]?.weight ?? '').trim();
+                                                        if (!raw) {
+                                                            onUpdateSet(set.id, { weight: null as any });
+                                                            return;
+                                                        }
+                                                        const n = Number(raw);
+                                                        if (!Number.isFinite(n) || n < 0) {
+                                                            Alert.alert('Peso inválido', 'Usa un número válido (>= 0).');
+                                                            return;
+                                                        }
+                                                        const kg = toKg(n);
+                                                        onUpdateSet(set.id, { weight: Math.round(kg * 100) / 100 });
+                                                        setDrafts((prev) => ({ ...prev, [set.id]: { ...(prev[set.id] || { distance: '', time: '', weight: '', reps: '' }), weight: String(Math.round(n * 100) / 100) } }));
+                                                    }}
                                                     keyboardType="numeric"
                                                     className="h-8 text-center"
                                                 />
@@ -129,8 +208,22 @@ export function ExerciseGrouper({
                                             {!isWeightOnly && (
                                                 <IronInput
                                                     placeholder="-"
-                                                    value={set.reps?.toString() || ''}
-                                                    onChangeText={(val) => onUpdateSet(set.id, { reps: parseInt(val) || 0 })}
+                                                    value={drafts[set.id]?.reps ?? ''}
+                                                    onChangeText={(val) => setDrafts((prev) => ({ ...prev, [set.id]: { ...(prev[set.id] || { distance: '', time: '', weight: '', reps: '' }), reps: val } }))}
+                                                    onBlur={() => {
+                                                        const raw = (drafts[set.id]?.reps ?? '').trim();
+                                                        if (!raw) {
+                                                            onUpdateSet(set.id, { reps: null as any });
+                                                            return;
+                                                        }
+                                                        const n = Number(raw);
+                                                        if (!Number.isFinite(n) || n < 0) {
+                                                            Alert.alert('Reps inválidas', 'Usa un entero >= 0.');
+                                                            return;
+                                                        }
+                                                        onUpdateSet(set.id, { reps: Math.floor(n) });
+                                                        setDrafts((prev) => ({ ...prev, [set.id]: { ...(prev[set.id] || { distance: '', time: '', weight: '', reps: '' }), reps: String(Math.floor(n)) } }));
+                                                    }}
                                                     keyboardType="numeric"
                                                     className="h-8 text-center"
                                                 />

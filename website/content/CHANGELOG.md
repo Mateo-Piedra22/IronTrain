@@ -1,20 +1,7 @@
 # Changelog
 
-## 1.3.0 (2026-01-16)
-- Implementar soporte completo para diferentes tipos de ejercicios (peso_repeticiones, solo_repeticiones, solo_peso, distancia_tiempo).
-- Añadir validación y limpieza de datos para series basadas en el tipo de ejercicio.
-- Mejorar el modal del historial para mostrar diferentes métricas por tipo de ejercicio.
-- Mejorar la copia de entrenamientos con opciones avanzadas y resolución de conflictos.
-- Actualizar la pantalla de análisis con resúmenes de cardio, solo repeticiones y solo peso.
-- Corregir la posición de la superposición del temporizador y añadir inserciones de área segura.
-- Añadir un script de sincronización de contenido para el sitio web y actualizar la página de descargas.
-- Mejorar la validación de formularios y el manejo de errores en varios componentes.
-
-## 1.3.1 (Unreleased)
-- Soporte para múltiples temas (claro/oscuro).
-- Soporte para diferentes idiomas (inglés/español).
-- Conexión con múltiples dispositivos (relojes/bands compatibles).
-- Vinculación con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos.
+## 1.2.1 (Unreleased)
+- Placeholder: describir cambios nuevos antes del próximo release.
 
 ## 1.2.0 (2026-01-15)
 - Rework settings: mejor organización y acceso rápido.

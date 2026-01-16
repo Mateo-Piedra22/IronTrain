@@ -4,7 +4,7 @@ import { GoalsWidget } from '@/components/GoalsWidget';
 import { IronCard } from '@/components/IronCard';
 import { PRCenter } from '@/components/PRCenter';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
-import { AnalysisService, CategoryVolumeRow, ExerciseVolumeRow, OneRMProgressRow, OneRepMax, VolumeSeriesPoint, WorkoutComparison, WorkoutStreak, WorkoutSummary } from '@/src/services/AnalysisService';
+import { AnalysisService, CardioSummary, CategoryVolumeRow, ExerciseVolumeRow, OneRMProgressRow, OneRepMax, RepsOnlySummary, VolumeSeriesPoint, WeightOnlySummary, WorkoutComparison, WorkoutStreak, WorkoutSummary } from '@/src/services/AnalysisService';
 import { backupService } from '@/src/services/BackupService';
 import { configService } from '@/src/services/ConfigService';
 import { UnitService } from '@/src/services/UnitService';
@@ -35,6 +35,9 @@ export default function AnalysisScreen() {
     const [summaryRange, setSummaryRange] = useState<WorkoutSummary | null>(null);
     const [comparison, setComparison] = useState<WorkoutComparison | null>(null);
     const [volumeSeries, setVolumeSeries] = useState<VolumeSeriesPoint[]>([]);
+    const [cardioSummary, setCardioSummary] = useState<CardioSummary | null>(null);
+    const [repsOnlySummary, setRepsOnlySummary] = useState<RepsOnlySummary | null>(null);
+    const [weightOnlySummary, setWeightOnlySummary] = useState<WeightOnlySummary | null>(null);
     const [categoryVolume, setCategoryVolume] = useState<CategoryVolumeRow[]>([]);
     const [topExercisesByVolume, setTopExercisesByVolume] = useState<ExerciseVolumeRow[]>([]);
     const [top1RMProgress, setTop1RMProgress] = useState<OneRMProgressRow[]>([]);
@@ -130,11 +133,14 @@ export default function AnalysisScreen() {
         setError(null);
         const requestId = ++rangeRequestIdRef.current;
         try {
-            const [s7, sRange, comp, series, cats, maxes, topExVol, rmProg] = await Promise.all([
+            const [s7, sRange, comp, series, cardio, repsOnly, weightOnly, cats, maxes, topExVol, rmProg] = await Promise.all([
                 AnalysisService.getWorkoutSummary(7),
                 AnalysisService.getWorkoutSummary(days),
                 AnalysisService.getWorkoutComparison(days),
                 AnalysisService.getVolumeSeries(days, b),
+                AnalysisService.getCardioSummary(days),
+                AnalysisService.getRepsOnlySummary(days),
+                AnalysisService.getWeightOnlySummary(days),
                 AnalysisService.getCategoryVolume(days, 6),
                 AnalysisService.getTop1RMs(days, 8),
                 AnalysisService.getTopExercisesByVolume(days, 8),
@@ -146,6 +152,9 @@ export default function AnalysisScreen() {
             setSummaryRange(sRange);
             setComparison(comp);
             setVolumeSeries(series);
+            setCardioSummary(cardio);
+            setRepsOnlySummary(repsOnly);
+            setWeightOnlySummary(weightOnly);
             setCategoryVolume(cats);
             setOneRepMaxes(maxes);
             setTopExercisesByVolume(topExVol);
@@ -176,7 +185,7 @@ export default function AnalysisScreen() {
     );
 
     return (
-        <SafeAreaWrapper className="flex-1 bg-iron-900" edges={['left', 'right']}>
+        <SafeAreaWrapper className="flex-1 bg-iron-900" edges={['top', 'left', 'right']}>
             <ScrollView className="px-4 mt-2" contentContainerStyle={{ paddingBottom: 120 }}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-4 px-4 mb-4">
                     <View className="flex-row gap-2">
@@ -324,6 +333,43 @@ export default function AnalysisScreen() {
                                             : '—'}
                                     </Text>
                                     <Text className="text-iron-500 text-xs font-bold">vol/min</Text>
+                                </View>
+                            </View>
+
+                            <View className="h-[1px] bg-iron-700 my-4" />
+                            <Text className="text-iron-950 font-black uppercase text-xs tracking-wider mb-3">Otros tipos</Text>
+                            <View className="flex-row gap-3">
+                                <View className="flex-1">
+                                    <Text className="text-iron-500 text-xs font-bold uppercase">Cardio</Text>
+                                    <Text className="text-iron-950 text-xl font-black mt-1">
+                                        {cardioSummary ? Math.round((cardioSummary.totalDistanceMeters / 1000) * 10) / 10 : 0}
+                                    </Text>
+                                    <Text className="text-iron-500 text-xs font-bold">
+                                        km • {cardioSummary ? Math.round(cardioSummary.totalTimeSeconds / 60) : 0} min
+                                    </Text>
+                                    <Text className="text-iron-500 text-xs font-bold mt-1">
+                                        mejor: {cardioSummary?.bestSpeedKmh != null ? `${Math.round(cardioSummary.bestSpeedKmh * 10) / 10} km/h` : '—'}
+                                    </Text>
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="text-iron-500 text-xs font-bold uppercase">Reps</Text>
+                                    <Text className="text-iron-950 text-xl font-black mt-1">{repsOnlySummary?.totalReps ?? 0}</Text>
+                                    <Text className="text-iron-500 text-xs font-bold">
+                                        sesiones: {repsOnlySummary?.sessions ?? 0}
+                                    </Text>
+                                    <Text className="text-iron-500 text-xs font-bold mt-1">
+                                        mejor: {repsOnlySummary?.bestReps ?? '—'}
+                                    </Text>
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="text-iron-500 text-xs font-bold uppercase">Peso</Text>
+                                    <Text className="text-iron-950 text-xl font-black mt-1">
+                                        {weightOnlySummary?.bestWeightKg != null ? Math.round(displayWeight(weightOnlySummary.bestWeightKg) * 10) / 10 : 0}
+                                    </Text>
+                                    <Text className="text-iron-500 text-xs font-bold">{unit}</Text>
+                                    <Text className="text-iron-500 text-xs font-bold mt-1">
+                                        sesiones: {weightOnlySummary?.sessions ?? 0}
+                                    </Text>
                                 </View>
                             </View>
                         </IronCard>

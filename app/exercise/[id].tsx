@@ -12,6 +12,8 @@ import { workoutService } from '@/src/services/WorkoutService';
 import { useTimerStore } from '@/src/store/timerStore';
 import { Colors } from '@/src/theme';
 import { Exercise, WorkoutSet } from '@/src/types/db';
+import { formatTimeSeconds } from '@/src/utils/time';
+import * as Haptics from 'expo-haptics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Info, Pencil, Timer, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -21,7 +23,8 @@ import { BarChart, LineChart } from 'react-native-gifted-charts';
 type Tab = 'track' | 'history' | 'analysis';
 type AnalysisTab = 'overview' | 'prs' | 'tools';
 type HistoryTab = 'sessions' | 'sets';
-type SetsSort = 'recent' | 'weight' | 'orm' | 'volume';
+type SetsSort = 'recent' | 'weight' | 'orm' | 'volume' | 'reps' | 'distance' | 'time' | 'pace' | 'speed';
+type CardioMetric = 'distance' | 'time' | 'pace' | 'speed';
 
 export default function ExerciseDetailScreen() {
     const { workoutId, exerciseId, exerciseName } = useLocalSearchParams<{ workoutId: string, exerciseId: string, exerciseName: string }>();
@@ -37,6 +40,8 @@ export default function ExerciseDetailScreen() {
     const [historyRangeDays, setHistoryRangeDays] = useState<30 | 90 | 365>(90);
     const [historyTab, setHistoryTab] = useState<HistoryTab>('sessions');
     const [setsSort, setSetsSort] = useState<SetsSort>('recent');
+    const [cardioMetric, setCardioMetric] = useState<CardioMetric>('speed');
+    const [cardioPrimaryPR, setCardioPrimaryPR] = useState<CardioMetric>('speed');
 
     const [workoutLocked, setWorkoutLocked] = useState(false);
 
@@ -59,6 +64,42 @@ export default function ExerciseDetailScreen() {
     useEffect(() => {
         loadData();
     }, [workoutId, exerciseId, historyRangeDays]);
+
+    useEffect(() => {
+        const m = configService.get('exerciseCardioMetricById')?.[exerciseId];
+        if (m === 'distance' || m === 'time' || m === 'pace' || m === 'speed') {
+            setCardioMetric(m);
+        } else {
+            setCardioMetric('speed');
+        }
+    }, [exerciseId]);
+
+    useEffect(() => {
+        const m = configService.get('exerciseCardioPrimaryPRById')?.[exerciseId];
+        if (m === 'distance' || m === 'time' || m === 'pace' || m === 'speed') {
+            setCardioPrimaryPR(m);
+        } else {
+            setCardioPrimaryPR(cardioMetric);
+        }
+    }, [exerciseId, cardioMetric]);
+
+    const setCardioMetricPersisted = async (m: CardioMetric) => {
+        setCardioMetric(m);
+        try {
+            const prev = configService.get('exerciseCardioMetricById') || {};
+            const next = { ...prev, [exerciseId]: m };
+            await configService.set('exerciseCardioMetricById', next);
+        } catch { }
+    };
+
+    const setCardioPrimaryPRPersisted = async (m: CardioMetric) => {
+        setCardioPrimaryPR(m);
+        try {
+            const prev = configService.get('exerciseCardioPrimaryPRById') || {};
+            const next = { ...prev, [exerciseId]: m };
+            await configService.set('exerciseCardioPrimaryPRById', next);
+        } catch { }
+    };
 
     // Added specific effect to refresh history when entering the tab
     useEffect(() => {
@@ -156,6 +197,32 @@ export default function ExerciseDetailScreen() {
         }
     };
 
+    const handleCopySet = async (setId: string) => {
+        if (!workoutId) return;
+        if (workoutLocked) {
+            Alert.alert('Entrenamiento finalizado', 'Este entrenamiento está finalizado y no se puede editar.');
+            return;
+        }
+        const s = sets.find((x) => x.id === setId);
+        if (!s) return;
+
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            await workoutService.addSet(workoutId, exerciseId, s.type as any, {
+                weight: s.weight,
+                reps: s.reps,
+                distance: s.distance,
+                time: s.time,
+                rpe: s.rpe,
+                notes: s.notes,
+            });
+            loadTrackData();
+        } catch (e: any) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            Alert.alert('Error', e?.message ?? 'No se pudo copiar la serie');
+        }
+    };
+
     const copyFromHistory = async (histSets: WorkoutSet[]) => {
         if (!workoutId) return;
         if (workoutLocked) {
@@ -166,6 +233,9 @@ export default function ExerciseDetailScreen() {
             await workoutService.addSet(workoutId, exerciseId, s.type as any, {
                 weight: s.weight,
                 reps: s.reps,
+                distance: (s as any).distance,
+                time: (s as any).time,
+                rpe: s.rpe,
                 notes: s.notes,
                 order_index: sets.length + 1
             });
@@ -195,8 +265,10 @@ export default function ExerciseDetailScreen() {
 
     // --- GRAPHS DATA ---
     const rounding = unit === 'kg' ? configService.get('calculatorsRoundingKg') : configService.get('calculatorsRoundingLbs');
+    const exType = currentExercise?.type ?? 'weight_reps';
 
     const oneRmSeries = useMemo(() => {
+        if (exType !== 'weight_reps') return [];
         return [...history].reverse().map(h => {
             const validSets = h.sets.filter(s => (s.weight || 0) > 0 && (s.reps || 0) > 0);
             const best = validSets.reduce((acc, s) => {
@@ -213,9 +285,10 @@ export default function ExerciseDetailScreen() {
             })();
             return { value: Math.round(displayWeight(best)), label };
         });
-    }, [history, unit]);
+    }, [history, unit, exType]);
 
     const volumeData = useMemo(() => {
+        if (exType !== 'weight_reps') return [];
         return [...history].reverse().map(h => {
             const vol = h.sets.reduce((acc, s) => acc + ((displayWeight(s.weight || 0)) * (s.reps || 0)), 0);
             const label = (() => {
@@ -228,7 +301,109 @@ export default function ExerciseDetailScreen() {
             })();
             return { value: Math.round(vol), label };
         });
-    }, [history, unit]);
+    }, [history, unit, exType]);
+
+    const distanceSeries = useMemo(() => {
+        if (exType !== 'distance_time') return [];
+        return [...history].reverse().map((h) => {
+            const distKm = (h.sets || []).reduce((acc, s: any) => acc + ((s.distance || 0) / 1000), 0);
+            const label = (() => {
+                try {
+                    const d = new Date(h.date || Date.now());
+                    return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+                } catch {
+                    return '--/--';
+                }
+            })();
+            return { value: Math.round(distKm * 100) / 100, label };
+        });
+    }, [history, exType]);
+
+    const speedSeries = useMemo(() => {
+        if (exType !== 'distance_time') return [];
+        return [...history].reverse().map((h) => {
+            const distKm = (h.sets || []).reduce((acc, s: any) => acc + ((s.distance || 0) / 1000), 0);
+            const timeSec = (h.sets || []).reduce((acc, s: any) => acc + (s.time || 0), 0);
+            const speed = (distKm > 0 && timeSec > 0) ? (distKm / (timeSec / 3600)) : 0;
+            const label = (() => {
+                try {
+                    const d = new Date(h.date || Date.now());
+                    return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+                } catch {
+                    return '--/--';
+                }
+            })();
+            return { value: Math.round(speed * 100) / 100, label };
+        });
+    }, [history, exType]);
+
+    const timeSeries = useMemo(() => {
+        if (exType !== 'distance_time') return [];
+        return [...history].reverse().map((h) => {
+            const timeSec = (h.sets || []).reduce((acc, s: any) => acc + (s.time || 0), 0);
+            const label = (() => {
+                try {
+                    const d = new Date(h.date || Date.now());
+                    return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+                } catch {
+                    return '--/--';
+                }
+            })();
+            const min = timeSec > 0 ? (timeSec / 60) : 0;
+            return { value: Math.round(min * 10) / 10, label };
+        });
+    }, [history, exType]);
+
+    const paceSeries = useMemo(() => {
+        if (exType !== 'distance_time') return [];
+        return [...history].reverse().map((h) => {
+            const distKm = (h.sets || []).reduce((acc, s: any) => acc + ((s.distance || 0) / 1000), 0);
+            const timeSec = (h.sets || []).reduce((acc, s: any) => acc + (s.time || 0), 0);
+            const paceSecPerKm = (distKm > 0 && timeSec > 0) ? (timeSec / distKm) : 0;
+            const label = (() => {
+                try {
+                    const d = new Date(h.date || Date.now());
+                    return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+                } catch {
+                    return '--/--';
+                }
+            })();
+            const minPerKm = paceSecPerKm > 0 ? (paceSecPerKm / 60) : 0;
+            return { value: Math.round(minPerKm * 100) / 100, label };
+        });
+    }, [history, exType]);
+
+    const repsSeries = useMemo(() => {
+        if (exType !== 'reps_only') return [];
+        return [...history].reverse().map((h) => {
+            const best = (h.sets || []).reduce((m: number, s: any) => Math.max(m, s.reps || 0), 0);
+            const label = (() => {
+                try {
+                    const d = new Date(h.date || Date.now());
+                    return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+                } catch {
+                    return '--/--';
+                }
+            })();
+            return { value: best, label };
+        });
+    }, [history, exType]);
+
+    const weightSeries = useMemo(() => {
+        if (exType !== 'weight_only') return [];
+        return [...history].reverse().map((h) => {
+            const bestKg = (h.sets || []).reduce((m: number, s: any) => Math.max(m, s.weight || 0), 0);
+            const label = (() => {
+                try {
+                    const d = new Date(h.date || Date.now());
+                    return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+                } catch {
+                    return '--/--';
+                }
+            })();
+            return { value: Math.round(displayWeight(bestKg) * 10) / 10, label };
+        });
+    }, [history, exType, unit]);
 
     const insights = useMemo(() => {
         const flat = history.flatMap((h) => (h.sets || []).map((s) => ({ ...s, __date: h.date })));
@@ -238,6 +413,7 @@ export default function ExerciseDetailScreen() {
             if (!best) return s;
             return (w > (best.weight || 0)) ? s : best;
         }, null as any);
+
         const best1rm = flat.reduce((best: any, s: any) => {
             const w = s.weight || 0;
             const r = s.reps || 0;
@@ -246,10 +422,55 @@ export default function ExerciseDetailScreen() {
             if (!best || est > best.est) return { est, ...s };
             return best;
         }, null as any);
+
         const bestSessionVol = history.reduce((best, h) => {
-            const vol = (h.sets || []).reduce((acc, s) => acc + ((displayWeight(s.weight || 0)) * (s.reps || 0)), 0);
+            const vol = (h.sets || []).reduce((acc, s: any) => acc + ((displayWeight(s.weight || 0)) * (s.reps || 0)), 0);
             if (!best || vol > best.vol) return { vol, date: h.date };
             return best;
+        }, null as any);
+
+        const bestDistance = flat.reduce((best: any, s: any) => {
+            const d = (s.distance || 0);
+            if (d <= 0) return best;
+            if (!best) return s;
+            return (d > (best.distance || 0)) ? s : best;
+        }, null as any);
+
+        const bestSpeed = flat.reduce((best: any, s: any) => {
+            const dKm = (s.distance || 0) / 1000;
+            const t = s.time || 0;
+            if (dKm <= 0 || t <= 0) return best;
+            const speed = dKm / (t / 3600);
+            if (!best || speed > best.speed) return { speed, ...s };
+            return best;
+        }, null as any);
+
+        const bestPace = flat.reduce((best: any, s: any) => {
+            const dKm = (s.distance || 0) / 1000;
+            const t = s.time || 0;
+            if (dKm <= 0 || t <= 0) return best;
+            const pace = t / dKm;
+            if (!best || pace < best.pace) return { pace, ...s };
+            return best;
+        }, null as any);
+
+        const bestSessionDistance = history.reduce((best: any, h) => {
+            const distKm = (h.sets || []).reduce((acc, s: any) => acc + ((s.distance || 0) / 1000), 0);
+            if (!best || distKm > best.distKm) return { distKm, date: h.date };
+            return best;
+        }, null as any);
+
+        const bestSessionTime = history.reduce((best: any, h) => {
+            const timeSec = (h.sets || []).reduce((acc, s: any) => acc + (s.time || 0), 0);
+            if (!best || timeSec > best.timeSec) return { timeSec, date: h.date };
+            return best;
+        }, null as any);
+
+        const bestReps = flat.reduce((best: any, s: any) => {
+            const r = s.reps || 0;
+            if (r <= 0) return best;
+            if (!best) return s;
+            return (r > (best.reps || 0)) ? s : best;
         }, null as any);
 
         const now = Date.now();
@@ -260,26 +481,113 @@ export default function ExerciseDetailScreen() {
 
         const heaviestDisplay = heaviest ? { ...heaviest, weight: displayWeight(heaviest.weight || 0) } : null;
         const best1rmDisplay = best1rm ? { ...best1rm, est: displayWeight(best1rm.est || 0) } : null;
-        return { heaviest: heaviestDisplay, best1rm: best1rmDisplay, bestSessionVol, sessions30, daysSince };
-    }, [history, unit]);
+        const bestDistanceDisplay = bestDistance ? { ...bestDistance, distanceKm: Math.round(((bestDistance.distance || 0) / 1000) * 100) / 100 } : null;
+        const bestSpeedDisplay = bestSpeed ? { ...bestSpeed, speedKmh: Math.round((bestSpeed.speed || 0) * 100) / 100 } : null;
+        const bestPaceDisplay = bestPace ? { ...bestPace, paceSecPerKm: Math.round((bestPace.pace || 0)) } : null;
+        const bestRepsDisplay = bestReps ? { ...bestReps } : null;
+
+        return {
+            heaviest: heaviestDisplay,
+            best1rm: best1rmDisplay,
+            bestSessionVol,
+            bestDistance: bestDistanceDisplay,
+            bestSpeed: bestSpeedDisplay,
+            bestPace: bestPaceDisplay,
+            bestSessionDistance,
+            bestSessionTime,
+            bestReps: bestRepsDisplay,
+            sessions30,
+            daysSince,
+        };
+    }, [history, unit, exType]);
+
+    const cardioPrimarySummary = useMemo(() => {
+        if (exType !== 'distance_time') return null;
+        const fmtDate = (ms: number | null | undefined) => {
+            if (!ms) return null;
+            try {
+                return new Date(ms).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+            } catch {
+                return null;
+            }
+        };
+
+        if (cardioPrimaryPR === 'distance') {
+            const km = insights.bestSessionDistance?.distKm;
+            return {
+                title: 'Distancia',
+                value: km != null ? `${Math.round(km * 100) / 100} km` : '—',
+                dateLabel: fmtDate(insights.bestSessionDistance?.date),
+            };
+        }
+        if (cardioPrimaryPR === 'time') {
+            const t = insights.bestSessionTime?.timeSec;
+            return {
+                title: 'Tiempo',
+                value: t ? formatTimeSeconds(t) : '—',
+                dateLabel: fmtDate(insights.bestSessionTime?.date),
+            };
+        }
+        if (cardioPrimaryPR === 'pace') {
+            const paceSec = insights.bestPace?.paceSecPerKm;
+            return {
+                title: 'Ritmo',
+                value: paceSec ? `${formatTimeSeconds(paceSec)}/km` : '—',
+                dateLabel: fmtDate((insights.bestPace as any)?.__date),
+            };
+        }
+        const sp = insights.bestSpeed?.speedKmh;
+        return {
+            title: 'Velocidad',
+            value: sp != null ? `${Math.round(sp * 10) / 10} km/h` : '—',
+            dateLabel: fmtDate((insights.bestSpeed as any)?.__date),
+        };
+    }, [exType, cardioPrimaryPR, insights]);
 
     const historySets = useMemo(() => {
-        return history.flatMap((h) => (h.sets || []).map((s) => {
-            const w = s.weight || 0;
+        return history.flatMap((h) => (h.sets || []).map((s: any) => {
+            const base = { ...s, __date: h.date };
+            if (exType === 'distance_time') {
+                const distKm = (s.distance || 0) / 1000;
+                const timeSec = s.time || 0;
+                const paceSecPerKm = (distKm > 0 && timeSec > 0) ? (timeSec / distKm) : 0;
+                const speedKmh = (distKm > 0 && timeSec > 0) ? (distKm / (timeSec / 3600)) : 0;
+                return { ...base, __distKm: distKm, __timeSec: timeSec, __pace: paceSecPerKm, __speed: speedKmh };
+            }
+            if (exType === 'reps_only') {
+                return { ...base, __reps: s.reps || 0 };
+            }
+            if (exType === 'weight_only') {
+                const wKg = s.weight || 0;
+                return { ...base, __w: displayWeight(wKg) };
+            }
+            const wKg = s.weight || 0;
             const r = s.reps || 0;
-            const orm = (w > 0 && r > 0) ? CalculatorService.estimate1RM('epley', w, r) : 0;
-            const wd = displayWeight(w);
+            const orm = (wKg > 0 && r > 0) ? CalculatorService.estimate1RM('epley', wKg, r) : 0;
+            const wd = displayWeight(wKg);
             const ormDisplay = displayWeight(orm);
             const vol = wd * r;
-            return { ...s, __date: h.date, __orm: Math.round(ormDisplay), __vol: vol, __w: wd };
+            return { ...base, __orm: Math.round(ormDisplay), __vol: vol, __w: wd };
         }));
-    }, [history, unit]);
+    }, [history, unit, exType]);
 
     const sortedHistorySets = useMemo(() => {
         const arr = [...historySets];
-        if (setsSort === 'weight') return arr.sort((a: any, b: any) => (b.weight || 0) - (a.weight || 0));
+        if (setsSort === 'weight') return arr.sort((a: any, b: any) => ((b.__w ?? b.weight) || 0) - ((a.__w ?? a.weight) || 0));
         if (setsSort === 'orm') return arr.sort((a: any, b: any) => (b.__orm || 0) - (a.__orm || 0));
         if (setsSort === 'volume') return arr.sort((a: any, b: any) => (b.__vol || 0) - (a.__vol || 0));
+        if (setsSort === 'reps') return arr.sort((a: any, b: any) => (b.__reps ?? b.reps ?? 0) - (a.__reps ?? a.reps ?? 0));
+        if (setsSort === 'distance') return arr.sort((a: any, b: any) => (b.__distKm || 0) - (a.__distKm || 0));
+        if (setsSort === 'time') return arr.sort((a: any, b: any) => (b.__timeSec || 0) - (a.__timeSec || 0));
+        if (setsSort === 'pace') return arr.sort((a: any, b: any) => {
+            const ap = a.__pace || 0;
+            const bp = b.__pace || 0;
+            if (ap === 0 && bp === 0) return 0;
+            if (ap === 0) return 1;
+            if (bp === 0) return -1;
+            return ap - bp;
+        });
+        if (setsSort === 'speed') return arr.sort((a: any, b: any) => (b.__speed || 0) - (a.__speed || 0));
         return arr.sort((a: any, b: any) => (b.__date || 0) - (a.__date || 0));
     }, [historySets, setsSort]);
 
@@ -302,6 +610,8 @@ export default function ExerciseDetailScreen() {
                         index={idx}
                         onUpdate={handleUpdateSet}
                         onDelete={handleDeleteSet}
+                        onCopy={handleCopySet}
+                        exerciseType={currentExercise?.type ?? 'weight_reps'}
                         disabled={workoutLocked}
                     />
                 ))}
@@ -364,12 +674,31 @@ export default function ExerciseDetailScreen() {
             ) : historyTab === 'sets' ? (
                 <View>
                     <View className="flex-row gap-2 mb-4 flex-wrap">
-                        {([
-                            { id: 'recent', label: 'Recientes' },
-                            { id: 'weight', label: 'Peso' },
-                            { id: 'orm', label: '1RM' },
-                            { id: 'volume', label: 'Volumen' }
-                        ] as const).map((s) => (
+                        {(exType === 'distance_time'
+                            ? ([
+                                { id: 'recent', label: 'Recientes' },
+                                { id: 'distance', label: 'Distancia' },
+                                { id: 'time', label: 'Tiempo' },
+                                { id: 'pace', label: 'Ritmo' },
+                                { id: 'speed', label: 'Velocidad' },
+                            ] as const)
+                            : exType === 'reps_only'
+                                ? ([
+                                    { id: 'recent', label: 'Recientes' },
+                                    { id: 'reps', label: 'Reps' },
+                                ] as const)
+                                : exType === 'weight_only'
+                                    ? ([
+                                        { id: 'recent', label: 'Recientes' },
+                                        { id: 'weight', label: 'Peso' },
+                                    ] as const)
+                                    : ([
+                                        { id: 'recent', label: 'Recientes' },
+                                        { id: 'weight', label: 'Peso' },
+                                        { id: 'orm', label: '1RM' },
+                                        { id: 'volume', label: 'Volumen' }
+                                    ] as const)
+                        ).map((s) => (
                             <TouchableOpacity
                                 key={s.id}
                                 onPress={() => setSetsSort(s.id)}
@@ -403,14 +732,45 @@ export default function ExerciseDetailScreen() {
                                         </View>
                                         <View className="flex-row items-end justify-between">
                                             <Text className="text-iron-950 font-black text-2xl">
-                                                {Math.round((s.__w || 0) * 100) / 100}<Text className="text-iron-500 text-xs font-bold"> {unit}</Text>
-                                                <Text className="text-iron-500 text-xs font-bold"> × </Text>
-                                                {s.reps || 0}<Text className="text-iron-500 text-xs font-bold"> reps</Text>
+                                                {exType === 'distance_time'
+                                                    ? `${Math.round((s.__distKm || 0) * 100) / 100} km`
+                                                    : exType === 'reps_only'
+                                                        ? `${s.reps || 0} reps`
+                                                        : exType === 'weight_only'
+                                                            ? `${Math.round((s.__w || 0) * 100) / 100} ${unit}`
+                                                            : (
+                                                                <>
+                                                                    {Math.round((s.__w || 0) * 100) / 100}<Text className="text-iron-500 text-xs font-bold"> {unit}</Text>
+                                                                    <Text className="text-iron-500 text-xs font-bold"> × </Text>
+                                                                    {s.reps || 0}<Text className="text-iron-500 text-xs font-bold"> reps</Text>
+                                                                </>
+                                                            )
+                                                }
                                             </Text>
+                                            {exType === 'distance_time' ? (
+                                                <Text className="text-iron-500 text-xs font-bold">{formatTimeSeconds(s.__timeSec || 0)}</Text>
+                                            ) : null}
                                         </View>
                                         <View className="flex-row items-center justify-between mt-2">
-                                            <Text className="text-iron-500 text-xs font-bold">1RM: <Text className="text-iron-950">{s.__orm || 0}</Text> {unit}</Text>
-                                            <Text className="text-iron-500 text-xs font-bold">VOL: <Text className="text-iron-950">{Math.round(s.__vol || 0)}</Text></Text>
+                                            {exType === 'weight_reps' ? (
+                                                <>
+                                                    <Text className="text-iron-500 text-xs font-bold">1RM: <Text className="text-iron-950">{s.__orm || 0}</Text> {unit}</Text>
+                                                    <Text className="text-iron-500 text-xs font-bold">VOL: <Text className="text-iron-950">{Math.round(s.__vol || 0)}</Text></Text>
+                                                </>
+                                            ) : exType === 'distance_time' ? (
+                                                <>
+                                                    <Text className="text-iron-500 text-xs font-bold">
+                                                        Ritmo: <Text className="text-iron-950">{s.__pace ? formatTimeSeconds(s.__pace) : '—'}</Text>
+                                                    </Text>
+                                                    <Text className="text-iron-500 text-xs font-bold">
+                                                        Vel: <Text className="text-iron-950">{s.__speed ? `${Math.round(s.__speed * 10) / 10} km/h` : '—'}</Text>
+                                                    </Text>
+                                                </>
+                                            ) : exType === 'reps_only' ? (
+                                                <Text className="text-iron-500 text-xs font-bold">Reps: <Text className="text-iron-950">{s.reps || 0}</Text></Text>
+                                            ) : (
+                                                <Text className="text-iron-500 text-xs font-bold">Peso: <Text className="text-iron-950">{Math.round((s.__w || 0) * 100) / 100}</Text> {unit}</Text>
+                                            )}
                                         </View>
                                     </View>
                                 );
@@ -467,17 +827,46 @@ export default function ExerciseDetailScreen() {
                                                 </View>
                                                 <View className="items-start">
                                                     <Text className="font-black text-iron-950 text-lg leading-tight">
-                                                        {s.weight !== undefined && s.weight !== null ? Math.round(displayWeight(s.weight) * 100) / 100 : 0}
-                                                        <Text className="text-xs font-bold text-iron-600">{unit}</Text>
+                                                        {exType === 'distance_time'
+                                                            ? `${Math.round((((s as any).distance || 0) / 1000) * 100) / 100} km`
+                                                            : exType === 'reps_only'
+                                                                ? `${s.reps !== undefined && s.reps !== null ? s.reps : 0}`
+                                                                : exType === 'weight_only'
+                                                                    ? `${s.weight !== undefined && s.weight !== null ? Math.round(displayWeight(s.weight) * 100) / 100 : 0}`
+                                                                    : `${s.weight !== undefined && s.weight !== null ? Math.round(displayWeight(s.weight) * 100) / 100 : 0}`
+                                                        }
+                                                        {exType === 'weight_reps' || exType === 'weight_only' ? (
+                                                            <Text className="text-xs font-bold text-iron-600">{unit}</Text>
+                                                        ) : null}
+                                                        {exType === 'reps_only' ? (
+                                                            <Text className="text-xs font-bold text-iron-600">reps</Text>
+                                                        ) : null}
                                                     </Text>
+                                                    {exType === 'distance_time' ? (
+                                                        <Text className="text-xs font-bold text-iron-600">
+                                                            {formatTimeSeconds((s as any).time || 0)}
+                                                        </Text>
+                                                    ) : null}
                                                 </View>
                                             </View>
 
                                             <View className="flex-row items-center">
-                                                <Text className="font-black text-iron-950 text-lg leading-tight">
-                                                    {s.reps !== undefined && s.reps !== null ? s.reps : 0}
-                                                    <Text className="text-xs font-bold text-iron-600">reps</Text>
-                                                </Text>
+                                                {exType === 'weight_reps' ? (
+                                                    <Text className="font-black text-iron-950 text-lg leading-tight">
+                                                        {s.reps !== undefined && s.reps !== null ? s.reps : 0}
+                                                        <Text className="text-xs font-bold text-iron-600">reps</Text>
+                                                    </Text>
+                                                ) : exType === 'distance_time' ? (
+                                                    <Text className="text-xs font-bold text-iron-600">
+                                                        {(() => {
+                                                            const dKm = (((s as any).distance || 0) / 1000);
+                                                            const t = (s as any).time || 0;
+                                                            if (dKm <= 0 || t <= 0) return '—';
+                                                            const pace = t / dKm;
+                                                            return `${formatTimeSeconds(pace)}/km`;
+                                                        })()}
+                                                    </Text>
+                                                ) : null}
                                                 {s.rpe ? <View className="bg-white px-1.5 py-0.5 rounded ml-2 border border-primary/40"><Text className="text-[10px] font-bold text-iron-950">@{s.rpe}</Text></View> : null}
                                             </View>
                                         </View>
@@ -524,91 +913,461 @@ export default function ExerciseDetailScreen() {
                             <Text className="text-iron-500 text-xs font-bold">última: {insights.daysSince == null ? '—' : `${insights.daysSince}d`}</Text>
                         </IronCard>
                         <IronCard className="flex-1">
-                            <Text className="text-iron-500 text-xs font-bold uppercase">Mejor 1RM</Text>
-                            <Text className="text-iron-950 text-2xl font-black mt-1">{insights.best1rm?.est ?? 0}</Text>
-                            <Text className="text-iron-500 text-xs font-bold">{unit}</Text>
+                            <Text className="text-iron-500 text-xs font-bold uppercase">
+                                {exType === 'distance_time'
+                                    ? cardioMetric === 'distance'
+                                        ? 'Mejor distancia'
+                                        : cardioMetric === 'time'
+                                            ? 'Mayor tiempo'
+                                            : cardioMetric === 'pace'
+                                                ? 'Mejor ritmo'
+                                                : 'Mejor velocidad'
+                                    : exType === 'reps_only'
+                                        ? 'Mejor reps'
+                                        : exType === 'weight_only'
+                                            ? 'Mejor peso'
+                                            : 'Mejor 1RM'
+                                }
+                            </Text>
+                            <Text className="text-iron-950 text-2xl font-black mt-1">
+                                {exType === 'distance_time'
+                                    ? cardioMetric === 'distance'
+                                        ? (insights.bestSessionDistance?.distKm != null ? Math.round(insights.bestSessionDistance.distKm * 100) / 100 : 0)
+                                        : cardioMetric === 'time'
+                                            ? formatTimeSeconds(insights.bestSessionTime?.timeSec ?? 0)
+                                            : cardioMetric === 'pace'
+                                                ? (insights.bestPace?.paceSecPerKm ? formatTimeSeconds(insights.bestPace.paceSecPerKm) : '—')
+                                                : (insights.bestSpeed?.speedKmh ?? 0)
+                                    : exType === 'reps_only'
+                                        ? (insights.bestReps?.reps ?? 0)
+                                        : exType === 'weight_only'
+                                            ? (insights.heaviest?.weight ?? 0)
+                                            : (insights.best1rm?.est ?? 0)
+                                }
+                            </Text>
+                            <Text className="text-iron-500 text-xs font-bold">
+                                {exType === 'distance_time'
+                                    ? cardioMetric === 'distance'
+                                        ? 'km'
+                                        : cardioMetric === 'time'
+                                            ? ''
+                                            : cardioMetric === 'pace'
+                                                ? '/km'
+                                                : 'km/h'
+                                    : exType === 'reps_only'
+                                        ? 'reps'
+                                        : unit
+                                }
+                            </Text>
                         </IronCard>
                     </View>
 
-                    <View className="rounded-xl overflow-hidden bg-surface border border-iron-700 elevation-1">
-                        <View className="px-4 py-3 bg-iron-100 flex-row items-center gap-2 border-b border-iron-200">
-                            <View className="w-1.5 h-4 bg-primary rounded-full" />
-                            <Text className="text-iron-950 font-black tracking-tight text-sm uppercase">1RM estimado</Text>
-                        </View>
-                        <View className="py-6 items-center bg-surface">
-                            {oneRmSeries.length > 1 ? (
-                                <LineChart
-                                    data={oneRmSeries}
-                                    color={Colors.primary.DEFAULT}
-                                    thickness={3}
-                                    dataPointsColor={Colors.primary.DEFAULT}
-                                    hideRules
-                                    height={200}
-                                    width={screenWidth - 64}
-                                    curved
-                                    isAnimated
-                                    startFillColor={Colors.primary.DEFAULT}
-                                    endFillColor={Colors.primary.DEFAULT}
-                                    startOpacity={0.2}
-                                    endOpacity={0}
-                                    areaChart
-                                    yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
-                                    xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
-                                    initialSpacing={0}
-                                    endSpacing={0}
-                                />
-                            ) : (
-                                <Text className="text-iron-500">Aún no hay suficientes datos.</Text>
-                            )}
-                        </View>
-                    </View>
+                    {exType === 'weight_reps' ? (
+                        <>
+                            <View className="rounded-xl overflow-hidden bg-surface border border-iron-700 elevation-1">
+                                <View className="px-4 py-3 bg-iron-100 flex-row items-center gap-2 border-b border-iron-200">
+                                    <View className="w-1.5 h-4 bg-primary rounded-full" />
+                                    <Text className="text-iron-950 font-black tracking-tight text-sm uppercase">1RM estimado</Text>
+                                </View>
+                                <View className="py-6 items-center bg-surface">
+                                    {oneRmSeries.length > 1 ? (
+                                        <LineChart
+                                            data={oneRmSeries}
+                                            color={Colors.primary.DEFAULT}
+                                            thickness={3}
+                                            dataPointsColor={Colors.primary.DEFAULT}
+                                            hideRules
+                                            height={200}
+                                            width={screenWidth - 64}
+                                            curved
+                                            isAnimated
+                                            startFillColor={Colors.primary.DEFAULT}
+                                            endFillColor={Colors.primary.DEFAULT}
+                                            startOpacity={0.2}
+                                            endOpacity={0}
+                                            areaChart
+                                            yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                            xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                            initialSpacing={0}
+                                            endSpacing={0}
+                                        />
+                                    ) : (
+                                        <Text className="text-iron-500">Aún no hay suficientes datos.</Text>
+                                    )}
+                                </View>
+                            </View>
 
-                    <View className="rounded-xl overflow-hidden bg-surface border border-iron-700 elevation-1">
-                        <View className="px-4 py-3 bg-iron-100 flex-row items-center gap-2 border-b border-iron-200">
-                            <View className="w-1.5 h-4 bg-iron-600 rounded-full" />
-                            <Text className="text-iron-950 font-black tracking-tight text-sm uppercase">Volumen</Text>
+                            <View className="rounded-xl overflow-hidden bg-surface border border-iron-700 elevation-1">
+                                <View className="px-4 py-3 bg-iron-100 flex-row items-center gap-2 border-b border-iron-200">
+                                    <View className="w-1.5 h-4 bg-iron-600 rounded-full" />
+                                    <Text className="text-iron-950 font-black tracking-tight text-sm uppercase">Volumen</Text>
+                                </View>
+                                <View className="py-6 items-center bg-surface">
+                                    {volumeData.length > 0 ? (
+                                        <BarChart
+                                            data={volumeData}
+                                            frontColor={Colors.primary.dark}
+                                            barWidth={16}
+                                            spacing={28}
+                                            roundedTop
+                                            hideRules
+                                            height={200}
+                                            width={screenWidth - 64}
+                                            yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                            xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                            initialSpacing={0}
+                                            endSpacing={0}
+                                        />
+                                    ) : (
+                                        <Text className="text-iron-500">Aún no hay volumen para mostrar.</Text>
+                                    )}
+                                </View>
+                            </View>
+                        </>
+                    ) : exType === 'distance_time' ? (
+                        <>
+                            <View className="flex-row gap-2 mb-2 flex-wrap">
+                                {([
+                                    { id: 'distance', label: 'Distancia' },
+                                    { id: 'time', label: 'Tiempo' },
+                                    { id: 'pace', label: 'Ritmo' },
+                                    { id: 'speed', label: 'Velocidad' },
+                                ] as const).map((m) => (
+                                    <TouchableOpacity
+                                        key={m.id}
+                                        onPress={() => void setCardioMetricPersisted(m.id)}
+                                        className={`px-3 py-2 rounded-full border ${cardioMetric === m.id ? 'bg-surface border-primary' : 'bg-transparent border-iron-700'}`}
+                                        accessibilityRole="button"
+                                        accessibilityLabel={`Cambiar métrica a ${m.label}`}
+                                    >
+                                        <Text className={`font-bold text-xs ${cardioMetric === m.id ? 'text-primary' : 'text-iron-950'}`}>{m.label}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <View className="rounded-xl overflow-hidden bg-surface border border-iron-700 elevation-1">
+                                <View className="px-4 py-3 bg-iron-100 flex-row items-center justify-between gap-2 border-b border-iron-200">
+                                    <View className="flex-row items-center gap-2">
+                                        <View className={`w-1.5 h-4 rounded-full ${cardioMetric === 'distance' ? 'bg-primary' : 'bg-iron-600'}`} />
+                                        <Text className="text-iron-950 font-black tracking-tight text-sm uppercase">
+                                            {cardioMetric === 'distance' ? 'Distancia por sesión' : cardioMetric === 'time' ? 'Tiempo por sesión' : cardioMetric === 'pace' ? 'Ritmo (min/km)' : 'Velocidad (km/h)'}
+                                        </Text>
+                                    </View>
+                                    {cardioPrimarySummary ? (
+                                        <View className="items-end">
+                                            <Text className="text-iron-500 text-[10px] font-bold uppercase">
+                                                PR: {cardioPrimarySummary.title}{cardioPrimarySummary.dateLabel ? ` • ${cardioPrimarySummary.dateLabel}` : ''}
+                                            </Text>
+                                            <Text className="text-iron-950 text-xs font-black">{cardioPrimarySummary.value}</Text>
+                                        </View>
+                                    ) : null}
+                                </View>
+                                <View className="py-6 items-center bg-surface">
+                                    {cardioMetric === 'distance' ? (
+                                        distanceSeries.length > 0 ? (
+                                            <BarChart
+                                                data={distanceSeries}
+                                                frontColor={Colors.primary.dark}
+                                                barWidth={16}
+                                                spacing={28}
+                                                roundedTop
+                                                hideRules
+                                                height={200}
+                                                width={screenWidth - 64}
+                                                yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                                xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                                initialSpacing={0}
+                                                endSpacing={0}
+                                            />
+                                        ) : (
+                                            <Text className="text-iron-500">Aún no hay distancia para mostrar.</Text>
+                                        )
+                                    ) : cardioMetric === 'speed' ? (
+                                        speedSeries.length > 1 ? (
+                                            <LineChart
+                                                data={speedSeries}
+                                                color={Colors.primary.DEFAULT}
+                                                thickness={3}
+                                                dataPointsColor={Colors.primary.DEFAULT}
+                                                hideRules
+                                                height={200}
+                                                width={screenWidth - 64}
+                                                curved
+                                                isAnimated
+                                                startFillColor={Colors.primary.DEFAULT}
+                                                endFillColor={Colors.primary.DEFAULT}
+                                                startOpacity={0.2}
+                                                endOpacity={0}
+                                                areaChart
+                                                yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                                xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                                initialSpacing={0}
+                                                endSpacing={0}
+                                                pointerConfig={{
+                                                    pointerStripHeight: 190,
+                                                    pointerStripColor: Colors.iron[300],
+                                                    pointerStripWidth: 2,
+                                                    pointerColor: Colors.primary.DEFAULT,
+                                                    pointerLabelWidth: 140,
+                                                    pointerLabelHeight: 60,
+                                                    shiftPointerLabelX: -70,
+                                                    shiftPointerLabelY: -70,
+                                                    autoAdjustPointerLabelPosition: true,
+                                                    pointerLabelComponent: (items: any[]) => {
+                                                        const it = items?.[0] ?? {};
+                                                        const v = Number(it.value ?? 0);
+                                                        const speed = Number.isFinite(v) ? Math.round(v * 10) / 10 : 0;
+                                                        return (
+                                                            <View className="bg-iron-900 border border-iron-700 rounded-xl px-3 py-2">
+                                                                <Text className="text-iron-500 text-[10px] font-bold">{String(it.label ?? '')}</Text>
+                                                                <Text className="text-iron-950 text-base font-black">{speed > 0 ? `${speed} km/h` : '—'}</Text>
+                                                            </View>
+                                                        );
+                                                    }
+                                                }}
+                                            />
+                                        ) : (
+                                            <Text className="text-iron-500">Aún no hay suficientes datos.</Text>
+                                        )
+                                    ) : cardioMetric === 'time' ? (
+                                        timeSeries.length > 0 ? (
+                                            <BarChart
+                                                data={timeSeries}
+                                                frontColor={Colors.primary.dark}
+                                                barWidth={16}
+                                                spacing={28}
+                                                roundedTop
+                                                hideRules
+                                                height={200}
+                                                width={screenWidth - 64}
+                                                yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                                xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                                initialSpacing={0}
+                                                endSpacing={0}
+                                            />
+                                        ) : (
+                                            <Text className="text-iron-500">Aún no hay tiempo para mostrar.</Text>
+                                        )
+                                    ) : (
+                                        paceSeries.length > 1 ? (
+                                            <LineChart
+                                                data={paceSeries}
+                                                color={Colors.primary.DEFAULT}
+                                                thickness={3}
+                                                dataPointsColor={Colors.primary.DEFAULT}
+                                                hideRules
+                                                height={200}
+                                                width={screenWidth - 64}
+                                                curved
+                                                isAnimated
+                                                startFillColor={Colors.primary.DEFAULT}
+                                                endFillColor={Colors.primary.DEFAULT}
+                                                startOpacity={0.2}
+                                                endOpacity={0}
+                                                areaChart
+                                                yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                                xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                                formatYLabel={(label: string) => {
+                                                    const n = Number(String(label).replace(',', '.'));
+                                                    if (!Number.isFinite(n) || n <= 0) return label;
+                                                    return formatTimeSeconds(Math.round(n * 60));
+                                                }}
+                                                initialSpacing={0}
+                                                endSpacing={0}
+                                                pointerConfig={{
+                                                    pointerStripHeight: 190,
+                                                    pointerStripColor: Colors.iron[300],
+                                                    pointerStripWidth: 2,
+                                                    pointerColor: Colors.primary.DEFAULT,
+                                                    pointerLabelWidth: 140,
+                                                    pointerLabelHeight: 60,
+                                                    shiftPointerLabelX: -70,
+                                                    shiftPointerLabelY: -70,
+                                                    autoAdjustPointerLabelPosition: true,
+                                                    pointerLabelComponent: (items: any[]) => {
+                                                        const it = items?.[0] ?? {};
+                                                        const minutesPerKm = Number(it.value ?? 0);
+                                                        const paceSec = Number.isFinite(minutesPerKm) && minutesPerKm > 0 ? Math.round(minutesPerKm * 60) : 0;
+                                                        return (
+                                                            <View className="bg-iron-900 border border-iron-700 rounded-xl px-3 py-2">
+                                                                <Text className="text-iron-500 text-[10px] font-bold">{String(it.label ?? '')}</Text>
+                                                                <Text className="text-iron-950 text-base font-black">
+                                                                    {paceSec > 0 ? `${formatTimeSeconds(paceSec)}/km` : '—'}
+                                                                </Text>
+                                                            </View>
+                                                        );
+                                                    }
+                                                }}
+                                            />
+                                        ) : (
+                                            <Text className="text-iron-500">Aún no hay suficientes datos.</Text>
+                                        )
+                                    )}
+                                </View>
+                            </View>
+                        </>
+                    ) : exType === 'reps_only' ? (
+                        <View className="rounded-xl overflow-hidden bg-surface border border-iron-700 elevation-1">
+                            <View className="px-4 py-3 bg-iron-100 flex-row items-center gap-2 border-b border-iron-200">
+                                <View className="w-1.5 h-4 bg-primary rounded-full" />
+                                <Text className="text-iron-950 font-black tracking-tight text-sm uppercase">Reps máximas</Text>
+                            </View>
+                            <View className="py-6 items-center bg-surface">
+                                {repsSeries.length > 1 ? (
+                                    <LineChart
+                                        data={repsSeries}
+                                        color={Colors.primary.DEFAULT}
+                                        thickness={3}
+                                        dataPointsColor={Colors.primary.DEFAULT}
+                                        hideRules
+                                        height={200}
+                                        width={screenWidth - 64}
+                                        curved
+                                        isAnimated
+                                        startFillColor={Colors.primary.DEFAULT}
+                                        endFillColor={Colors.primary.DEFAULT}
+                                        startOpacity={0.2}
+                                        endOpacity={0}
+                                        areaChart
+                                        yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                        xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                        initialSpacing={0}
+                                        endSpacing={0}
+                                    />
+                                ) : (
+                                    <Text className="text-iron-500">Aún no hay suficientes datos.</Text>
+                                )}
+                            </View>
                         </View>
-                        <View className="py-6 items-center bg-surface">
-                            {volumeData.length > 0 ? (
-                                <BarChart
-                                    data={volumeData}
-                                    frontColor={Colors.primary.dark}
-                                    barWidth={16}
-                                    spacing={28}
-                                    roundedTop
-                                    hideRules
-                                    height={200}
-                                    width={screenWidth - 64}
-                                    yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
-                                    xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
-                                    initialSpacing={0}
-                                    endSpacing={0}
-                                />
-                            ) : (
-                                <Text className="text-iron-500">Aún no hay volumen para mostrar.</Text>
-                            )}
+                    ) : (
+                        <View className="rounded-xl overflow-hidden bg-surface border border-iron-700 elevation-1">
+                            <View className="px-4 py-3 bg-iron-100 flex-row items-center gap-2 border-b border-iron-200">
+                                <View className="w-1.5 h-4 bg-primary rounded-full" />
+                                <Text className="text-iron-950 font-black tracking-tight text-sm uppercase">Peso máximo</Text>
+                            </View>
+                            <View className="py-6 items-center bg-surface">
+                                {weightSeries.length > 1 ? (
+                                    <LineChart
+                                        data={weightSeries}
+                                        color={Colors.primary.DEFAULT}
+                                        thickness={3}
+                                        dataPointsColor={Colors.primary.DEFAULT}
+                                        hideRules
+                                        height={200}
+                                        width={screenWidth - 64}
+                                        curved
+                                        isAnimated
+                                        startFillColor={Colors.primary.DEFAULT}
+                                        endFillColor={Colors.primary.DEFAULT}
+                                        startOpacity={0.2}
+                                        endOpacity={0}
+                                        areaChart
+                                        yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                        xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10 }}
+                                        initialSpacing={0}
+                                        endSpacing={0}
+                                    />
+                                ) : (
+                                    <Text className="text-iron-500">Aún no hay suficientes datos.</Text>
+                                )}
+                            </View>
                         </View>
-                    </View>
+                    )}
                 </View>
             ) : analysisTab === 'prs' ? (
                 <View className="gap-4">
                     <IronCard>
                         <Text className="text-iron-950 font-bold text-lg mb-3">Mejores marcas (en rango)</Text>
-                        <View className="flex-row justify-between items-center mb-2">
-                            <Text className="text-iron-500 font-bold">Serie más pesada</Text>
-                            <Text className="text-iron-950 font-black">
-                                {(insights.heaviest?.weight ?? 0)} {unit} × {(insights.heaviest?.reps ?? 0)}
-                            </Text>
-                        </View>
-                        <View className="flex-row justify-between items-center mb-2">
-                            <Text className="text-iron-500 font-bold">Mejor 1RM (Epley)</Text>
-                            <Text className="text-iron-950 font-black">{insights.best1rm?.est ?? 0} {unit}</Text>
-                        </View>
-                        <View className="flex-row justify-between items-center">
-                            <Text className="text-iron-500 font-bold">Mejor volumen sesión</Text>
-                            <Text className="text-iron-950 font-black">{insights.bestSessionVol?.vol ? Math.round(insights.bestSessionVol.vol) : 0}</Text>
-                        </View>
-                        <Text className="text-iron-500 text-xs mt-3">Nota: las PRs dependen de las series marcadas como completadas.</Text>
+                        {exType === 'weight_reps' ? (
+                            <>
+                                <View className="flex-row justify-between items-center mb-2">
+                                    <Text className="text-iron-500 font-bold">Serie más pesada</Text>
+                                    <Text className="text-iron-950 font-black">
+                                        {(insights.heaviest?.weight ?? 0)} {unit} × {(insights.heaviest?.reps ?? 0)}
+                                    </Text>
+                                </View>
+                                <View className="flex-row justify-between items-center mb-2">
+                                    <Text className="text-iron-500 font-bold">Mejor 1RM (Epley)</Text>
+                                    <Text className="text-iron-950 font-black">{insights.best1rm?.est ?? 0} {unit}</Text>
+                                </View>
+                                <View className="flex-row justify-between items-center">
+                                    <Text className="text-iron-500 font-bold">Mejor volumen sesión</Text>
+                                    <Text className="text-iron-950 font-black">{insights.bestSessionVol?.vol ? Math.round(insights.bestSessionVol.vol) : 0}</Text>
+                                </View>
+                                <Text className="text-iron-500 text-xs mt-3">Nota: las PRs dependen de las series marcadas como completadas.</Text>
+                            </>
+                        ) : exType === 'distance_time' ? (
+                            <>
+                                <Text className="text-iron-500 text-xs font-bold uppercase mb-2">PR principal</Text>
+                                <View className="flex-row gap-2 mb-4 flex-wrap">
+                                    {([
+                                        { id: 'speed', label: 'Velocidad' },
+                                        { id: 'pace', label: 'Ritmo' },
+                                        { id: 'distance', label: 'Distancia' },
+                                        { id: 'time', label: 'Tiempo' },
+                                    ] as const).map((m) => (
+                                        <TouchableOpacity
+                                            key={m.id}
+                                            onPress={() => void setCardioPrimaryPRPersisted(m.id)}
+                                            className={`px-3 py-2 rounded-full border ${cardioPrimaryPR === m.id ? 'bg-surface border-primary' : 'bg-transparent border-iron-700'}`}
+                                            accessibilityRole="button"
+                                            accessibilityLabel={`Definir PR principal como ${m.label}`}
+                                        >
+                                            <Text className={`font-bold text-xs ${cardioPrimaryPR === m.id ? 'text-primary' : 'text-iron-950'}`}>{m.label}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+
+                                <View className="flex-row justify-between items-center mb-3">
+                                    <Text className="text-iron-500 font-bold">
+                                        {cardioPrimaryPR === 'distance'
+                                            ? 'Mejor distancia (sesión)'
+                                            : cardioPrimaryPR === 'time'
+                                                ? 'Mayor tiempo (sesión)'
+                                                : cardioPrimaryPR === 'pace'
+                                                    ? 'Mejor ritmo'
+                                                    : 'Mejor velocidad'}
+                                    </Text>
+                                    <Text className="text-iron-950 font-black">
+                                        {cardioPrimaryPR === 'distance'
+                                            ? `${insights.bestSessionDistance?.distKm != null ? (Math.round(insights.bestSessionDistance.distKm * 100) / 100) : 0} km`
+                                            : cardioPrimaryPR === 'time'
+                                                ? (insights.bestSessionTime?.timeSec ? formatTimeSeconds(insights.bestSessionTime.timeSec) : '—')
+                                                : cardioPrimaryPR === 'pace'
+                                                    ? (insights.bestPace?.paceSecPerKm ? `${formatTimeSeconds(insights.bestPace.paceSecPerKm)}/km` : '—')
+                                                    : `${insights.bestSpeed?.speedKmh != null ? (Math.round(insights.bestSpeed.speedKmh * 10) / 10) : 0} km/h`
+                                        }
+                                    </Text>
+                                </View>
+
+                                <View className="flex-row justify-between items-center mb-2">
+                                    <Text className="text-iron-500 font-bold">Mejor velocidad</Text>
+                                    <Text className="text-iron-950 font-black">{insights.bestSpeed?.speedKmh ?? 0} km/h</Text>
+                                </View>
+                                <View className="flex-row justify-between items-center mb-2">
+                                    <Text className="text-iron-500 font-bold">Mejor ritmo</Text>
+                                    <Text className="text-iron-950 font-black">{insights.bestPace?.paceSecPerKm ? `${formatTimeSeconds(insights.bestPace.paceSecPerKm)}/km` : '—'}</Text>
+                                </View>
+                                <View className="flex-row justify-between items-center">
+                                    <Text className="text-iron-500 font-bold">Mejor distancia (sesión)</Text>
+                                    <Text className="text-iron-950 font-black">{insights.bestSessionDistance?.distKm != null ? (Math.round(insights.bestSessionDistance.distKm * 100) / 100) : 0} km</Text>
+                                </View>
+                                <View className="flex-row justify-between items-center mt-2">
+                                    <Text className="text-iron-500 font-bold">Mayor tiempo (sesión)</Text>
+                                    <Text className="text-iron-950 font-black">{insights.bestSessionTime?.timeSec ? formatTimeSeconds(insights.bestSessionTime.timeSec) : '—'}</Text>
+                                </View>
+                            </>
+                        ) : exType === 'reps_only' ? (
+                            <View className="flex-row justify-between items-center">
+                                <Text className="text-iron-500 font-bold">Mejor set</Text>
+                                <Text className="text-iron-950 font-black">{insights.bestReps?.reps ?? 0} reps</Text>
+                            </View>
+                        ) : (
+                            <View className="flex-row justify-between items-center">
+                                <Text className="text-iron-500 font-bold">Mejor set</Text>
+                                <Text className="text-iron-950 font-black">{insights.heaviest?.weight ?? 0} {unit}</Text>
+                            </View>
+                        )}
                     </IronCard>
                 </View>
             ) : (
@@ -678,7 +1437,7 @@ export default function ExerciseDetailScreen() {
                         )}
 
                         {/* Warmup Calc (Workout Mode) */}
-                        {workoutId && (
+                        {workoutId && (exType === 'weight_reps' || exType === 'weight_only') && (
                             <TouchableOpacity
                                 onPress={() => {
                                     if (workoutLocked) {

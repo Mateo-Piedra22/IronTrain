@@ -436,7 +436,7 @@ export class DatabaseService {
     public async getWorkoutByDate(dateStart: number, dateEnd: number): Promise<Workout | null> {
         const db = this.getDatabase();
         return await db.getFirstAsync<Workout>(
-            'SELECT * FROM workouts WHERE date >= ? AND date < ? LIMIT 1',
+            'SELECT * FROM workouts WHERE date >= ? AND date < ? ORDER BY start_time DESC, date DESC LIMIT 1',
             [dateStart, dateEnd]
         );
     }
@@ -474,8 +474,8 @@ export class DatabaseService {
     public async addSet(set: Partial<WorkoutSet> & { workout_id: string; exercise_id: string; order_index: number; type: string }): Promise<string> {
         const id = this.generateId();
         await this.run(
-            `INSERT INTO workout_sets (id, workout_id, exercise_id, type, weight, reps, distance, time, rpe, order_index, completed, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO workout_sets (id, workout_id, exercise_id, type, weight, reps, distance, time, rpe, order_index, completed, notes, superset_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 id,
                 set.workout_id,
@@ -488,7 +488,8 @@ export class DatabaseService {
                 set.rpe ?? null,
                 set.order_index,
                 set.completed ?? 0,
-                set.notes ?? null
+                set.notes ?? null,
+                set.superset_id ?? null
             ]
         );
         return id;
@@ -513,6 +514,11 @@ export class DatabaseService {
 
     public async deleteSet(id: string): Promise<void> {
         await this.run('DELETE FROM workout_sets WHERE id = ?', [id]);
+    }
+
+    public async getSetById(id: string): Promise<WorkoutSet | null> {
+        const db = this.getDatabase();
+        return await db.getFirstAsync<WorkoutSet>('SELECT * FROM workout_sets WHERE id = ?', [id]);
     }
 
     public async factoryReset(): Promise<void> {

@@ -13,9 +13,13 @@ export function Nav() {
     <header className="sticky top-0 z-50 border-b border-iron-200 bg-white/80 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
         <Link href="/" className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-iron-500 flex items-center justify-center text-white font-black">
-            IT
-          </div>
+          <img
+            src="/icon.png"
+            alt="IronTrain"
+            width={36}
+            height={36}
+            className="h-9 w-9 rounded-xl border border-iron-200 bg-white"
+          />
           <div className="font-black text-slate-900">IronTrain</div>
         </Link>
 

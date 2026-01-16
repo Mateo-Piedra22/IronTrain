@@ -33,6 +33,7 @@ export default function DailyLogScreen() {
   const [historyVisible, setHistoryVisible] = useState(false);
   const [historyData, setHistoryData] = useState<{ date: number; sets: WorkoutSet[] }[]>([]);
   const [historyExerciseName, setHistoryExerciseName] = useState('');
+  const [historyExerciseType, setHistoryExerciseType] = useState<ExerciseType>('weight_reps');
 
   const loadData = async () => {
     setLoading(true);
@@ -78,6 +79,8 @@ export default function DailyLogScreen() {
     await workoutService.addSet(workout.id, originalSet.exercise_id, originalSet.type, {
       weight: originalSet.weight,
       reps: originalSet.reps,
+      distance: (originalSet as any).distance,
+      time: (originalSet as any).time,
       notes: originalSet.notes,
       rpe: originalSet.rpe
     });
@@ -165,6 +168,7 @@ export default function DailyLogScreen() {
     const exSet = sets.find(s => s.exercise_id === exerciseId);
     const name = exSet?.exercise_name || 'Ejercicio';
     setHistoryExerciseName(name);
+    setHistoryExerciseType(exSet?.exercise_type ?? 'weight_reps');
 
     // Fetch
     const history = await workoutService.getExerciseHistory(exerciseId);
@@ -252,18 +256,19 @@ export default function DailyLogScreen() {
         </View>
       ) : (
         <>
-          {/* Copy Option if empty */}
-          {sets.length === 0 && (
-            <View className="items-center mt-4 mb-2">
-              <TouchableOpacity
-                onPress={() => setCopyModalVisible(true)}
-                className="bg-surface px-4 py-2 rounded-full border border-iron-700 flex-row items-center border-dashed active:bg-iron-200"
-              >
-                <Copy size={14} color={Colors.iron[500]} />
-                <Text className="text-iron-950 text-xs font-bold ml-2 uppercase">Copiar del historial</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          <View className="items-center mt-4 mb-2">
+            <TouchableOpacity
+              onPress={() => setCopyModalVisible(true)}
+              className="bg-surface px-4 py-2 rounded-full border border-iron-700 flex-row items-center border-dashed active:bg-iron-200"
+              accessibilityRole="button"
+              accessibilityLabel="Copiar ejercicios desde otro día"
+            >
+              <Copy size={14} color={Colors.iron[500]} />
+              <Text className="text-iron-950 text-xs font-bold ml-2 uppercase">
+                {sets.length === 0 ? 'Copiar del historial' : 'Copiar (agregar/reemplazar)'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           <WorkoutLog
             sets={sets}
@@ -308,12 +313,14 @@ export default function DailyLogScreen() {
         onClose={() => setHistoryVisible(false)}
         history={historyData}
         exerciseName={historyExerciseName}
+        exerciseType={historyExerciseType}
       />
 
       <CopyWorkoutModal
         visible={copyModalVisible}
         onClose={() => setCopyModalVisible(false)}
         targetDate={selectedDate}
+        targetWorkoutId={workout?.id || ''}
         onCopyComplete={loadData}
         markedDates={markedDates}
       />

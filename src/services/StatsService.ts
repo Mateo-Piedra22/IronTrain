@@ -37,7 +37,9 @@ class StatsService {
         if (!workout || !workout.duration || workout.duration <= 0) return 0;
 
         const sets = await dbService.getSetsForWorkout(workoutId);
-        const totalVolume = sets.reduce((acc, s) => acc + ((s.weight || 0) * (s.reps || 0)), 0);
+        const totalVolume = sets
+            .filter((s) => (s as any).exercise_type === 'weight_reps')
+            .reduce((acc, s) => acc + ((s.weight || 0) * (s.reps || 0)), 0);
 
         // Duration is usually in seconds (from end_time - start_time) or stored as minutes? 
         // Based on previous code, we store start/end timestamps.

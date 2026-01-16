@@ -3,6 +3,7 @@ import { Colors } from '@/src/theme';
 import { Pause, Play, RotateCcw, X } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface IntervalTimerModalProps {
     visible: boolean;
@@ -110,7 +111,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
         // Config Mode
         return (
             <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-                <View className="flex-1 bg-iron-900 p-6">
+                <SafeAreaView className="flex-1 bg-iron-900 p-6" edges={['top', 'bottom', 'left', 'right']}>
                     <View className="flex-row justify-between items-center mb-8">
                         <Text className="text-iron-950 font-bold text-2xl">Interval Timer</Text>
                         <TouchableOpacity onPress={onClose}>
@@ -153,16 +154,21 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                     <View className="mt-auto">
                         <IronButton label="START WORKOUT" onPress={handleStart} variant="solid" size="lg" />
                     </View>
-                </View>
+                </SafeAreaView>
             </Modal>
         );
     }
 
     // Active Mode
+    const insets = useSafeAreaInsets();
     return (
         <Modal visible={visible} animationType="fade">
-            <View className={`flex-1 ${getBgColor()} justify-center items-center relative`}>
-                <TouchableOpacity onPress={onClose} className="absolute top-12 right-6 p-2 bg-iron-950/20 rounded-full">
+            <SafeAreaView className={`flex-1 ${getBgColor()} justify-center items-center relative`} edges={['top', 'bottom', 'left', 'right']}>
+                <TouchableOpacity
+                    onPress={onClose}
+                    className="absolute right-6 p-2 bg-iron-950/20 rounded-full"
+                    style={{ top: insets.top + 12 }}
+                >
                     <X color="white" size={28} />
                 </TouchableOpacity>
 
@@ -181,7 +187,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                 </View>
 
                 {status !== 'finished' && (
-                    <View className="absolute bottom-12 flex-row gap-6">
+                    <View className="absolute flex-row gap-6" style={{ bottom: insets.bottom + 12 }}>
                         <TouchableOpacity onPress={handleReset} className="p-6 bg-white/20 rounded-full">
                             <RotateCcw color="white" size={32} />
                         </TouchableOpacity>
@@ -193,11 +199,11 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                 )}
 
                 {status === 'finished' && (
-                    <View className="absolute bottom-12 w-full px-6">
+                    <View className="absolute w-full px-6" style={{ bottom: insets.bottom + 12 }}>
                         <IronButton label="Close" onPress={onClose} variant="outline" />
                     </View>
                 )}
-            </View>
+            </SafeAreaView>
         </Modal>
     );
 }

@@ -29,6 +29,28 @@ export interface WorkoutSummary {
     avgDurationMin: number | null;
 }
 
+export interface CardioSummary {
+    days: number;
+    sessions: number;
+    totalDistanceMeters: number;
+    totalTimeSeconds: number;
+    avgSpeedKmh: number | null;
+    bestSpeedKmh: number | null;
+}
+
+export interface RepsOnlySummary {
+    days: number;
+    sessions: number;
+    totalReps: number;
+    bestReps: number | null;
+}
+
+export interface WeightOnlySummary {
+    days: number;
+    sessions: number;
+    bestWeightKg: number | null;
+}
+
 export interface WorkoutComparison {
     days: number;
     current: WorkoutSummary;
@@ -150,7 +172,8 @@ export class AnalysisService {
             SELECT w.date, SUM(s.weight * s.reps) as volume
             FROM workouts w
             JOIN workout_sets s ON s.workout_id = w.id
-            WHERE w.status = 'completed' AND s.completed = 1
+            JOIN exercises e ON e.id = s.exercise_id
+            WHERE w.status = 'completed' AND s.completed = 1 AND e.type = 'weight_reps'
             GROUP BY w.id
             ORDER BY w.date ASC
             LIMIT 7
@@ -175,7 +198,8 @@ export class AnalysisService {
                 SELECT COALESCE(SUM(s.weight * s.reps), 0) as total
                 FROM workout_sets s
                 JOIN workouts w ON s.workout_id = w.id
-                WHERE w.status = 'completed' AND w.date > ? AND s.completed = 1
+                JOIN exercises e ON e.id = s.exercise_id
+                WHERE w.status = 'completed' AND w.date > ? AND s.completed = 1 AND e.type = 'weight_reps'
             `,
             [cutoffMs]
         );
@@ -200,6 +224,118 @@ export class AnalysisService {
         };
     }
 
+    static async getCardioSummary(days: number): Promise<CardioSummary> {
+        const now = Date.now();
+        const cutoffMs = now - (days * 86400 * 1000);
+
+        const row = await dbService.getFirst<{
+            sessions: number;
+            totalDistanceMeters: number;
+            totalTimeSeconds: number;
+            avgSpeedKmh: number | null;
+            bestSpeedKmh: number | null;
+        }>(
+            `
+                SELECT
+                  COUNT(DISTINCT s.workout_id) as sessions,
+                  COALESCE(SUM(s.distance), 0) as totalDistanceMeters,
+                  COALESCE(SUM(s.time), 0) as totalTimeSeconds,
+                  CASE
+                    WHEN COALESCE(SUM(s.time), 0) > 0 AND COALESCE(SUM(s.distance), 0) > 0
+                    THEN ((SUM(s.distance) / 1000.0) / (SUM(s.time) / 3600.0))
+                    ELSE NULL
+                  END as avgSpeedKmh,
+                  MAX(
+                    CASE
+                      WHEN s.distance > 0 AND s.time > 0
+                      THEN ((s.distance / 1000.0) / (s.time / 3600.0))
+                      ELSE NULL
+                    END
+                  ) as bestSpeedKmh
+                FROM workout_sets s
+                JOIN workouts w ON s.workout_id = w.id
+                JOIN exercises e ON e.id = s.exercise_id
+                WHERE w.status = 'completed'
+                  AND w.date > ?
+                  AND s.completed = 1
+                  AND e.type = 'distance_time'
+            `,
+            [cutoffMs]
+        );
+
+        return {
+            days,
+            sessions: row?.sessions ?? 0,
+            totalDistanceMeters: row?.totalDistanceMeters ?? 0,
+            totalTimeSeconds: row?.totalTimeSeconds ?? 0,
+            avgSpeedKmh: row?.avgSpeedKmh ?? null,
+            bestSpeedKmh: row?.bestSpeedKmh ?? null,
+        };
+    }
+
+    static async getRepsOnlySummary(days: number): Promise<RepsOnlySummary> {
+        const now = Date.now();
+        const cutoffMs = now - (days * 86400 * 1000);
+
+        const row = await dbService.getFirst<{
+            sessions: number;
+            totalReps: number;
+            bestReps: number | null;
+        }>(
+            `
+                SELECT
+                  COUNT(DISTINCT s.workout_id) as sessions,
+                  COALESCE(SUM(s.reps), 0) as totalReps,
+                  MAX(s.reps) as bestReps
+                FROM workout_sets s
+                JOIN workouts w ON s.workout_id = w.id
+                JOIN exercises e ON e.id = s.exercise_id
+                WHERE w.status = 'completed'
+                  AND w.date > ?
+                  AND s.completed = 1
+                  AND e.type = 'reps_only'
+            `,
+            [cutoffMs]
+        );
+
+        return {
+            days,
+            sessions: row?.sessions ?? 0,
+            totalReps: row?.totalReps ?? 0,
+            bestReps: row?.bestReps ?? null,
+        };
+    }
+
+    static async getWeightOnlySummary(days: number): Promise<WeightOnlySummary> {
+        const now = Date.now();
+        const cutoffMs = now - (days * 86400 * 1000);
+
+        const row = await dbService.getFirst<{
+            sessions: number;
+            bestWeightKg: number | null;
+        }>(
+            `
+                SELECT
+                  COUNT(DISTINCT s.workout_id) as sessions,
+                  MAX(s.weight) as bestWeightKg
+                FROM workout_sets s
+                JOIN workouts w ON s.workout_id = w.id
+                JOIN exercises e ON e.id = s.exercise_id
+                WHERE w.status = 'completed'
+                  AND w.date > ?
+                  AND s.completed = 1
+                  AND e.type = 'weight_only'
+            `,
+            [cutoffMs]
+        );
+
+        return {
+            days,
+            sessions: row?.sessions ?? 0,
+            bestWeightKg: row?.bestWeightKg ?? null,
+        };
+    }
+
     static async getWorkoutSummaryBetween(startMs: number, endMs: number): Promise<Omit<WorkoutSummary, 'days'> & { startMs: number; endMs: number }> {
         const workoutCountRow = await dbService.getFirst<{ count: number }>(
             'SELECT COUNT(*) as count FROM workouts WHERE status = ? AND date > ? AND date <= ?',
@@ -210,10 +346,12 @@ export class AnalysisService {
                 SELECT COALESCE(SUM(s.weight * s.reps), 0) as total
                 FROM workout_sets s
                 JOIN workouts w ON s.workout_id = w.id
+                JOIN exercises e ON e.id = s.exercise_id
                 WHERE w.status = 'completed'
                 AND w.date > ?
                 AND w.date <= ?
                 AND s.completed = 1
+                AND e.type = 'weight_reps'
             `,
             [startMs, endMs]
         );
@@ -344,8 +482,8 @@ export class AnalysisService {
                     c.id as categoryId,
                     c.name as categoryName,
                     c.color as categoryColor,
-                    COALESCE(SUM(s.weight * s.reps), 0) as volume,
-                    COALESCE(COUNT(*), 0) as setCount
+                    COALESCE(SUM(CASE WHEN s.weight > 0 AND s.reps > 0 THEN (s.weight * s.reps) ELSE 0 END), 0) as volume,
+                    COALESCE(COUNT(CASE WHEN s.weight > 0 AND s.reps > 0 THEN 1 END), 0) as setCount
                 FROM workout_sets s
                 JOIN workouts w ON s.workout_id = w.id
                 JOIN exercises e ON s.exercise_id = e.id
@@ -353,6 +491,7 @@ export class AnalysisService {
                 WHERE w.status = 'completed'
                 AND w.date > ?
                 AND s.completed = 1
+                AND e.type = 'weight_reps'
                 GROUP BY c.id
                 ORDER BY volume DESC
                 LIMIT ?
@@ -378,8 +517,8 @@ export class AnalysisService {
                     e.name as exerciseName,
                     c.name as categoryName,
                     c.color as categoryColor,
-                    COALESCE(SUM(s.weight * s.reps), 0) as volume,
-                    COALESCE(COUNT(*), 0) as setCount
+                    COALESCE(SUM(CASE WHEN s.weight > 0 AND s.reps > 0 THEN (s.weight * s.reps) ELSE 0 END), 0) as volume,
+                    COALESCE(COUNT(CASE WHEN s.weight > 0 AND s.reps > 0 THEN 1 END), 0) as setCount
                 FROM workout_sets s
                 JOIN workouts w ON s.workout_id = w.id
                 JOIN exercises e ON s.exercise_id = e.id
@@ -387,6 +526,7 @@ export class AnalysisService {
                 WHERE w.status = 'completed'
                 AND w.date > ?
                 AND s.completed = 1
+                AND e.type = 'weight_reps'
                 GROUP BY e.id
                 ORDER BY volume DESC
                 LIMIT ?

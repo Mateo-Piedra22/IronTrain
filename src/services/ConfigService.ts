@@ -18,6 +18,9 @@ export interface AppConfig {
     calculatorsDefault1RMFormula: 'epley' | 'brzycki' | 'lombardi';
     calculatorsRoundingKg: number;
     calculatorsRoundingLbs: number;
+
+    exerciseCardioMetricById: Record<string, 'distance' | 'time' | 'pace' | 'speed'>;
+    exerciseCardioPrimaryPRById: Record<string, 'distance' | 'time' | 'pace' | 'speed'>;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -38,6 +41,9 @@ const DEFAULT_CONFIG: AppConfig = {
     calculatorsDefault1RMFormula: 'epley',
     calculatorsRoundingKg: 2.5,
     calculatorsRoundingLbs: 5,
+
+    exerciseCardioMetricById: {},
+    exerciseCardioPrimaryPRById: {},
 };
 
 class ConfigService {
@@ -72,6 +78,8 @@ class ConfigService {
                         s.key === 'calculatorsRoundingKg' ||
                         s.key === 'calculatorsRoundingLbs'
                     ) loadedConfig[s.key] = parseFloat(s.value);
+                    else if (s.key === 'exerciseCardioMetricById') loadedConfig[s.key] = JSON.parse(s.value);
+                    else if (s.key === 'exerciseCardioPrimaryPRById') loadedConfig[s.key] = JSON.parse(s.value);
                     else loadedConfig[s.key] = s.value;
                 } catch (e) {
                     console.warn(`Failed to parse setting ${s.key}`, e);
@@ -95,6 +103,33 @@ class ConfigService {
             loadedConfig.calculatorsRoundingKg = Math.max(0.25, sanitizeNumber(loadedConfig.calculatorsRoundingKg, DEFAULT_CONFIG.calculatorsRoundingKg));
             loadedConfig.calculatorsRoundingLbs = Math.max(0.5, sanitizeNumber(loadedConfig.calculatorsRoundingLbs, DEFAULT_CONFIG.calculatorsRoundingLbs));
 
+            const allowedCardioMetrics = new Set(['distance', 'time', 'pace', 'speed']);
+            const rawMap = loadedConfig.exerciseCardioMetricById;
+            const cleaned: Record<string, 'distance' | 'time' | 'pace' | 'speed'> = {};
+            if (rawMap && typeof rawMap === 'object') {
+                const entries = Object.entries(rawMap).slice(0, 500);
+                for (const [k, v] of entries) {
+                    if (typeof k !== 'string') continue;
+                    if (typeof v !== 'string') continue;
+                    if (!allowedCardioMetrics.has(v)) continue;
+                    cleaned[k] = v as any;
+                }
+            }
+            loadedConfig.exerciseCardioMetricById = cleaned;
+
+            const rawPRMap = loadedConfig.exerciseCardioPrimaryPRById;
+            const cleanedPR: Record<string, 'distance' | 'time' | 'pace' | 'speed'> = {};
+            if (rawPRMap && typeof rawPRMap === 'object') {
+                const entries = Object.entries(rawPRMap).slice(0, 500);
+                for (const [k, v] of entries) {
+                    if (typeof k !== 'string') continue;
+                    if (typeof v !== 'string') continue;
+                    if (!allowedCardioMetrics.has(v)) continue;
+                    cleanedPR[k] = v as any;
+                }
+            }
+            loadedConfig.exerciseCardioPrimaryPRById = cleanedPR;
+
             this.cache = loadedConfig;
             return loadedConfig;
         } catch (e) {
@@ -115,6 +150,7 @@ class ConfigService {
         // Persist
         let dbValue = String(value);
         if (typeof value === 'boolean') dbValue = value ? 'true' : 'false';
+        else if (typeof value === 'object') dbValue = JSON.stringify(value);
         
         await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, dbValue]);
     }
