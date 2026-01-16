@@ -8,6 +8,7 @@
     "ios": "node scripts/dev.js --ios",
     "web": "node scripts/dev.js --web",
     "generate-changelog": "node scripts/generate-changelog.js",
+    "website:sync-content": "node -e \"require('./scripts/sync-website-content').syncWebsiteContent(require('path').resolve(__dirname))\"",
     "release:prepare": "node scripts/release-prepare.js",
     "release:finalize": "node scripts/release-finalize.js",
     "postinstall": "node scripts/patch-css-interop.js && node scripts/generate-changelog.js",

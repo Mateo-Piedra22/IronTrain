@@ -44,6 +44,8 @@ Esto actualiza:
 - `package.json` (versión del paquete)
 - `docs/CHANGELOG.md` (crea/asegura `1.2.0 (Unreleased)`)
 - `src/changelog.generated.json` (JSON que usa la app)
+- `website/content/CHANGELOG.md` (copia para la web)
+- `website/content/DOWNLOADS.json` (copia para la web)
 
 ---
 
@@ -68,6 +70,7 @@ Esto hace:
 - `Unreleased` → fecha (`YYYY-MM-DD`)
 - crea el siguiente `Unreleased` (ej. `1.2.1 (Unreleased)`)
 - regenera `src/changelog.generated.json`
+- sincroniza `website/content/*` (para que Vercel no ignore cambios solo en `docs/`)
 
 ---
 
@@ -79,6 +82,11 @@ Archivos típicos que cambian:
 - `package.json`
 - `docs/CHANGELOG.md`
 - `src/changelog.generated.json`
+- `website/content/CHANGELOG.md`
+- `website/content/DOWNLOADS.json`
+
+Tip: si por algún motivo querés sincronizarlo manualmente:
+- `npm run website:sync-content`
 
 ---
 

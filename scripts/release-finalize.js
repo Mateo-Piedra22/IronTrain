@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { generate } = require('./generate-changelog');
+const { syncWebsiteContent } = require('./sync-website-content');
 
 function isSemver(v) {
   return /^\d+\.\d+\.\d+$/.test(String(v).trim());
@@ -60,6 +61,7 @@ function main() {
   fs.writeFileSync(changelogPath, updated.endsWith('\n') ? updated : updated + '\n', 'utf8');
 
   generate();
+  syncWebsiteContent(repoRoot);
 }
 
 try {
@@ -68,4 +70,3 @@ try {
   console.error(String(e && e.message ? e.message : e));
   process.exitCode = 1;
 }
-
