@@ -16,6 +16,14 @@ export type UpdateCheckResult =
     | { status: 'error'; message: string }
     | { status: 'up_to_date'; installedVersion: string }
     | {
+        status: 'update_pending';
+        installedVersion: string;
+        latestVersion: string;
+        date: string | null;
+        downloadsPageUrl: string | null;
+        notesUrl: string | null;
+    }
+    | {
         status: 'update_available';
         installedVersion: string;
         latestVersion: string;
@@ -71,18 +79,32 @@ export class UpdateService {
                 return { status: 'up_to_date', installedVersion };
             }
 
+            const downloadUrl = safeString(latest?.downloadUrl);
+            const notesUrl = safeString(latest?.notesUrl);
+            const downloadsPageUrl = safeString(data?.downloadsPageUrl);
+
+            if (!downloadUrl) {
+                return {
+                    status: 'update_pending',
+                    installedVersion,
+                    latestVersion,
+                    date: safeString(latest?.date) ?? null,
+                    downloadsPageUrl,
+                    notesUrl,
+                };
+            }
+
             return {
                 status: 'update_available',
                 installedVersion,
                 latestVersion,
                 date: safeString(latest?.date) ?? null,
-                downloadUrl: safeString(latest?.downloadUrl),
-                notesUrl: safeString(latest?.notesUrl),
-                downloadsPageUrl: safeString(data?.downloadsPageUrl),
+                downloadUrl,
+                notesUrl,
+                downloadsPageUrl,
             };
         } catch (e) {
             return { status: 'error', message: (e as any)?.message ? String((e as any).message) : 'Error de red' };
         }
     }
 }
-

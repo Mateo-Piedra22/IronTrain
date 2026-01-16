@@ -9,39 +9,34 @@ export async function GET() {
 
   const released = changelog.releases.filter((r) => r.unreleased !== true);
   const latestChangelog = released[0] ?? null;
-  const latestDownload = downloads.latest ?? null;
+  const candidates = [downloads.latest, ...(downloads.previous ?? [])].filter(Boolean) as Array<{
+    version?: string;
+    date?: string | null;
+    apk?: { url?: string };
+  }>;
 
-  const downloadHasApk = !!latestDownload?.apk?.url;
-  const canCompare = !!latestChangelog && !!latestDownload && isSemver(latestChangelog.version) && isSemver(latestDownload.version);
+  let best: { version: string; date: string | null; url: string } | null = null;
+  for (const c of candidates) {
+    const v = c.version;
+    const url = c.apk?.url;
+    if (!v || !url) continue;
+    if (!isSemver(v)) continue;
+    if (!best || compareSemver(v, best.version) > 0) {
+      best = { version: v, date: (c.date ?? null) as any, url };
+    }
+  }
 
-  const preferredVersion =
-    canCompare
-      ? (compareSemver(latestDownload!.version, latestChangelog!.version) > 0 ? latestDownload!.version : latestChangelog!.version)
-      : (latestChangelog?.version ?? latestDownload?.version ?? null);
-
-  const latest =
-    preferredVersion
-      ? {
-          version: preferredVersion,
-          date:
-            (preferredVersion === latestDownload?.version ? (latestDownload?.date ?? null) : null) ??
-            (preferredVersion === latestChangelog?.version ? (latestChangelog?.date ?? null) : null) ??
-            null,
-        }
-      : null;
-
-  const downloadUrl =
-    downloadHasApk && latestDownload?.version && preferredVersion === latestDownload.version
-      ? latestDownload.apk?.url ?? null
-      : null;
+  const latest = best
+    ? { version: best.version, date: best.date ?? null, downloadUrl: best.url }
+    : (latestChangelog ? { version: latestChangelog.version, date: latestChangelog.date ?? null, downloadUrl: null } : null);
 
   const payload = {
     latest: latest
       ? {
           version: latest.version,
           date: latest.date ?? null,
-          downloadUrl,
-          notesUrl: 'https://irontrain.motiona.xyz/changelog',
+          downloadUrl: latest.downloadUrl ?? null,
+          notesUrl: `https://irontrain.motiona.xyz/changelog#v${latest.version}`,
         }
       : null,
     downloadsPageUrl: downloads.downloadsPageUrl || 'https://irontrain.motiona.xyz/downloads',

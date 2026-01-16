@@ -411,6 +411,12 @@ export default function SettingsScreen() {
                             <Text className="text-iron-500 text-xs mt-1">No se pudo comprobar: {updateStatus.message}</Text>
                         ) : updateStatus.status === 'up_to_date' ? (
                             <Text className="text-iron-500 text-xs mt-1">Estás al día (v{updateStatus.installedVersion}).</Text>
+                        ) : updateStatus.status === 'update_pending' ? (
+                            <Text className="text-iron-500 text-xs mt-1">
+                                Update pendiente: v{updateStatus.latestVersion}
+                                {updateStatus.date ? ` · ${updateStatus.date}` : ''}
+                                {' · APK aún no está listo.'}
+                            </Text>
                         ) : (
                             <Text className="text-iron-500 text-xs mt-1">
                                 Actualización disponible: v{updateStatus.latestVersion}
@@ -435,8 +441,11 @@ export default function SettingsScreen() {
                         <View className="flex-1">
                             <TouchableOpacity
                                 onPress={async () => {
-                                    if (updateStatus.status !== 'update_available') return;
-                                    const url = updateStatus.downloadUrl ?? updateStatus.downloadsPageUrl ?? updateStatus.notesUrl;
+                                    if (updateStatus.status !== 'update_available' && updateStatus.status !== 'update_pending') return;
+                                    const url =
+                                        updateStatus.status === 'update_available'
+                                            ? (updateStatus.downloadUrl ?? updateStatus.downloadsPageUrl ?? updateStatus.notesUrl)
+                                            : (updateStatus.downloadsPageUrl ?? updateStatus.notesUrl);
                                     if (!url) {
                                         Alert.alert('Sin enlace', 'No hay enlace de descarga configurado.');
                                         return;
@@ -447,13 +456,13 @@ export default function SettingsScreen() {
                                         Alert.alert('Error', 'No se pudo abrir el enlace.');
                                     }
                                 }}
-                                disabled={updateStatus.status !== 'update_available'}
-                                className={`bg-primary rounded-xl p-4 flex-row items-center justify-center gap-2 ${updateStatus.status !== 'update_available' ? 'opacity-60' : ''}`}
+                                disabled={updateStatus.status !== 'update_available' && updateStatus.status !== 'update_pending'}
+                                className={`bg-primary rounded-xl p-4 flex-row items-center justify-center gap-2 ${updateStatus.status !== 'update_available' && updateStatus.status !== 'update_pending' ? 'opacity-60' : ''}`}
                                 accessibilityRole="button"
                                 accessibilityLabel="Abrir descarga"
                             >
                                 <Download size={18} color="white" />
-                                <Text className="text-white font-bold">Descargar</Text>
+                                <Text className="text-white font-bold">{updateStatus.status === 'update_pending' ? 'Ver descargas' : 'Descargar'}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

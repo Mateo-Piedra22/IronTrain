@@ -23,6 +23,10 @@ export default async function DownloadsPage() {
           : (latestDownloads ? { version: latestDownloads.version, date: latestDownloads.date ?? null } : null));
 
   const published = changelog.releases.filter((r) => r.unreleased !== true);
+  const latestApk = latest?.version ? downloadMap.get(latest.version) : undefined;
+  const latestApkUrl = latestApk?.url;
+  const fallbackLatestAvailableUrl = downloads.latest?.apk?.url;
+  const fallbackLatestAvailableVersion = downloads.latest?.version;
 
   return (
     <div className="space-y-6">
@@ -39,19 +43,34 @@ export default async function DownloadsPage() {
             <div className="text-sm font-black text-iron-600">Última versión</div>
             <div className="mt-1 text-2xl font-black text-slate-900">{latest ? `v${latest.version}` : '—'}</div>
             <div className="mt-1 text-sm text-slate-500">{latest?.date ?? '—'}</div>
+            {!latestApkUrl && fallbackLatestAvailableVersion && latest?.version && fallbackLatestAvailableVersion !== latest.version ? (
+              <div className="mt-2 text-xs font-bold text-slate-500">
+                APK para v{latest.version} todavía no está listo. Último APK disponible: v{fallbackLatestAvailableVersion}.
+              </div>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-3">
-            {downloads.latest?.apk?.url ? (
+            {latestApkUrl ? (
               <a
-                href={downloads.latest.apk.url}
+                href={latestApkUrl}
                 className="inline-flex items-center justify-center rounded-xl bg-iron-500 px-5 py-3 font-bold text-white hover:bg-iron-600"
               >
                 Descargar APK (Android)
               </a>
             ) : (
-              <span className="inline-flex items-center justify-center rounded-xl bg-slate-100 px-5 py-3 font-bold text-slate-500">
-                APK (pendiente)
-              </span>
+              <>
+                <span className="inline-flex items-center justify-center rounded-xl bg-slate-100 px-5 py-3 font-bold text-slate-500">
+                  APK (pendiente)
+                </span>
+                {fallbackLatestAvailableUrl && fallbackLatestAvailableVersion && latest?.version && fallbackLatestAvailableVersion !== latest.version ? (
+                  <a
+                    href={fallbackLatestAvailableUrl}
+                    className="inline-flex items-center justify-center rounded-xl border border-iron-200 bg-white px-5 py-3 font-bold text-slate-900 hover:bg-iron-50"
+                  >
+                    Descargar última disponible (v{fallbackLatestAvailableVersion})
+                  </a>
+                ) : null}
+              </>
             )}
             <a
               href="/changelog"
