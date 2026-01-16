@@ -12,6 +12,21 @@ export type ChangelogPayload = {
   releases: ChangelogRelease[];
 };
 
+function env(name: string): string | null {
+  const v = process.env[name];
+  return typeof v === 'string' && v.trim().length > 0 ? v.trim() : null;
+}
+
+async function fetchText(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { method: 'GET', next: { revalidate: 300 } });
+    if (!res.ok) return null;
+    return await res.text();
+  } catch {
+    return null;
+  }
+}
+
 function parseReleaseHeading(line: string): { version: string; date: string | null; unreleased: boolean } | null {
   const trimmed = line.trim();
   if (!trimmed.startsWith('## ')) return null;
@@ -46,9 +61,18 @@ export async function getChangelog(): Promise<ChangelogPayload> {
     (await resolveRepoFile('website/content/CHANGELOG.md')) ??
     (await resolveRepoFile('content/CHANGELOG.md')) ??
     (await resolveRepoFile('docs/CHANGELOG.md'));
-  if (!filePath) return { releases: [] };
+  const localMd = filePath ? await fs.readFile(filePath, 'utf8') : null;
+  const md = localMd ?? (await (async () => {
+    const owner = env('GITHUB_RELEASES_OWNER');
+    const repo = env('GITHUB_RELEASES_REPO');
+    if (!owner || !repo) return null;
+    const main = await fetchText(`https://raw.githubusercontent.com/${owner}/${repo}/main/docs/CHANGELOG.md`);
+    if (main) return main;
+    const master = await fetchText(`https://raw.githubusercontent.com/${owner}/${repo}/master/docs/CHANGELOG.md`);
+    return master;
+  })());
+  if (!md) return { releases: [] };
 
-  const md = await fs.readFile(filePath, 'utf8');
   const lines = md.split(/\r?\n/);
 
   const releases: ChangelogRelease[] = [];

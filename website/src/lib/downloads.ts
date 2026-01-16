@@ -55,6 +55,33 @@ export async function getDownloads(): Promise<DownloadsConfig> {
     previous: (local.previous ?? []).map((p) => enrich(p) as DownloadItem),
   };
 
+  const previousFromGh: DownloadItem[] = ghAll
+    .filter((r) => !!r.version && r.version !== (gh?.version ?? localEnriched.latest?.version))
+    .map((r) => ({
+      version: r.version!,
+      date: r.date ?? null,
+      apk: { url: r.apkUrl ?? undefined, sha256: undefined },
+    }));
+
+  const previousMergedMap = new Map<string, DownloadItem>();
+  for (const p of localEnriched.previous ?? []) {
+    if (!p?.version) continue;
+    previousMergedMap.set(p.version, p);
+  }
+  for (const p of previousFromGh) {
+    if (!p?.version) continue;
+    const existing = previousMergedMap.get(p.version);
+    if (existing) {
+      previousMergedMap.set(p.version, {
+        version: existing.version,
+        date: existing.date ?? p.date ?? null,
+        apk: { url: existing.apk?.url ?? p.apk?.url, sha256: existing.apk?.sha256 },
+      });
+    } else {
+      previousMergedMap.set(p.version, p);
+    }
+  }
+
   if (!gh) return localEnriched;
 
   const mergedLatest: DownloadItem = {
@@ -69,6 +96,6 @@ export async function getDownloads(): Promise<DownloadsConfig> {
   return {
     downloadsPageUrl: localEnriched.downloadsPageUrl ?? 'https://irontrain.motiona.xyz/downloads',
     latest: mergedLatest,
-    previous: localEnriched.previous ?? [],
+    previous: Array.from(previousMergedMap.values()),
   };
 }
