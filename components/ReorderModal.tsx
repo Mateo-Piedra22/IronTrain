@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Alert, Modal, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { IronButton } from './IronButton';
 
@@ -48,26 +49,28 @@ export function ReorderModal({ visible, onClose, items, onSave }: ReorderModalPr
 
     return (
         <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-            <View className="flex-1 bg-background pt-10 px-4">
-                <View className="flex-row justify-between items-center mb-6">
-                    <Text className="text-2xl font-bold text-iron-950">Reordenar ejercicios</Text>
-                    <IronButton label="Cerrar" variant="ghost" size="sm" onPress={onClose} />
+            <SafeAreaView edges={['top', 'bottom', 'left', 'right']} className="flex-1 bg-background">
+                <View className="flex-1 px-4 pt-4">
+                    <View className="flex-row justify-between items-center mb-6">
+                        <Text className="text-2xl font-bold text-iron-950">Reordenar ejercicios</Text>
+                        <IronButton label="Cerrar" variant="ghost" size="sm" onPress={onClose} />
+                    </View>
+
+                    <Text className="text-textMuted mb-4">Mantén presionado y arrastra para reordenar.</Text>
+
+                    <DraggableFlatList
+                        data={data}
+                        onDragEnd={({ data }) => setData(data)}
+                        keyExtractor={(item) => item.key}
+                        renderItem={renderItem}
+                        containerStyle={{ flex: 1 }}
+                    />
+
+                    <View className="py-6">
+                        <IronButton label="Guardar orden" onPress={handleSave} loading={loading} />
+                    </View>
                 </View>
-
-                <Text className="text-textMuted mb-4">Mantén presionado y arrastra para reordenar.</Text>
-
-                <DraggableFlatList
-                    data={data}
-                    onDragEnd={({ data }) => setData(data)}
-                    keyExtractor={(item) => item.key}
-                    renderItem={renderItem}
-                    containerStyle={{ flex: 1 }}
-                />
-
-                <View className="py-6">
-                    <IronButton label="Guardar orden" onPress={handleSave} loading={loading} />
-                </View>
-            </View>
+            </SafeAreaView>
         </Modal>
     );
 }

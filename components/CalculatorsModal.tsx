@@ -6,6 +6,7 @@ import { UnitService } from '@/src/services/UnitService';
 import { X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface CalculatorsModalProps {
     visible: boolean;
@@ -56,18 +57,19 @@ export function CalculatorsModal({ visible, onClose }: CalculatorsModalProps) {
 
     return (
         <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-            <View className="flex-1 bg-iron-900 p-4">
-                <View className="flex-row justify-between items-center mb-6 mt-4">
-                    <Text className="text-iron-950 font-bold text-lg">Calculadoras</Text>
-                    <TouchableOpacity
-                        onPress={onClose}
-                        className="p-2 bg-primary rounded-full active:opacity-80"
-                        accessibilityRole="button"
-                        accessibilityLabel="Cerrar calculadoras"
-                    >
-                        <X color="white" size={24} />
-                    </TouchableOpacity>
-                </View>
+            <SafeAreaView edges={['top', 'bottom', 'left', 'right']} className="flex-1 bg-iron-900">
+                <View className="flex-1 p-4">
+                    <View className="flex-row justify-between items-center mb-6">
+                        <Text className="text-iron-950 font-bold text-lg">Calculadoras</Text>
+                        <TouchableOpacity
+                            onPress={onClose}
+                            className="p-2 bg-primary rounded-full active:opacity-80"
+                            accessibilityRole="button"
+                            accessibilityLabel="Cerrar calculadoras"
+                        >
+                            <X color="white" size={24} />
+                        </TouchableOpacity>
+                    </View>
 
                 <View className="flex-row mb-6 bg-iron-800 p-1 rounded-lg">
                     <TouchableOpacity
@@ -96,7 +98,7 @@ export function CalculatorsModal({ visible, onClose }: CalculatorsModalProps) {
                     </TouchableOpacity>
                 </View>
 
-                <ScrollView>
+                    <ScrollView>
                     {activeTab === 'oneRm' ? (
                         <View>
                             <Text className="text-iron-950 font-bold text-lg mb-3">Estimación de 1RM</Text>
@@ -244,8 +246,9 @@ export function CalculatorsModal({ visible, onClose }: CalculatorsModalProps) {
                             </Text>
                         </View>
                     )}
-                </ScrollView>
-            </View>
+                    </ScrollView>
+                </View>
+            </SafeAreaView>
         </Modal>
     );
 }

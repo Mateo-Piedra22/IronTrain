@@ -15,6 +15,7 @@ import { Copy, Info, Plus, Timer, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { runOnJS } from 'react-native-reanimated';
 import { workoutService } from '../../src/services/WorkoutService';
 import { ExerciseType, Workout, WorkoutSet } from '../../src/types/db';
@@ -298,12 +299,18 @@ export default function DailyLogScreen() {
       <Modal visible={isPickerVisible} animationType="slide" presentationStyle="pageSheet">
         {/* ... */}
         <View className="flex-1 bg-iron-900">
-          <View className="flex-row justify-between items-center p-4 border-b border-iron-800 bg-iron-800">
-            <Text className="text-iron-950 font-bold text-lg">Seleccionar ejercicio</Text>
-            <TouchableOpacity onPress={() => setIsPickerVisible(false)}>
-              <X color={Colors.iron[950]} size={24} />
-            </TouchableOpacity>
-          </View>
+          <SafeAreaView edges={['top']} className="bg-iron-800 border-b border-iron-800">
+            <View className="flex-row justify-between items-center p-4">
+              <Text className="text-iron-950 font-bold text-lg">Seleccionar ejercicio</Text>
+              <TouchableOpacity
+                onPress={() => setIsPickerVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar selector de ejercicios"
+              >
+                <X color={Colors.iron[950]} size={24} />
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
           <ExerciseList onSelect={handleAddSet} />
         </View>
       </Modal>

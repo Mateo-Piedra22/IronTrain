@@ -6,6 +6,7 @@ import { es } from 'date-fns/locale';
 import { Copy, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
 
 interface CopyWorkoutModalProps {
@@ -163,12 +164,14 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
     return (
         <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
             <View className="flex-1 bg-iron-900">
-                <View className="flex-row justify-between items-center p-4 border-b border-iron-800 bg-iron-800">
-                    <Text className="text-iron-950 font-bold text-lg">Copiar desde fecha</Text>
-                    <TouchableOpacity onPress={onClose}>
-                        <X color={Colors.iron[950]} size={24} />
-                    </TouchableOpacity>
-                </View>
+                <SafeAreaView edges={['top']} className="bg-iron-800 border-b border-iron-800">
+                    <View className="flex-row justify-between items-center p-4">
+                        <Text className="text-iron-950 font-bold text-lg">Copiar desde fecha</Text>
+                        <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Cerrar copiar entrenamiento">
+                            <X color={Colors.iron[950]} size={24} />
+                        </TouchableOpacity>
+                    </View>
+                </SafeAreaView>
 
                 <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
                     <Calendar

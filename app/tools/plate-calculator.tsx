@@ -8,6 +8,7 @@ import { Stack, useFocusEffect } from 'expo-router';
 import { Settings } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function PlateCalculator() {
     const [unit, setUnit] = useState(configService.get('weightUnit'));
@@ -265,19 +266,20 @@ export default function PlateCalculator() {
                 )}
 
                 <Modal visible={isSettingsVisible} animationType="slide" presentationStyle="formSheet">
-                    <View className="flex-1 bg-iron-900 p-4">
-                        <View className="flex-row justify-between items-center mb-6 border-b border-iron-200 pb-4">
-                            <Text className="text-iron-950 text-xl font-bold">Inventario de discos</Text>
-                            <TouchableOpacity
-                                onPress={() => setIsSettingsVisible(false)}
-                                accessibilityRole="button"
-                                accessibilityLabel="Cerrar inventario"
-                            >
-                                <Text className="text-primary font-bold">Listo</Text>
-                            </TouchableOpacity>
-                        </View>
+                    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} className="flex-1 bg-iron-900">
+                        <View className="flex-1 p-4">
+                            <View className="flex-row justify-between items-center mb-6 border-b border-iron-200 pb-4">
+                                <Text className="text-iron-950 text-xl font-bold">Inventario de discos</Text>
+                                <TouchableOpacity
+                                    onPress={() => setIsSettingsVisible(false)}
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Cerrar inventario"
+                                >
+                                    <Text className="text-primary font-bold">Listo</Text>
+                                </TouchableOpacity>
+                            </View>
 
-                        <ScrollView>
+                            <ScrollView>
                             <View className="bg-surface p-4 rounded-xl border border-iron-700 mb-4">
                                 <Text className="text-iron-950 font-bold mb-2">Preferencia</Text>
                                 <TouchableOpacity
@@ -364,8 +366,9 @@ export default function PlateCalculator() {
                                 </View>
                                 <Text className="text-iron-500 text-xs mt-2">Escribe el peso y presiona Enter. Se agrega como par (2 discos).</Text>
                             </View>
-                        </ScrollView>
-                    </View>
+                            </ScrollView>
+                        </View>
+                    </SafeAreaView>
                 </Modal>
             </ScrollView>
         </SafeAreaWrapper>

@@ -83,7 +83,7 @@ export default function TemplatesScreen() {
     };
 
     return (
-        <SafeAreaWrapper className="bg-iron-900" edges={['left', 'right']}>
+        <SafeAreaWrapper className="bg-iron-900" edges={['top', 'left', 'right']}>
             <Stack.Screen options={{ headerShown: false }} />
             
             <View className="pt-4 px-4 pb-4 border-b border-iron-200 flex-row justify-between items-center bg-iron-900">

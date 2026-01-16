@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-01-16T02:34:54.835Z",
+  "generatedAt": "2026-01-16T03:12:53.701Z",
   "source": "docs/CHANGELOG.md",
   "releases": [
     {
-      "version": "1.3.1",
+      "version": "1.4.0",
       "date": null,
       "unreleased": true,
       "items": [
@@ -11,6 +11,22 @@
         "Soporte para diferentes idiomas (inglés/español).",
         "Conexión con múltiples dispositivos (relojes/bands compatibles).",
         "Vinculación con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos."
+      ]
+    },
+    {
+      "version": "1.3.2",
+      "date": null,
+      "unreleased": true,
+      "items": [
+        "Placeholder: describir cambios nuevos antes del próximo release."
+      ]
+    },
+    {
+      "version": "1.3.1",
+      "date": "2026-01-16",
+      "unreleased": false,
+      "items": [
+        "Se añadió SafeAreaView a todos los componentes modales para mejorar la compatibilidad con los dispositivos."
       ]
     },
     {
