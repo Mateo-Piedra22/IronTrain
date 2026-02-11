@@ -1,5 +1,5 @@
-import { Colors } from '@/src/theme';
 import { UnitService } from '@/src/services/UnitService';
+import { Colors } from '@/src/theme';
 import { ExerciseType, WorkoutSet } from '@/src/types/db';
 import { formatTimeSeconds, parseFlexibleTimeToSeconds } from '@/src/utils/time';
 import { Ionicons } from '@expo/vector-icons';
@@ -168,8 +168,8 @@ export function ExerciseGrouper({
                                                         Alert.alert('Tiempo inválido', 'Usa mm:ss, hh:mm:ss o sufijos: 90s, 10m, 1h.');
                                                         return;
                                                     }
-                                                    onUpdateSet(set.id, { time: parsed.seconds });
-                                                    setDrafts((prev) => ({ ...prev, [set.id]: { ...(prev[set.id] || { distance: '', time: '', weight: '', reps: '' }), time: formatTimeSeconds(parsed.seconds) } }));
+                                                    onUpdateSet(set.id, { time: parsed.seconds! });
+                                                    setDrafts((prev) => ({ ...prev, [set.id]: { ...(prev[set.id] || { distance: '', time: '', weight: '', reps: '' }), time: formatTimeSeconds(parsed.seconds!) } }));
                                                 }}
                                                 keyboardType="default"
                                                 className="h-8 text-center"

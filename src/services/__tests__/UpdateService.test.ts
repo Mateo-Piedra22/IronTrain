@@ -11,7 +11,7 @@ import { UpdateService } from '../UpdateService';
 
 describe('UpdateService', () => {
     beforeEach(() => {
-        // @ts-expect-error - jest env
+        // @ts-ignore - jest env
         global.fetch = jest.fn();
     });
 

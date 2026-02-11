@@ -6,6 +6,10 @@
 - Conexión con múltiples dispositivos (relojes/bands compatibles).
 - Vinculación con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos.
 
+## 1.3.2 (2026-02-11)
+- Rework del IntervalTimer.
+- Mejora del calculo de discos.
+
 ## 1.3.1 (2026-01-16)
 - Se añadió SafeAreaView a todos los componentes modales para mejorar la compatibilidad con los dispositivos.
 

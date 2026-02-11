@@ -219,8 +219,8 @@ export default function PlateCalculator() {
                                             <View className="w-14 h-14 rounded-full bg-white border-4 border-iron-300 items-center justify-center mb-1 shadow-sm">
                                                 <Text className="text-iron-950 font-bold">{p.plate}</Text>
                                             </View>
-                                            <Text className="text-iron-950 font-bold text-xs">x{p.pairs}/lado</Text>
-                                            <Text className="text-iron-500 text-[10px] font-bold">({p.pairs * 2})</Text>
+                                            <Text className="text-iron-950 font-bold text-xs">×{p.pairs * 2} discos</Text>
+                                            <Text className="text-iron-500 text-[10px] font-bold">({p.pairs}/lado)</Text>
                                         </View>
                                     ))}
                                 </View>
@@ -235,8 +235,8 @@ export default function PlateCalculator() {
                                             <View className="w-14 h-14 rounded-full bg-white border-4 border-iron-300 items-center justify-center mb-1 shadow-sm">
                                                 <Text className="text-iron-950 font-bold">{p.plate}</Text>
                                             </View>
-                                            <Text className="text-iron-950 font-bold text-xs">x{p.pairs}/lado</Text>
-                                            <Text className="text-iron-500 text-[10px] font-bold">({p.pairs * 2})</Text>
+                                            <Text className="text-iron-950 font-bold text-xs">×{p.pairs * 2} discos</Text>
+                                            <Text className="text-iron-500 text-[10px] font-bold">({p.pairs}/lado)</Text>
                                         </View>
                                     ))}
                                 </View>
@@ -258,7 +258,7 @@ export default function PlateCalculator() {
                             >
                                 <Text className="text-iron-950 font-bold mb-1">{l.totalWeight} {unit}</Text>
                                 <Text className="text-iron-500 text-xs font-bold">
-                                    {l.perSide.map((p) => `${p.plate}×${p.pairs}/lado`).join(' · ')}
+                                    {l.perSide.map((p) => `${p.plate}${unit} ×${p.pairs * 2} discos (${p.pairs}/lado)`).join(' · ')}
                                 </Text>
                             </Pressable>
                         ))}
@@ -280,92 +280,92 @@ export default function PlateCalculator() {
                             </View>
 
                             <ScrollView>
-                            <View className="bg-surface p-4 rounded-xl border border-iron-700 mb-4">
-                                <Text className="text-iron-950 font-bold mb-2">Preferencia</Text>
-                                <TouchableOpacity
-                                    onPress={() => setPreferFewerPlates(!preferFewerPlates)}
-                                    className={`p-3 rounded-xl border ${preferFewerPlates ? 'bg-primary border-primary' : 'bg-white border-iron-200'}`}
-                                    accessibilityRole="button"
-                                    accessibilityLabel="Alternar preferencia de menos discos"
-                                >
-                                    <Text className={`font-bold ${preferFewerPlates ? 'text-white' : 'text-iron-950'}`}>
-                                        {preferFewerPlates ? 'Preferir menos discos (más rápido)' : 'Permitir más discos (más opciones)'}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            <View className="bg-surface p-4 rounded-xl border border-iron-700 mb-4">
-                                <Text className="text-iron-950 font-bold mb-2">Simetría</Text>
-                                <Text className="text-iron-500 text-xs mb-3">La app calcula siempre por pares (1 disco por lado). Un disco suelto no se usa.</Text>
-                                {hasOddCounts && (
+                                <View className="bg-surface p-4 rounded-xl border border-iron-700 mb-4">
+                                    <Text className="text-iron-950 font-bold mb-2">Preferencia</Text>
                                     <TouchableOpacity
-                                        onPress={normalizeToPairs}
-                                        className="p-3 rounded-xl border bg-white border-iron-200 active:bg-iron-200"
+                                        onPress={() => setPreferFewerPlates(!preferFewerPlates)}
+                                        className={`p-3 rounded-xl border ${preferFewerPlates ? 'bg-primary border-primary' : 'bg-white border-iron-200'}`}
                                         accessibilityRole="button"
-                                        accessibilityLabel="Normalizar inventario a pares"
+                                        accessibilityLabel="Alternar preferencia de menos discos"
                                     >
-                                        <Text className="text-iron-950 font-bold">Normalizar a pares</Text>
-                                        <Text className="text-iron-500 text-xs mt-1">Resta 1 a los conteos impares (solo {unit}).</Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-
-                            {inventoryForUnit.map((p, idx) => (
-                                <View key={p.weight} className="flex-row items-center justify-between mb-4 bg-surface p-3 rounded-xl border border-iron-700 elevation-1">
-                                    <View>
-                                        <Text className="text-iron-950 font-bold text-lg">{p.weight} {p.unit}</Text>
-                                        <Text className="text-iron-500 text-xs">
-                                            Pares utilizables: {Math.floor((p.count ?? 0) / 2)} {((p.count ?? 0) % 2 !== 0) ? '· sobra 1' : ''}
+                                        <Text className={`font-bold ${preferFewerPlates ? 'text-white' : 'text-iron-950'}`}>
+                                            {preferFewerPlates ? 'Preferir menos discos (más rápido)' : 'Permitir más discos (más opciones)'}
                                         </Text>
-                                    </View>
-                                    <View className="flex-row items-center gap-4">
-                                        <TouchableOpacity
-                                            onPress={() => updateInventory(p.weight, -2)}
-                                            className="w-10 h-10 bg-iron-200 rounded-full items-center justify-center"
-                                            accessibilityRole="button"
-                                            accessibilityLabel={`Quitar un par de ${p.weight} ${p.unit}`}
-                                        >
-                                            <Text className="text-iron-950 font-bold text-xl">-</Text>
-                                        </TouchableOpacity>
-                                        <Text className="text-iron-950 font-bold text-xl w-10 text-center">{p.count}</Text>
-                                        <TouchableOpacity
-                                            onPress={() => updateInventory(p.weight, 2)}
-                                            className="w-10 h-10 bg-iron-200 rounded-full items-center justify-center"
-                                            accessibilityRole="button"
-                                            accessibilityLabel={`Agregar un par de ${p.weight} ${p.unit}`}
-                                        >
-                                            <Text className="text-iron-950 font-bold text-xl">+</Text>
-                                        </TouchableOpacity>
-                                    </View>
+                                    </TouchableOpacity>
                                 </View>
-                            ))}
 
-                            {/* Add Custom Plate View */}
-                            <View className="mt-4 pt-4 border-t border-iron-200">
-                                <Text className="text-iron-950 font-bold mb-2">Agregar disco</Text>
-                                <View className="flex-row gap-2">
-                                    <TextInput
-                                        className="flex-1 bg-surface text-iron-950 p-3 rounded-lg border border-iron-700"
-                                        placeholder={`Peso (${unit})`}
-                                        placeholderTextColor={Colors.iron[400]}
-                                        keyboardType="numeric"
-                                        onSubmitEditing={(e) => {
-                                            const w = parseFloat(e.nativeEvent.text);
-                                            if (!isNaN(w) && w > 0) {
-                                                const existing = inventory.find((p) => p.weight === w && p.unit === unit && p.type === 'standard');
-                                                const base = existing
-                                                    ? inventory.map((p) => (p.weight === w && p.unit === unit && p.type === 'standard' ? { ...p, count: p.count + 2 } : p))
-                                                    : [...inventory, { weight: w, count: 2, type: 'standard' as any, unit } as any];
-                                                const newInv = base.sort((a, b) => b.weight - a.weight);
-                                                setInventory(newInv);
-                                                settingsService.updatePlateInventory(newInv);
-                                            }
-                                        }}
-                                        accessibilityLabel="Agregar disco personalizado"
-                                    />
+                                <View className="bg-surface p-4 rounded-xl border border-iron-700 mb-4">
+                                    <Text className="text-iron-950 font-bold mb-2">Simetría</Text>
+                                    <Text className="text-iron-500 text-xs mb-3">La app calcula siempre por pares (1 disco por lado). Un disco suelto no se usa.</Text>
+                                    {hasOddCounts && (
+                                        <TouchableOpacity
+                                            onPress={normalizeToPairs}
+                                            className="p-3 rounded-xl border bg-white border-iron-200 active:bg-iron-200"
+                                            accessibilityRole="button"
+                                            accessibilityLabel="Normalizar inventario a pares"
+                                        >
+                                            <Text className="text-iron-950 font-bold">Normalizar a pares</Text>
+                                            <Text className="text-iron-500 text-xs mt-1">Resta 1 a los conteos impares (solo {unit}).</Text>
+                                        </TouchableOpacity>
+                                    )}
                                 </View>
-                                <Text className="text-iron-500 text-xs mt-2">Escribe el peso y presiona Enter. Se agrega como par (2 discos).</Text>
-                            </View>
+
+                                {inventoryForUnit.map((p, idx) => (
+                                    <View key={p.weight} className="flex-row items-center justify-between mb-4 bg-surface p-3 rounded-xl border border-iron-700 elevation-1">
+                                        <View>
+                                            <Text className="text-iron-950 font-bold text-lg">{p.weight} {p.unit}</Text>
+                                            <Text className="text-iron-500 text-xs">
+                                                Pares utilizables: {Math.floor((p.count ?? 0) / 2)} {((p.count ?? 0) % 2 !== 0) ? '· sobra 1' : ''}
+                                            </Text>
+                                        </View>
+                                        <View className="flex-row items-center gap-4">
+                                            <TouchableOpacity
+                                                onPress={() => updateInventory(p.weight, -2)}
+                                                className="w-10 h-10 bg-iron-200 rounded-full items-center justify-center"
+                                                accessibilityRole="button"
+                                                accessibilityLabel={`Quitar un par de ${p.weight} ${p.unit}`}
+                                            >
+                                                <Text className="text-iron-950 font-bold text-xl">-</Text>
+                                            </TouchableOpacity>
+                                            <Text className="text-iron-950 font-bold text-xl w-10 text-center">{p.count}</Text>
+                                            <TouchableOpacity
+                                                onPress={() => updateInventory(p.weight, 2)}
+                                                className="w-10 h-10 bg-iron-200 rounded-full items-center justify-center"
+                                                accessibilityRole="button"
+                                                accessibilityLabel={`Agregar un par de ${p.weight} ${p.unit}`}
+                                            >
+                                                <Text className="text-iron-950 font-bold text-xl">+</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                ))}
+
+                                {/* Add Custom Plate View */}
+                                <View className="mt-4 pt-4 border-t border-iron-200">
+                                    <Text className="text-iron-950 font-bold mb-2">Agregar disco</Text>
+                                    <View className="flex-row gap-2">
+                                        <TextInput
+                                            className="flex-1 bg-surface text-iron-950 p-3 rounded-lg border border-iron-700"
+                                            placeholder={`Peso (${unit})`}
+                                            placeholderTextColor={Colors.iron[400]}
+                                            keyboardType="numeric"
+                                            onSubmitEditing={(e) => {
+                                                const w = parseFloat(e.nativeEvent.text);
+                                                if (!isNaN(w) && w > 0) {
+                                                    const existing = inventory.find((p) => p.weight === w && p.unit === unit && p.type === 'standard');
+                                                    const base = existing
+                                                        ? inventory.map((p) => (p.weight === w && p.unit === unit && p.type === 'standard' ? { ...p, count: p.count + 2 } : p))
+                                                        : [...inventory, { weight: w, count: 2, type: 'standard' as any, unit } as any];
+                                                    const newInv = base.sort((a, b) => b.weight - a.weight);
+                                                    setInventory(newInv);
+                                                    settingsService.updatePlateInventory(newInv);
+                                                }
+                                            }}
+                                            accessibilityLabel="Agregar disco personalizado"
+                                        />
+                                    </View>
+                                    <Text className="text-iron-500 text-xs mt-2">Escribe el peso y presiona Enter. Se agrega como par (2 discos).</Text>
+                                </View>
                             </ScrollView>
                         </View>
                     </SafeAreaView>

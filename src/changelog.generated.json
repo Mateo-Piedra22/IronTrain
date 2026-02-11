@@ -1,16 +1,22 @@
 {
-  "generatedAt": "2026-01-16T12:41:26.166Z",
+  "generatedAt": "2026-02-11T03:10:24.832Z",
   "source": "docs/CHANGELOG.md",
   "releases": [
     {
-      "version": "1.4.0",
+      "version": "1.3.3",
       "date": null,
       "unreleased": true,
       "items": [
-        "Soporte para múltiples temas (claro/oscuro).",
-        "Soporte para diferentes idiomas (inglés/español).",
-        "Conexión con múltiples dispositivos (relojes/bands compatibles).",
-        "Vinculación con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos."
+        "Placeholder: describir cambios nuevos antes del próximo release."
+      ]
+    },
+    {
+      "version": "1.3.2",
+      "date": "2026-02-11",
+      "unreleased": false,
+      "items": [
+        "Rework del IntervalTimer.",
+        "Mejora del calculo de discos."
       ]
     },
     {
