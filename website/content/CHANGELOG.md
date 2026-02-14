@@ -1,10 +1,18 @@
 # Changelog
 
-## 1.3.3 (Unreleased)
-- Placeholder: describir cambios nuevos antes del próximo release.
+## 1.4.0 (Unreleased)
+- Soporte para múltiples temas (claro/oscuro).
+- Soporte para diferentes idiomas (inglés/español).
+- Conexión con múltiples dispositivos (relojes/bands compatibles).
+- Vinculación con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos.
+
+## 1.3.3 (2026-02-14)
+- Se corrigió el problema de que no se mostraran volúmenes incorrectos en análisis.
+- Se corrigió un espaciado en el modal de "Interval Timer".
+- Se pulió el sistema de actualizaciones.
 
 ## 1.3.2 (2026-02-11)
-- Rework del IntervalTimer.
+- Rework del Interval Timer.
 - Mejora del calculo de discos.
 
 ## 1.3.1 (2026-01-16)

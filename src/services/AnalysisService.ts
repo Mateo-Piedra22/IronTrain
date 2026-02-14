@@ -173,7 +173,11 @@ export class AnalysisService {
             FROM workouts w
             JOIN workout_sets s ON s.workout_id = w.id
             JOIN exercises e ON e.id = s.exercise_id
-            WHERE w.status = 'completed' AND s.completed = 1 AND e.type = 'weight_reps'
+            WHERE w.status = 'completed' 
+            AND s.completed = 1 
+            AND e.type = 'weight_reps'
+            AND s.weight < 1000
+            AND s.reps < 500
             GROUP BY w.id
             ORDER BY w.date ASC
             LIMIT 7
@@ -199,7 +203,12 @@ export class AnalysisService {
                 FROM workout_sets s
                 JOIN workouts w ON s.workout_id = w.id
                 JOIN exercises e ON e.id = s.exercise_id
-                WHERE w.status = 'completed' AND w.date > ? AND s.completed = 1 AND e.type = 'weight_reps'
+                WHERE w.status = 'completed' 
+                AND w.date > ? 
+                AND s.completed = 1 
+                AND e.type = 'weight_reps'
+                AND s.weight < 1000 -- Guard against typos/outliers
+                AND s.reps < 500 -- Guard against typos/outliers
             `,
             [cutoffMs]
         );
@@ -420,7 +429,13 @@ export class AnalysisService {
                 SELECT w.date as date, COALESCE(SUM(s.weight * s.reps), 0) as volume
                 FROM workouts w
                 JOIN workout_sets s ON s.workout_id = w.id
-                WHERE w.status = 'completed' AND w.date > ? AND s.completed = 1
+                JOIN exercises e ON s.exercise_id = e.id
+                WHERE w.status = 'completed' 
+                AND w.date > ? 
+                AND s.completed = 1
+                AND e.type = 'weight_reps' -- Strict type check
+                AND s.weight < 1000
+                AND s.reps < 500
                 GROUP BY w.id
                 ORDER BY w.date ASC
             `,

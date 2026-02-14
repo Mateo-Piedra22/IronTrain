@@ -67,7 +67,13 @@ export class UpdateService {
         const installedVersion = String((Constants.expoConfig as any)?.version ?? '0.0.0');
 
         try {
-            const res = await fetch(feedUrl, { method: 'GET' });
+            const url = new URL(feedUrl);
+            url.searchParams.append('t', Date.now().toString());
+
+            const res = await fetch(url.toString(), {
+                method: 'GET',
+                headers: { 'Cache-Control': 'no-cache' }
+            });
             if (!res.ok) return { status: 'error', message: `HTTP ${res.status}` };
             const data = (await res.json()) as UpdateFeed;
 

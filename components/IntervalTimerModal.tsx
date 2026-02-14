@@ -357,33 +357,39 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
 
                     {/* Steppers */}
                     <View className="flex-1 px-5 pt-6">
-                        <View className="flex-row justify-between mb-8">
-                            <Stepper
-                                value={workSec}
-                                onChange={setWorkSec}
-                                min={5}
-                                max={600}
-                                step={5}
-                                label="Trabajo"
-                                formatFn={formatTime}
-                            />
-                            <Stepper
-                                value={restSec}
-                                onChange={setRestSec}
-                                min={0}
-                                max={300}
-                                step={5}
-                                label="Descanso"
-                                formatFn={formatTime}
-                            />
-                            <Stepper
-                                value={rounds}
-                                onChange={setRounds}
-                                min={1}
-                                max={50}
-                                step={1}
-                                label="Rondas"
-                            />
+                        <View className="flex-row flex-wrap justify-between gap-y-6 mb-8">
+                            <View className="w-[48%] items-center">
+                                <Stepper
+                                    value={workSec}
+                                    onChange={setWorkSec}
+                                    min={5}
+                                    max={600}
+                                    step={5}
+                                    label="Trabajo"
+                                    formatFn={formatTime}
+                                />
+                            </View>
+                            <View className="w-[48%] items-center">
+                                <Stepper
+                                    value={restSec}
+                                    onChange={setRestSec}
+                                    min={0}
+                                    max={300}
+                                    step={5}
+                                    label="Descanso"
+                                    formatFn={formatTime}
+                                />
+                            </View>
+                            <View className="w-full items-center">
+                                <Stepper
+                                    value={rounds}
+                                    onChange={setRounds}
+                                    min={1}
+                                    max={50}
+                                    step={1}
+                                    label="Rondas"
+                                />
+                            </View>
                         </View>
 
                         {/* Work/Rest visualization */}
