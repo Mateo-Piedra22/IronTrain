@@ -5,8 +5,9 @@ import * as Linking from 'expo-linking';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { AlertTriangle, Download } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -15,7 +16,8 @@ import { TimerOverlay } from '../components/TimerOverlay';
 import '../global.css';
 import { configService } from '../src/services/ConfigService';
 import { dbService } from '../src/services/DatabaseService';
-import { UpdateService } from '../src/services/UpdateService';
+import { updateService } from '../src/services/UpdateService';
+import { useUpdateStore } from '../src/store/updateStore';
 
 /**
  * IronTrain Entry Point
@@ -77,45 +79,83 @@ export default function RootLayout() {
     hideSplash();
   }, [fontsLoaded, fontError, dbInitialized]);
 
+  // Initialize Update Service
   useEffect(() => {
-    const ready = (fontsLoaded || !!fontError) && dbInitialized;
-    if (!ready) return;
-    if (updatePromptShown.current) return;
-    updatePromptShown.current = true;
+    updateService.init();
+  }, []);
 
-    const timeoutId = setTimeout(() => {
-      void (async () => {
-        const result = await UpdateService.checkForUpdate();
-        if (result.status !== 'update_available') return;
+  // Monitor Update Status (Blocking & Notifications)
+  const updateStatus = useUpdateStore((state) => state.status);
+  const installedVersion = useUpdateStore((state) => state.installedVersion);
+  const latestVersion = useUpdateStore((state) => state.latestVersion);
+  const downloadUrl = useUpdateStore((state) => state.downloadUrl);
+  const notesUrl = useUpdateStore((state) => state.notesUrl);
 
-        Alert.alert(
-          'Actualización disponible',
-          `Hay una nueva versión (v${result.latestVersion}).`,
-          [
-            { text: 'Más tarde', style: 'cancel' },
-            {
-              text: 'Descargar',
-              onPress: async () => {
-                const url = result.downloadUrl ?? result.downloadsPageUrl ?? result.notesUrl;
-                if (!url) return;
-                try {
-                  await Linking.openURL(url);
-                } catch {
-                  Alert.alert('Error', 'No se pudo abrir el enlace.');
-                }
-              }
+  const updateInfo = {
+    installedVersion,
+    latestVersion,
+    downloadUrl,
+    notesUrl,
+    downloadsPageUrl: downloadUrl // fallback
+  };
+
+  useEffect(() => {
+    if (updateStatus === 'update_available' && !updatePromptShown.current) {
+      updatePromptShown.current = true;
+      Alert.alert(
+        'Actualización disponible',
+        `Una nueva versión (${updateInfo.latestVersion}) está lista para descargar.`,
+        [
+          { text: 'Más tarde', style: 'cancel' },
+          {
+            text: 'Actualizar',
+            onPress: () => {
+              const url = updateInfo.downloadUrl ?? updateInfo.notesUrl;
+              if (url) Linking.openURL(url);
             }
-          ]
-        );
-      })();
-    }, 900);
-
-    return () => clearTimeout(timeoutId);
-  }, [fontsLoaded, fontError, dbInitialized]);
+          }
+        ]
+      );
+    }
+  }, [updateStatus, updateInfo]);
 
   // Render Loading Fallback (shouldn't be visible due to Splash Screen, but safe guard)
   if ((!fontsLoaded && !fontError) || !dbInitialized) {
     return null;
+  }
+
+  // FORCE UPDATE BLOCKING SCREEN
+  if (updateStatus === 'deprecated') {
+    return (
+      <SafeAreaProvider>
+        <View className="flex-1 bg-iron-900 items-center justify-center p-6">
+          <StatusBar style="light" />
+          <View className="items-center mb-8">
+            <AlertTriangle size={64} color={Colors.primary.DEFAULT} />
+            <Text className="text-iron-950 text-2xl font-bold mt-4 text-center">
+              Actualización Requerida
+            </Text>
+            <Text className="text-iron-600 text-center mt-2 px-4">
+              Tu versión de IronTrain es demasiado antigua y ya no es compatible. Por favor, actualiza para continuar.
+            </Text>
+            <Text className="text-iron-500 text-xs mt-4 font-mono">
+              v{updateInfo.installedVersion} {'->'} v{updateInfo.latestVersion}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => {
+              const url = updateInfo.downloadUrl ?? updateInfo.notesUrl;
+              if (url) Linking.openURL(url);
+            }}
+            className="bg-primary w-full py-4 rounded-xl flex-row items-center justify-center gap-2"
+          >
+            <Download size={20} color="white" />
+            <Text className="text-white font-bold text-lg">Descargar Actualización</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaProvider>
+    );
   }
 
   return (

@@ -1,20 +1,45 @@
-import { eachDayOfInterval, format, getDay, subDays } from 'date-fns';
 import { Colors } from '@/src/theme';
-import React, { useMemo } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { eachDayOfInterval, endOfWeek, format, isSameDay, startOfWeek, subDays } from 'date-fns';
+import { es } from 'date-fns/locale';
+import * as Haptics from 'expo-haptics';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 interface ConsistencyHeatmapProps {
     timestamps: number[];
 }
 
 export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
-    const today = new Date();
-    // Generate last 365 days
-    const days = useMemo(() => {
-        return eachDayOfInterval({
-            start: subDays(today, 364),
-            end: today
+    const [selectedDate, setSelectedDate] = useState<{ date: Date; count: number } | null>(null);
+    const scrollViewRef = useRef<ScrollView>(null);
+
+    const weeks = useMemo(() => {
+        const today = new Date();
+        const start = subDays(today, 364);
+
+        // Ensure we cover full weeks starting on Monday
+        const alignedStart = startOfWeek(start, { weekStartsOn: 1 });
+        const alignedEnd = endOfWeek(today, { weekStartsOn: 1 });
+
+        const allDays = eachDayOfInterval({ start: alignedStart, end: alignedEnd });
+
+        const weeksArray: Date[][] = [];
+        let currentWeek: Date[] = [];
+
+        allDays.forEach((day, index) => {
+            currentWeek.push(day);
+            if (currentWeek.length === 7) {
+                weeksArray.push(currentWeek);
+                currentWeek = [];
+            }
         });
+
+        // Push any remaining partial week (though logic ensures alignment)
+        if (currentWeek.length > 0) {
+            weeksArray.push(currentWeek);
+        }
+
+        return weeksArray;
     }, []);
 
     const countMap = useMemo(() => {
@@ -26,96 +51,205 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
         return map;
     }, [timestamps]);
 
-    const getCellColor = (date: Date) => {
-        const key = format(date, 'yyyy-MM-dd');
-        const count = countMap.get(key) ?? 0;
-        if (count <= 0) return Colors.iron[700];
+    const getCellColor = (count: number, isSelected: boolean) => {
+        if (isSelected) return Colors.iron[950]; // Dark selection
+        if (count === 0) return Colors.iron[300]; // Darker empty cell (as requested)
         if (count === 1) return Colors.primary.light;
         if (count === 2) return Colors.primary.DEFAULT;
         return Colors.primary.dark;
     };
 
-    // We render 53 columns.
-    // Each column has 7 cells.
-    // We need to pad the start so the first day aligns correctly to the day of week.
-
-    const Grid = () => {
-        const startDate = days[0];
-        const startDayOfWeek = getDay(startDate) === 0 ? 6 : getDay(startDate) - 1; // 0=Mon
-
-        const totalDays = days.length + startDayOfWeek;
-        const totalWeeks = Math.ceil(totalDays / 7);
-
-        const grid = [];
-        let dayIndex = 0;
-
-        for (let w = 0; w < totalWeeks; w++) {
-            const weekColumn = [];
-            for (let d = 0; d < 7; d++) {
-                // Check if valid day
-                const currentGridIndex = w * 7 + d;
-                if (currentGridIndex < startDayOfWeek || dayIndex >= days.length) {
-                    weekColumn.push(null);
-                } else {
-                    weekColumn.push(days[dayIndex]);
-                    dayIndex++;
-                }
-            }
-            grid.push(weekColumn);
+    // Auto-scroll to end (Today)
+    useEffect(() => {
+        if (scrollViewRef.current) {
+            // Small timeout to allow layout compilation
+            setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 100);
         }
-
-        return (
-            <View className="flex-row gap-1">
-                {grid.map((week, wIndex) => (
-                    <View key={wIndex} className="gap-1">
-                        {week.map((day, dIndex) => (
-                            <View
-                                key={dIndex}
-                                className="w-3 h-3 rounded-sm"
-                                style={{
-                                    backgroundColor: day ? getCellColor(day) : 'transparent'
-                                }}
-                            />
-                        ))}
-                    </View>
-                ))}
-            </View>
-        );
-    };
+    }, [weeks]);
 
     return (
-        <View className="bg-surface border border-iron-700 p-4 rounded-xl">
-            <View className="flex-row justify-between mb-4">
-                <Text className="text-iron-950 font-bold text-lg">Consistencia (1 año)</Text>
-                <Text className="text-iron-500 text-xs font-bold">{timestamps.length} entrenamientos · {countMap.size} días</Text>
+        <View style={styles.container}>
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.title}>Consistencia (último año)</Text>
+                    <Text style={styles.subtitle}>
+                        {timestamps.length} entrenamientos en {countMap.size} días activos
+                    </Text>
+                </View>
+                {selectedDate && (
+                    <View style={styles.tooltip}>
+                        <Text style={styles.tooltipDate}>
+                            {format(selectedDate.date, 'd MMM', { locale: es })}
+                        </Text>
+                        <Text style={styles.tooltipCount}>
+                            {selectedDate.count === 1 ? '1 sesión' : `${selectedDate.count} sesiones`}
+                        </Text>
+                    </View>
+                )}
             </View>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-2 px-2">
-                <View className="flex-row">
-                    {/* Day Labels (Mon, Wed, Fri) */}
-                    <View className="justify-between mr-2 py-1">
-                        <Text className="text-[9px] text-iron-500 h-3">Lun</Text>
-                        <View className="h-3" />
-                        <Text className="text-[9px] text-iron-500 h-3">Mié</Text>
-                        <View className="h-3" />
-                        <Text className="text-[9px] text-iron-500 h-3">Vie</Text>
-                        <View className="h-3" />
+            <ScrollView
+                ref={scrollViewRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+            >
+                <View style={styles.grid}>
+                    <View style={styles.labels}>
+                        <Text style={styles.dayLabel}>Lun</Text>
+                        <View style={styles.dayGap} />
+                        <Text style={styles.dayLabel}>Mié</Text>
+                        <View style={styles.dayGap} />
+                        <Text style={styles.dayLabel}>Vie</Text>
                     </View>
 
-                    <Grid />
+                    {weeks.map((week, wIndex) => (
+                        <View key={wIndex} style={styles.weekColumn}>
+                            <View style={styles.monthLabelContainer}>
+                                {/* Show label if Monday is the start of the month (roughly) */}
+                                {week[0].getDate() <= 7 && (
+                                    <Text style={styles.monthLabel}>
+                                        {format(week[0], 'MMM', { locale: es })}
+                                    </Text>
+                                )}
+                            </View>
+
+                            {week.map((day, dIndex) => {
+                                const key = format(day, 'yyyy-MM-dd');
+                                const count = countMap.get(key) ?? 0;
+                                const isSelected = selectedDate ? isSameDay(day, selectedDate.date) : false;
+
+                                return (
+                                    <Pressable
+                                        key={dIndex}
+                                        onPress={() => {
+                                            Haptics.selectionAsync();
+                                            setSelectedDate({ date: day, count });
+                                        }}
+                                        style={[
+                                            styles.cell,
+                                            { backgroundColor: getCellColor(count, isSelected) }
+                                        ]}
+                                    />
+                                );
+                            })}
+                        </View>
+                    ))}
                 </View>
             </ScrollView>
 
-            <View className="flex-row items-center justify-between mt-4">
-                <Text className="text-iron-500 text-xs font-bold">Menos</Text>
-                <View className="flex-row items-center gap-2">
-                    <View className="w-3 h-3 rounded-sm" style={{ backgroundColor: Colors.iron[700] }} />
-                    <View className="w-3 h-3 rounded-sm" style={{ backgroundColor: Colors.primary.light }} />
-                    <View className="w-3 h-3 rounded-sm" style={{ backgroundColor: Colors.primary.DEFAULT }} />
-                    <View className="w-3 h-3 rounded-sm" style={{ backgroundColor: Colors.primary.dark }} />
-                </View>
-                <Text className="text-iron-500 text-xs font-bold">Más</Text>
+            <View style={styles.legend}>
+                <Text style={styles.legendLabel}>Menos</Text>
+                <View style={[styles.cell, { backgroundColor: Colors.iron[300] }]} />
+                <View style={[styles.cell, { backgroundColor: Colors.primary.light }]} />
+                <View style={[styles.cell, { backgroundColor: Colors.primary.DEFAULT }]} />
+                <View style={[styles.cell, { backgroundColor: Colors.primary.dark }]} />
+                <Text style={styles.legendLabel}>Más</Text>
             </View>
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        backgroundColor: Colors.surface,
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
+        padding: 16,
+        borderRadius: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+        marginBottom: 16,
+    },
+    title: {
+        color: Colors.iron[950],
+        fontWeight: 'bold',
+        fontSize: 18,
+    },
+    subtitle: {
+        color: Colors.iron[500],
+        fontSize: 12,
+        marginTop: 2,
+    },
+    tooltip: {
+        alignItems: 'flex-end',
+        backgroundColor: Colors.iron[100],
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: Colors.iron[200],
+    },
+    tooltipDate: {
+        color: Colors.iron[900],
+        fontSize: 10,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
+    tooltipCount: {
+        color: Colors.primary.DEFAULT,
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    scrollContent: {
+        paddingRight: 8,
+    },
+    grid: {
+        flexDirection: 'row',
+        gap: 3, // Tighter gap
+    },
+    labels: {
+        justifyContent: 'space-between',
+        paddingVertical: 3, // Align with cells + gaps
+        marginRight: 6,
+        marginTop: 16, // Offset for month labels
+    },
+    dayLabel: {
+        fontSize: 9,
+        color: Colors.iron[400],
+        height: 10,
+        fontWeight: '600',
+    },
+    dayGap: {
+        height: 10 + 3, // cell height + gap
+    },
+    weekColumn: {
+        gap: 3,
+    },
+    monthLabelContainer: {
+        height: 12,
+        marginBottom: 4,
+        justifyContent: 'flex-end',
+    },
+    monthLabel: {
+        fontSize: 9,
+        color: Colors.iron[500],
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
+    cell: {
+        width: 10,
+        height: 10,
+        borderRadius: 2,
+    },
+    legend: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        marginTop: 12,
+        gap: 6,
+    },
+    legendLabel: {
+        color: Colors.iron[400],
+        fontSize: 10,
+        fontWeight: '600',
+    }
+});

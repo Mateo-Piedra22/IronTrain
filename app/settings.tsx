@@ -4,7 +4,8 @@ import { backupService } from '@/src/services/BackupService';
 import { ChangelogService } from '@/src/services/ChangelogService';
 import { AppConfig, configService } from '@/src/services/ConfigService';
 import { dbService } from '@/src/services/DatabaseService';
-import { UpdateCheckResult, UpdateService } from '@/src/services/UpdateService';
+import { updateService } from '@/src/services/UpdateService';
+import { useUpdateStore } from '@/src/store/updateStore';
 import { Colors } from '@/src/theme';
 import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
@@ -30,13 +31,31 @@ export default function SettingsScreen() {
     const [preferFewerPlates, setPreferFewerPlates] = useState(true);
     const [roundKg, setRoundKg] = useState(2.5);
     const [roundLbs, setRoundLbs] = useState(5);
+
     const [rmFormula, setRmFormula] = useState<AppConfig['calculatorsDefault1RMFormula']>('epley');
-    const [updateStatus, setUpdateStatus] = useState<UpdateCheckResult>({ status: 'disabled' });
-    const [checkingUpdate, setCheckingUpdate] = useState(false);
+
+    // Update Store
+    const updateStatus = useUpdateStore((state) => state.status);
+    const installedVersionStr = useUpdateStore((state) => state.installedVersion);
+    const latestVersion = useUpdateStore((state) => state.latestVersion);
+    const releaseDate = useUpdateStore((state) => state.releaseDate);
+    const updateError = useUpdateStore((state) => state.error);
+    const downloadUrl = useUpdateStore((state) => state.downloadUrl);
+    const notesUrl = useUpdateStore((state) => state.notesUrl);
+    const lastChecked = useUpdateStore((state) => state.lastChecked);
+
+    const updateInfo = {
+        installedVersion: installedVersionStr,
+        latestVersion,
+        date: releaseDate,
+        error: updateError,
+        downloadUrl,
+        notesUrl,
+        lastChecked
+    };
 
     useEffect(() => {
         loadSettings();
-        checkUpdates();
     }, []);
 
     const loadSettings = async () => {
@@ -54,13 +73,7 @@ export default function SettingsScreen() {
     };
 
     const checkUpdates = async () => {
-        setCheckingUpdate(true);
-        try {
-            const result = await UpdateService.checkForUpdate();
-            setUpdateStatus(result);
-        } finally {
-            setCheckingUpdate(false);
-        }
+        await updateService.checkForUpdate();
     };
 
     const saveSetting = async <K extends keyof AppConfig>(key: K, value: AppConfig[K]) => {
@@ -171,7 +184,7 @@ export default function SettingsScreen() {
                             <Text className="text-iron-950 font-semibold">Descanso por defecto</Text>
                         </View>
                         <View className="flex-row items-center">
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 onPress={() => saveSetting('defaultRestTimer', Math.max(0, defaultTimer - 30))}
                                 className="w-8 h-8 bg-iron-200 rounded-full items-center justify-center mr-2"
                                 accessibilityRole="button"
@@ -180,7 +193,7 @@ export default function SettingsScreen() {
                                 <Text className="font-bold">-</Text>
                             </TouchableOpacity>
                             <Text className="text-iron-950 mr-2 font-bold w-8 text-center">{defaultTimer}s</Text>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 onPress={() => saveSetting('defaultRestTimer', defaultTimer + 30)}
                                 className="w-8 h-8 bg-iron-200 rounded-full items-center justify-center"
                                 accessibilityRole="button"
@@ -405,22 +418,25 @@ export default function SettingsScreen() {
                 <View className="bg-surface rounded-xl overflow-hidden border border-iron-700 elevation-1">
                     <View className="p-4 border-b border-iron-200">
                         <Text className="text-iron-950 font-semibold">Estado</Text>
-                        {updateStatus.status === 'disabled' ? (
-                            <Text className="text-iron-500 text-xs mt-1">Configura `extra.updateFeedUrl` para habilitar comprobación.</Text>
-                        ) : updateStatus.status === 'error' ? (
-                            <Text className="text-iron-500 text-xs mt-1">No se pudo comprobar: {updateStatus.message}</Text>
-                        ) : updateStatus.status === 'up_to_date' ? (
-                            <Text className="text-iron-500 text-xs mt-1">Estás al día (v{updateStatus.installedVersion}).</Text>
-                        ) : updateStatus.status === 'update_pending' ? (
+                        {updateStatus === 'idle' || updateStatus === 'error' ? (
                             <Text className="text-iron-500 text-xs mt-1">
-                                Update pendiente: v{updateStatus.latestVersion}
-                                {updateStatus.date ? ` · ${updateStatus.date}` : ''}
-                                {' · APK aún no está listo.'}
+                                {updateStatus === 'error' && updateInfo.error
+                                    ? `Error: ${updateInfo.error}`
+                                    : `Instalada: v${updateInfo.installedVersion}`}
                             </Text>
+                        ) : updateStatus === 'checking' ? (
+                            <Text className="text-iron-500 text-xs mt-1">Buscando actualizaciones...</Text>
+                        ) : updateStatus === 'up_to_date' ? (
+                            <Text className="text-iron-500 text-xs mt-1">Estás al día (v{updateInfo.installedVersion}).</Text>
                         ) : (
                             <Text className="text-iron-500 text-xs mt-1">
-                                Actualización disponible: v{updateStatus.latestVersion}
-                                {updateStatus.date ? ` · ${updateStatus.date}` : ''}
+                                {updateStatus === 'update_pending' ? 'Actualización detectada' : 'Actualización disponible'}: v{updateInfo.latestVersion}
+                                {updateInfo.date ? ` · ${updateInfo.date}` : ''}
+                            </Text>
+                        )}
+                        {updateInfo.lastChecked && (
+                            <Text className="text-iron-400 text-[10px] mt-1">
+                                Última comprobación: {new Date(updateInfo.lastChecked).toLocaleTimeString()}
                             </Text>
                         )}
                     </View>
@@ -429,25 +445,22 @@ export default function SettingsScreen() {
                         <View className="flex-1">
                             <TouchableOpacity
                                 onPress={checkUpdates}
-                                disabled={checkingUpdate || updateStatus.status === 'disabled'}
-                                className={`bg-white border border-iron-200 rounded-xl p-4 items-center ${checkingUpdate || updateStatus.status === 'disabled' ? 'opacity-60' : ''}`}
+                                disabled={updateStatus === 'checking'}
+                                className={`bg-white border border-iron-200 rounded-xl p-4 items-center ${updateStatus === 'checking' ? 'opacity-60' : ''}`}
                                 accessibilityRole="button"
                                 accessibilityLabel="Buscar actualizaciones"
                             >
-                                <Text className="text-iron-950 font-bold">{checkingUpdate ? 'Buscando...' : 'Buscar'}</Text>
+                                <Text className="text-iron-950 font-bold">{updateStatus === 'checking' ? 'Buscando...' : 'Buscar'}</Text>
                             </TouchableOpacity>
                         </View>
 
                         <View className="flex-1">
                             <TouchableOpacity
                                 onPress={async () => {
-                                    if (updateStatus.status !== 'update_available' && updateStatus.status !== 'update_pending') return;
-                                    const url =
-                                        updateStatus.status === 'update_available'
-                                            ? (updateStatus.downloadUrl ?? updateStatus.downloadsPageUrl ?? updateStatus.notesUrl)
-                                            : (updateStatus.downloadsPageUrl ?? updateStatus.notesUrl);
+                                    if (updateStatus !== 'update_available' && updateStatus !== 'update_pending') return;
+                                    const url = updateInfo.downloadUrl ?? updateInfo.notesUrl;
                                     if (!url) {
-                                        Alert.alert('Sin enlace', 'No hay enlace de descarga configurado.');
+                                        Alert.alert('Sin enlace', 'No hay enlace de descarga disponible.');
                                         return;
                                     }
                                     try {
@@ -456,13 +469,13 @@ export default function SettingsScreen() {
                                         Alert.alert('Error', 'No se pudo abrir el enlace.');
                                     }
                                 }}
-                                disabled={updateStatus.status !== 'update_available' && updateStatus.status !== 'update_pending'}
-                                className={`bg-primary rounded-xl p-4 flex-row items-center justify-center gap-2 ${updateStatus.status !== 'update_available' && updateStatus.status !== 'update_pending' ? 'opacity-60' : ''}`}
+                                disabled={updateStatus !== 'update_available' && updateStatus !== 'update_pending'}
+                                className={`bg-primary rounded-xl p-4 flex-row items-center justify-center gap-2 ${updateStatus !== 'update_available' && updateStatus !== 'update_pending' ? 'opacity-60' : ''}`}
                                 accessibilityRole="button"
                                 accessibilityLabel="Abrir descarga"
                             >
                                 <Download size={18} color="white" />
-                                <Text className="text-white font-bold">{updateStatus.status === 'update_pending' ? 'Ver descargas' : 'Descargar'}</Text>
+                                <Text className="text-white font-bold">{updateStatus === 'update_pending' ? 'Ver notas' : 'Descargar'}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
