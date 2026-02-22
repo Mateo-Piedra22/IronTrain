@@ -3,9 +3,20 @@
 # 1. Add Android Tools to Path (Session Only)
 Write-Host "Configuring Android Environment..."
 $base = $env:LOCALAPPDATA
-$platformTools = "$base\Android\Sdk\platform-tools"
-$emulator = "$base\Android\Sdk\emulator"
-$env:Path = "$platformTools;$emulator;$env:Path"
+$androidSdk = "$base\Android\Sdk"
+$platformTools = "$androidSdk\platform-tools"
+$emulator = "$androidSdk\emulator"
+
+# Inject Android SDK and Studio's bundled JDK so Gradle can compile the native modules
+$env:ANDROID_HOME = $androidSdk
+$studioJbr = "C:\Program Files\Android\Android Studio\jbr"
+if (Test-Path $studioJbr) {
+    $env:JAVA_HOME = $studioJbr
+    $env:Path = "$studioJbr\bin;$platformTools;$emulator;$env:Path"
+}
+else {
+    $env:Path = "$platformTools;$emulator;$env:Path"
+}
 
 # 2. Check/Start Emulator
 Write-Host "Checking Emulator..."
@@ -13,7 +24,8 @@ $running = Get-Process emulator -ErrorAction SilentlyContinue
 if (-not $running) {
     Write-Host "   Starting 'Medium_Phone_API_36.1'..."
     Start-Process emulator -ArgumentList "-avd Medium_Phone_API_36.1" -NoNewWindow
-} else {
+}
+else {
     Write-Host "   Emulator already running."
 }
 
@@ -52,6 +64,6 @@ while ((Get-Date) -lt $bootDeadline) {
     Start-Sleep -Seconds 5
 }
 
-# 4. Start Expo
-Write-Host "Starting IronTrain..."
-npx expo start --android
+# 4. Start Expo (Native Dev Client required for Notifee)
+Write-Host "Starting IronTrain (Native Build)..."
+npx expo run:android

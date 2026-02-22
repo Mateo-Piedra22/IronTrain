@@ -1,0 +1,271 @@
+.motiona-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  display: inline-block;
+  opacity: 0.7;
+}
+
+.motiona-label::before {
+  content: '[ ';
+}
+
+.motiona-label::after {
+  content: ' ]';
+}
+
+.motiona-hero-title {
+  font-size: var(--text-hero);
+  line-height: var(--leading-none);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  color: var(--ink);
+}
+
+.motiona-section-heading {
+  font-size: var(--text-5xl);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  color: var(--ink);
+}
+
+@media (max-width: 768px) {
+  .motiona-section-heading {
+    font-size: var(--text-4xl);
+  }
+}
+
+.motiona-subtitle {
+  font-size: var(--text-xl);
+  line-height: var(--leading-normal);
+  color: var(--muted);
+}
+
+.motiona-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  background-color: var(--ink);
+  color: var(--bg-color);
+  border: 1px solid var(--line-color);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.motiona-card {
+  background-color: var(--panel-color);
+  border: 1px solid var(--line-color);
+  padding: var(--space-6);
+}
+
+.motiona-panel {
+  border: 1px solid var(--line-color);
+  background-color: var(--panel-color);
+  padding: var(--space-5);
+}
+
+.motiona-btn-primary {
+  padding: var(--space-4) var(--space-6);
+  background-color: var(--accent);
+  color: white;
+  border: 1px solid var(--line-color);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  transition: transform var(--transition-base);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.motiona-btn-primary:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 0 var(--line-color);
+}
+
+.motiona-btn-primary:active {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 var(--line-color);
+}
+
+.motiona-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.motiona-btn-secondary {
+  padding: var(--space-4) var(--space-6);
+  border: 1px solid var(--line-color);
+  background-color: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  transition: all var(--transition-base);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.motiona-btn-secondary:hover {
+  background-color: var(--ink);
+  color: var(--bg-color);
+}
+
+.motiona-input {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background-color: white;
+  border: 1px solid var(--line-color);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.motiona-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.motiona-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--panel-color);
+}
+
+.motiona-input::placeholder {
+  color: var(--muted-2);
+  opacity: 0.6;
+}
+
+.motiona-input-label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  opacity: 0.7;
+}
+
+.motiona-select {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--panel-color);
+  border: 1px solid var(--line-color);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  outline: none;
+}
+
+.motiona-checkbox {
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid var(--line-color);
+  cursor: pointer;
+  appearance: none;
+  background-color: white;
+  position: relative;
+}
+
+.motiona-checkbox:checked {
+  background-color: var(--ink);
+}
+
+.motiona-checkbox:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.motiona-icon-box {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--line-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--panel-color);
+}
+
+.motiona-avatar-box {
+  border: 1px solid var(--line-color);
+  background-color: var(--panel-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.motiona-feature-list {
+  list-style: none;
+  padding: 0;
+}
+
+.motiona-feature-item {
+  border-top: 1px solid var(--line-color);
+  padding: var(--space-4) 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  font-size: var(--text-sm);
+  transition: all var(--transition-base);
+  cursor: pointer;
+}
+
+.motiona-feature-item:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding-left: var(--space-3);
+}
+
+.motiona-stat {
+  border: 1px solid var(--line-color);
+  background-color: var(--panel-color);
+  padding: var(--space-4);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.motiona-stat .value {
+  font-size: var(--text-4xl);
+  font-weight: bold;
+  margin-bottom: var(--space-2);
+}
+
+.motiona-stat .label {
+  font-size: var(--text-xs);
+  opacity: 0.7;
+}
+
+.motiona-divider {
+  border-top: 1px solid var(--line-color);
+  margin: var(--space-10) 0;
+}
+
+.motiona-gradient-text {
+  color: var(--accent);
+}
+
+.motiona-meta-text {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--muted-2);
+}

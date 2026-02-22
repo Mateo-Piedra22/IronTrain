@@ -1,23 +1,27 @@
+import { ChangelogService } from '@/src/services/ChangelogService';
 import { Colors } from '@/src/theme';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { AlertTriangle, Download } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../components/TimerOverlay';
 import { TimerOverlay } from '../components/TimerOverlay';
+import { GlobalBanner } from '../components/ui/GlobalBanner';
+import { ToastContainer } from '../components/ui/ToastContainer';
 import '../global.css';
 import { configService } from '../src/services/ConfigService';
 import { dbService } from '../src/services/DatabaseService';
 import { updateService } from '../src/services/UpdateService';
 import { useUpdateStore } from '../src/store/updateStore';
+import { notify } from '../src/utils/notify';
 
 /**
  * IronTrain Entry Point
@@ -48,6 +52,7 @@ const IronTrainTheme = {
 };
 
 export default function RootLayout() {
+  const router = useRouter();
   const [dbInitialized, setDbInitialized] = useState(false);
   const updatePromptShown = useRef(false);
   const [fontsLoaded, fontError] = useFonts({
@@ -68,6 +73,26 @@ export default function RootLayout() {
     }
     initInfo();
   }, []);
+
+  // What's new proactive banner
+  useEffect(() => {
+    if (dbInitialized) {
+      const currentVersion = ChangelogService.getAppVersion();
+      const lastAppVersion = configService.get('lastViewedChangelogVersion') || '0.0.0';
+      if (lastAppVersion !== '0.0.0' && currentVersion !== lastAppVersion) {
+        notify.banner(
+          `¡Actualizado a v${currentVersion}! Toca para ver qué hay de nuevo. 🎉`,
+          'success',
+          'Novedades',
+          () => router.push('/changelog'),
+          true
+        );
+      }
+      if (lastAppVersion !== currentVersion) {
+        configService.set('lastViewedChangelogVersion', currentVersion);
+      }
+    }
+  }, [dbInitialized, router]);
 
   // Splash Screen Hiding Logic
   useEffect(() => {
@@ -102,19 +127,14 @@ export default function RootLayout() {
   useEffect(() => {
     if (updateStatus === 'update_available' && !updatePromptShown.current) {
       updatePromptShown.current = true;
-      Alert.alert(
-        'Actualización disponible',
-        `Una nueva versión (${updateInfo.latestVersion}) está lista para descargar.`,
-        [
-          { text: 'Más tarde', style: 'cancel' },
-          {
-            text: 'Actualizar',
-            onPress: () => {
-              const url = updateInfo.downloadUrl ?? updateInfo.notesUrl;
-              if (url) Linking.openURL(url);
-            }
-          }
-        ]
+      notify.banner(
+        `Nueva versión ${updateInfo.latestVersion} lista para descargar.`,
+        'info',
+        'Actualizar',
+        () => {
+          const url = updateInfo.downloadUrl ?? updateInfo.notesUrl;
+          if (url) Linking.openURL(url);
+        }
       );
     }
   }, [updateStatus, updateInfo]);
@@ -164,6 +184,8 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider value={IronTrainTheme}>
           <StatusBar style="dark" backgroundColor={Colors.iron[900]} />
+          <ToastContainer />
+          <GlobalBanner />
           <TimerOverlay />
           <Stack
             screenOptions={{

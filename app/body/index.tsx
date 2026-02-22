@@ -5,6 +5,7 @@ import { BodyMetric, bodyService } from '@/src/services/BodyService';
 import { configService } from '@/src/services/ConfigService';
 import { UnitService } from '@/src/services/UnitService';
 import { Colors } from '@/src/theme';
+import { notify } from '@/src/utils/notify';
 import { format } from 'date-fns';
 import { Stack, useFocusEffect } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
@@ -41,7 +42,7 @@ export default function BodyTrackerScreen() {
 
     const handleLog = async () => {
         if (!weight) {
-            Alert.alert('Error', 'Ingresa tu peso');
+            notify.error('Ingresa tu peso');
             return;
         }
         try {
@@ -53,7 +54,7 @@ export default function BodyTrackerScreen() {
             setFat('');
             loadData();
         } catch (e) {
-            Alert.alert('Error', 'No se pudo guardar');
+            notify.error('No se pudo guardar');
         }
     };
 

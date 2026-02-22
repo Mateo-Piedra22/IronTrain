@@ -1,0 +1,134 @@
+.motiona-master-grid {
+  display: grid;
+  grid-template-columns: 250px 1fr 300px;
+  min-height: 100vh;
+  border-top: 1px solid var(--line-color);
+}
+
+.motiona-grid-col {
+  border-right: 1px solid var(--line-color);
+  padding: var(--space-6);
+  position: relative;
+}
+
+.motiona-grid-left {
+  background-color: var(--panel-color);
+}
+
+.motiona-grid-main {
+  background-color: var(--bg-color);
+}
+
+.motiona-grid-rail {
+  background-color: var(--bg-color);
+  border-right: 0;
+}
+
+@media (max-width: 1024px) {
+  .motiona-master-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .motiona-grid-col {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-color);
+  }
+
+  .motiona-grid-rail {
+    border-bottom: 0;
+  }
+}
+
+.motiona-container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
+}
+
+.motiona-container-sm {
+  max-width: 640px;
+}
+
+.motiona-container-md {
+  max-width: 768px;
+}
+
+.motiona-container-lg {
+  max-width: 1024px;
+}
+
+.motiona-container-xl {
+  max-width: 1280px;
+}
+
+.motiona-container-2xl {
+  max-width: 1536px;
+}
+
+.motiona-section {
+  padding: var(--space-12) 0;
+}
+
+@media (max-width: 768px) {
+  .motiona-section {
+    padding: var(--space-8) 0;
+  }
+}
+
+.motiona-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-6);
+}
+
+.motiona-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6);
+}
+
+.motiona-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-6);
+}
+
+@media (max-width: 1024px) {
+  .motiona-grid-3,
+  .motiona-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .motiona-grid-2,
+  .motiona-grid-3,
+  .motiona-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.motiona-flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.motiona-flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.motiona-flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.motiona-gap-2 { gap: var(--space-2); }
+.motiona-gap-3 { gap: var(--space-3); }
+.motiona-gap-4 { gap: var(--space-4); }
+.motiona-gap-5 { gap: var(--space-5); }
+.motiona-gap-6 { gap: var(--space-6); }

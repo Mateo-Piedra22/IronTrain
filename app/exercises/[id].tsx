@@ -5,6 +5,7 @@ import { CategoryService } from '@/src/services/CategoryService';
 import { Exercise, ExerciseService } from '@/src/services/ExerciseService';
 import { Colors } from '@/src/theme';
 import { ExerciseType } from '@/src/types/db';
+import { notify } from '@/src/utils/notify';
 import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LucidePlus, LucideSearch, LucideTrash2 } from 'lucide-react-native';
@@ -54,7 +55,7 @@ export default function CategoryDetailScreen() {
 
     const handleCreate = async () => {
         if (!newName.trim() || !id) {
-            Alert.alert('Falta información', 'Escribe un nombre para el ejercicio.');
+            notify.error('Escribe un nombre para el ejercicio.');
             return;
         }
         try {
@@ -68,7 +69,7 @@ export default function CategoryDetailScreen() {
             setIsAdding(false);
             loadData();
         } catch (e) {
-            Alert.alert('Error', (e as Error).message);
+            notify.error((e as Error).message);
         }
     };
 
@@ -83,7 +84,7 @@ export default function CategoryDetailScreen() {
                         await ExerciseService.delete(exId);
                         loadData();
                     } catch (e) {
-                        Alert.alert('No se pudo eliminar', (e as Error).message);
+                        notify.error((e as Error).message);
                     }
                 }
             }

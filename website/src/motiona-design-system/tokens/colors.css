@@ -1,0 +1,48 @@
+:root {
+  --line-color: #000000;
+  --bg-color: #f4f4f0;
+  --panel-color: #e8e8e8;
+  --ink: #000000;
+  --muted: #333333;
+  --muted-2: #5a5a5a;
+  --accent: #ff4d00;
+  --accent-hover: #e64400;
+  --success: #16A34A;
+  --success-fg: #FFFFFF;
+  --warning: #CA8A04;
+  --warning-fg: #FFFFFF;
+  --error: #DC2626;
+  --error-fg: #FFFFFF;
+  --info: #0284C7;
+  --info-fg: #FFFFFF;
+}
+
+[data-brand="argenpos"] {
+  --accent: #5a1a1a;
+  --accent-hover: #4a1515;
+}
+
+[data-brand="ironhub"] {
+  --accent: #ff4d00;
+  --accent-hover: #e64400;
+}
+
+[data-brand="irontrain"] {
+  --accent: #0066CC;
+  --accent-hover: #0052a3;
+}
+
+[data-brand="linknexus"] {
+  --accent: #7C3AED;
+  --accent-hover: #6d28d9;
+}
+
+[data-brand="nighthub"] {
+  --accent: #000000;
+  --accent-hover: #1a1a1a;
+}
+
+[data-brand="turnopro"] {
+  --accent: #059669;
+  --accent-hover: #047857;
+}

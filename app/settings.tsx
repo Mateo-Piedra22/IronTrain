@@ -7,6 +7,7 @@ import { dbService } from '@/src/services/DatabaseService';
 import { updateService } from '@/src/services/UpdateService';
 import { useUpdateStore } from '@/src/store/updateStore';
 import { Colors } from '@/src/theme';
+import { notify } from '@/src/utils/notify';
 import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
 import { ChevronRight, Database, Disc, Download, Timer, Trash2 } from 'lucide-react-native';
@@ -93,12 +94,13 @@ export default function SettingsScreen() {
     const handleBackup = async () => {
         try {
             const result = await backupService.exportData();
-            Alert.alert(
-                'Listo',
-                result.shared ? 'Backup exportado.' : 'Backup creado (no se pudo abrir el compartir automáticamente).'
-            );
+            if (result.shared) {
+                notify.success('Backup exportado.');
+            } else {
+                notify.info('Backup creado (no se compartió automáticamente).');
+            }
         } catch (e) {
-            Alert.alert('Error', 'No se pudo crear el backup.');
+            notify.error('No se pudo crear el backup.');
         }
     };
 
@@ -114,9 +116,9 @@ export default function SettingsScreen() {
                     onPress: async () => {
                         try {
                             const success = await backupService.importData({ mode: 'overwrite' });
-                            if (success) Alert.alert('Listo', 'Datos restaurados. Reinicia la app.');
+                            if (success) notify.success('Datos restaurados. Reinicia la app.');
                         } catch (e) {
-                            Alert.alert('Error', 'No se pudo restaurar el backup.');
+                            notify.error('No se pudo restaurar el backup.');
                         }
                     }
                 }
@@ -138,9 +140,9 @@ export default function SettingsScreen() {
                             await dbService.factoryReset();
                             await configService.reset();
                             await loadSettings();
-                            Alert.alert('Listo', 'Datos eliminados. La app quedó como nueva.');
+                            notify.success('Datos eliminados. La app quedó como nueva.');
                         } catch (e) {
-                            Alert.alert('Error', 'No se pudo completar el restablecimiento.');
+                            notify.error('No se pudo completar el restablecimiento.');
                         }
                     }
                 }
@@ -460,13 +462,13 @@ export default function SettingsScreen() {
                                     if (updateStatus !== 'update_available' && updateStatus !== 'update_pending') return;
                                     const url = updateInfo.downloadUrl ?? updateInfo.notesUrl;
                                     if (!url) {
-                                        Alert.alert('Sin enlace', 'No hay enlace de descarga disponible.');
+                                        notify.error('No hay enlace de descarga disponible.');
                                         return;
                                     }
                                     try {
                                         await Linking.openURL(url);
                                     } catch {
-                                        Alert.alert('Error', 'No se pudo abrir el enlace.');
+                                        notify.error('No se pudo abrir el enlace.');
                                     }
                                 }}
                                 disabled={updateStatus !== 'update_available' && updateStatus !== 'update_pending'}

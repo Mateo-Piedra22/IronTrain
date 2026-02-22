@@ -2,9 +2,10 @@ import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
 import { ExerciseService } from '@/src/services/ExerciseService';
 import { ExerciseType } from '@/src/types/db';
+import { notify } from '@/src/utils/notify';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 export default function ExerciseModal() {
     const router = useRouter();
@@ -40,7 +41,7 @@ export default function ExerciseModal() {
 
     const handleSave = async () => {
         if (!name.trim()) {
-            Alert.alert('Validación', 'El nombre es obligatorio.');
+            notify.error('El nombre es obligatorio.');
             return;
         }
 
@@ -59,7 +60,7 @@ export default function ExerciseModal() {
             router.back();
             //Ideally trigger refresh on previous screen
         } catch (e) {
-            Alert.alert('Error', (e as Error).message);
+            notify.error((e as Error).message);
         } finally {
             setLoading(false);
         }

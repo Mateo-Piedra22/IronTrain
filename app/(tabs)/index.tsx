@@ -5,18 +5,20 @@ import { HistoryModal } from '@/components/HistoryModal';
 import { IntervalTimerModal } from '@/components/IntervalTimerModal';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { WorkoutLog } from '@/components/WorkoutLog';
+import { ChangelogService } from '@/src/services/ChangelogService';
 import { configService } from '@/src/services/ConfigService';
 import { useTimerStore } from '@/src/store/timerStore';
 import { Colors } from '@/src/theme';
+import { notify } from '@/src/utils/notify';
 import { addDays, subDays } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
 import { Copy, Info, Plus, Timer, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { runOnJS } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { workoutService } from '../../src/services/WorkoutService';
 import { ExerciseType, Workout, WorkoutSet } from '../../src/types/db';
 
@@ -35,6 +37,7 @@ export default function DailyLogScreen() {
   const [historyData, setHistoryData] = useState<{ date: number; sets: WorkoutSet[] }[]>([]);
   const [historyExerciseName, setHistoryExerciseName] = useState('');
   const [historyExerciseType, setHistoryExerciseType] = useState<ExerciseType>('weight_reps');
+  const [hasNewChangelog, setHasNewChangelog] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -61,6 +64,15 @@ export default function DailyLogScreen() {
   useFocusEffect(
     useCallback(() => {
       loadData();
+
+      // Check changelog unread badge
+      const latestVersion = ChangelogService.getLatestRelease()?.version;
+      const lastViewed = configService.get('lastViewedChangelogVersion');
+      if (latestVersion && latestVersion !== lastViewed) {
+        setHasNewChangelog(true);
+      } else {
+        setHasNewChangelog(false);
+      }
     }, [selectedDate]) // Re-fetch on focus just in case
   );
 
@@ -106,7 +118,7 @@ export default function DailyLogScreen() {
       }
     } catch (e: any) {
       setSets(prevSetsSnapshot);
-      Alert.alert('Error', e?.message ?? 'No se pudo actualizar la serie');
+      notify.error('Error', e?.message ?? 'No se pudo actualizar la serie');
     }
   };
 
@@ -129,7 +141,7 @@ export default function DailyLogScreen() {
     const currentIndex = uniqueExercises.indexOf(exerciseId);
 
     if (currentIndex === -1 || currentIndex >= uniqueExercises.length - 1) {
-      Alert.alert('Aviso', 'No hay un ejercicio debajo para enlazar.');
+      notify.warning('No hay un ejercicio debajo para enlazar.');
       return;
     }
 
@@ -142,7 +154,7 @@ export default function DailyLogScreen() {
     if (!currentSet || !nextSet) return;
 
     if (currentSet.superset_id && nextSet.superset_id && currentSet.superset_id === nextSet.superset_id) {
-      Alert.alert('Aviso', 'Ya están enlazados.');
+      notify.warning('Ya están enlazados.');
       return;
     }
 
@@ -214,8 +226,11 @@ export default function DailyLogScreen() {
             </View>
             <View className="w-10 items-end">
               <Link href="/changelog" asChild>
-                <TouchableOpacity>
+                <TouchableOpacity className="relative">
                   <Info size={28} color={Colors.iron[950]} />
+                  {hasNewChangelog && (
+                    <View className="absolute top-0 -right-1 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-iron-100" />
+                  )}
                 </TouchableOpacity>
               </Link>
             </View>

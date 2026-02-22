@@ -7,7 +7,8 @@ jest.mock('expo-constants', () => ({
     },
 }));
 
-import { UpdateService } from '../UpdateService';
+import { useUpdateStore } from '../../store/updateStore';
+import { updateService } from '../UpdateService';
 
 describe('UpdateService', () => {
     beforeEach(() => {
@@ -25,7 +26,8 @@ describe('UpdateService', () => {
             }),
         });
 
-        const res = await UpdateService.checkForUpdate();
+        await updateService.checkForUpdate();
+        const res = useUpdateStore.getState();
         expect(res.status).toBe('update_available');
         if (res.status === 'update_available') {
             expect(res.latestVersion).toBe('1.3.0');
@@ -43,7 +45,8 @@ describe('UpdateService', () => {
             }),
         });
 
-        const res = await UpdateService.checkForUpdate();
+        await updateService.checkForUpdate();
+        const res = useUpdateStore.getState();
         expect(res.status).toBe('update_pending');
         if (res.status === 'update_pending') {
             expect(res.latestVersion).toBe('1.3.0');

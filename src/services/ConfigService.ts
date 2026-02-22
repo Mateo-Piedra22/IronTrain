@@ -21,6 +21,7 @@ export interface AppConfig {
 
     exerciseCardioMetricById: Record<string, 'distance' | 'time' | 'pace' | 'speed'>;
     exerciseCardioPrimaryPRById: Record<string, 'distance' | 'time' | 'pace' | 'speed'>;
+    lastViewedChangelogVersion: string;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -44,6 +45,7 @@ const DEFAULT_CONFIG: AppConfig = {
 
     exerciseCardioMetricById: {},
     exerciseCardioPrimaryPRById: {},
+    lastViewedChangelogVersion: '0.0.0',
 };
 
 class ConfigService {
@@ -58,9 +60,9 @@ class ConfigService {
 
         try {
             const settings = await dbService.getAll<{ key: string, value: string }>('SELECT key, value FROM settings');
-            
+
             const loadedConfig: any = { ...DEFAULT_CONFIG };
-            
+
             settings.forEach(s => {
                 try {
                     // Try parsing JSON if value is complex, otherwise use raw string or number conversion
@@ -151,7 +153,7 @@ class ConfigService {
         let dbValue = String(value);
         if (typeof value === 'boolean') dbValue = value ? 'true' : 'false';
         else if (typeof value === 'object') dbValue = JSON.stringify(value);
-        
+
         await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, dbValue]);
     }
 

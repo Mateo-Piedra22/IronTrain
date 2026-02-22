@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-02-19T17:29:01.599Z",
+  "generatedAt": "2026-02-22T21:37:17.833Z",
   "source": "docs/CHANGELOG.md",
   "releases": [
     {
@@ -11,6 +11,16 @@
         "Soporte para diferentes idiomas (inglés/español).",
         "Conexión con múltiples dispositivos (relojes/bands compatibles).",
         "Vinculación con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos."
+      ]
+    },
+    {
+      "version": "1.3.5",
+      "date": "2026-02-22",
+      "unreleased": false,
+      "items": [
+        "**Enterprise OS Notifications V2**: Migración a `@notifee/react-native` para notificaciones locales (Rest Timers) persistentes a nivel de sistema que sobreviven al Background State. Gestor de permisos Zero-Trust integrado `NotificationPermissionsService` y enrutamiento inteligente híbrido (In-App vs OS).",
+        "**In-App Notifications (Toasts)**: Reemplazo global de `Alert.alert` intrusivos por un moderno sistema de *Toasts* y *Banners* impulsado por Zustand.",
+        "**Proactive What's New**: Banner interactivo de actualización en la pantalla principal posterior a actualizaciones y *Badge* de notificación de `Novedades` en el diario de entrenamiento."
       ]
     },
     {

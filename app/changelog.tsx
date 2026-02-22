@@ -1,5 +1,6 @@
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { ChangelogRelease, ChangelogService } from '@/src/services/ChangelogService';
+import { configService } from '@/src/services/ConfigService';
 import { Colors } from '@/src/theme';
 import { Stack, useFocusEffect } from 'expo-router';
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
@@ -24,6 +25,11 @@ export default function ChangelogModalScreen() {
             setReleases(ChangelogService.getReleases());
             const all = ChangelogService.getReleases({ includeUnreleased: true });
             setUnreleased(all.filter((r) => r.unreleased === true || r.date === null || String(r.date ?? '').trim().toLowerCase() === 'unreleased'));
+
+            const latest = ChangelogService.getLatestRelease();
+            if (latest?.version) {
+                configService.set('lastViewedChangelogVersion', latest.version);
+            }
         }, [])
     );
 

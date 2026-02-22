@@ -12,12 +12,13 @@ import { workoutService } from '@/src/services/WorkoutService';
 import { useTimerStore } from '@/src/store/timerStore';
 import { Colors } from '@/src/theme';
 import { Exercise, WorkoutSet } from '@/src/types/db';
+import { notify } from '@/src/utils/notify';
 import { formatTimeSeconds } from '@/src/utils/time';
 import * as Haptics from 'expo-haptics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Info, Pencil, Timer, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Dimensions, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { BarChart, LineChart } from 'react-native-gifted-charts';
 
 type Tab = 'track' | 'history' | 'analysis';
@@ -147,7 +148,7 @@ export default function ExerciseDetailScreen() {
 
     const handleUpdateSet = async (setId: string, updates: Partial<WorkoutSet>) => {
         if (workoutLocked) {
-            Alert.alert('Entrenamiento finalizado', 'Este entrenamiento está finalizado y no se puede editar.');
+            notify.info('Este entrenamiento está finalizado y no se puede editar.');
             return;
         }
         const prev = sets.find((s) => s.id === setId);
@@ -167,7 +168,7 @@ export default function ExerciseDetailScreen() {
             }
         } catch (e: any) {
             setSets(prevSnapshot);
-            Alert.alert('Error', e?.message ?? 'No se pudo actualizar la serie');
+            notify.error(e?.message ?? 'No se pudo actualizar la serie');
         }
 
         // Refresh history in background to check for completion status changes
@@ -176,7 +177,7 @@ export default function ExerciseDetailScreen() {
 
     const handleDeleteSet = async (setId: string) => {
         if (workoutLocked) {
-            Alert.alert('Entrenamiento finalizado', 'Este entrenamiento está finalizado y no se puede editar.');
+            notify.info('Este entrenamiento está finalizado y no se puede editar.');
             return;
         }
         setSets(prev => prev.filter(s => s.id !== setId));
@@ -187,7 +188,7 @@ export default function ExerciseDetailScreen() {
     const handleAddSet = async () => {
         if (!workoutId) return;
         if (workoutLocked) {
-            Alert.alert('Entrenamiento finalizado', 'Este entrenamiento está finalizado y no se puede editar.');
+            notify.info('Este entrenamiento está finalizado y no se puede editar.');
             return;
         }
         const nextIndex = sets.length;
@@ -200,7 +201,7 @@ export default function ExerciseDetailScreen() {
     const handleCopySet = async (setId: string) => {
         if (!workoutId) return;
         if (workoutLocked) {
-            Alert.alert('Entrenamiento finalizado', 'Este entrenamiento está finalizado y no se puede editar.');
+            notify.info('Este entrenamiento está finalizado y no se puede editar.');
             return;
         }
         const s = sets.find((x) => x.id === setId);
@@ -219,14 +220,14 @@ export default function ExerciseDetailScreen() {
             loadTrackData();
         } catch (e: any) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            Alert.alert('Error', e?.message ?? 'No se pudo copiar la serie');
+            notify.error(e?.message ?? 'No se pudo copiar la serie');
         }
     };
 
     const copyFromHistory = async (histSets: WorkoutSet[]) => {
         if (!workoutId) return;
         if (workoutLocked) {
-            Alert.alert('Entrenamiento finalizado', 'Este entrenamiento está finalizado y no se puede editar.');
+            notify.info('Este entrenamiento está finalizado y no se puede editar.');
             return;
         }
         for (const s of histSets) {
@@ -247,7 +248,7 @@ export default function ExerciseDetailScreen() {
     const handleAddWarmupSets = async (newSets: Partial<WorkoutSet>[]) => {
         if (!workoutId) return;
         if (workoutLocked) {
-            Alert.alert('Entrenamiento finalizado', 'Este entrenamiento está finalizado y no se puede editar.');
+            notify.info('Este entrenamiento está finalizado y no se puede editar.');
             return;
         }
         for (const s of newSets) {
@@ -1441,7 +1442,7 @@ export default function ExerciseDetailScreen() {
                             <TouchableOpacity
                                 onPress={() => {
                                     if (workoutLocked) {
-                                        Alert.alert('Entrenamiento finalizado', 'Este entrenamiento está finalizado y no se puede editar.');
+                                        notify.info('Este entrenamiento está finalizado y no se puede editar.');
                                         return;
                                     }
                                     setWarmupVisible(true);

@@ -4,6 +4,7 @@ import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { workoutService } from '@/src/services/WorkoutService';
 import { Colors } from '@/src/theme';
 import { Workout } from '@/src/types/db';
+import { notify } from '@/src/utils/notify';
 import { FlashList } from '@shopify/flash-list';
 import { format } from 'date-fns';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
@@ -46,7 +47,7 @@ export default function TemplatesScreen() {
             setIsCreating(false);
             router.push({ pathname: '/workout/[id]', params: { id } });
         } catch (e) {
-            Alert.alert('Error', 'No se pudo crear la plantilla.');
+            notify.error('No se pudo crear la plantilla.');
         }
     };
 
@@ -61,7 +62,7 @@ export default function TemplatesScreen() {
                         const newId = await workoutService.loadTemplate(templateId, today);
                         router.push({ pathname: '/workout/[id]', params: { id: newId } });
                     } catch (e) {
-                        Alert.alert('Error', (e as Error).message);
+                        notify.error((e as Error).message);
                     }
                 }
             }
@@ -85,10 +86,10 @@ export default function TemplatesScreen() {
     return (
         <SafeAreaWrapper className="bg-iron-900" edges={['top', 'left', 'right']}>
             <Stack.Screen options={{ headerShown: false }} />
-            
+
             <View className="pt-4 px-4 pb-4 border-b border-iron-200 flex-row justify-between items-center bg-iron-900">
                 <Text className="text-3xl font-bold text-iron-950">Plantillas</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                     onPress={() => setIsCreating(true)}
                     className="bg-surface p-2 rounded-lg border border-iron-700 elevation-1 active:bg-iron-200"
                 >
@@ -102,7 +103,7 @@ export default function TemplatesScreen() {
                 contentContainerStyle={{ padding: 16 }}
                 renderItem={({ item }: { item: Workout }) => (
                     <View className="bg-surface p-4 rounded-xl mb-4 border border-iron-700 elevation-1 flex-row items-center justify-between">
-                        <Pressable 
+                        <Pressable
                             className="flex-1 flex-row items-center gap-4"
                             onPress={() => router.push({ pathname: '/workout/[id]', params: { id: item.id } })}
                         >
@@ -116,13 +117,13 @@ export default function TemplatesScreen() {
                         </Pressable>
 
                         <View className="flex-row items-center gap-2">
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 onPress={() => handleLoad(item.id)}
                                 className="w-10 h-10 bg-primary rounded-full items-center justify-center shadow-sm active:opacity-80"
                             >
                                 <Play size={20} color="white" fill="white" />
                             </TouchableOpacity>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 onPress={() => handleDelete(item.id)}
                                 className="w-10 h-10 bg-iron-200 rounded-full items-center justify-center active:bg-red-100"
                             >
