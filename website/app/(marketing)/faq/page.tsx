@@ -43,22 +43,23 @@ const faqs = [
 
 export default function FAQPage() {
   return (
-    <div className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-3xl font-black text-slate-900">FAQ</h1>
-        <p className="text-slate-600">
+    <>
+      <header className="border-b border-current/20 pb-6">
+        <div className="text-[10px] opacity-40 tracking-[0.3em] mb-3">━━━ PREGUNTAS FRECUENTES ━━━</div>
+        <h1 className="text-4xl font-bold tracking-tight">FAQ</h1>
+        <p className="mt-2 opacity-70 leading-relaxed">
           Preguntas frecuentes oficiales. Si falta algo, lo añadimos aquí para que quede centralizado y mantenible.
         </p>
       </header>
 
       <div className="grid gap-4">
         {faqs.map((f) => (
-          <section key={f.q} className="rounded-2xl border border-iron-200 bg-white p-6">
-            <h2 className="text-lg font-black text-slate-900">{f.q}</h2>
-            <p className="mt-2 text-slate-700">{f.a}</p>
+          <section key={f.q} className="border border-current/20 p-6 bg-[#f5f1e8] hover:border-current/40 transition-colors">
+            <h2 className="text-lg font-bold">{f.q}</h2>
+            <p className="mt-2 opacity-80 leading-relaxed">{f.a}</p>
           </section>
         ))}
       </div>
-    </div>
+    </>
   );
 }
