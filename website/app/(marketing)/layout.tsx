@@ -30,10 +30,10 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
     const leftPanelContent = (
         <div className="flex flex-col h-full font-mono text-sm">
             <Link href="/" className="border-b border-[#1a1a2e]/10 pb-5 mb-6 block group hover:border-[#1a1a2e]/30 transition-colors">
-                <div className="text-[10px] opacity-40 tracking-[0.2em] mb-3">[ APP ENTRENAMIENTO PERSONALIZADO ]</div>
+                <div className="text-[10px] opacity-40 tracking-[0.2em] mb-3">[ ENTRENAMIENTO FITNESS ]</div>
                 <div className="flex items-center gap-3 mb-2">
                     <Image
-                        src="/Logo IronTrain.png"
+                        src="/icon.png"
                         alt="IronTrain"
                         width={32}
                         height={32}

@@ -3,33 +3,70 @@ import MarketingLayout from './(marketing)/layout';
 import './globals.css';
 
 export const metadata: Metadata = {
-    title: 'IronTrain | App de Entrenamiento Personalizado',
-    description: 'App móvil de entrenamiento con rutinas personalizadas y seguimiento de progreso. Desarrollado por MotionA.',
-    keywords: ['fitness app', 'entrenamiento', 'IronTrain', 'MotionA', 'rutinas gym'],
-    authors: [{ name: 'MotionA' }],
-    creator: 'MotionA',
-    publisher: 'MotionA',
-    metadataBase: new URL('https://irontrain.motiona.xyz'),
-    alternates: {
-        canonical: '/',
+    title: {
+        default: 'IronTrain - App de Entrenamiento Personalizado con Rutinas Inteligentes',
+        template: '%s | IronTrain'
     },
+    description: 'App móvil de entrenamiento con rutinas personalizadas basadas en IA, seguimiento de progreso en tiempo real, planes adaptados a tu nivel y estadísticas detalladas. Transforma tu físico con tecnología inteligente. Desarrollado por MotionA.',
+    keywords: [
+        'app entrenamiento',
+        'fitness app',
+        'rutinas gimnasio',
+        'entrenamiento personalizado',
+        'app gym',
+        'seguimiento progreso fitness',
+        'rutinas inteligentes',
+        'workout app',
+        'entrenador personal app',
+        'ejercicios gimnasio',
+        'plan entrenamiento',
+        'fitness tracker',
+        'app musculación',
+        'rutinas gym personalizadas',
+        'entrenamiento IA',
+        'fitness argentina',
+        'app fitness gratis',
+        'training app'
+    ],
+    applicationName: 'IronTrain',
+    creator: 'Mateo Piedrabuena',
+    publisher: 'MotionA',
+    authors: [{ name: 'MotionA', url: 'https://motiona.xyz' }],
+    category: 'health',
+    icons: {
+        icon: [{ url: '/icon.png', type: 'image/png' }],
+        apple: [{ url: '/icon.png', sizes: '180x180', type: 'image/png' }]
+    },
+    appleWebApp: {
+        capable: true,
+        statusBarStyle: 'default',
+        title: 'IronTrain'
+    },
+    metadataBase: new URL('https://irontrain.motiona.xyz'),
     openGraph: {
-        title: 'IronTrain | App de Entrenamiento Personalizado',
-        description: 'App móvil de entrenamiento desarrollada por MotionA.',
-        url: 'https://irontrain.motiona.xyz',
-        siteName: 'IronTrain',
-        locale: 'es_AR',
         type: 'website',
+        locale: 'es_AR',
+        siteName: 'IronTrain',
+        title: 'IronTrain - App de Entrenamiento Personalizado',
+        description: 'App móvil de entrenamiento con rutinas personalizadas, seguimiento de progreso y planes adaptados a tu nivel.',
+        url: 'https://irontrain.motiona.xyz',
+        images: [{
+            url: '/og-image.png',
+            width: 1200,
+            height: 630,
+            alt: 'IronTrain - App de Entrenamiento'
+        }]
     },
     twitter: {
         card: 'summary_large_image',
-        title: 'IronTrain | Entrenamiento Personalizado',
-        description: 'App móvil de entrenamiento desarrollada por MotionA.',
+        title: 'IronTrain - Entrenamiento Personalizado',
+        description: 'App móvil de entrenamiento con rutinas inteligentes y seguimiento de progreso.',
+        images: ['/og-image.png']
     },
     robots: {
         index: true,
-        follow: true,
-    },
+        follow: true
+    }
 };
 
 export default function RootLayout({
