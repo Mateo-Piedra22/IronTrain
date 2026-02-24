@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Landing Page - RECIBO TÉRMICO THEME
  * IronTrain - App de Entrenamiento
