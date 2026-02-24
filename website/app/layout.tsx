@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import MarketingLayout from './(marketing)/layout';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -81,9 +80,7 @@ export default function RootLayout({
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
             </head>
             <body className="min-h-screen antialiased" data-brand="irontrain">
-                <MarketingLayout>
-                    {children}
-                </MarketingLayout>
+                {children}
             </body>
         </html>
     );

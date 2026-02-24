@@ -15,9 +15,13 @@ interface MarketingLayoutProps {
 }
 
 const primaryLinks = [
-    { href: "/#features", label: "Características", code: "001" },
-    { href: "/#pricing", label: "Planes", code: "002" },
-    { href: "/#about", label: "Sobre Nosotros", code: "003" },
+    { href: "/", label: "Inicio", code: "001" },
+    { href: "/downloads", label: "Descargas", code: "002" },
+    { href: "/changelog", label: "Changelog", code: "003" },
+    { href: "/faq", label: "FAQ", code: "004" },
+    { href: "/donate", label: "Donar", code: "005" },
+    { href: "/support", label: "Soporte", code: "006" },
+    { href: "/privacy", label: "Privacidad", code: "007" },
 ];
 
 export default function MarketingLayout({ children }: MarketingLayoutProps) {
