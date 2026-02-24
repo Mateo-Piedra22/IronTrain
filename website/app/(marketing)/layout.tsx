@@ -5,10 +5,10 @@
  * Identidad única: MotionA Brand Identity
  */
 
-import { Mail, MapPin, Phone } from "lucide-react";
+import { Mail, MapPin, Menu, Phone, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 
 interface MarketingLayoutProps {
     children: ReactNode;
@@ -25,6 +25,7 @@ const primaryLinks = [
 ];
 
 export default function MarketingLayout({ children }: MarketingLayoutProps) {
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const currentDate = new Date().toLocaleDateString('es-AR', { 
         day: '2-digit', 
         month: '2-digit', 
@@ -150,7 +151,7 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
     );
 
     return (
-        <div className="min-h-screen bg-[#f5f1e8] text-[#1a1a2e] thermal-paper">
+        <div className={`min-h-screen bg-[#f5f1e8] text-[#1a1a2e] thermal-paper ${isMobileMenuOpen ? "overflow-hidden h-screen" : ""}`}>
             <div className="flex">
                 {/* LEFT SIDEBAR */}
                 <aside className="hidden lg:flex w-64 border-r border-current/20 p-6 sticky top-0 h-screen overflow-y-auto thermal-scrollbar flex-col">
@@ -168,14 +169,45 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
                 </aside>
             </div>
 
-            {/* MOBILE MENU */}
-            <div className="lg:hidden fixed top-0 left-0 right-0 bg-[#f5f1e8] border-b border-[#1a1a2e]/20 p-4 z-50 flex items-center justify-between font-mono">
+            <div className="lg:hidden fixed top-0 left-0 right-0 bg-[#f5f1e8] border-b border-[#1a1a2e]/20 px-4 py-3 z-[60] flex items-center justify-between font-mono">
                 <div className="text-lg font-bold">IRONTRAIN</div>
-                <div className="flex gap-3">
+                <div className="flex items-center gap-2">
                     <Link href="https://play.google.com/store" className="text-sm border border-[#1a1a2e] px-3 py-1">ANDROID</Link>
                     <Link href="https://apps.apple.com" className="text-sm bg-[#1a1a2e] text-[#f5f1e8] px-3 py-1">iOS</Link>
+                    <button
+                        type="button"
+                        aria-label={isMobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+                        onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+                        className="p-2 border border-[#1a1a2e] bg-transparent"
+                    >
+                        {isMobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+                    </button>
                 </div>
             </div>
+            {isMobileMenuOpen && (
+                <>
+                    <div
+                        className="lg:hidden fixed inset-0 bg-black/20 z-[50]"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                    />
+                    <div
+                        className="lg:hidden fixed top-[56px] left-0 right-0 z-[60] bg-[#f5f1e8] border-b border-[#1a1a2e]/20 max-h-[75vh] overflow-y-auto overscroll-contain thermal-scrollbar"
+                        onClick={(event) => {
+                            const target = event.target as HTMLElement;
+                            if (target.closest("a")) {
+                                setIsMobileMenuOpen(false);
+                            }
+                        }}
+                    >
+                        <div className="p-5 border-b border-[#1a1a2e]/20">
+                            {leftPanelContent}
+                        </div>
+                        <div className="p-5">
+                            {rightPanelContent}
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }
