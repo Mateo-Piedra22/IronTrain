@@ -9,6 +9,9 @@ export interface AppConfig {
     showGhostValues: boolean;
     autoFinishWorkout: boolean;
 
+    hapticFeedbackEnabled: boolean;
+    soundFeedbackEnabled: boolean;
+
     analyticsDefaultRangeDays: 7 | 30 | 90 | 365;
 
     plateCalculatorDefaultBarWeightKg: number;
@@ -32,6 +35,9 @@ const DEFAULT_CONFIG: AppConfig = {
     language: 'es',
     showGhostValues: true,
     autoFinishWorkout: false,
+
+    hapticFeedbackEnabled: true,
+    soundFeedbackEnabled: true,
 
     analyticsDefaultRangeDays: 30,
 
@@ -71,7 +77,9 @@ class ConfigService {
                         s.key === 'showGhostValues' ||
                         s.key === 'autoFinishWorkout' ||
                         s.key === 'autoStartRestTimerOnSetComplete' ||
-                        s.key === 'plateCalculatorPreferFewerPlates'
+                        s.key === 'plateCalculatorPreferFewerPlates' ||
+                        s.key === 'hapticFeedbackEnabled' ||
+                        s.key === 'soundFeedbackEnabled'
                     ) loadedConfig[s.key] = s.value === 'true';
                     else if (
                         s.key === 'analyticsDefaultRangeDays' ||

@@ -6,6 +6,14 @@
 - Conexión con múltiples dispositivos (relojes/bands compatibles).
 - Vinculación con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos.
 
+## 1.3.6 (2026-02-25)
+- **Consistense Heatmap**: Se mejoró el heatmap de consistencia para solucionar un bug de desfasaje de dias.
+- **Copy Workout**: Se mejoró la funcionalidad de copiar entrenamiento para asemejar la vista de calendario y la visualización de ejercicios realizados en el día seleccionado.
+- **Interval Timer**: Se reparó un bug que impedía el correcto funcionamiento del temporizador de intervalos y se añadieron presets de tiempo para facilitar el uso.
+- **Haptics & Sounds**: Se mejoró la funcionalidad de vibraciones y sonidos para que sean más agradables y menos intrusivos, adicionalmente se solucionó un bug que impedía el funcionamiento de ambos subsistemas.
+- **Settings**: Se mejoró la funcionalidad de ajustes para poder activar/desactivar vibraciones y sonidos.
+- **UI Improvements**: Se solucinaron incompatibilidades con la UI en la pestaña "Analytics" en dispositivos de pantalla pequeña.
+
 ## 1.3.5 (2026-02-22)
 - **Enterprise OS Notifications V2**: Migración a `@notifee/react-native` para notificaciones locales (Rest Timers) persistentes a nivel de sistema que sobreviven al Background State. Gestor de permisos Zero-Trust integrado `NotificationPermissionsService` y enrutamiento inteligente híbrido (In-App vs OS).
 - **In-App Notifications (Toasts)**: Reemplazo global de `Alert.alert` intrusivos por un moderno sistema de *Toasts* y *Banners* impulsado por Zustand.

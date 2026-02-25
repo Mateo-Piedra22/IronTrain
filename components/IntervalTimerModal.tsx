@@ -1,10 +1,10 @@
 import { Colors } from '@/src/theme';
-import * as Haptics from 'expo-haptics';
 import { ChevronDown, Minus, Pause, Play, Plus, RotateCcw, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
+import { feedbackService } from '../src/services/FeedbackService';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface IntervalTimerModalProps {
@@ -25,11 +25,22 @@ interface TimerPreset {
 
 // ─── Presets ─────────────────────────────────────────────────────────────────
 const PRESETS: TimerPreset[] = [
+    // --- Alta Intensidad Corta ---
     { id: 'tabata', name: 'Tabata', description: '20s trabajo / 10s descanso × 8', work: 20, rest: 10, rounds: 8 },
-    { id: 'emom', name: 'EMOM', description: '40s trabajo / 20s descanso × 10', work: 40, rest: 20, rounds: 10 },
     { id: 'hiit30', name: 'HIIT 30/30', description: '30s trabajo / 30s descanso × 10', work: 30, rest: 30, rounds: 10 },
     { id: 'hiit45', name: 'HIIT 45/15', description: '45s trabajo / 15s descanso × 8', work: 45, rest: 15, rounds: 8 },
-    { id: 'boxing', name: 'Boxing', description: '3min rounds / 1min descanso × 6', work: 180, rest: 60, rounds: 6 },
+
+    // --- Potencia / Sprints ---
+    { id: 'sprint', name: 'Sprints', description: '30s sprint / 90s recuperación × 5', work: 30, rest: 90, rounds: 5 },
+
+    // --- Formatos por Minuto ---
+    { id: 'emom_classic', name: 'EMOM', description: '60s intervalo (trabajo + descanso) × 10', work: 60, rest: 0, rounds: 10 },
+    { id: 'emom_4020', name: 'Circuito 40/20', description: '40s trabajo / 20s transición × 10', work: 40, rest: 20, rounds: 10 },
+    { id: 'circuit_6015', name: 'Circuito Largo', description: '60s trabajo / 15s transición × 8', work: 60, rest: 15, rounds: 8 },
+
+    // --- Deportes de Combate ---
+    { id: 'boxing', name: 'Boxing', description: '3min asalto / 1min descanso × 6', work: 180, rest: 60, rounds: 6 },
+    { id: 'mma', name: 'MMA', description: '5min asalto / 1min descanso × 3', work: 300, rest: 60, rounds: 3 },
 ];
 
 const PREPARE_DURATION = 5;
@@ -49,35 +60,25 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
     const [restSec, setRestSec] = useState(10);
     const [rounds, setRounds] = useState(8);
 
-    // Runtime
+    // Runtime — timestamp-based to avoid drift and state update conflicts
     const [phase, setPhase] = useState<TimerPhase>('idle');
     const [currentRound, setCurrentRound] = useState(1);
     const [timeLeft, setTimeLeft] = useState(0);
     const [isPaused, setIsPaused] = useState(false);
     const [elapsedTotal, setElapsedTotal] = useState(0);
 
+    // Timestamp-based timer state
+    const endAtMsRef = useRef<number | null>(null);
+    const pausedTimeLeftRef = useRef<number>(0);
+
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const progressAnim = useRef(new Animated.Value(0)).current;
     const pulseAnim = useRef(new Animated.Value(1)).current;
-    const phaseRef = useRef<TimerPhase>('idle');
-    const currentRoundRef = useRef(1);
-    const isPausedRef = useRef(false);
 
-    // Keep refs in sync
-    useEffect(() => { phaseRef.current = phase; }, [phase]);
-    useEffect(() => { currentRoundRef.current = currentRound; }, [currentRound]);
-    useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
+    // Ref to track if a transition is pending (prevents double-transitions)
+    const transitionPendingRef = useRef(false);
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
-    const phaseDuration = useCallback((p: TimerPhase): number => {
-        switch (p) {
-            case 'prepare': return PREPARE_DURATION;
-            case 'work': return workSec;
-            case 'rest': return restSec;
-            default: return 0;
-        }
-    }, [workSec, restSec]);
-
     const totalWorkoutTime = useMemo(() => {
         return (workSec + restSec) * rounds;
     }, [workSec, restSec, rounds]);
@@ -123,48 +124,62 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
         }).start();
     }, [pulseAnim]);
 
-    // ─── Phase transitions ────────────────────────────────────────────────────
-    const transitionPhase = useCallback(() => {
-        const p = phaseRef.current;
-        const r = currentRoundRef.current;
+    // ─── Start a timed phase ──────────────────────────────────────────────────
+    const startPhaseTimer = useCallback((durationSec: number) => {
+        const now = Date.now();
+        endAtMsRef.current = now + durationSec * 1000;
+        pausedTimeLeftRef.current = 0;
+        setTimeLeft(durationSec);
+        animateProgress(durationSec);
+    }, [animateProgress]);
 
-        if (p === 'prepare') {
+    // ─── Phase transitions (called from useEffect, NOT from state updater) ────
+    const transitionToNextPhase = useCallback((currentPhase: TimerPhase, currentRound: number) => {
+        if (transitionPendingRef.current) return;
+        transitionPendingRef.current = true;
+
+        if (currentPhase === 'prepare') {
             setPhase('work');
-            setTimeLeft(workSec);
-            animateProgress(workSec);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } else if (p === 'work') {
-            if (r >= rounds) {
-                // Last round, no rest needed  — finish
+            startPhaseTimer(workSec);
+            feedbackService.phaseChange('work');
+        } else if (currentPhase === 'work') {
+            if (currentRound >= rounds) {
                 setPhase('finished');
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                setTimeLeft(0);
+                endAtMsRef.current = null;
+                feedbackService.workoutFinished();
             } else if (restSec > 0) {
                 setPhase('rest');
-                setTimeLeft(restSec);
-                animateProgress(restSec);
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                startPhaseTimer(restSec);
+                feedbackService.phaseChange('rest');
             } else {
-                // No rest, go directly to next work round
                 setCurrentRound(prev => prev + 1);
-                setTimeLeft(workSec);
-                animateProgress(workSec);
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                startPhaseTimer(workSec);
+                feedbackService.phaseChange('work');
             }
-        } else if (p === 'rest') {
-            if (r >= rounds) {
+        } else if (currentPhase === 'rest') {
+            if (currentRound >= rounds) {
                 setPhase('finished');
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                setTimeLeft(0);
+                endAtMsRef.current = null;
+                feedbackService.workoutFinished();
             } else {
                 setCurrentRound(prev => prev + 1);
                 setPhase('work');
-                setTimeLeft(workSec);
-                animateProgress(workSec);
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                startPhaseTimer(workSec);
+                feedbackService.phaseChange('work');
             }
         }
-    }, [workSec, restSec, rounds, animateProgress]);
 
-    // ─── Main tick ────────────────────────────────────────────────────────────
+        // Reset pending flag after React processes the state updates
+        requestAnimationFrame(() => {
+            transitionPendingRef.current = false;
+        });
+    }, [workSec, restSec, rounds, startPhaseTimer]);
+
+    const lastSecPulseRef = useRef<number | null>(null);
+
+    // ─── Main tick (timestamp-based, drift-proof) ──────────────────────────────
     useEffect(() => {
         if (phase === 'idle' || phase === 'finished' || isPaused) {
             if (intervalRef.current) {
@@ -177,21 +192,38 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
             return;
         }
 
-        intervalRef.current = setInterval(() => {
-            setTimeLeft(prev => {
-                if (prev <= 1) {
-                    transitionPhase();
-                    return 0;
-                }
-                // Haptic on last 3 seconds
-                if (prev <= 4 && prev > 1) {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        const tick = () => {
+            if (!endAtMsRef.current) return;
+
+            const now = Date.now();
+            const remaining = Math.max(0, Math.ceil((endAtMsRef.current - now) / 1000));
+
+            setTimeLeft(remaining);
+            setElapsedTotal(prev => prev + 1);
+
+            // Haptic countdown for last 3 seconds
+            if (remaining <= 3 && remaining > 0) {
+                if (lastSecPulseRef.current !== remaining) {
+                    lastSecPulseRef.current = remaining;
+                    feedbackService.countdown();
                     triggerPulse();
                 }
-                return prev - 1;
-            });
-            setElapsedTotal(prev => prev + 1);
-        }, 1000);
+            } else {
+                lastSecPulseRef.current = null;
+            }
+
+            // Phase transition when time runs out
+            if (remaining <= 0) {
+                endAtMsRef.current = null;
+                // We need current phase/round for transition. Use a ref-free approach:
+                // The transition will be triggered by a separate effect watching timeLeft === 0
+            }
+        };
+
+        // Immediate tick to sync after resume/phase change
+        tick();
+
+        intervalRef.current = setInterval(tick, 1000);
 
         return () => {
             if (intervalRef.current) {
@@ -199,29 +231,47 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                 intervalRef.current = null;
             }
         };
-    }, [phase, isPaused, transitionPhase, triggerPulse, progressAnim]);
+    }, [phase, isPaused, triggerPulse, progressAnim]);
+
+    // ─── Phase transition effect (fires when timeLeft reaches 0) ──────────────
+    useEffect(() => {
+        if (timeLeft === 0 && phase !== 'idle' && phase !== 'finished' && !isPaused) {
+            transitionToNextPhase(phase, currentRound);
+        }
+    }, [timeLeft, phase, currentRound, isPaused, transitionToNextPhase]);
 
     // ─── Actions ──────────────────────────────────────────────────────────────
     const handleStart = () => {
         setPhase('prepare');
-        setTimeLeft(PREPARE_DURATION);
         setCurrentRound(1);
         setIsPaused(false);
         setElapsedTotal(0);
-        animateProgress(PREPARE_DURATION);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        transitionPendingRef.current = false;
+        startPhaseTimer(PREPARE_DURATION);
+        feedbackService.buttonPress();
     };
 
     const handlePause = () => {
-        setIsPaused(prev => !prev);
         if (!isPaused) {
+            // Pausing
+            if (endAtMsRef.current) {
+                const now = Date.now();
+                pausedTimeLeftRef.current = Math.max(0, Math.ceil((endAtMsRef.current - now) / 1000));
+            }
+            endAtMsRef.current = null;
             progressAnim.stopAnimation();
+            setIsPaused(true);
         } else {
-            // Resume animation with remaining time
-            const remaining = timeLeft;
-            animateProgress(remaining);
+            // Resuming
+            const remaining = pausedTimeLeftRef.current > 0 ? pausedTimeLeftRef.current : timeLeft;
+            if (remaining > 0) {
+                const now = Date.now();
+                endAtMsRef.current = now + remaining * 1000;
+                animateProgress(remaining);
+            }
+            setIsPaused(false);
         }
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        feedbackService.buttonPress();
     };
 
     const handleReset = useCallback(() => {
@@ -230,6 +280,9 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
         setTimeLeft(0);
         setCurrentRound(1);
         setElapsedTotal(0);
+        endAtMsRef.current = null;
+        pausedTimeLeftRef.current = 0;
+        transitionPendingRef.current = false;
         progressAnim.setValue(0);
     }, [progressAnim]);
 
@@ -238,11 +291,17 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
         onClose();
     };
 
+    const handleSkipPhase = () => {
+        endAtMsRef.current = null;
+        setTimeLeft(0);
+        feedbackService.buttonPress();
+    };
+
     const applyPreset = (preset: TimerPreset) => {
         setWorkSec(preset.work);
         setRestSec(preset.rest);
         setRounds(preset.rounds);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        feedbackService.buttonPress();
     };
 
     useEffect(() => {
@@ -266,7 +325,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                     onPress={() => {
                         const next = Math.max(min, value - step);
                         onChange(next);
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        feedbackService.buttonPress();
                     }}
                     className="w-11 h-11 rounded-xl bg-iron-800 border border-iron-700 items-center justify-center active:bg-iron-200"
                 >
@@ -281,7 +340,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                     onPress={() => {
                         const next = Math.min(max, value + step);
                         onChange(next);
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        feedbackService.buttonPress();
                     }}
                     className="w-11 h-11 rounded-xl bg-iron-800 border border-iron-700 items-center justify-center active:bg-iron-200"
                 >
@@ -567,10 +626,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
 
                         {/* Skip phase button */}
                         <TouchableOpacity
-                            onPress={() => {
-                                transitionPhase();
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            }}
+                            onPress={handleSkipPhase}
                             className="w-14 h-14 bg-white/15 rounded-full items-center justify-center active:bg-white/25"
                         >
                             <ChevronDown color="white" size={26} />

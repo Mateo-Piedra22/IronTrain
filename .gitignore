@@ -39,6 +39,10 @@ yarn-error.*
 .env.*
 .env*.local
 
+# agent
+.agent/
+.agents/
+
 # typescript
 *.tsbuildinfo
 

@@ -175,26 +175,28 @@ export default function AnalysisScreen() {
     return (
         <SafeAreaWrapper className="flex-1 bg-iron-900" edges={['top', 'left', 'right']}>
             <View className="flex-1 px-4 mt-2">
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-4 px-4 mb-4" contentContainerStyle={{ paddingRight: 20 }}>
-                    <View className="flex-row gap-2 items-center">
-                        {[
-                            { key: 'overview', label: 'Resumen' },
-                            { key: 'trends', label: 'Tendencias' },
-                            { key: 'records', label: 'Récords' },
-                            { key: 'tools', label: 'Herramientas' },
-                        ].map((t) => (
-                            <Pressable
-                                key={t.key}
-                                onPress={() => setTab(t.key as any)}
-                                className={`px-4 py-2 rounded-full border ${tab === t.key ? 'bg-primary border-primary' : 'bg-iron-200 border-iron-300'}`}
-                            >
-                                <Text className={`font-bold ${tab === t.key ? 'text-white' : 'text-iron-600'}`}>{t.label}</Text>
-                            </Pressable>
-                        ))}
-                    </View>
-                </ScrollView>
+                <View style={{ height: 48, marginBottom: 16 }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-4 px-4" contentContainerStyle={{ paddingRight: 20, alignItems: 'center' }}>
+                        <View className="flex-row gap-2 items-center">
+                            {[
+                                { key: 'overview', label: 'Resumen' },
+                                { key: 'trends', label: 'Tendencias' },
+                                { key: 'records', label: 'Récords' },
+                                { key: 'tools', label: 'Herramientas' },
+                            ].map((t) => (
+                                <Pressable
+                                    key={t.key}
+                                    onPress={() => setTab(t.key as any)}
+                                    className={`px-4 py-2 rounded-full border ${tab === t.key ? 'bg-primary border-primary' : 'bg-iron-200 border-iron-300'}`}
+                                >
+                                    <Text className={`font-bold ${tab === t.key ? 'text-white' : 'text-iron-600'}`}>{t.label}</Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                    </ScrollView>
+                </View>
 
-                <ScrollView contentContainerStyle={{ paddingBottom: 100, flexGrow: 1, justifyContent: 'flex-start' }} showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
                     {isLoading && !rangeData.summary7 ? (
                         <View className="flex-1 justify-center items-center py-20 pb-0">
                             <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />

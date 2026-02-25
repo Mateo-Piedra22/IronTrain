@@ -10,7 +10,7 @@ import { Colors } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
-import { ChevronRight, Database, Disc, Download, Timer, Trash2 } from 'lucide-react-native';
+import { ChevronRight, Database, Disc, Download, Timer, Trash2, Vibrate, Volume2 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
 
@@ -26,6 +26,8 @@ export default function SettingsScreen() {
     const [units, setUnits] = useState('kg');
     const [defaultTimer, setDefaultTimer] = useState(90);
     const [autoRestOnComplete, setAutoRestOnComplete] = useState(true);
+    const [hapticEnabled, setHapticEnabled] = useState(true);
+    const [soundEnabled, setSoundEnabled] = useState(true);
     const [analyticsRange, setAnalyticsRange] = useState<7 | 30 | 90 | 365>(30);
     const [barKg, setBarKg] = useState(20);
     const [barLbs, setBarLbs] = useState(45);
@@ -64,6 +66,8 @@ export default function SettingsScreen() {
         setUnits(configService.get('weightUnit'));
         setDefaultTimer(configService.get('defaultRestTimer'));
         setAutoRestOnComplete(configService.get('autoStartRestTimerOnSetComplete'));
+        setHapticEnabled(configService.get('hapticFeedbackEnabled'));
+        setSoundEnabled(configService.get('soundFeedbackEnabled'));
         setAnalyticsRange(configService.get('analyticsDefaultRangeDays'));
         setBarKg(configService.get('plateCalculatorDefaultBarWeightKg'));
         setBarLbs(configService.get('plateCalculatorDefaultBarWeightLbs'));
@@ -82,6 +86,8 @@ export default function SettingsScreen() {
         if (key === 'weightUnit') setUnits(value as any);
         if (key === 'defaultRestTimer') setDefaultTimer(value as any);
         if (key === 'autoStartRestTimerOnSetComplete') setAutoRestOnComplete(value as any);
+        if (key === 'hapticFeedbackEnabled') setHapticEnabled(value as any);
+        if (key === 'soundFeedbackEnabled') setSoundEnabled(value as any);
         if (key === 'analyticsDefaultRangeDays') setAnalyticsRange(value as any);
         if (key === 'plateCalculatorDefaultBarWeightKg') setBarKg(value as any);
         if (key === 'plateCalculatorDefaultBarWeightLbs') setBarLbs(value as any);
@@ -218,6 +224,36 @@ export default function SettingsScreen() {
                             value={autoRestOnComplete}
                             onValueChange={(v) => saveSetting('autoStartRestTimerOnSetComplete', v)}
                             accessibilityLabel="Activar o desactivar auto descanso"
+                        />
+                    </View>
+
+                    <View className="flex-row items-center justify-between p-4 border-t border-iron-200">
+                        <View className="flex-row items-center gap-3">
+                            <Vibrate size={20} color={Colors.primary.DEFAULT} />
+                            <View>
+                                <Text className="text-iron-950 font-semibold">Tensiones y vibración</Text>
+                                <Text className="text-iron-500 text-xs">Retroalimentación háptica en botones y timers.</Text>
+                            </View>
+                        </View>
+                        <Switch
+                            value={hapticEnabled}
+                            onValueChange={(v) => saveSetting('hapticFeedbackEnabled', v)}
+                            accessibilityLabel="Activar o desactivar vibración"
+                        />
+                    </View>
+
+                    <View className="flex-row items-center justify-between p-4 border-t border-iron-200">
+                        <View className="flex-row items-center gap-3">
+                            <Volume2 size={20} color={Colors.primary.DEFAULT} />
+                            <View>
+                                <Text className="text-iron-950 font-semibold">Efectos de sonido</Text>
+                                <Text className="text-iron-500 text-xs">Tonos al completar timers y series.</Text>
+                            </View>
+                        </View>
+                        <Switch
+                            value={soundEnabled}
+                            onValueChange={(v) => saveSetting('soundFeedbackEnabled', v)}
+                            accessibilityLabel="Activar o desactivar sonido"
                         />
                     </View>
                 </View>

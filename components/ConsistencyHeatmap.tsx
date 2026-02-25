@@ -103,38 +103,43 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
                         <Text style={styles.dayLabel}>Vie</Text>
                     </View>
 
-                    {weeks.map((week, wIndex) => (
-                        <View key={wIndex} style={styles.weekColumn}>
-                            <View style={styles.monthLabelContainer}>
-                                {/* Show label if Monday is the start of the month (roughly) */}
-                                {week[0].getDate() <= 7 && (
-                                    <Text style={styles.monthLabel}>
-                                        {format(week[0], 'MMM', { locale: es })}
-                                    </Text>
-                                )}
+                    {weeks.map((week, wIndex) => {
+                        const firstDayOfMonth = week.find(d => d.getDate() === 1);
+                        const isFirstWeek = wIndex === 0;
+                        const labelDay = firstDayOfMonth || (isFirstWeek ? week[0] : null);
+
+                        return (
+                            <View key={wIndex} style={styles.weekColumn}>
+                                <View style={styles.monthLabelContainer}>
+                                    {labelDay && (
+                                        <Text style={styles.monthLabel}>
+                                            {format(labelDay, 'MMM', { locale: es })}
+                                        </Text>
+                                    )}
+                                </View>
+
+                                {week.map((day, dIndex) => {
+                                    const key = format(day, 'yyyy-MM-dd');
+                                    const count = countMap.get(key) ?? 0;
+                                    const isSelected = selectedDate ? isSameDay(day, selectedDate.date) : false;
+
+                                    return (
+                                        <Pressable
+                                            key={dIndex}
+                                            onPress={() => {
+                                                Haptics.selectionAsync();
+                                                setSelectedDate({ date: day, count });
+                                            }}
+                                            style={[
+                                                styles.cell,
+                                                { backgroundColor: getCellColor(count, isSelected) }
+                                            ]}
+                                        />
+                                    );
+                                })}
                             </View>
-
-                            {week.map((day, dIndex) => {
-                                const key = format(day, 'yyyy-MM-dd');
-                                const count = countMap.get(key) ?? 0;
-                                const isSelected = selectedDate ? isSameDay(day, selectedDate.date) : false;
-
-                                return (
-                                    <Pressable
-                                        key={dIndex}
-                                        onPress={() => {
-                                            Haptics.selectionAsync();
-                                            setSelectedDate({ date: day, count });
-                                        }}
-                                        style={[
-                                            styles.cell,
-                                            { backgroundColor: getCellColor(count, isSelected) }
-                                        ]}
-                                    />
-                                );
-                            })}
-                        </View>
-                    ))}
+                        );
+                    })}
                 </View>
             </ScrollView>
 

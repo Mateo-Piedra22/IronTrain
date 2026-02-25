@@ -1,5 +1,6 @@
 import notifee, { AndroidImportance, TimestampTrigger, TriggerType } from '@notifee/react-native';
 import { create } from 'zustand';
+import { feedbackService } from '../services/FeedbackService';
 
 const TIMER_NOTIFICATION_ID = 'rest-timer-alert';
 
@@ -107,6 +108,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
         const left = Math.max(0, Math.ceil((endAtMs - now) / 1000));
         if (left <= 0) {
             cancelTimerNotification();
+            feedbackService.restTimerExpired();
             set({ timeLeft: 0, isRunning: false, endAtMs: null });
         } else {
             set({ timeLeft: left });

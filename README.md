@@ -18,14 +18,14 @@ IronTrain es una app de entrenamiento Local-First (sin cuentas) enfocada en fuer
 - Charts: react-native-gifted-charts
 
 ## Documentación
-- [Arquitectura](file:///c:/Users/mateo/OneDrive/Escritorio/Work/Programas/IronTrain/docs/ARCHITECTURE.md)
-- [Desarrollo](file:///c:/Users/mateo/OneDrive/Escritorio/Work/Programas/IronTrain/docs/DEVELOPMENT.md)
-- [DB y migraciones](file:///c:/Users/mateo/OneDrive/Escritorio/Work/Programas/IronTrain/docs/DATABASE.md)
-- [Unidades, timers y estados](file:///c:/Users/mateo/OneDrive/Escritorio/Work/Programas/IronTrain/docs/UNITS_TIMERS_WORKOUT_STATUS.md)
-- [Testing](file:///c:/Users/mateo/OneDrive/Escritorio/Work/Programas/IronTrain/docs/TESTING.md)
-- [Release (Android)](file:///c:/Users/mateo/OneDrive/Escritorio/Work/Programas/IronTrain/docs/RELEASE.md)
-- [Seguridad y privacidad](file:///c:/Users/mateo/OneDrive/Escritorio/Work/Programas/IronTrain/docs/SECURITY_PRIVACY.md)
-- [Changelog](file:///c:/Users/mateo/OneDrive/Escritorio/Work/Programas/IronTrain/docs/CHANGELOG.md)
+- [Arquitectura](docs/ARCHITECTURE.md)
+- [Desarrollo](docs/DEVELOPMENT.md)
+- [DB y migraciones](docs/DATABASE.md)
+- [Unidades, timers y estados](docs/UNITS_TIMERS_WORKOUT_STATUS.md)
+- [Testing](docs/TESTING.md)
+- [Release (Android)](docs/RELEASE.md)
+- [Seguridad y privacidad](docs/SECURITY_PRIVACY.md)
+- [Changelog](docs/CHANGELOG.md)
 
 ## Comandos
 ```bash

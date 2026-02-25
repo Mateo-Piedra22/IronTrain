@@ -1,13 +1,14 @@
 import { workoutService } from '@/src/services/WorkoutService';
 import { Colors } from '@/src/theme';
-import { Workout } from '@/src/types/db';
-import { format } from 'date-fns';
+import { ExerciseType, Workout, WorkoutSet } from '@/src/types/db';
+import { format, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Copy, X } from 'lucide-react-native';
-import React, { useState } from 'react';
-import { Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Copy, Tag, X } from 'lucide-react-native';
+import React, { useCallback, useState } from 'react';
+import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Calendar, DateData } from 'react-native-calendars';
+import { DayProps } from 'react-native-calendars/src/calendar/day/index';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Calendar } from 'react-native-calendars';
 
 interface CopyWorkoutModalProps {
     visible: boolean;
@@ -21,22 +22,29 @@ interface CopyWorkoutModalProps {
 export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId, onCopyComplete, markedDates }: CopyWorkoutModalProps) {
     const [selectedDateStr, setSelectedDateStr] = useState('');
     const [sourceWorkout, setSourceWorkout] = useState<Workout | null>(null);
+    const [sourceSets, setSourceSets] = useState<(WorkoutSet & { exercise_name: string; category_color: string; exercise_type: ExerciseType })[]>([]);
     const [loading, setLoading] = useState(false);
 
-    const handleDayPress = async (day: { dateString: string }) => {
+    const handleDayPress = async (day: { dateString: string; year: number; month: number; day: number }) => {
         setSelectedDateStr(day.dateString);
         setLoading(true);
         try {
             // Fetch workout for this date
-            // Parse date string to Date object (local noon)
-            const parts = day.dateString.split('-');
-            const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
+            const d = new Date(day.year, day.month - 1, day.day, 12, 0, 0);
 
             const workout = await workoutService.getWorkoutWithSetsForDate(d);
             setSourceWorkout(workout);
+
+            if (workout) {
+                const fetchedSets = await workoutService.getSets(workout.id);
+                setSourceSets(fetchedSets as any);
+            } else {
+                setSourceSets([]);
+            }
         } catch (e) {
-            console.log('No se encontró entrenamiento para esa fecha');
+            console.log('No se encontró entrenamiento para esa fecha', e);
             setSourceWorkout(null);
+            setSourceSets([]);
         } finally {
             setLoading(false);
         }
@@ -161,10 +169,75 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
         askMode(false);
     };
 
+    const renderCalendarDay = useCallback(({ date, state }: DayProps & { date?: DateData }) => {
+        if (!date) return <View />;
+
+        const d = new Date(date.year, date.month - 1, date.day, 12);
+        const dateStr = date.dateString;
+        const isSelected = selectedDateStr === dateStr;
+        const isToday = isSameDay(d, new Date());
+        const marks = markedDates[dateStr];
+        const isCompleted = marks?.status === 'completed';
+        const isDisabled = state === 'disabled';
+
+        // Styles
+        const containerStyle = [
+            styles.calendarDay,
+            isSelected ? styles.bgPrimary :
+                isCompleted ? styles.bgIron800Completed : {}
+        ];
+
+        const textStyle = [
+            styles.calendarDayText,
+            isSelected ? styles.textWhiteBold :
+                isToday ? styles.textPrimaryBold :
+                    isDisabled ? styles.textIron400 : styles.textIron950
+        ];
+
+        return (
+            <TouchableOpacity
+                onPress={() => handleDayPress(date)}
+                style={containerStyle}
+                disabled={isDisabled}
+            >
+                <Text style={textStyle}>
+                    {date.day}
+                </Text>
+
+                <View style={styles.calendarDotsContainer}>
+                    {marks?.colors?.slice(0, 4).map((color: string, i: number) => (
+                        <View
+                            key={`${dateStr}-cal-dot-${i}`}
+                            style={[styles.calDot, { backgroundColor: color }]}
+                        />
+                    ))}
+                </View>
+
+                {isCompleted && !isSelected && (
+                    <View style={styles.calendarCompletedTick}>
+                        <View style={styles.tickDot} />
+                    </View>
+                )}
+            </TouchableOpacity>
+        );
+    }, [selectedDateStr, markedDates]);
+
+    // Group sets by exercise 
+    const getGroupedSets = () => {
+        const grouped: Record<string, { exercise_name: string; count: number; category_color: string }> = {};
+        sourceSets.forEach(s => {
+            if (!grouped[s.exercise_id]) {
+                grouped[s.exercise_id] = { exercise_name: s.exercise_name, count: 0, category_color: s.category_color };
+            }
+            grouped[s.exercise_id].count++;
+        });
+        return Object.values(grouped);
+    };
+
     return (
         <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-            <View className="flex-1 bg-iron-900">
-                <SafeAreaView edges={['top']} className="bg-iron-800 border-b border-iron-800">
+            <View className="flex-1 bg-surface">
+                <SafeAreaView edges={['top']} className="bg-white border-b border-iron-200">
                     <View className="flex-row justify-between items-center p-4">
                         <Text className="text-iron-950 font-bold text-lg">Copiar desde fecha</Text>
                         <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Cerrar copiar entrenamiento">
@@ -175,53 +248,68 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
 
                 <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
                     <Calendar
-                        onDayPress={handleDayPress}
-                        markedDates={{
-                            ...markedDates,
-                            [selectedDateStr]: { selected: true, selectedColor: Colors.primary.dark }
-                        }}
+                        current={format(targetDate, 'yyyy-MM-dd')}
+                        dayComponent={renderCalendarDay}
                         theme={{
-                            backgroundColor: Colors.white,
-                            calendarBackground: Colors.white,
+                            backgroundColor: Colors.surface,
+                            calendarBackground: Colors.surface,
                             textSectionTitleColor: Colors.iron[500],
-                            dayTextColor: Colors.iron[950],
-                            todayTextColor: Colors.primary.dark,
-                            selectedDayBackgroundColor: Colors.primary.dark,
-                            selectedDayTextColor: Colors.white,
+                            arrowColor: Colors.primary.DEFAULT,
                             monthTextColor: Colors.iron[950],
-                            arrowColor: Colors.primary.dark,
-                            dotColor: Colors.green,
-                            selectedDotColor: Colors.white,
-                            textDisabledColor: Colors.iron[400],
+                            textMonthFontWeight: 'bold',
                         }}
                     />
 
-                    <View className="p-4">
-                        <Text className="text-iron-950 text-sm mb-2 uppercase font-bold">Entrenamiento seleccionado</Text>
+                    <View className="p-4 bg-iron-100 min-h-full">
+                        <Text className="text-iron-500 text-xs mb-3 uppercase font-bold tracking-wider">Entrenamiento seleccionado</Text>
 
                         {loading ? (
-                            <Text className="text-iron-950 italic">Buscando en el historial...</Text>
+                            <Text className="text-iron-500 italic">Buscando en el historial...</Text>
                         ) : sourceWorkout ? (
-                            <View className="bg-iron-800 p-4 rounded-xl border border-iron-700">
-                                <Text className="text-iron-950 font-bold text-lg mb-1">{sourceWorkout.name || 'Entrenamiento'}</Text>
-                                <Text className="text-iron-950 text-xs mb-4">
-                                    {format(new Date(selectedDateStr), 'EEEE, d MMMM yyyy', { locale: es })}
-                                </Text>
+                            <View className="bg-white p-5 rounded-2xl shadow-sm border border-iron-200 elevation-1">
+                                <View className="mb-4">
+                                    <Text className="text-iron-950 font-black text-xl mb-1">{sourceWorkout.name || 'Entrenamiento'}</Text>
+                                    <Text className="text-primary font-bold">
+                                        {format(new Date(selectedDateStr), 'EEEE, d MMMM yyyy', { locale: es })}
+                                    </Text>
+                                </View>
+
+                                {sourceSets.length > 0 ? (
+                                    <View className="mb-5 bg-iron-50 rounded-xl p-3 border border-iron-200">
+                                        <Text className="text-iron-950 font-bold mb-2">Ejercicios ({getGroupedSets().length})</Text>
+                                        <View className="gap-2">
+                                            {getGroupedSets().map((grp, i) => (
+                                                <View key={i} className="flex-row items-center gap-2">
+                                                    <View
+                                                        className="w-2 h-2 rounded-full"
+                                                        style={{ backgroundColor: grp.category_color || Colors.primary.dark }}
+                                                    />
+                                                    <Text className="text-iron-700 font-medium flex-1" numberOfLines={1}>{grp.exercise_name}</Text>
+                                                    <Text className="text-iron-500 text-xs font-bold bg-white px-2 py-0.5 rounded-full border border-iron-200">{grp.count} sets</Text>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    </View>
+                                ) : (
+                                    <Text className="text-iron-500 italic mb-4">Este entrenamiento no tiene ejercicios.</Text>
+                                )}
 
                                 <TouchableOpacity
                                     onPress={handleCopy}
-                                    className="bg-primary p-3 rounded-lg flex-row justify-center items-center active:opacity-90"
+                                    className="bg-primary p-4 rounded-xl flex-row justify-center items-center active:opacity-90 mt-2"
+                                    disabled={sourceSets.length === 0}
                                 >
-                                    <Copy color="white" size={18} />
-                                    <Text className="text-white font-bold ml-2 uppercase">Copiar a este día</Text>
+                                    <Copy color="white" size={20} />
+                                    <Text className="text-white font-bold ml-2 uppercase tracking-wide">Copiar rutina</Text>
                                 </TouchableOpacity>
                             </View>
                         ) : selectedDateStr ? (
-                            <View className="bg-iron-800/50 p-4 rounded-xl border border-iron-800 border-dashed items-center">
-                                <Text className="text-iron-950">No hay datos de entrenamiento para esa fecha.</Text>
+                            <View className="bg-white p-6 rounded-2xl border border-iron-200 border-dashed items-center mt-2">
+                                <Tag size={32} color={Colors.iron[300]} className="mb-3" />
+                                <Text className="text-iron-700 font-medium text-center">No hay entrenamiento registrado en esta fecha.</Text>
                             </View>
                         ) : (
-                            <Text className="text-iron-950">Selecciona una fecha para previsualizar.</Text>
+                            <Text className="text-iron-500 italic">Selecciona un día en el calendario para ver detalles.</Text>
                         )}
                     </View>
                 </ScrollView>
@@ -229,3 +317,54 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
         </Modal>
     );
 }
+
+const styles = StyleSheet.create({
+    calendarDay: {
+        width: 45,
+        height: 45,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 12,
+        margin: 2,
+    },
+    bgPrimary: { backgroundColor: Colors.primary.DEFAULT },
+    bgIron800Completed: {
+        backgroundColor: Colors.white,
+        borderWidth: 2,
+        borderColor: 'rgba(34, 197, 94, 0.4)'
+    },
+    calendarDayText: {
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    textWhiteBold: { color: Colors.white, fontWeight: 'bold' },
+    textPrimaryBold: { color: Colors.primary.DEFAULT, fontWeight: 'bold' },
+    textIron400: { color: Colors.iron[400] },
+    textIron950: { color: Colors.iron[950] },
+
+    calendarDotsContainer: {
+        flexDirection: 'row',
+        gap: 2,
+        marginTop: 4,
+        position: 'absolute',
+        bottom: 6,
+        justifyContent: 'center',
+        width: '100%',
+    },
+    calDot: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+    },
+    calendarCompletedTick: {
+        position: 'absolute',
+        top: 2,
+        right: 2,
+    },
+    tickDot: {
+        width: 6,
+        height: 6,
+        backgroundColor: Colors.green,
+        borderRadius: 3,
+    }
+});
