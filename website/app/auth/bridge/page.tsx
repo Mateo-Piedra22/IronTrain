@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { Check, ExternalLink, User } from 'lucide-react';
+import { AlertTriangle, Check, ExternalLink, User } from 'lucide-react';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
@@ -22,7 +22,10 @@ async function getAuthenticatedSession() {
     };
 }
 
-export default async function AuthBridgePage() {
+export default async function AuthBridgePage(props: { searchParams?: Promise<{ [key: string]: string | undefined }> }) {
+    const searchParams = props.searchParams ? await props.searchParams : undefined;
+    const errorMsg = searchParams?.error;
+
     const session = await getAuthenticatedSession();
     if (!session) {
         redirect('/auth/sign-in');
@@ -32,15 +35,100 @@ export default async function AuthBridgePage() {
     const redirectUri = cookieStore.get('redirect_uri')?.value;
 
     const profileResult = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, session.id));
-    if (profileResult.length === 0) {
+    let profile = profileResult[0];
+
+    if (!profile) {
         await db.insert(schema.userProfiles).values({
             id: session.id,
             displayName: 'Atleta Iron',
             isPublic: 1,
             updatedAt: new Date(),
         }).onConflictDoNothing();
+        const newProfile = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, session.id));
+        profile = newProfile[0];
     }
 
+    // ONBOARDING STEP: Set Username
+    if (!profile.username) {
+        async function setUsernameAction(formData: FormData) {
+            'use server';
+            const sessionId = session?.id;
+            if (!sessionId) return redirect('/auth/sign-in');
+
+            const rawUser = formData.get('username') as string;
+            if (!rawUser) return redirect('/auth/bridge?error=Usuario_Requerido');
+
+            const username = rawUser.trim().toLowerCase();
+
+            // Rules
+            if (username.length < 3 || username.length > 20) return redirect('/auth/bridge?error=Debe_tener_entre_3_y_20_caracteres');
+            if (!/^[a-z0-9_]+$/.test(username)) return redirect('/auth/bridge?error=Solo_minusculas_numeros_y_guiones');
+
+            const blacklist = ['admin', 'irontrain', 'motiona', 'put', 'mierd', 'fuck', 'shit', 'bitch', 'conch', 'verg', 'pij', 'bolud', 'pelotud', 'trol', 'sex', 'porn'];
+            if (blacklist.some(b => username.includes(b))) return redirect('/auth/bridge?error=Palabra_no_permitida');
+
+            // Unique
+            const existing = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.username, username));
+            if (existing.length > 0) return redirect('/auth/bridge?error=El_usuario_ya_existe_elige_otro');
+
+            // Update
+            await db.update(schema.userProfiles).set({ username, updatedAt: new Date() }).where(eq(schema.userProfiles.id, sessionId));
+
+            // Re-run bridge logic
+            redirect('/auth/bridge');
+        }
+
+        return (
+            <div className="min-h-screen bg-[#f5f1e8] flex flex-col items-center justify-center p-6 font-mono text-[#1a1a2e]">
+                <div className="w-full max-w-sm">
+                    <div className="bg-white border border-[#1a1a2e]/20 p-8 rounded-[2rem] shadow-sm space-y-6">
+                        <div className="text-center space-y-2">
+                            <h1 className="text-2xl font-black uppercase tracking-tight">Setup Identidad</h1>
+                            <p className="text-xs opacity-60 leading-relaxed">
+                                Elige tu nombre de usuario público. Todo P2P y progreso estará atado a este ID.
+                            </p>
+
+                            <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 text-left">
+                                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                                <span className="text-[10px] uppercase font-bold text-red-700 tracking-widest leading-relaxed">
+                                    Esta acción es permanente. No podrás cambiarlo más adelante.
+                                </span>
+                            </div>
+                        </div>
+
+                        <form action={setUsernameAction} className="space-y-4 pt-2">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest opacity-40">Username</label>
+                                <div className="relative">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30 font-bold">@</span>
+                                    <input
+                                        type="text"
+                                        name="username"
+                                        required
+                                        maxLength={20}
+                                        pattern="[a-z0-9_]+"
+                                        placeholder="atleta_iron"
+                                        className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl pl-10 pr-4 py-4 text-sm font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20 transition-all lowercase"
+                                    />
+                                </div>
+                                {errorMsg && (
+                                    <div className="text-[10px] font-bold text-red-600 uppercase mt-2 text-center bg-red-50 p-2 rounded border border-red-100">
+                                        Error: {errorMsg.replace(/_/g, ' ')}
+                                    </div>
+                                )}
+                            </div>
+
+                            <button type="submit" className="w-full bg-[#1a1a2e] text-white py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all active:scale-95 shadow-[0_10px_30px_rgba(0,0,0,0.15)] flex justify-center items-center">
+                                Reclamar Identidad
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // NORMAL SUCCESS / REDIRECT BRIDGE
     if (redirectUri) {
         cookieStore.delete('redirect_uri');
         const appUrl = `${redirectUri}${redirectUri.includes('?') ? '&' : '?'}token=${session.token}`;
@@ -58,7 +146,7 @@ export default async function AuthBridgePage() {
                     <div className="space-y-3">
                         <h1 className="text-4xl font-black tracking-tighter uppercase italic">¡Acceso Concedido!</h1>
                         <p className="text-sm opacity-50 max-w-[280px] mx-auto leading-relaxed">
-                            Tu identidad ha sido verificada. Volviendo a la terminal de IronTrain...
+                            @{profile.username} ha sido sincronizado. Volviendo a la terminal de IronTrain...
                         </p>
                     </div>
 
@@ -90,8 +178,8 @@ export default async function AuthBridgePage() {
                 </div>
 
                 <div className="space-y-2">
-                    <h2 className="text-2xl font-black tracking-tight">{profileResult[0]?.displayName || 'Atleta Logueado'}</h2>
-                    <p className="text-xs opacity-40 uppercase tracking-widest">IronTrain ID: {session.id.slice(0, 8)}...</p>
+                    <h2 className="text-2xl font-black tracking-tight">{profile.displayName}</h2>
+                    <p className="text-xs opacity-40 uppercase tracking-widest">@{profile.username}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 pt-4">

@@ -4,11 +4,12 @@ import { SocialFriend, SocialInboxItem, SocialLeaderboardEntry, SocialProfile, S
 import { useAuthStore } from '@/src/store/authStore';
 import { Colors } from '@/src/theme';
 import * as Clipboard from 'expo-clipboard';
-import { Copy, UserCheck } from 'lucide-react-native';
+import { Copy, Globe, UserCheck } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Linking,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -82,6 +83,14 @@ export default function SocialTab() {
         }
     };
 
+    const handleOpenPublicRoutines = async () => {
+        try {
+            await Linking.openURL('https://irontrain.motiona.xyz/feed');
+        } catch {
+            Alert.alert('Error', 'No se pudo abrir la página de rutinas públicas.');
+        }
+    };
+
     const handleSendRequest = async (friendId: string) => {
         try {
             await SocialService.sendFriendRequest(friendId);
@@ -133,8 +142,17 @@ export default function SocialTab() {
     return (
         <SafeAreaWrapper style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.title}>IronSocial</Text>
-                {loading && <ActivityIndicator color={Colors.primary.DEFAULT} />}
+                <View>
+                    <Text style={styles.title}>IronSocial</Text>
+                    <Text style={styles.subtitle}>Rutinas públicas y amigos</Text>
+                </View>
+                <View style={styles.headerActions}>
+                    <TouchableOpacity style={styles.publicBtn} onPress={handleOpenPublicRoutines}>
+                        <Globe size={16} color={Colors.white} />
+                        <Text style={styles.publicBtnText}>Rutinas públicas</Text>
+                    </TouchableOpacity>
+                    {loading && <ActivityIndicator color={Colors.primary.DEFAULT} />}
+                </View>
             </View>
 
             <ScrollView
@@ -144,6 +162,9 @@ export default function SocialTab() {
                 {profile && (
                     <View style={styles.profileCard}>
                         <Text style={styles.profileName}>{profile.displayName}</Text>
+                        {profile.username && (
+                            <Text style={styles.profileUsername}>@{profile.username}</Text>
+                        )}
                         <Text style={styles.profileStats}>Rutinas compartidas: {profile.shareStats || 0}</Text>
                         <TouchableOpacity style={styles.idBox} onPress={handleCopyId}>
                             <Text style={styles.idText} numberOfLines={1} ellipsizeMode="middle">ID: {profile.id}</Text>
@@ -308,6 +329,33 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
     },
+    subtitle: {
+        color: Colors.iron[500],
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 2,
+    },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    publicBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: Colors.primary.DEFAULT,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 12,
+    },
+    publicBtnText: {
+        color: Colors.white,
+        fontSize: 11,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
+    },
     title: {
         fontSize: 28,
         fontWeight: 'bold',
@@ -330,6 +378,13 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: Colors.iron[950],
         marginBottom: 4,
+    },
+    profileUsername: {
+        fontSize: 16,
+        fontWeight: '900',
+        color: Colors.primary.DEFAULT,
+        marginBottom: 8,
+        letterSpacing: 0.5,
     },
     profileStats: {
         fontSize: 14,

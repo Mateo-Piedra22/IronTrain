@@ -1,16 +1,40 @@
 {
-  "generatedAt": "2026-03-04T16:15:41.320Z",
+  "generatedAt": "2026-03-04T17:57:28.534Z",
   "source": "docs/CHANGELOG.md",
   "releases": [
     {
-      "version": "1.4.0",
+      "version": "2.0.1",
       "date": null,
       "unreleased": true,
       "items": [
-        "Soporte para múltiples temas (claro/oscuro).",
-        "Soporte para diferentes idiomas (inglés/español).",
-        "Conexión con múltiples dispositivos (relojes/bands compatibles).",
-        "Vinculación con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos."
+        "**Sistema de temas**: Posibilidad de elegir entre tema claro y oscuro.",
+        "**Soporte para diferentes idiomas**: Posibilidad de elegir entre inglés y español.",
+        "**Conexión con múltiples dispositivos**: Posibilidad de conectar con múltiples dispositivos (relojes/bands compatibles).",
+        "**Vinculación con servicios de salud**: Posibilidad de vincular con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos."
+      ]
+    },
+    {
+      "version": "2.0.0",
+      "date": "2026-03-04",
+      "unreleased": false,
+      "items": [
+        "**Tu app ahora funciona sin internet y luego se actualiza sola**: Entrenas en el gimnasio, terminas y, sin tocar nada, los datos se suben al instante cuando hay señal. Si algo falla, el sistema reintenta hasta que todo quede igual en tu celular y en la nube.",
+        "**Entrás una vez y no volvés a poner usuario ni contraseña**: Abrís la app o la web, tu sesión sigue viva y tu historial ya está ahí. Si cerraste sesión por error, al volver a entrar se baja automáticamente todo lo tuyo sin perderte ni un peso levantado.",
+        "**Backup tuyo, en tu bolsillo**: Además de compartir por WhatsApp, ahora podés tocar “Descargar” y guardar un archivo .json en el celular. Lo guardás en Drive, lo mandás por mail o lo dejás en la PC: tu información siempre está bajo tu control.",
+        "**Nuevo sistema de sociales**: Al crear tu cuenta y loguearte, se te crea un perfil. Podes buscar y añadir amigos, enviar solicitudes, compartir rutinas y compararse entre sí. Tenés un inbox para recibir rutinas, un ranking para comparar tus records entre amigos y una página de búsqueda de rutinas.",
+        "**Setup de Identidad Único (Zero-Trust)**: Al crear una cuenta por primera vez se te pedirá elegir tu nombre de usuario único (@username). Este identificador te representará en IronSocial de por vida. Viene equipado con filtros estrictos de profanidad, unicidad real en servidor y diseño paramédico para tu protección.",
+        "**Telemetría y Soporte Integrado (Nuevo Comando Central)**: Ahora la app contabiliza descargas únicas reales por OS, y te permite reportar Bugs o pedir Sugerencias directamente desde 'Ajustes' > 'Comunidad y Feedback', sin salir de la App. Todo monitoreado en un nuevo Dashboard ultra-avanzado y protegido donde el staff de IronTrain puede resolver problemas en vivo.",
+        "**Tus métricas, mejoradas**: se amplió el sistema de estadísticas para que puedas ver tus records, tu progreso y tus mejores entrenamientos, adicionalmente, se implementó un sistema completo de \"Body Measures\" para que puedas ver y actualizar tu progreso en peso, tamaños y porcentajes de tu cuerpo.",
+        "**Compartir rutinas sin romperse la cabeza**: Elegís tu rutina, tocás “Compartir” y se genera un link. Lo abrís desde cualquier celu y la app te recrea la rutina completa, ejercicios y categorías incluidas. Si al otro le falta un ejercicio, se crea automáticamente sin errores. Adicionalmente, se implementó una página de rutinas pública para que puedas descargar y copiar rutinas publicadas por otros usuarios (podes publicar las tuyas colocándolas en públicas!) (estas rutinas están sujetas a revisión automática).",
+        "**Nuevo diseño de la app**: Se rediseño la aplicación por completo buscando un aspecto homogéneo en todo el sistema y una optimización a niveles visuales de alto grado, rediseñamos y estandarizamos los modales, páginas y todos los gráficos desde el calendario de asistencia hasta la calculadora de discos tienen mejor contraste y aspecto.",
+        "**Por debajo todo nuevo (y más rápido)**: Reescribimos la forma en que la app guarda configuraciones, chequea actualizaciones, cuenta estadísticas y sincroniza rutinas. Se nota en el día a día: abre más rápido, gasta menos batería y rara vez tira error.",
+        "**Iconos y pantalla de carga renovados**: El ícono ahora tiene mejor resolución en Android e iOS.",
+        "**Notificaciones in-app y de sistema**: Se mejoró y amplió el sistema de notificaciones para que sean más intuitivas y cómodas. Se añadieron notificaciones para recordatorios de entrenamiento, avisos de nuevas versiones y notificaciones de nuevos amigos.",
+        "**Control de estado de entrenamiento**: Se implementó un sistema de control de estado de entrenamiento para poder pausar, reiniciar, reanudar y finalizar entrenamientos de manera más intuitiva y cómoda, adicionalmente, ahora es posible editar el tiempo final del entrenamiento (esto es clave ya que afecta a las estadísticas).",
+        "**Tipos de serie**: Se implementó un sistema de tipos de serie para poder diferenciar entre series de calentamiento, series efectivas, series al fallo, etc. Esto permite una mejor visualización y análisis en profundidas de los entrenamientos.",
+        "**Calculadora de discos**: Se mejoró y amplió la calculadora de discos, se implementó la diferenciación tanto visual como funcional de discos estándar, bumper y calibrados (afectan visualmente a la representación brindada al calcular), esto implica un control mas preciso del inventario de discos de cada usuario.",
+        "**Tu información más protegida que nunca**: Antes un archivo dañado podía romper la sincronización. Ahora validamos cada dato que entra o sale: si algo no cuadra, se rechaza y te avisamos, pero tu historial queda intacto.",
+        "**Mas opciones de configuración**: Se añadieron más opciones de configuración en la sección de ajustes, como la posibilidad de activar/desactivar notificaciones, sonidos, establecer que dias entrenás (afecta a las rachas y recordatorios), entre otras."
       ]
     },
     {

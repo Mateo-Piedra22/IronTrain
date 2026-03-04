@@ -21,6 +21,7 @@ import { ToastContainer } from '../components/ui/ToastContainer';
 import '../global.css';
 import { configService } from '../src/services/ConfigService';
 import { dbService } from '../src/services/DatabaseService';
+import { MetricsAndFeedbackService } from '../src/services/MetricsAndFeedbackService';
 import { syncService } from '../src/services/SyncService';
 import { updateService } from '../src/services/UpdateService';
 import { useAuthStore } from '../src/store/authStore';
@@ -91,6 +92,8 @@ export default function RootLayout() {
         await dbService.init();
         await configService.init();
         setDbInitialized(true);
+        // Track install analytics asynchronously
+        MetricsAndFeedbackService.trackInstallIfNeeded();
       } catch (e) {
         console.error('CRITICAL: Initialization failed:', e);
         // In production, we should log this to a crash reporting service (Sentry)

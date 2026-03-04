@@ -134,3 +134,23 @@ export const sharesInbox = pgTable('shares_inbox', {
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
 });
+
+// --- ADMIN & METRICS ---
+export const appInstalls = pgTable('app_installs', {
+    id: text('id').primaryKey(), // uniquely generated uuid per device installation
+    platform: text('platform').notNull(), // 'android', 'ios', 'web'
+    version: text('version'), // e.g. '1.0.0'
+    metadata: text('metadata'), // Extra JSON data (device model, os version)
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const feedback = pgTable('feedback', {
+    id: text('id').primaryKey(),
+    userId: text('user_id'), // Optional if anonymous, refs userProfiles.id
+    type: text('type').notNull(), // 'bug', 'feature_request', 'review', 'other'
+    message: text('message').notNull(),
+    status: text('status').default('open').notNull(), // 'open', 'in_progress', 'resolved', 'closed'
+    metadata: text('metadata'), // JSON string with app version, OS, etc. for repro
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});

@@ -1,10 +1,11 @@
+import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { routineService } from '@/src/services/RoutineService';
 import { Colors } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Download } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function ShareRoutineScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -64,86 +65,197 @@ export default function ShareRoutineScreen() {
 
     if (loading) {
         return (
-            <View style={{ flex: 1, backgroundColor: Colors.iron[900], justifyContent: 'center', alignItems: 'center' }}>
+            <SafeAreaWrapper style={styles.screen} centered contentClassName="items-center justify-center">
                 <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
-                <Text style={{ marginTop: 16, color: Colors.iron[500], fontFamily: 'mono' }}>Conectando con IronTrain...</Text>
-            </View>
+                <Text style={styles.loadingText}>Conectando con IronTrain...</Text>
+            </SafeAreaWrapper>
         );
     }
 
     if (error || !payload) {
         return (
-            <View style={{ flex: 1, backgroundColor: Colors.iron[900], padding: 24, justifyContent: 'center', alignItems: 'center' }}>
+            <SafeAreaWrapper style={styles.screen} centered contentClassName="items-center justify-center">
                 <AlertCircle size={48} color={Colors.primary.DEFAULT} />
-                <Text style={{ marginTop: 16, color: Colors.iron[950], fontSize: 18, fontWeight: 'bold' }}>Rutina Inaccesible</Text>
-                <Text style={{ marginTop: 8, color: Colors.iron[500], textAlign: 'center' }}>{error}</Text>
-                <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 32, paddingVertical: 12, paddingHorizontal: 24, backgroundColor: Colors.iron[200], borderRadius: 8 }}>
-                    <Text style={{ color: Colors.iron[950], fontWeight: 'bold' }}>Volver</Text>
+                <Text style={styles.errorTitle}>Rutina Inaccesible</Text>
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity onPress={() => router.back()} style={styles.errorBtn}>
+                    <Text style={styles.errorBtnText}>Volver</Text>
                 </TouchableOpacity>
-            </View>
+            </SafeAreaWrapper>
         );
     }
 
     const { routine, routine_days, routine_exercises, exercises } = payload;
 
     return (
-        <ScrollView style={{ flex: 1, backgroundColor: Colors.iron[900] }} contentContainerStyle={{ padding: 24 }}>
-            <View style={{ backgroundColor: Colors.iron[50], padding: 24, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[200], marginBottom: 24 }}>
-                <Text style={{ fontSize: 24, fontWeight: 'bold', color: Colors.iron[950], marginBottom: 8 }}>{routine.name}</Text>
-                {routine.description && <Text style={{ fontSize: 14, color: Colors.iron[500], marginBottom: 16 }}>{routine.description}</Text>}
+        <SafeAreaWrapper style={styles.screen}>
+            <ScrollView contentContainerStyle={styles.content}>
+                <View style={styles.card}>
+                    <Text style={styles.title}>{routine.name}</Text>
+                    {routine.description && <Text style={styles.description}>{routine.description}</Text>}
 
-                <View style={{ flexDirection: 'row', gap: 16, marginBottom: 16 }}>
-                    <View>
-                        <Text style={{ fontSize: 10, color: Colors.iron[400], fontWeight: 'bold' }}>DÍAS</Text>
-                        <Text style={{ fontSize: 18, fontWeight: 'bold', color: Colors.iron[800] }}>{routine_days.length}</Text>
+                    <View style={styles.summaryRow}>
+                        <View>
+                            <Text style={styles.summaryLabel}>DÍAS</Text>
+                            <Text style={styles.summaryValue}>{routine_days.length}</Text>
+                        </View>
+                        <View>
+                            <Text style={styles.summaryLabel}>EJERCICIOS DISTINTOS</Text>
+                            <Text style={styles.summaryValue}>{exercises.length}</Text>
+                        </View>
                     </View>
-                    <View>
-                        <Text style={{ fontSize: 10, color: Colors.iron[400], fontWeight: 'bold' }}>EJERCICIOS DISTINTOS</Text>
-                        <Text style={{ fontSize: 18, fontWeight: 'bold', color: Colors.iron[800] }}>{exercises.length}</Text>
+
+                    <View style={styles.dayList}>
+                        {routine_days.map((day: any) => {
+                            const dayExercises = routine_exercises.filter((re: any) => re.routine_day_id === day.id);
+                            return (
+                                <View key={day.id} style={styles.dayRow}>
+                                    <Text style={styles.dayName}>{day.name}</Text>
+                                    <Text style={styles.dayCount}>{dayExercises.length} ej.</Text>
+                                </View>
+                            );
+                        })}
                     </View>
                 </View>
 
-                {/* Day Previews */}
-                <View style={{ gap: 8 }}>
-                    {routine_days.map((day: any) => {
-                        const dayExercises = routine_exercises.filter((re: any) => re.routine_day_id === day.id);
-                        return (
-                            <View key={day.id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.iron[200] }}>
-                                <Text style={{ color: Colors.iron[800], fontWeight: '600' }}>{day.name}</Text>
-                                <Text style={{ color: Colors.iron[400], fontSize: 12 }}>{dayExercises.length} ej.</Text>
-                            </View>
-                        );
-                    })}
-                </View>
-            </View>
+                <TouchableOpacity onPress={handleImport} disabled={importing} style={[styles.importBtn, importing && styles.importBtnLoading]}>
+                    {importing ? (
+                        <ActivityIndicator color="white" />
+                    ) : (
+                        <>
+                            <Download size={20} color="white" />
+                            <Text style={styles.importBtnText}>Importar Rutina</Text>
+                        </>
+                    )}
+                </TouchableOpacity>
 
-            <TouchableOpacity
-                onPress={handleImport}
-                disabled={importing}
-                style={{
-                    backgroundColor: Colors.primary.DEFAULT,
-                    padding: 18,
-                    borderRadius: 12,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    opacity: importing ? 0.7 : 1
-                }}
-            >
-                {importing ? (
-                    <ActivityIndicator color="white" />
-                ) : (
-                    <>
-                        <Download size={20} color="white" />
-                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Importar Rutina</Text>
-                    </>
-                )}
-            </TouchableOpacity>
-
-            <Text style={{ color: Colors.iron[400], fontSize: 12, textAlign: 'center', marginTop: 16, paddingHorizontal: 24 }}>
-                IronTrain revisará los ejercicios para evitar duplicados en tu base de datos local automáticamente.
-            </Text>
-        </ScrollView>
+                <Text style={styles.helperText}>
+                    IronTrain revisará los ejercicios para evitar duplicados en tu base de datos local automáticamente.
+                </Text>
+            </ScrollView>
+        </SafeAreaWrapper>
     );
 }
+
+const styles = StyleSheet.create({
+    screen: {
+        flex: 1,
+        backgroundColor: Colors.background,
+    },
+    content: {
+        padding: 24,
+        paddingBottom: 32,
+    },
+    loadingText: {
+        marginTop: 16,
+        color: Colors.iron[500],
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    errorTitle: {
+        marginTop: 16,
+        color: Colors.iron[950],
+        fontSize: 18,
+        fontWeight: '800',
+    },
+    errorText: {
+        marginTop: 8,
+        color: Colors.iron[500],
+        textAlign: 'center',
+    },
+    errorBtn: {
+        marginTop: 24,
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        backgroundColor: Colors.surface,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: Colors.border,
+    },
+    errorBtnText: {
+        color: Colors.iron[950],
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        fontSize: 12,
+        letterSpacing: 0.6,
+    },
+    card: {
+        backgroundColor: Colors.surface,
+        padding: 20,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: Colors.border,
+        marginBottom: 20,
+    },
+    title: {
+        fontSize: 22,
+        fontWeight: '800',
+        color: Colors.iron[950],
+        marginBottom: 8,
+    },
+    description: {
+        fontSize: 14,
+        color: Colors.iron[500],
+        marginBottom: 16,
+    },
+    summaryRow: {
+        flexDirection: 'row',
+        gap: 16,
+        marginBottom: 16,
+    },
+    summaryLabel: {
+        fontSize: 10,
+        color: Colors.iron[400],
+        fontWeight: '800',
+        letterSpacing: 0.6,
+    },
+    summaryValue: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: Colors.iron[800],
+    },
+    dayList: {
+        gap: 8,
+    },
+    dayRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        borderTopWidth: 1,
+        borderTopColor: Colors.border,
+    },
+    dayName: {
+        color: Colors.iron[800],
+        fontWeight: '700',
+    },
+    dayCount: {
+        color: Colors.iron[400],
+        fontSize: 12,
+    },
+    importBtn: {
+        backgroundColor: Colors.primary.DEFAULT,
+        padding: 18,
+        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    importBtnLoading: {
+        opacity: 0.7,
+    },
+    importBtnText: {
+        color: 'white',
+        fontWeight: '800',
+        fontSize: 14,
+        textTransform: 'uppercase',
+        letterSpacing: 0.6,
+    },
+    helperText: {
+        color: Colors.iron[400],
+        fontSize: 12,
+        textAlign: 'center',
+        marginTop: 16,
+        paddingHorizontal: 24,
+    },
+});

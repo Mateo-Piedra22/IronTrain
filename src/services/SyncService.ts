@@ -22,6 +22,11 @@ interface SyncPayload {
     created_at: number;
 }
 
+export interface SyncStatus {
+    hasData: boolean;
+    recordCount: number;
+}
+
 export class SyncService {
     private isSyncing = false;
 
@@ -293,6 +298,89 @@ export class SyncService {
             console.error('Failed to restore snapshot:', error);
             throw error;
         }
+    }
+
+    public async checkRemoteStatus(): Promise<SyncStatus> {
+        const token = useAuthStore.getState().token;
+        if (!token) throw new Error('Usuario no autenticado');
+
+        const response = await this.requestWithRetry(`${API_BASE_URL}/status`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return await response.json();
+    }
+
+    public async checkLocalStatus(): Promise<SyncStatus> {
+        const db = dbService.getDatabase();
+        let count = 0;
+        const tables = ['workouts', 'routines', 'exercises'];
+        for (const t of tables) {
+            const res = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) as count FROM ${t}`);
+            count += res?.count || 0;
+        }
+        return { hasData: count > 0, recordCount: count };
+    }
+
+    public async pushLocalSnapshot(): Promise<void> {
+        const token = useAuthStore.getState().token;
+        if (!token) throw new Error('Usuario no autenticado');
+
+        const db = dbService.getDatabase();
+        const tables = [
+            'exercises', 'categories', 'workouts', 'workout_sets',
+            'routines', 'routine_days', 'routine_exercises',
+            'measurements', 'goals'
+        ];
+
+        const snapshot: Record<string, any[]> = {};
+        for (const table of tables) {
+            snapshot[table] = await db.getAllAsync(`SELECT * FROM ${table}`);
+        }
+
+        const response = await this.requestWithRetry(`${API_BASE_URL}/snapshot`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ snapshot })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Snapshot push failed! status: ${response.status}`);
+        }
+
+        await db.runAsync('DELETE FROM sync_queue');
+        await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', Date.now().toString()]);
+    }
+
+    public async pullCloudSnapshot(): Promise<void> {
+        const token = useAuthStore.getState().token;
+        if (!token) throw new Error('Usuario no autenticado');
+
+        const response = await this.requestWithRetry(`${API_BASE_URL}/snapshot`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Snapshot pull failed! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const snapshot = data.snapshot;
+        if (!snapshot) throw new Error('Invalid snapshot received');
+
+        const fileUri = FileSystem.documentDirectory + 'irontrain_cloud_snapshot.json';
+        await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(snapshot));
+
+        await this.restoreDatabaseSnapshot(fileUri);
+
+        const db = dbService.getDatabase();
+        await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', Date.now().toString()]);
     }
 }
 

@@ -1,5 +1,5 @@
 import { and, eq, isNull } from 'drizzle-orm';
-import { Download, Sparkles } from 'lucide-react';
+import { Copy, Download, Sparkles } from 'lucide-react';
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -35,6 +35,7 @@ export default async function RoutineSharePage({ params }: RoutinePageProps) {
 
     // Prepare Deep Link (Will trigger intent over IronTrain app)
     const deepLink = `irontrain://share/routine/${id}`;
+    const publicLink = `https://irontrain.motiona.xyz/share/routine/${id}`;
 
     return (
         <div className="flex flex-col min-h-[calc(100vh-80px)] p-6 md:p-12 items-center justify-center">
@@ -73,14 +74,41 @@ export default async function RoutineSharePage({ params }: RoutinePageProps) {
                             <Download className="w-4 h-4 group-hover:-translate-y-1 transition-transform" />
                             ABRIR Y DESCARGAR EN LA APP
                         </a>
+                        <button
+                            type="button"
+                            className="w-full px-6 py-3 border border-current/20 hover:border-current transition-colors flex items-center justify-center gap-2 text-xs font-bold tracking-wider uppercase"
+                            data-copy={publicLink}
+                        >
+                            <Copy className="w-4 h-4" />
+                            Copiar link público
+                        </button>
 
                         <p className="text-xs text-center opacity-40 mt-4 px-4 leading-relaxed tracking-wide">
-                            {/* TODO: Change this link to official stores when officially deployed to stores. Currently points to /downloads. */}
-                            Si no tienes P2P Habilitado o la App instalada, debes <Link href="/downloads" className="underline hover:text-red-500">Descargar IronTrain</Link> primero.
+                            Si no tienes la app instalada, debes <Link href="/downloads" className="underline hover:text-red-500">Descargar IronTrain</Link> primero.
                         </p>
                     </div>
                 </div>
             </div>
+            <script
+                dangerouslySetInnerHTML={{
+                    __html: `
+                    (function () {
+                        document.querySelectorAll('[data-copy]').forEach(function (btn) {
+                            btn.addEventListener('click', async function () {
+                                try {
+                                    const link = btn.getAttribute('data-copy');
+                                    if (!link) return;
+                                    await navigator.clipboard.writeText(link);
+                                    const previous = btn.innerHTML;
+                                    btn.innerHTML = 'Link copiado';
+                                    setTimeout(() => { btn.innerHTML = previous; }, 1200);
+                                } catch {}
+                            });
+                        });
+                    })();
+                `,
+                }}
+            />
         </div>
     );
 }

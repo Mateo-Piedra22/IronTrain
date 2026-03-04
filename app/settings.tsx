@@ -10,9 +10,9 @@ import { Colors } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
-import { BarChart3, Bell, Calculator, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, CloudLightning, Database, Disc, Download, LogOut, Megaphone, RefreshCw, Ruler, Shield, Smartphone, Timer, Trash2, User, Vibrate, Volume2, Zap } from 'lucide-react-native';
+import { BarChart3, Bell, Calculator, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, CloudLightning, Database, Disc, Download, LogOut, Megaphone, MessageSquare, RefreshCw, Ruler, Shield, Smartphone, Timer, Trash2, User, Vibrate, Volume2, Zap } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { syncService } from '../src/services/SyncService';
 import { useAuthStore } from '../src/store/authStore';
 import { confirm } from '../src/store/confirmStore';
@@ -124,11 +124,61 @@ export default function SettingsScreen() {
 
     const handleCloudSnapshot = async () => {
         try {
-            notify.info('Sincronizando nube...', 'Calculando reconciliación de datos local-nube, esto puede tardar unos segundos.');
-            await syncService.syncBidirectional();
-            notify.success('Sincronización completa', 'Todos los datos están respaldados en la nube Neon de IronTrain de manera exitosa.');
+            notify.info('Verificando estado...', 'Comprobando registros en la nube y en el dispositivo.');
+            const local = await syncService.checkLocalStatus();
+            const remote = await syncService.checkRemoteStatus();
+
+            if (local.hasData && remote.hasData) {
+                Alert.alert(
+                    'Resolución de Conflictos P2P',
+                    `Tenes datos completos en ambas partes:\nCelular: ${local.recordCount} registros.\nNube Neon: ${remote.recordCount} registros.\n¿Qué base de datos querés utilizar como fuente de verdad?`,
+                    [
+                        {
+                            text: 'Celular (Sobrescribir Nube)',
+                            onPress: async () => {
+                                try {
+                                    notify.info('Cargando...', 'Subiendo Snapshot a la Nube...');
+                                    await syncService.pushLocalSnapshot();
+                                    notify.success('Éxito', 'Nube actualizada con los datos de tu celular.');
+                                } catch (e) { notify.error('Error'); }
+                            },
+                        },
+                        {
+                            text: 'Nube (Sobrescribir Celular)',
+                            onPress: async () => {
+                                try {
+                                    notify.info('Cargando...', 'Descargando Snapshot de la Nube...');
+                                    await syncService.pullCloudSnapshot();
+                                    notify.success('Éxito', 'Celular actualizado con los datos de la nube.');
+                                } catch (e) { notify.error('Error'); }
+                            },
+                        },
+                        {
+                            text: 'Sincronizar (Mezclar ambos)',
+                            onPress: async () => {
+                                try {
+                                    notify.info('Sincronizando...', 'Fusionando datos local-nube sin perder métricas.');
+                                    await syncService.syncBidirectional();
+                                    notify.success('Éxito', 'Sincronización híbrida completa.');
+                                } catch (e) { notify.error('Error'); }
+                            },
+                        },
+                        { text: 'Cancelar', style: 'cancel' }
+                    ]
+                );
+            } else if (local.hasData && !remote.hasData) {
+                notify.info('Subiendo (Zero-Trust)...', 'La nube está vacía, forzando subida de datos locales...');
+                await syncService.pushLocalSnapshot();
+                notify.success('Copia Creada', 'Tus datos ahora están respaldados en la nube Neon.');
+            } else if (!local.hasData && remote.hasData) {
+                notify.info('Recuperando...', 'Recuperando tu historial completo desde la nube...');
+                await syncService.pullCloudSnapshot();
+                notify.success('Recuperación Exitosa', 'Toda tu cuenta ha resucitado en este dispositivo.');
+            } else {
+                notify.info('Cuenta Nueva', 'No hay métricas en el celular ni en la nube para procesar todavía.');
+            }
         } catch (error: any) {
-            notify.error('Fallo en sincronización', error?.message || 'Revisa tu conexión o inicia sesión.');
+            notify.error('Fallo en Reconocimiento', error?.message || 'Error conectando con los servidores Neon. Revisa tu conexión.');
         }
     };
 
@@ -575,13 +625,27 @@ export default function SettingsScreen() {
 
                 {/* Danger Zone */}
                 <SectionHeader icon={Shield} title="Zona de riesgo" />
-                <View style={[s.card, { borderColor: '#ef444430' }]}>
+                <View style={[s.card, { borderColor: '#ef444430', marginBottom: 24 }]}>
                     <TouchableOpacity onPress={handleResetDB} style={s.settingRow}>
                         <View style={s.settingLeft}>
                             <View style={[s.settingIconCircle, { backgroundColor: '#ef444415' }]}><Trash2 size={16} color="#ef4444" /></View>
                             <Text style={[s.settingLabel, { color: '#ef4444' }]}>Restablecer de fábrica</Text>
                         </View>
                         <ChevronRight size={16} color="#ef4444" />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Community and Feedback */}
+                <SectionHeader icon={MessageSquare} title="Comunidad y Feedback" />
+                <View style={[s.card, { marginBottom: 24 }]}>
+                    <TouchableOpacity onPress={() => router.push('/feedback' as any)} style={s.settingRow}>
+                        <View style={s.settingLeft}>
+                            <View style={[s.settingIconCircle, { backgroundColor: `${Colors.primary.DEFAULT}15` }]}>
+                                <MessageSquare size={16} color={Colors.primary.DEFAULT} />
+                            </View>
+                            <Text style={s.settingLabel}>Enviar Feedback y Reportes</Text>
+                        </View>
+                        <ChevronRight size={16} color={Colors.iron[400]} />
                     </TouchableOpacity>
                 </View>
 
