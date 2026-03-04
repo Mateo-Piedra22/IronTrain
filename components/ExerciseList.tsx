@@ -106,7 +106,7 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
     return (
         <View style={{ flex: 1, backgroundColor: inModal ? Colors.iron[100] : Colors.iron[900] }}>
             {/* Search Header */}
-            <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: inModal ? Colors.iron[200] : Colors.iron[800] }}>
+            <View style={{ padding: 16 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, gap: 10 }}>
                     <Search size={20} color={Colors.iron[400]} />
                     <TextInput

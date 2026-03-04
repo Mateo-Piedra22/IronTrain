@@ -1,7 +1,7 @@
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { MetricsAndFeedbackService } from '@/src/services/MetricsAndFeedbackService';
 import { Colors } from '@/src/theme';
-import { router } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { Check, ChevronLeft, Lightbulb, MessageSquareQuote, ShieldAlert } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -59,14 +59,20 @@ export default function FeedbackScreen() {
 
     return (
         <SafeAreaWrapper style={s.container} edges={['top', 'left', 'right']}>
+            <Stack.Screen options={{ headerShown: false }} />
+
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled">
                     <View style={s.header}>
-                        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-                            <ChevronLeft size={24} color={Colors.iron[950]} />
-                        </TouchableOpacity>
-                        <Text style={s.headerTitle}>Centro de Feedback</Text>
-                        <View style={{ width: 40 }} />
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                            <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+                                <ChevronLeft size={20} color={Colors.iron[950]} />
+                            </TouchableOpacity>
+                            <View>
+                                <Text style={s.pageTitle}>Centro de Feedback</Text>
+                                <Text style={s.pageSub}>Reporta errores y sugerencias</Text>
+                            </View>
+                        </View>
                     </View>
 
                     <Text style={s.description}>
@@ -124,7 +130,7 @@ export default function FeedbackScreen() {
 const s = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.iron[50],
+        backgroundColor: Colors.iron[900],
     },
     scrollContent: {
         padding: 20,
@@ -133,24 +139,30 @@ const s = StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
         marginBottom: 24,
     },
     backBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: Colors.white,
-        borderWidth: 1,
-        borderColor: Colors.iron[200],
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: Colors.surface,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: Colors.iron[300],
     },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '900',
+    pageTitle: {
         color: Colors.iron[950],
-        textTransform: 'uppercase',
+        fontWeight: '900',
+        fontSize: 24,
+        letterSpacing: -1,
+    },
+    pageSub: {
+        color: Colors.primary.DEFAULT,
+        fontSize: 12,
+        fontWeight: '800',
+        marginTop: 2,
+        letterSpacing: 0.5,
     },
     description: {
         fontSize: 14,

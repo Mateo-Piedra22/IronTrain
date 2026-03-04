@@ -24,6 +24,19 @@ export default function TabLayout() {
             shadowRadius: 4,
           },
           headerShown: useClientOnlyValue(false, true),
+          headerStyle: {
+            backgroundColor: Colors.iron[900],
+            elevation: 0,
+            shadowOpacity: 0,
+            borderBottomWidth: 1,
+            borderBottomColor: Colors.iron[700],
+          },
+          headerTintColor: Colors.iron[950],
+          headerTitleStyle: {
+            fontWeight: '900',
+            color: Colors.iron[950],
+            fontSize: 18,
+          },
           tabBarLabelStyle: { fontWeight: 'bold' },
         }}>
         <Tabs.Screen

@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Image,
     Linking,
     RefreshControl,
     ScrollView,
@@ -132,7 +133,21 @@ export default function SocialTab() {
     if (!authState.token) {
         return (
             <SafeAreaWrapper style={styles.container} centered contentClassName="items-center justify-center">
-                <Text style={styles.title}>Iniciá sesión para usar IronSocial</Text>
+                <View style={styles.loggedOutContainer}>
+                    <View style={styles.loggedOutIcon}>
+                        <Globe size={48} color={Colors.iron[400]} />
+                    </View>
+                    <Text style={styles.loggedOutTitle}>Conectate a IronSocial</Text>
+                    <Text style={styles.loggedOutSub}>
+                        Sincronizá tus rutinas, compartilas con amigos y descubrí la comunidad IronTrain.
+                    </Text>
+                    <TouchableOpacity style={styles.loginBtn} onPress={() => useAuthStore.getState().login()}>
+                        <Text style={styles.loginBtnText}>Iniciar Sesión</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.signupBtn} onPress={() => useAuthStore.getState().login()}>
+                        <Text style={styles.signupBtnText}>Crear Cuenta</Text>
+                    </TouchableOpacity>
+                </View>
             </SafeAreaWrapper>
         );
     }
@@ -142,16 +157,20 @@ export default function SocialTab() {
     return (
         <SafeAreaWrapper style={styles.container}>
             <View style={styles.header}>
-                <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
                     <Text style={styles.title}>IronSocial</Text>
-                    <Text style={styles.subtitle}>Rutinas públicas y amigos</Text>
+                </View>
+                <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                    <Image
+                        source={require('../../assets/images/icon.png')}
+                        style={{ width: 100, height: 100, resizeMode: 'contain' }}
+                    />
                 </View>
                 <View style={styles.headerActions}>
                     <TouchableOpacity style={styles.publicBtn} onPress={handleOpenPublicRoutines}>
                         <Globe size={16} color={Colors.white} />
-                        <Text style={styles.publicBtnText}>Rutinas públicas</Text>
                     </TouchableOpacity>
-                    {loading && <ActivityIndicator color={Colors.primary.DEFAULT} />}
+                    {loading && <ActivityIndicator size="small" color={Colors.primary.DEFAULT} />}
                 </View>
             </View>
 
@@ -321,45 +340,96 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: Colors.background,
     },
-    header: {
-        paddingHorizontal: 20,
-        paddingTop: 12,
-        marginBottom: 16,
-        flexDirection: 'row',
+    loggedOutContainer: {
         alignItems: 'center',
-        justifyContent: 'space-between',
+        paddingHorizontal: 32,
     },
-    subtitle: {
-        color: Colors.iron[500],
-        fontSize: 12,
-        fontWeight: '600',
-        marginTop: 2,
+    loggedOutIcon: {
+        width: 96,
+        height: 96,
+        borderRadius: 48,
+        backgroundColor: Colors.iron[100],
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 24,
+    },
+    loggedOutTitle: {
+        fontSize: 22,
+        fontWeight: '900',
+        color: Colors.iron[950],
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    loggedOutSub: {
+        fontSize: 15,
+        color: Colors.iron[600],
+        textAlign: 'center',
+        lineHeight: 22,
+        marginBottom: 32,
+    },
+    loginBtn: {
+        backgroundColor: Colors.primary.DEFAULT,
+        paddingVertical: 14,
+        paddingHorizontal: 32,
+        borderRadius: 12,
+        width: '100%',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    loginBtnText: {
+        color: Colors.white,
+        fontSize: 16,
+        fontWeight: '800',
+    },
+    signupBtn: {
+        backgroundColor: Colors.surface,
+        paddingVertical: 14,
+        paddingHorizontal: 32,
+        borderRadius: 12,
+        width: '100%',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: Colors.iron[300],
+    },
+    signupBtnText: {
+        color: Colors.primary.DEFAULT,
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        height: 60,
+        backgroundColor: Colors.iron[900],
+        zIndex: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+        elevation: 4,
+    },
+    title: {
+        color: Colors.iron[950],
+        fontWeight: '900',
+        fontSize: 20,
+        letterSpacing: -0.5,
     },
     headerActions: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
+        zIndex: 10,
     },
     publicBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
         backgroundColor: Colors.primary.DEFAULT,
-        paddingHorizontal: 12,
+        paddingHorizontal: 10,
         paddingVertical: 8,
         borderRadius: 12,
-    },
-    publicBtnText: {
-        color: Colors.white,
-        fontSize: 11,
-        fontWeight: '800',
-        letterSpacing: 0.5,
-        textTransform: 'uppercase',
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: Colors.iron[950],
     },
     scrollContent: {
         paddingHorizontal: 20,

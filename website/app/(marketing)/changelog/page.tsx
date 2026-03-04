@@ -1,5 +1,21 @@
 import { getChangelog } from '../../../src/lib/changelog';
 
+// Helper to render text with bold (**text**) parts styled
+function renderChangelogItem(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      const boldContent = part.slice(2, -2);
+      return (
+        <strong key={idx} className="text-base font-bold text-iron-500">
+          {boldContent}
+        </strong>
+      );
+    }
+    return part;
+  });
+}
+
 export const dynamic = 'force-static';
 
 export default async function ChangelogPage() {
@@ -32,7 +48,7 @@ export default async function ChangelogPage() {
               {r.items.map((it, idx) => (
                 <li key={`${r.version}-${idx}`} className="flex gap-3">
                   <span className="mt-[2px] text-[10px] opacity-50">•</span>
-                  <span className="opacity-80 leading-relaxed">{it}</span>
+                  <span className="opacity-80 leading-relaxed">{renderChangelogItem(it)}</span>
                 </li>
               ))}
             </ul>
@@ -57,7 +73,7 @@ export default async function ChangelogPage() {
                   {r.items.map((it, idx) => (
                     <li key={`${r.version}-${idx}`} className="flex gap-3">
                       <span className="mt-[2px] text-[10px] opacity-50">•</span>
-                      <span className="opacity-80 leading-relaxed">{it}</span>
+                      <span className="opacity-80 leading-relaxed">{renderChangelogItem(it)}</span>
                     </li>
                   ))}
                 </ul>

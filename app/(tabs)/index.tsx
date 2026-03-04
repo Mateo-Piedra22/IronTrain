@@ -277,7 +277,7 @@ export default function DailyLogScreen() {
             headerRight={
               <Link href="/changelog" asChild>
                 <TouchableOpacity className="relative p-1 active:opacity-50">
-                  <Info size={24} color={Colors.iron[50]} />
+                  <Info size={24} color={Colors.iron[950]} />
                   {hasNewChangelog && (
                     <View className="absolute top-0 -right-1 w-3 h-3 rounded-full bg-red-500 border-2 border-iron-900" />
                   )}

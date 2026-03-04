@@ -163,7 +163,7 @@ const ss = StyleSheet.create({
     itemBulletWrapper: { width: 20, alignItems: 'flex-start', paddingTop: 8 },
     itemBulletDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary.DEFAULT },
     itemText: { color: Colors.iron[600], flex: 1, fontSize: 14, lineHeight: 22 },
-    itemBold: { color: Colors.iron[950], fontWeight: '800' },
+    itemBold: { color: Colors.primary.DEFAULT, fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
     unreleasedBtn: { paddingHorizontal: 20, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 1, borderColor: Colors.iron[300], borderStyle: 'dashed' },
     unreleasedText: { color: Colors.iron[950], fontWeight: '900', fontSize: 15 },
     emptyCard: { backgroundColor: Colors.surface, padding: 24, borderRadius: 20, borderWidth: 1, borderColor: Colors.iron[300] },

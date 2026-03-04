@@ -197,7 +197,7 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
                 </View>
 
                 {headerCenter && (
-                    <View style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }}>
+                    <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                         {headerCenter}
                     </View>
                 )}
@@ -280,14 +280,15 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        height: 60,
         backgroundColor: Colors.iron[900],
     },
     monthTitle: {
-        color: Colors.iron[50],
-        fontWeight: 'bold',
+        color: Colors.iron[950],
+        fontWeight: '900',
+        fontSize: 20,
         textTransform: 'capitalize',
-        fontSize: 18,
+        letterSpacing: -0.5,
     },
     expandButton: {
         padding: 8,

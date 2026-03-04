@@ -193,12 +193,17 @@ export default function AnalysisScreen() {
                 zIndex: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 4
             }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
-                    <Text style={{ color: Colors.iron[50], fontWeight: 'bold', fontSize: 18 }}>
+                    <Text style={{
+                        color: Colors.iron[950],
+                        fontWeight: '900',
+                        fontSize: 20,
+                        letterSpacing: -0.5
+                    }}>
                         Análisis
                     </Text>
                 </View>
 
-                <View style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }}>
+                <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                     <Image
                         source={require('../../assets/images/icon.png')}
                         style={{ width: 100, height: 100, resizeMode: 'contain' }}

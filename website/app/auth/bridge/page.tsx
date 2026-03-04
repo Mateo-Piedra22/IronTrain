@@ -15,9 +15,15 @@ async function getAuthenticatedSession() {
     const sessionData = data.session as { access_token?: string; token?: string } | null;
     const token = sessionData?.access_token ?? sessionData?.token;
     if (!token) return null;
+
+    // Neon Auth typically provides name in the user object
+    const user = data.user as any;
+    const name = user.name || user.full_name || user.fullName || user.displayName || user.display_name;
+
     return {
         id: data.user.id,
         email: data.user.email,
+        name: name as string | undefined,
         token
     };
 }
@@ -38,9 +44,10 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
     let profile = profileResult[0];
 
     if (!profile) {
+        // Use name from session if available, otherwise default to 'Atleta Iron'
         await db.insert(schema.userProfiles).values({
             id: session.id,
-            displayName: 'Atleta Iron',
+            displayName: session.name || 'Atleta Iron',
             isPublic: 1,
             updatedAt: new Date(),
         }).onConflictDoNothing();
@@ -71,8 +78,15 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
             const existing = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.username, username));
             if (existing.length > 0) return redirect('/auth/bridge?error=El_usuario_ya_existe_elige_otro');
 
-            // Update
-            await db.update(schema.userProfiles).set({ username, updatedAt: new Date() }).where(eq(schema.userProfiles.id, sessionId));
+            // Get display name from form
+            const displayName = formData.get('display_name') as string;
+
+            // Update with both username and display name
+            await db.update(schema.userProfiles).set({
+                username,
+                displayName: displayName?.trim() || profile.displayName || 'Atleta Iron',
+                updatedAt: new Date()
+            }).where(eq(schema.userProfiles.id, sessionId));
 
             // Re-run bridge logic
             redirect('/auth/bridge');
@@ -85,7 +99,7 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
                         <div className="text-center space-y-2">
                             <h1 className="text-2xl font-black uppercase tracking-tight">Setup Identidad</h1>
                             <p className="text-xs opacity-60 leading-relaxed">
-                                Elige tu nombre de usuario público. Todo P2P y progreso estará atado a este ID.
+                                Elige tu nombre de usuario público y tu nombre. Todo P2P y progreso estará atado a este ID.
                             </p>
 
                             <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 text-left">
@@ -98,6 +112,25 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
 
                         <form action={setUsernameAction} className="space-y-4 pt-2">
                             <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest opacity-40">Nombre de display</label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        name="display_name"
+                                        required
+                                        minLength={1}
+                                        maxLength={50}
+                                        defaultValue={profile.displayName || ''}
+                                        placeholder="Tu nombre"
+                                        className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-4 py-4 text-sm font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20 transition-all"
+                                    />
+                                </div>
+                                <p className="text-[9px] opacity-40 text-center">
+                                    Este nombre será visible en tu perfil público
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
                                 <label className="text-[10px] font-black uppercase tracking-widest opacity-40">Username</label>
                                 <div className="relative">
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30 font-bold">@</span>
@@ -105,15 +138,25 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
                                         type="text"
                                         name="username"
                                         required
+                                        minLength={3}
                                         maxLength={20}
-                                        pattern="[a-z0-9_]+"
+                                        pattern="^[a-z0-9_]+$"
+                                        title="Solo letras minúsculas, números y guiones bajos (3-20 caracteres)"
                                         placeholder="atleta_iron"
                                         className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl pl-10 pr-4 py-4 text-sm font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20 transition-all lowercase"
                                     />
                                 </div>
+                                <p className="text-[9px] opacity-40 text-center">
+                                    3-20 caracteres • solo letras minúsculas, números y _
+                                </p>
                                 {errorMsg && (
                                     <div className="text-[10px] font-bold text-red-600 uppercase mt-2 text-center bg-red-50 p-2 rounded border border-red-100">
-                                        Error: {errorMsg.replace(/_/g, ' ')}
+                                        {errorMsg === 'Usuario_Requerido' && 'Debes ingresar un nombre de usuario'}
+                                        {errorMsg === 'Debe_tener_entre_3_y_20_caracteres' && 'El usuario debe tener entre 3 y 20 caracteres'}
+                                        {errorMsg === 'Solo_minusculas_numeros_y_guiones' && 'Solo letras minúsculas, números y guiones bajos (_)'}
+                                        {errorMsg === 'Palabra_no_permitida' && 'Esta palabra no está permitida'}
+                                        {errorMsg === 'El_usuario_ya_existe_elige_otro' && 'Este usuario ya existe, elige otro'}
+                                        {errorMsg !== 'Usuario_Requerido' && errorMsg !== 'Debe_tener_entre_3_y_20_caracteres' && errorMsg !== 'Solo_minusculas_numeros_y_guiones' && errorMsg !== 'Palabra_no_permitida' && errorMsg !== 'El_usuario_ya_existe_elige_otro' && errorMsg.replace(/_/g, ' ')}
                                     </div>
                                 )}
                             </div>

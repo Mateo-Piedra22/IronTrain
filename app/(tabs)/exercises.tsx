@@ -124,7 +124,7 @@ export default function LibraryScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
                     <Text style={s.headerTitle}>Biblioteca</Text>
                 </View>
-                <View style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }}>
+                <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                     <Image source={require('../../assets/images/icon.png')} style={{ width: 100, height: 100, resizeMode: 'contain' }} />
                 </View>
                 <View style={{ zIndex: 10, width: 24 }} />
@@ -257,7 +257,7 @@ const s = StyleSheet.create({
         elevation: 4,
     },
     headerTitle: {
-        color: Colors.iron[50],
+        color: Colors.iron[950],
         fontWeight: '900',
         fontSize: 20,
         letterSpacing: -0.5,
@@ -374,26 +374,24 @@ const s = StyleSheet.create({
         paddingHorizontal: 32,
     },
     emptyIconCircle: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: Colors.surface,
-        borderWidth: 1,
-        borderColor: Colors.iron[300],
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: Colors.iron[100],
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 16,
+        marginBottom: 20,
     },
     emptyTitle: {
-        fontSize: 16,
-        fontWeight: '800',
+        fontSize: 20,
+        fontWeight: '900',
         color: Colors.iron[950],
-        marginBottom: 6,
+        marginBottom: 8,
     },
     emptySub: {
-        fontSize: 14,
-        color: Colors.iron[500],
+        fontSize: 15,
+        color: Colors.iron[600],
         textAlign: 'center',
-        lineHeight: 20,
+        lineHeight: 22,
     },
 });
