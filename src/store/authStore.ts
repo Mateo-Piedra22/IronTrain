@@ -79,12 +79,16 @@ export const useAuthStore = create<AuthState>((set) => ({
         try {
             set({ isLoading: true, error: null });
 
-            const returnUrl = Linking.createURL('auth/callback');
+            // Using just 'callback' as the path which resolves to app/callback.tsx
+            const returnUrl = Linking.createURL('callback');
 
             const authUrl = `${WEBSITE_URL}/auth/sign-in?redirectUri=${encodeURIComponent(returnUrl)}`;
 
+            // Using dismissed condition for better transition
             const result = await WebBrowser.openAuthSessionAsync(authUrl, returnUrl);
 
+            // If the browser session completes and returns a result with a URL
+            // we handle it here as a fallback, although callback.tsx should handle it too.
             if (result.type === 'success' && result.url) {
                 const parsedUrl = Linking.parse(result.url);
                 const rawToken = parsedUrl.queryParams?.token;
@@ -98,20 +102,13 @@ export const useAuthStore = create<AuthState>((set) => ({
                     }
 
                     await SecureStore.setItemAsync(TOKEN_KEY, token);
-
-                    set({
-                        token,
-                        user: userData,
-                        isLoading: false,
-                        error: null
-                    });
-                } else {
-                    throw new Error('No se recibió un token válido.');
+                    await useAuthStore.getState().initialize();
                 }
             } else if (result.type === 'cancel' || result.type === 'dismiss') {
-                set({ isLoading: false, error: 'Login cancelado.' });
-            } else {
-                throw new Error('Error de autenticación.');
+                // If it's dismissed, we wait a bit to see if we were already redirected to callback.tsx
+                setTimeout(() => {
+                    set({ isLoading: false });
+                }, 2000);
             }
         } catch (e: unknown) {
             set({ isLoading: false, error: getErrorMessage(e, 'Error desconocido') });

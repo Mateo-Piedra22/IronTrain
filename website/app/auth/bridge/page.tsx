@@ -173,7 +173,7 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
 
     // NORMAL SUCCESS / REDIRECT BRIDGE
     if (redirectUri) {
-        const appUrl = `${redirectUri}${redirectUri.includes('?') ? '&' : '?'}token=${session.token}`;
+        const appUrl = `${redirectUri}${redirectUri.includes('?') ? '&' : '?'}token=${encodeURIComponent(session.token)}`;
 
         return (
             <div className="min-h-screen bg-[#f5f1e8] flex flex-col items-center justify-center p-6 font-mono text-[#1a1a2e]">
