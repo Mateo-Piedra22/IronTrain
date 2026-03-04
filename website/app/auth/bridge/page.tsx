@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import * as jose from 'jose';
 import { AlertTriangle, Check, ExternalLink, User } from 'lucide-react';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
@@ -173,7 +174,23 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
 
     // NORMAL SUCCESS / REDIRECT BRIDGE
     if (redirectUri) {
-        const appUrl = `${redirectUri}${redirectUri.includes('?') ? '&' : '?'}token=${encodeURIComponent(session.token)}`;
+        // We generate our own JWT for the mobile app, signed with our secret
+        // so the API verifyAuth (jose.jwtVerify) can trust it.
+        const secretStr = process.env.NEON_AUTH_COOKIE_SECRET;
+        if (!secretStr) throw new Error('NEON_AUTH_COOKIE_SECRET not configured');
+        const secret = new TextEncoder().encode(secretStr);
+
+        const jwt = await new jose.SignJWT({
+            id: session.id,
+            email: session.email,
+        })
+            .setProtectedHeader({ alg: 'HS256' })
+            .setIssuedAt()
+            .setSubject(session.id)
+            .setExpirationTime('30d') // Long lived for mobile app
+            .sign(secret);
+
+        const appUrl = `${redirectUri}${redirectUri.includes('?') ? '&' : '?'}token=${encodeURIComponent(jwt)}`;
 
         return (
             <div className="min-h-screen bg-[#f5f1e8] flex flex-col items-center justify-center p-6 font-mono text-[#1a1a2e]">
