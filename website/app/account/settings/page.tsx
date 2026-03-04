@@ -5,32 +5,23 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
+import { auth } from '../../../src/lib/auth/server';
 
 export const revalidate = 0;
 
-async function getSession() {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('__session')?.value || cookieStore.get('session')?.value;
-    if (!token) return null;
-
-    try {
-        const jose = await import('jose');
-        const secretStr = process.env.NEON_AUTH_COOKIE_SECRET;
-        if (!secretStr) return null;
-        const secret = new TextEncoder().encode(secretStr);
-        const { payload } = await jose.jwtVerify(token, secret);
-        return {
-            id: (payload.sub || payload.id) as string,
-            email: payload.email as string,
-            token
-        };
-    } catch {
-        return null;
-    }
+// Session helper moved to using official SDK
+async function getAuthenticatedSession() {
+    const { data } = await auth.getSession();
+    if (!data) return null;
+    return {
+        id: data.user.id,
+        email: data.user.email,
+        token: data.session.token
+    };
 }
 
 export default async function AuthBridgePage() {
-    const session = await getSession();
+    const session = await getAuthenticatedSession();
     if (!session) {
         redirect('/auth/sign-in');
     }

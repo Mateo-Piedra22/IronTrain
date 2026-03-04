@@ -81,9 +81,6 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
                 <Link href="/feed" className="block py-2 px-3 text-center border border-current hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all">
                     FEED SOCIAL P2P
                 </Link>
-                <Link href="#pricing" className="block py-2 px-3 text-center border border-current hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all">
-                    PRO
-                </Link>
             </div>
 
             <div className="mt-6 pt-5 border-t border-[#1a1a2e]/10">
@@ -150,7 +147,6 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
                     </Link>
                     <Link href="/downloads" className="block hover:opacity-70 transition-opacity">DESCARGAS</Link>
                     <Link href="/feed" className="block hover:opacity-70 transition-opacity">FEED P2P</Link>
-                    <Link href="#pricing" className="block hover:opacity-70 transition-opacity">PRO</Link>
                 </div>
             </div>
 

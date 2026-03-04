@@ -1,32 +1,29 @@
 import { desc, eq } from 'drizzle-orm';
-import * as jose from 'jose';
 import { CheckCircle, EyeOff, Shield, Trash2 } from 'lucide-react';
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { db } from '../../src/db';
 import * as schema from '../../src/db/schema';
+import { auth } from '../../src/lib/auth/server';
 
 export const revalidate = 0;
 
 // Hardcoded Admin Users (move to env in production: ADMIN_USER_IDS)
-const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '').split(',').filter(Boolean);
+const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
 
 async function getAuthenticatedAdmin(): Promise<string | null> {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('__session')?.value || cookieStore.get('session')?.value;
-    if (!token) return null;
-
     try {
-        const secretStr = process.env.NEON_AUTH_COOKIE_SECRET;
-        if (!secretStr) return null;
+        const { data: session } = await auth.getSession();
+        const userId = session?.user?.id;
 
-        const secret = new TextEncoder().encode(secretStr);
-        const { payload } = await jose.jwtVerify(token, secret);
-        const userId = (payload.sub || payload.id) as string | undefined;
+        if (!userId) return null;
 
-        if (!userId || !ADMIN_USER_IDS.includes(userId)) return null;
-        return userId;
+        // If ADMIN_USER_IDS is empty, NO ONE is an admin (default secure)
+        if (ADMIN_USER_IDS.length === 0) return null;
+
+        if (ADMIN_USER_IDS.includes(userId)) return userId;
+
+        return null;
     } catch {
         return null;
     }

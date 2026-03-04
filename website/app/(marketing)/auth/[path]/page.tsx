@@ -1,5 +1,4 @@
 import { AuthView } from '@neondatabase/auth/react';
-import { cookies } from 'next/headers';
 
 export const dynamicParams = false;
 
@@ -13,23 +12,11 @@ export function generateStaticParams() {
 }
 
 export default async function AuthPage({
-    params,
-    searchParams
+    params
 }: {
     params: Promise<{ path: string }>;
-    searchParams: Promise<{ redirectUri?: string }>;
 }) {
     const { path } = await params;
-    const { redirectUri } = await searchParams;
-
-    if (redirectUri) {
-        (await cookies()).set('redirect_uri', redirectUri, {
-            path: '/',
-            maxAge: 600, // 10 minutes
-            httpOnly: true,
-            sameSite: 'lax',
-        });
-    }
 
     return (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)] p-6">
