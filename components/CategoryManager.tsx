@@ -4,9 +4,10 @@ import { Colors } from '@/src/theme';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { Pencil, Plus, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CategoryService } from '../src/services/CategoryService';
+import { confirm } from '../src/store/confirmStore';
 import { Category } from '../src/types/db';
 
 import { ColorPicker } from './ui/ColorPicker';
@@ -52,13 +53,13 @@ export function CategoryManager() {
             setCategoryName('');
             loadData();
         } catch (e) {
-            Alert.alert('Error', (e as Error)?.message || 'No se pudo guardar la categoría');
+            confirm.error('Error', (e as Error)?.message || 'No se pudo guardar la categoría');
         }
     };
 
     const handleDelete = async (category: Category) => {
         if (category.is_system) {
-            Alert.alert('Error', 'Cannot delete system categories');
+            confirm.error('Error', 'No se pueden eliminar categorías del sistema.');
             return;
         }
 
@@ -71,27 +72,21 @@ export function CategoryManager() {
                 ? `\n\nEjemplos:\n- ${impact.sampleExerciseNames.slice(0, 6).join('\n- ')}${impact.sampleExerciseNames.length > 6 ? '\n- ...' : ''}`
                 : '';
 
-            Alert.alert(
+            confirm.destructive(
                 'Eliminar categoría',
                 `¿Eliminar "${category.name}"?${movedMsg}${examples}`,
-                [
-                    { text: 'Cancelar', style: 'cancel' },
-                    {
-                        text: 'Eliminar',
-                        style: 'destructive',
-                        onPress: async () => {
-                            try {
-                                await CategoryService.deleteAndReassignExercises(category.id);
-                                loadData();
-                            } catch (e: any) {
-                                Alert.alert('Error', e?.message || 'No se pudo eliminar.');
-                            }
-                        }
+                async () => {
+                    try {
+                        await CategoryService.deleteAndReassignExercises(category.id);
+                        loadData();
+                    } catch (e: any) {
+                        confirm.error('Error', e?.message || 'No se pudo eliminar.');
                     }
-                ]
+                },
+                'Eliminar'
             );
         } catch (e: any) {
-            Alert.alert('Error', e?.message || 'No se pudo eliminar.');
+            confirm.error('Error', e?.message || 'No se pudo eliminar.');
         }
     };
 
@@ -109,9 +104,9 @@ export function CategoryManager() {
     };
 
     return (
-        <View className="flex-1 bg-iron-900">
+        <View style={{ flex: 1, backgroundColor: Colors.iron[900] }}>
             {loading ? (
-                <View className="flex-1 items-center justify-center">
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                     <ActivityIndicator color={Colors.primary.DEFAULT} />
                 </View>
             ) : (
@@ -120,35 +115,52 @@ export function CategoryManager() {
                     contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
                     keyExtractor={(item) => item.id}
                     renderItem={({ item }: any) => (
-                        <View className="flex-row items-center justify-between p-4 mb-3 bg-surface rounded-xl border border-iron-700 elevation-1">
-                            <View className="flex-row items-center gap-3">
-                                <View className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color || '#3b82f6' }} />
-                                <Text className="text-iron-950 font-bold text-base">{item.name}</Text>
-                                {item.is_system === 1 && (
-                                    <Text className="text-xs text-iron-500 bg-iron-200 px-2 py-0.5 rounded">SYSTEM</Text>
-                                )}
+                        <View style={{
+                            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                            padding: 16, marginBottom: 12, backgroundColor: Colors.surface,
+                            borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300],
+                            borderLeftWidth: 4, borderLeftColor: item.color || '#3b82f6',
+                            elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6,
+                        }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                                <View style={{
+                                    width: 36, height: 36, borderRadius: 10,
+                                    backgroundColor: (item.color || '#3b82f6') + '20',
+                                    justifyContent: 'center', alignItems: 'center',
+                                }}>
+                                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: item.color || '#3b82f6' }} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                                        <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 }}>{item.name}</Text>
+                                        {item.is_system === 1 && (
+                                            <View style={{ backgroundColor: Colors.iron[200], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                                <Text style={{ fontSize: 9, color: Colors.iron[600], fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>SISTEMA</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                </View>
                             </View>
 
-                            <View className="flex-row items-center gap-2">
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 {item.id !== CategoryService.UNCATEGORIZED_ID && (
                                     <TouchableOpacity
                                         onPress={() => openModal(item)}
-                                        className="p-2 bg-iron-200 rounded-lg active:opacity-50"
+                                        style={{ padding: 8, backgroundColor: Colors.iron[200], borderRadius: 10, borderWidth: 1, borderColor: Colors.iron[300] }}
                                         accessibilityRole="button"
                                         accessibilityLabel={`Editar categoría ${item.name}`}
                                     >
-                                        <Pencil size={18} color={Colors.iron[500]} />
+                                        <Pencil size={14} color={Colors.iron[500]} />
                                     </TouchableOpacity>
                                 )}
-
                                 {!item.is_system && (
                                     <TouchableOpacity
                                         onPress={() => handleDelete(item)}
-                                        className="p-2 bg-red-100 rounded-lg active:opacity-50"
+                                        style={{ padding: 8, backgroundColor: '#ef444412', borderRadius: 10, borderWidth: 1, borderColor: '#ef444425' }}
                                         accessibilityRole="button"
                                         accessibilityLabel={`Eliminar categoría ${item.name}`}
                                     >
-                                        <Trash2 size={18} color={Colors.red} />
+                                        <Trash2 size={14} color="#ef4444" />
                                     </TouchableOpacity>
                                 )}
                             </View>
@@ -159,54 +171,51 @@ export function CategoryManager() {
 
             <TouchableOpacity
                 onPress={() => openModal()}
-                className="absolute w-14 h-14 bg-primary rounded-full items-center justify-center elevation-3 border border-orange-400 active:scale-95"
-                style={{ right: 24, bottom: bottomOffset }}
+                style={{
+                    position: 'absolute', right: 24, bottom: bottomOffset,
+                    width: 56, height: 56, borderRadius: 16,
+                    backgroundColor: Colors.primary.DEFAULT, alignItems: 'center', justifyContent: 'center',
+                    shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
+                }}
                 accessibilityRole="button"
                 accessibilityLabel="Crear categoría"
             >
-                <Plus color="white" size={30} />
+                <Plus color="white" size={24} />
             </TouchableOpacity>
 
             {modalVisible && (
-                <Modal
-                    transparent
-                    visible
-                    animationType="fade"
-                    onRequestClose={() => setModalVisible(false)}
-                >
-                    <SafeAreaView className="flex-1 bg-black/50 justify-center items-center p-4" edges={['top', 'bottom', 'left', 'right']}>
-                        <View className="bg-surface w-full max-w-sm rounded-2xl p-6 border border-iron-700 elevation-2">
-                            <Text className="text-xl font-bold text-iron-950 mb-6">
+                <Modal transparent visible animationType="fade" onRequestClose={() => setModalVisible(false)}>
+                    <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 }} edges={['top', 'bottom', 'left', 'right']}>
+                        <View style={{
+                            backgroundColor: Colors.surface, width: '100%', maxWidth: 360,
+                            borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.iron[700],
+                            elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24,
+                        }}>
+                            <Text style={{ fontSize: 20, fontWeight: '900', color: Colors.iron[950], marginBottom: 20, letterSpacing: -0.3 }}>
                                 {editingCategory ? 'Editar categoría' : 'Nueva categoría'}
                             </Text>
 
-                            <IronInput
-                                label="Nombre"
-                                value={categoryName}
-                                onChangeText={setCategoryName}
-                                autoFocus
-                            />
+                            <IronInput label="Nombre" value={categoryName} onChangeText={setCategoryName} autoFocus />
 
-                            <Text className="text-iron-500 text-sm mb-2 font-bold uppercase tracking-wider">Color</Text>
-
+                            <Text style={{ color: Colors.iron[500], fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Color</Text>
                             <TouchableOpacity
                                 onPress={() => setShowColorPicker(true)}
-                                className="flex-row items-center bg-white p-4 rounded-xl border border-iron-500 mb-6 justify-between active:bg-iron-200"
+                                style={{
+                                    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.iron[200],
+                                    padding: 14, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[300],
+                                    marginBottom: 20, justifyContent: 'space-between',
+                                }}
                             >
-                                <Text className="text-iron-950 font-semibold">Color seleccionado</Text>
-                                <View className="flex-row items-center gap-3">
-                                    <Text className="text-iron-500 uppercase font-mono">{selectedColor}</Text>
-                                    <View className="w-8 h-8 rounded-full border border-iron-200 shadow-sm" style={{ backgroundColor: selectedColor }} />
+                                <Text style={{ color: Colors.iron[950], fontWeight: '700', fontSize: 14 }}>Color seleccionado</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                    <Text style={{ color: Colors.iron[400], fontWeight: '600', fontSize: 11, textTransform: 'uppercase' }}>{selectedColor}</Text>
+                                    <View style={{ width: 32, height: 32, borderRadius: 10, borderWidth: 1, borderColor: Colors.iron[300], backgroundColor: selectedColor }} />
                                 </View>
                             </TouchableOpacity>
 
-                            <View className="flex-row gap-3">
-                                <View className="flex-1">
-                                    <IronButton label="Cancelar" variant="ghost" onPress={() => setModalVisible(false)} />
-                                </View>
-                                <View className="flex-1">
-                                    <IronButton label="Guardar" onPress={handleSave} />
-                                </View>
+                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                                <View style={{ flex: 1 }}><IronButton label="Cancelar" variant="ghost" onPress={() => setModalVisible(false)} /></View>
+                                <View style={{ flex: 1 }}><IronButton label="Guardar" onPress={handleSave} /></View>
                             </View>
                         </View>
                     </SafeAreaView>
@@ -217,10 +226,7 @@ export function CategoryManager() {
                 visible={showColorPicker}
                 initialColor={selectedColor}
                 onClose={() => setShowColorPicker(false)}
-                onSelect={(color) => {
-                    setSelectedColor(color);
-                    setShowColorPicker(false);
-                }}
+                onSelect={(color) => { setSelectedColor(color); setShowColorPicker(false); }}
             />
         </View>
     );

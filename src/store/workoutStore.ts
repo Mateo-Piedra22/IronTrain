@@ -69,15 +69,16 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
             isTimerRunning: workout.status !== 'completed' && workout.is_template !== 1,
             lastTickAtMs: Date.now()
         });
-        
+
         // Load sets if resuming or created
         await get().loadSetsForWorkout(workout.id);
     },
 
     resumeWorkout: async (workout) => {
+        const savedDuration = workout.duration ?? 0;
         set({
             activeWorkout: workout,
-            workoutTimer: workout.duration || 0,
+            workoutTimer: savedDuration,
             isTimerRunning: workout.status !== 'completed' && workout.is_template !== 1,
             lastTickAtMs: Date.now()
         });
@@ -97,6 +98,7 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
         const newTime = workoutTimer + deltaSec;
         set({ workoutTimer: newTime, lastTickAtMs: now });
 
+        // Persist to DB every 10 seconds
         if (newTime % 10 < deltaSec) {
             workoutService.update(activeWorkout.id, { duration: newTime });
         }
@@ -113,9 +115,10 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
             set({ activeWorkout: null, activeSets: [], isTimerRunning: false, workoutTimer: 0, lastTickAtMs: null });
             return;
         }
+        const savedDuration = workout.duration ?? 0;
         set({
             activeWorkout: workout,
-            workoutTimer: workout.duration || 0,
+            workoutTimer: savedDuration,
             isTimerRunning: workout.status !== 'completed' && workout.is_template !== 1,
             lastTickAtMs: Date.now()
         });
@@ -176,7 +179,7 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
 
         // Logic now delegated to Service
         await workoutService.addSet(activeWorkout.id, exerciseId);
-        
+
         // Refresh local state
         await get().loadSetsForWorkout(activeWorkout.id);
     },

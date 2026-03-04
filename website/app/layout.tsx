@@ -1,4 +1,6 @@
+import { NeonAuthUIProvider } from '@neondatabase/auth/react';
 import type { Metadata } from 'next';
+import { authClient } from '../src/lib/auth/client';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -80,7 +82,9 @@ export default function RootLayout({
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
             </head>
             <body className="min-h-screen antialiased" data-brand="irontrain">
-                {children}
+                <NeonAuthUIProvider authClient={authClient as any} redirectTo="/account/settings" emailOTP>
+                    {children}
+                </NeonAuthUIProvider>
             </body>
         </html>
     );

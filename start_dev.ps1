@@ -1,69 +1,99 @@
-# IronTrain One-Click Dev Script
+# IronTrain One-Click Dev Script (Physical USB Device Edition)
 
 # 1. Add Android Tools to Path (Session Only)
-Write-Host "Configuring Android Environment..."
+Write-Host "Configuring Android Environment for Physical Device..."
 $base = $env:LOCALAPPDATA
 $androidSdk = "$base\Android\Sdk"
 $platformTools = "$androidSdk\platform-tools"
-$emulator = "$androidSdk\emulator"
 
 # Inject Android SDK and Studio's bundled JDK so Gradle can compile the native modules
 $env:ANDROID_HOME = $androidSdk
 $studioJbr = "C:\Program Files\Android\Android Studio\jbr"
 if (Test-Path $studioJbr) {
     $env:JAVA_HOME = $studioJbr
-    $env:Path = "$studioJbr\bin;$platformTools;$emulator;$env:Path"
+    $env:Path = "$studioJbr\bin;$platformTools;$env:Path"
 }
 else {
-    $env:Path = "$platformTools;$emulator;$env:Path"
+    $env:Path = "$platformTools;$env:Path"
 }
 
-# 2. Check/Start Emulator
-Write-Host "Checking Emulator..."
-$running = Get-Process emulator -ErrorAction SilentlyContinue
-if (-not $running) {
-    Write-Host "   Starting 'Medium_Phone_API_36.1'..."
-    Start-Process emulator -ArgumentList "-avd Medium_Phone_API_36.1" -NoNewWindow
-}
-else {
-    Write-Host "   Emulator already running."
-}
-
-# 3. Wait for Device
-Write-Host "Waiting for device..."
-try { adb kill-server | Out-Null } catch {}
+# 2. Wait for Physical Device
+Write-Host ""
+Write-Host "Waiting for a physical Android device via USB..."
+Write-Host "--> Please connect your phone with a USB cable."
+Write-Host "--> Ensure 'USB Debugging' is enabled in Developer Options."
 try { adb start-server | Out-Null } catch {}
 
-$deadline = (Get-Date).AddMinutes(4)
 $serial = $null
-while ((Get-Date) -lt $deadline) {
+while ($true) {
     $lines = adb devices
-    $deviceLine = $lines | Select-String -Pattern '^emulator-\d+\s+' | Select-Object -First 1
-    if ($deviceLine) {
-        $parts = ($deviceLine.Line -split '\s+')
-        $serial = $parts[0]
-        $state = $parts[1]
-        Write-Host "   $($serial): $state"
-        if ($state -eq "device") { break }
-        if ($state -eq "offline" -or $state -eq "unauthorized") {
-            try { adb reconnect offline | Out-Null } catch {}
-            try { adb reconnect device | Out-Null } catch {}
-        }
+    
+    # Check for unauthorized devices first
+    $unauthLine = $lines | Select-String -Pattern '^([^\s]+)\s+unauthorized$' | Where-Object { $_.Line -notmatch 'emulator-' } | Select-Object -First 1
+    if ($unauthLine) {
+        Write-Host "   (!) Device detected but UNAUTHORIZED. Please accept the RSA prompt on your phone's screen!"
+        Start-Sleep -Seconds 3
+        continue
     }
-    Start-Sleep -Seconds 5
+
+    # Look for a device that is NOT an emulator
+    $deviceLine = $lines | Select-String -Pattern '^([^\s]+)\s+device$' | Where-Object { $_.Line -notmatch 'emulator-' } | Select-Object -First 1
+    if ($deviceLine) {
+        $serial = $deviceLine.Matches.Groups[1].Value
+        Write-Host "   (V) Physical device found: $serial"
+        break
+    }
+    
+    Start-Sleep -Seconds 3
 }
 
-if (-not $serial) {
-    throw "No emulator detected by adb."
+# 3. Handle Screen Mirroring (scrcpy)
+Write-Host "Checking for scrcpy (Screen Mirroring)..."
+$scrcpyPath = Get-Command scrcpy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Definition
+
+if (-not $scrcpyPath) {
+    # Find scrcpy.exe anywhere inside the winget packages
+    $scrcpyExe = Get-ChildItem -Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Filter "scrcpy.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($scrcpyExe) {
+        $scrcpyPath = $scrcpyExe.FullName
+    }
 }
 
-$bootDeadline = (Get-Date).AddMinutes(4)
-while ((Get-Date) -lt $bootDeadline) {
-    $boot = adb -s $serial shell getprop sys.boot_completed
-    if ($boot -eq "1") { break }
-    Start-Sleep -Seconds 5
+if ($scrcpyPath) {
+    Write-Host "Starting screen mirroring (scrcpy)..."
+    Start-Process $scrcpyPath -ArgumentList "-s $serial" -WindowStyle Hidden
+} else {
+    Write-Host "scrcpy not found. Installing via winget so you can see your phone on PC..."
+    try {
+        winget install --id Genymobile.scrcpy --silent --accept-package-agreements --accept-source-agreements
+        Write-Host "Locating scrcpy..."
+        $scrcpyExe = Get-ChildItem -Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Filter "scrcpy.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        
+        if ($scrcpyExe) {
+            Write-Host "Installation successful! Starting screen mirroring..."
+            $scrcpyPath = $scrcpyExe.FullName
+            Start-Process $scrcpyPath -ArgumentList "-s $serial" -WindowStyle Hidden
+        } else {
+            Write-Host "Warning: Could not automatically locate scrcpy after install."
+        }
+    } catch {
+        Write-Host "Failed to install scrcpy automatically. Screen mirroring won't be available."
+    }
 }
 
-# 4. Start Expo (Native Dev Client required for Notifee)
-Write-Host "Starting IronTrain (Native Build)..."
+# 4. Start Expo Native Build
+Write-Host "Creating Junction to resolve CMake MAX_PATH (260 characters) limits..."
+$junctionPath = "C:\IronTrain"
+if (Test-Path $junctionPath) {
+    cmd /c rmdir $junctionPath
+}
+cmd /c mklink /J $junctionPath . | Out-Null
+
+Write-Host "Starting IronTrain (Native Build) from Short-Path root ($junctionPath)..."
+Set-Location $junctionPath
 npx expo run:android
+
+# 5. Cleanup
+Set-Location "$PSScriptRoot"
+cmd /c rmdir $junctionPath | Out-Null
+Write-Host "Development Session Ended."

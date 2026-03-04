@@ -11,6 +11,9 @@ interface BackupData {
     exercises: any[];
     workouts: any[];
     workout_sets: any[];
+    routines: any[];
+    routine_days: any[];
+    routine_exercises: any[];
     body_metrics: any[];
     settings: any[];
     measurements: any[];
@@ -21,12 +24,15 @@ interface BackupData {
 export const TABLE_SCHEMAS: Record<string, string[]> = {
     categories: ['id', 'name', 'is_system', 'sort_order', 'color'],
     exercises: ['id', 'category_id', 'name', 'type', 'default_increment', 'notes', 'is_system'],
-    workouts: ['id', 'date', 'start_time', 'end_time', 'name', 'notes', 'status', 'is_template'],
+    workouts: ['id', 'date', 'start_time', 'end_time', 'name', 'notes', 'status', 'duration', 'is_template'],
     workout_sets: ['id', 'workout_id', 'exercise_id', 'type', 'weight', 'reps', 'distance', 'time', 'rpe', 'order_index', 'completed', 'notes', 'superset_id'],
+    routines: ['id', 'name', 'description'],
+    routine_days: ['id', 'routine_id', 'name', 'order_index'],
+    routine_exercises: ['id', 'routine_day_id', 'exercise_id', 'order_index', 'notes'],
     body_metrics: ['id', 'date', 'weight', 'body_fat', 'notes'], // Legacy table, keeping for compatibility
     settings: ['key', 'value', 'description'],
     measurements: ['id', 'date', 'type', 'value', 'unit', 'notes'],
-    plate_inventory: ['weight', 'count', 'type', 'unit'],
+    plate_inventory: ['weight', 'count', 'type', 'unit', 'color'],
     goals: ['id', 'title', 'target_value', 'current_value', 'deadline', 'type', 'reference_id', 'completed']
 };
 
@@ -65,6 +71,9 @@ class BackupService {
             const exercises = await this.safeGetAll('exercises');
             const workouts = await this.safeGetAll('workouts');
             const workout_sets = await this.safeGetAll('workout_sets');
+            const routines = await this.safeGetAll('routines');
+            const routine_days = await this.safeGetAll('routine_days');
+            const routine_exercises = await this.safeGetAll('routine_exercises');
             const body_metrics = await this.safeGetAll('body_metrics');
             const settings = await this.safeGetAll('settings');
             const measurements = await this.safeGetAll('measurements');
@@ -78,6 +87,9 @@ class BackupService {
                 exercises,
                 workouts,
                 workout_sets,
+                routines,
+                routine_days,
+                routine_exercises,
                 body_metrics,
                 settings,
                 measurements,
@@ -148,6 +160,9 @@ class BackupService {
                 exercises: this.normalizeArray(parsed?.exercises),
                 workouts: this.normalizeArray(parsed?.workouts),
                 workout_sets: this.normalizeArray(parsed?.workout_sets),
+                routines: this.normalizeArray(parsed?.routines),
+                routine_days: this.normalizeArray(parsed?.routine_days),
+                routine_exercises: this.normalizeArray(parsed?.routine_exercises),
                 body_metrics: this.normalizeArray(parsed?.body_metrics),
                 settings: this.normalizeArray(parsed?.settings),
                 measurements: this.normalizeArray(parsed?.measurements),
@@ -167,9 +182,9 @@ class BackupService {
                 if (!(await this.tableExists(table))) return;
 
                 const keys = Object.keys(rows[0]).filter(k => allowedColumns.includes(k));
-                
+
                 if (keys.length === 0) {
-                     return;
+                    return;
                 }
 
                 const placeholders = keys.map(() => '?').join(',');
@@ -198,6 +213,9 @@ class BackupService {
                 await dbService.run('BEGIN TRANSACTION');
 
                 if (mode === 'overwrite') {
+                    if (await this.tableExists('routine_exercises')) await dbService.run('DELETE FROM routine_exercises');
+                    if (await this.tableExists('routine_days')) await dbService.run('DELETE FROM routine_days');
+                    if (await this.tableExists('routines')) await dbService.run('DELETE FROM routines');
                     if (await this.tableExists('workout_sets')) await dbService.run('DELETE FROM workout_sets');
                     if (await this.tableExists('workouts')) await dbService.run('DELETE FROM workouts');
 
@@ -216,6 +234,9 @@ class BackupService {
                 await upsert('exercises', data.exercises);
                 await upsert('workouts', data.workouts);
                 await upsert('workout_sets', data.workout_sets);
+                await upsert('routines', data.routines);
+                await upsert('routine_days', data.routine_days);
+                await upsert('routine_exercises', data.routine_exercises);
                 await upsert('measurements', data.measurements);
                 await upsert('plate_inventory', data.plate_inventory);
                 await upsert('goals', data.goals);

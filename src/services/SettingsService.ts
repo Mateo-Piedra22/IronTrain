@@ -37,8 +37,8 @@ export class SettingsService {
             // Insert new
             for (const p of plates) {
                 await dbService.run(
-                    'INSERT INTO plate_inventory (weight, count, type, unit) VALUES (?, ?, ?, ?)',
-                    [p.weight, p.count, p.type, p.unit]
+                    'INSERT INTO plate_inventory (weight, count, type, unit, color) VALUES (?, ?, ?, ?, ?)',
+                    [p.weight, p.count, p.type, p.unit, p.color || null]
                 );
             }
 

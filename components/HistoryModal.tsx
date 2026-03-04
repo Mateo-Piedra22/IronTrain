@@ -1,3 +1,4 @@
+import { EmptyChartPlaceholder } from '@/components/EmptyChartPlaceholder';
 import { configService } from '@/src/services/ConfigService';
 import { UnitService } from '@/src/services/UnitService';
 import { Colors } from '@/src/theme';
@@ -5,7 +6,7 @@ import { formatTimeSeconds } from '@/src/utils/time';
 import { format } from 'date-fns';
 import { X } from 'lucide-react-native';
 import React, { useMemo } from 'react';
-import { Dimensions, FlatList, Modal, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
 import { ExerciseType, WorkoutSet } from '../src/types/db';
 
@@ -23,9 +24,7 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
     const displayWeight = (kgValue: number) => unit === 'kg' ? kgValue : UnitService.kgToLbs(kgValue);
 
     const chartData = useMemo(() => {
-        // Create a copy and sort ASC for chart
         const sorted = [...history].sort((a, b) => a.date - b.date);
-
         return sorted.map(h => {
             let value = 0;
             if (exerciseType === 'distance_time') {
@@ -40,7 +39,6 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
                 const maxW = valid.length > 0 ? Math.max(...valid.map(s => s.weight || 0)) : 0;
                 value = Math.round(displayWeight(maxW) * 10) / 10;
             }
-
             return {
                 value,
                 label: format(new Date(h.date), 'd/MM'),
@@ -54,38 +52,40 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
 
     return (
         <Modal visible={visible} animationType="fade" transparent>
-            <View className="flex-1 bg-iron-950/90 justify-center px-4 py-12">
-                <View className="bg-iron-900 border border-iron-700 rounded-xl flex-1 max-h-[90%] w-full overflow-hidden">
-                    <View className="flex-row justify-between items-center p-4 border-b border-iron-800 bg-iron-800">
+            <View style={ss.overlay}>
+                <View style={ss.sheet}>
+                    {/* Header */}
+                    <View style={ss.header}>
                         <View>
-                            <Text className="text-iron-950 font-bold text-lg">{exerciseName}</Text>
-                            <Text className="text-iron-500 text-xs">Historial de progreso</Text>
+                            <Text style={ss.headerTitle}>{exerciseName}</Text>
+                            <Text style={ss.headerSub}>Historial de progreso</Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} className="p-2 bg-primary rounded-full active:opacity-80">
-                            <X size={20} color="white" />
+                        <TouchableOpacity onPress={onClose} style={ss.closeBtn} accessibilityRole="button" accessibilityLabel="Cerrar historial">
+                            <X size={18} color="#fff" />
                         </TouchableOpacity>
                     </View>
 
                     <FlatList
-                        className="flex-1"
+                        style={{ flex: 1 }}
                         data={history}
                         ListHeaderComponent={
-                            <View className="p-4 items-center justify-center bg-iron-900/50 border-b border-iron-800 mb-2">
+                            <View style={ss.chartContainer}>
                                 {chartData.length > 1 ? (
-                                    <View className="overflow-hidden">
+                                    <View style={{ overflow: 'hidden' }}>
                                         <LineChart
                                             data={chartData}
-                                            color={Colors.primary.dark}
+                                            color={Colors.primary.DEFAULT}
                                             thickness={3}
-                                            dataPointsColor={Colors.primary.dark}
-                                            startFillColor="rgba(249, 115, 22, 0.3)"
-                                            endFillColor="rgba(249, 115, 22, 0.0)"
-                                            startOpacity={0.9}
+                                            dataPointsColor={Colors.primary.DEFAULT}
+                                            dataPointsRadius={4}
+                                            startFillColor={Colors.primary.DEFAULT}
+                                            endFillColor={Colors.primary.DEFAULT}
+                                            startOpacity={0.2}
                                             endOpacity={0.0}
                                             areaChart
-                                            yAxisTextStyle={{ color: Colors.iron[500], fontSize: 10 }}
-                                            xAxisLabelTextStyle={{ color: Colors.iron[500], fontSize: 10 }}
-                                            rulesColor={Colors.iron[700]}
+                                            yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                            xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                            rulesColor={Colors.iron[200]}
                                             rulesType="solid"
                                             hideRules={false}
                                             width={screenWidth - 64}
@@ -96,30 +96,38 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
                                             hideDataPoints={false}
                                             curved
                                             isAnimated
+                                            animationDuration={400}
+                                            yAxisLabelSuffix={exerciseType === 'distance_time' ? ' km' : exerciseType === 'reps_only' ? ' rep' : ` ${unit}`}
+                                            yAxisLabelWidth={40}
+                                            xAxisThickness={1}
+                                            xAxisColor={Colors.iron[200]}
+                                            yAxisThickness={0}
                                         />
                                     </View>
                                 ) : (
-                                    <View className="h-40 items-center justify-center">
-                                        <Text className="text-iron-500">No hay suficientes datos para el gráfico</Text>
-                                    </View>
+                                    <EmptyChartPlaceholder
+                                        title="Sin historial gráfico"
+                                        message="Necesitás al menos 2 sesiones previas para ver tu progreso."
+                                        height={160}
+                                    />
                                 )}
                             </View>
                         }
                         keyExtractor={(item) => item.date.toString()}
                         contentContainerStyle={{ paddingBottom: 20 }}
                         renderItem={({ item }) => (
-                            <View className="mb-4 px-4">
-                                <Text className="text-primary font-bold mb-2 text-sm bg-iron-800/50 self-start px-2 py-1 rounded">
+                            <View style={ss.sessionCard}>
+                                <Text style={ss.sessionDate}>
                                     {format(new Date(item.date), 'EEEE, d MMM yyyy')}
                                 </Text>
-                                <View className="bg-iron-800 rounded-lg p-2 gap-1 border border-iron-700">
+                                <View style={ss.setsContainer}>
                                     {item.sets.map((set, idx) => (
-                                        <View key={set.id} className="flex-row justify-between border-b border-iron-700/50 pb-1 mb-1 last:border-0 last:pb-0 last:mb-0">
-                                            <View className="flex-row items-center w-12">
-                                                <Text className="text-iron-500 font-mono text-xs w-6">#{idx + 1}</Text>
-                                                {set.type === 'pr' && <Text className="text-[10px] text-yellow-500 font-bold ml-1">PR</Text>}
+                                        <View key={set.id} style={[ss.setRow, idx < item.sets.length - 1 && ss.setRowBorder]}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', width: 44 }}>
+                                                <Text style={ss.setIndex}>#{idx + 1}</Text>
+                                                {set.type === 'pr' && <Text style={ss.prBadge}>PR</Text>}
                                             </View>
-                                            <Text className="text-iron-950 font-bold text-sm flex-1 text-center">
+                                            <Text style={ss.setValue}>
                                                 {exerciseType === 'distance_time'
                                                     ? `${Math.round(((set.distance || 0) / 1000) * 100) / 100} km  •  ${formatTimeSeconds(set.time || 0)}`
                                                     : exerciseType === 'reps_only'
@@ -129,7 +137,7 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
                                                             : `${Math.round(displayWeight(set.weight || 0) * 10) / 10} ${unit}  ×  ${set.reps || 0}`
                                                 }
                                             </Text>
-                                            <Text className="text-iron-500 text-xs w-24 text-right">
+                                            <Text style={ss.setMeta}>
                                                 {set.type !== 'normal'
                                                     ? set.type.toUpperCase()
                                                     : exerciseType === 'weight_reps'
@@ -151,7 +159,7 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
                             </View>
                         )}
                         ListEmptyComponent={
-                            <Text className="text-iron-500 text-center py-8">No hay historial.</Text>
+                            <Text style={ss.emptyText}>No hay historial.</Text>
                         }
                     />
                 </View>
@@ -159,3 +167,23 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
         </Modal>
     );
 }
+
+const ss = StyleSheet.create({
+    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 48 },
+    sheet: { backgroundColor: Colors.iron[900], borderWidth: 1, borderColor: Colors.iron[700], borderRadius: 20, flex: 1, maxHeight: '90%', width: '100%', overflow: 'hidden' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.iron[200], backgroundColor: Colors.surface },
+    headerTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
+    headerSub: { color: Colors.iron[400], fontSize: 11, marginTop: 2 },
+    closeBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: Colors.primary.DEFAULT, justifyContent: 'center', alignItems: 'center' },
+    chartContainer: { padding: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.iron[200], marginBottom: 8 },
+    sessionCard: { marginBottom: 12, paddingHorizontal: 16 },
+    sessionDate: { color: Colors.primary.DEFAULT, fontWeight: '800', fontSize: 12, backgroundColor: Colors.primary.DEFAULT + '10', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginBottom: 8 },
+    setsContainer: { backgroundColor: Colors.surface, borderRadius: 14, padding: 8, borderWidth: 1, borderColor: Colors.iron[700] },
+    setRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 6 },
+    setRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.iron[200] },
+    setIndex: { color: Colors.iron[400], fontSize: 11, fontWeight: '700', width: 24 },
+    prBadge: { fontSize: 9, color: '#f59e0b', fontWeight: '900', marginLeft: 4 },
+    setValue: { color: Colors.iron[950], fontWeight: '800', fontSize: 13, flex: 1, textAlign: 'center' },
+    setMeta: { color: Colors.iron[400], fontSize: 11, width: 88, textAlign: 'right', fontWeight: '600' },
+    emptyText: { color: Colors.iron[400], textAlign: 'center', paddingVertical: 32, fontSize: 14 },
+});

@@ -5,32 +5,22 @@ import { useWorkoutStore } from '@/src/store/workoutStore';
 import { Colors } from '@/src/theme';
 import { WorkoutSet } from '@/src/types/db';
 import { FlashList } from '@shopify/flash-list';
-import { clsx } from 'clsx';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { LucideClock, LucideMoreVertical } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, AppState, KeyboardAvoidingView, Platform, Pressable, Switch, Text, View } from 'react-native';
+import { AppState, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { confirm } from '../../src/store/confirmStore';
 
 export default function ActiveWorkoutScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const {
-        activeWorkout,
-        activeSets,
-        isTimerRunning,
-        workoutTimer,
-        tickTimer,
-        setWorkoutStatus,
-        updateSet,
-        addSet,
-        toggleSetComplete,
-        loadWorkoutById,
-        exerciseNames,
+        activeWorkout, activeSets, isTimerRunning, workoutTimer, tickTimer,
+        setWorkoutStatus, updateSet, addSet, toggleSetComplete, loadWorkoutById, exerciseNames,
     } = useWorkoutStore();
 
     const [unit, setUnit] = useState(configService.get('weightUnit'));
 
-    // Optimize callbacks for memoized child
     const handleUpdateSet = useCallback((setId: string, updates: Partial<WorkoutSet>) => {
         updateSet(setId, updates);
     }, [updateSet]);
@@ -39,34 +29,21 @@ export default function ActiveWorkoutScreen() {
         toggleSetComplete(setId);
     }, [toggleSetComplete]);
 
-
-    useFocusEffect(
-        useCallback(() => {
-            setUnit(configService.get('weightUnit'));
-        }, [])
-    );
+    useFocusEffect(useCallback(() => { setUnit(configService.get('weightUnit')); }, []));
 
     useEffect(() => {
         if (!id) return;
-        if (!activeWorkout || activeWorkout.id !== id) {
-            loadWorkoutById(id);
-        }
+        if (!activeWorkout || activeWorkout.id !== id) { loadWorkoutById(id); }
     }, [id, activeWorkout?.id, loadWorkoutById]);
 
-    // Timer effect
     useEffect(() => {
         let interval: any;
-        if (isTimerRunning) {
-            tickTimer();
-            interval = setInterval(tickTimer, 1000);
-        }
+        if (isTimerRunning) { tickTimer(); interval = setInterval(tickTimer, 1000); }
         return () => clearInterval(interval);
     }, [isTimerRunning, tickTimer]);
 
     useEffect(() => {
-        const sub = AppState.addEventListener('change', (s) => {
-            if (s === 'active') tickTimer();
-        });
+        const sub = AppState.addEventListener('change', (s) => { if (s === 'active') tickTimer(); });
         return () => sub.remove();
     }, [tickTimer]);
 
@@ -83,31 +60,22 @@ export default function ActiveWorkoutScreen() {
     const requestToggleStatus = (nextActive: boolean) => {
         if (!activeWorkout || isTemplate) return;
         if (!nextActive) {
-            Alert.alert('Finalizar entrenamiento', '¿Marcar este entrenamiento como finalizado? (se bloquea la edición)', [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Finalizar',
-                    style: 'destructive',
-                    onPress: async () => {
-                        await setWorkoutStatus('completed');
-                    }
-                }
-            ]);
+            confirm.ask(
+                'Finalizar entrenamiento',
+                '¿Marcar este entrenamiento como finalizado? (se bloquea la edición)',
+                async () => { await setWorkoutStatus('completed'); },
+                'Finalizar'
+            );
             return;
         }
-
-        Alert.alert('Reabrir entrenamiento', '¿Volver a marcarlo como activo? (podrás editar y seguir registrando)', [
-            { text: 'Cancelar', style: 'cancel' },
-            {
-                text: 'Reabrir',
-                onPress: async () => {
-                    await setWorkoutStatus('in_progress');
-                }
-            }
-        ]);
+        confirm.ask(
+            'Reabrir entrenamiento',
+            '¿Volver a marcarlo como activo? (podrás editar y seguir registrando)',
+            async () => { await setWorkoutStatus('in_progress'); },
+            'Reabrir'
+        );
     };
 
-    // Group sets by exercise
     const groupedSets = activeSets.reduce((acc, set) => {
         if (!acc[set.exercise_id]) acc[set.exercise_id] = [];
         acc[set.exercise_id].push(set);
@@ -122,53 +90,43 @@ export default function ActiveWorkoutScreen() {
     }, [activeWorkout, activeSets.length]);
 
     return (
-        <SafeAreaWrapper edges={['top', 'left', 'right']} className="bg-iron-900">
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+        <SafeAreaWrapper style={{ backgroundColor: Colors.iron[900] }} edges={['top', 'left', 'right']}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
                 <Stack.Screen options={{ headerShown: false }} />
 
                 {/* Header */}
-                <View className="px-4 pb-4 pt-2 bg-iron-900 border-b border-iron-700 flex-row justify-between items-center">
-                    <View className="flex-1 mr-4">
-                        <Text className="text-iron-950 font-bold text-lg" numberOfLines={1}>{activeWorkout?.name || 'Entrenamiento'}</Text>
+                <View style={ss.header}>
+                    <View style={{ flex: 1, marginRight: 16 }}>
+                        <Text style={ss.headerTitle} numberOfLines={1}>{activeWorkout?.name || 'Entrenamiento'}</Text>
                         {activeWorkout?.date ? (
-                            <Text className="text-iron-500 text-xs font-bold mt-0.5">
+                            <Text style={ss.headerSub}>
                                 {isTemplate ? 'Plantilla' : (isFinished ? 'Finalizado' : 'Activo')}
                             </Text>
                         ) : null}
                     </View>
 
-                    <View className="flex-row items-center gap-3">
-                        {/* Timer */}
+                    <View style={ss.headerActions}>
                         {!isTemplate && (
-                            <View className="flex-row items-center bg-surface px-3 py-1.5 rounded-lg border border-iron-700 shadow-sm">
+                            <View style={ss.timerChip}>
                                 <LucideClock size={14} color={Colors.primary.DEFAULT} />
-                                <Text className="text-primary ml-1.5 font-mono text-sm font-bold tracking-tight">{formatTime(workoutTimer)}</Text>
+                                <Text style={ss.timerText}>{formatTime(workoutTimer)}</Text>
                             </View>
                         )}
 
                         {!isTemplate && activeWorkout && (
-                            <View className={clsx(
-                                "px-3 py-1.5 rounded-full flex-row items-center border shadow-sm",
-                                isFinished ? "bg-green-100 border-green-500" : "bg-surface border-iron-700"
-                            )}>
-                                <Text className={clsx(
-                                    "text-xs font-bold uppercase tracking-wider mr-2",
-                                    isFinished ? "text-green-700" : "text-iron-950"
-                                )}>
+                            <View style={[ss.statusChip, isFinished ? ss.statusFinished : ss.statusActive]}>
+                                <Text style={[ss.statusText, isFinished ? { color: '#15803d' } : { color: Colors.iron[950] }]}>
                                     {isFinished ? 'Finalizado' : 'Activo'}
                                 </Text>
-                                <Switch
-                                    value={!isFinished}
-                                    onValueChange={(v) => requestToggleStatus(v)}
-                                />
+                                <Switch value={!isFinished} onValueChange={(v) => requestToggleStatus(v)} />
                             </View>
                         )}
                     </View>
                 </View>
 
                 {emptyState && (
-                    <View className="px-4 py-6">
-                        <Text className="text-iron-500 font-bold text-center">{emptyState}</Text>
+                    <View style={{ paddingHorizontal: 16, paddingVertical: 24 }}>
+                        <Text style={{ color: Colors.iron[400], fontWeight: '700', textAlign: 'center' }}>{emptyState}</Text>
                     </View>
                 )}
 
@@ -178,64 +136,40 @@ export default function ActiveWorkoutScreen() {
                     estimatedItemSize={200}
                     contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
                     renderItem={({ item: exId }) => (
-                        <View className="mb-6">
-                            <View className="flex-row justify-between items-center mb-2">
-                                <Text className="text-iron-950 font-bold text-lg">{exerciseNames[exId] || 'Loading Exercise...'}</Text>
+                        <View style={{ marginBottom: 24 }}>
+                            <View style={ss.exerciseHeader}>
+                                <Text style={ss.exerciseName}>{exerciseNames[exId] || 'Loading Exercise...'}</Text>
                                 <Pressable onPress={() => { }}><LucideMoreVertical size={20} color={Colors.iron[400]} /></Pressable>
                             </View>
 
                             {/* Sets Header */}
-                            <View className="flex-row mb-2 px-2">
-                                <View className="w-8"></View>
-                                <View className="flex-1"><Text className="text-center text-iron-500 text-xs font-bold tracking-wider">{unit.toUpperCase()}</Text></View>
-                                <View className="flex-1"><Text className="text-center text-iron-500 text-xs font-bold tracking-wider">REPS</Text></View>
-                                <View className="flex-1"><Text className="text-center text-iron-500 text-xs font-bold tracking-wider">RPE</Text></View>
-                                <View className="w-12"></View>
+                            <View style={ss.setsHeaderRow}>
+                                <View style={{ width: 32 }} />
+                                <View style={{ flex: 1 }}><Text style={ss.colLabel}>{unit.toUpperCase()}</Text></View>
+                                <View style={{ flex: 1 }}><Text style={ss.colLabel}>REPS</Text></View>
+                                <View style={{ flex: 1 }}><Text style={ss.colLabel}>RPE</Text></View>
+                                <View style={{ width: 48 }} />
                             </View>
 
-                            {/* Sets List */}
                             {groupedSets[exId].map((set, idx) => (
-                                <SetRowInput
-                                    key={set.id}
-                                    index={idx}
-                                    set={set}
-                                    onUpdate={handleUpdateSet}
-                                    onToggleComplete={handleToggleComplete}
-                                    disabled={!isEditable}
-                                />
+                                <SetRowInput key={set.id} index={idx} set={set} onUpdate={handleUpdateSet} onToggleComplete={handleToggleComplete} disabled={!isEditable} />
                             ))}
 
-                            {/* Add Set Button */}
                             {isEditable && (
-                                <Pressable
-                                    onPress={() => addSet(exId)}
-                                    className="bg-surface py-3 rounded-xl items-center mt-2 border border-iron-400 border-dashed active:bg-iron-200"
-                                    accessibilityRole="button"
-                                    accessibilityLabel="Agregar serie"
-                                >
-                                    <Text className="text-iron-950 text-xs font-bold uppercase">+ Agregar serie</Text>
+                                <Pressable onPress={() => addSet(exId)} style={ss.addSetBtn} accessibilityRole="button" accessibilityLabel="Agregar serie">
+                                    <Text style={ss.addSetText}>+ Agregar serie</Text>
                                 </Pressable>
                             )}
                         </View>
                     )}
                     ListFooterComponent={
                         isEditable ? (
-                            <Pressable
-                                onPress={() => router.push('/(tabs)/exercises')}
-                                className="bg-surface py-4 rounded-xl items-center border border-primary border-dashed mb-8 active:bg-iron-200"
-                                accessibilityRole="button"
-                                accessibilityLabel="Agregar ejercicio"
-                            >
-                                <Text className="text-primary font-bold uppercase">+ Agregar ejercicio</Text>
+                            <Pressable onPress={() => router.push('/(tabs)/exercises')} style={ss.addExerciseBtn} accessibilityRole="button" accessibilityLabel="Agregar ejercicio">
+                                <Text style={ss.addExerciseText}>+ Agregar ejercicio</Text>
                             </Pressable>
                         ) : (
-                            <Pressable
-                                onPress={() => router.replace('/(tabs)')}
-                                className="bg-surface py-4 rounded-xl items-center border border-iron-700 mb-8 active:bg-iron-200"
-                                accessibilityRole="button"
-                                accessibilityLabel="Volver"
-                            >
-                                <Text className="text-iron-950 font-bold uppercase">Volver</Text>
+                            <Pressable onPress={() => router.replace('/(tabs)')} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
+                                <Text style={ss.backBtnText}>Volver</Text>
                             </Pressable>
                         )
                     }
@@ -244,3 +178,26 @@ export default function ActiveWorkoutScreen() {
         </SafeAreaWrapper>
     );
 }
+
+const ss = StyleSheet.create({
+    header: { paddingHorizontal: 16, paddingBottom: 14, paddingTop: 8, backgroundColor: Colors.iron[900], borderBottomWidth: 1, borderBottomColor: Colors.iron[700], flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    headerTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 17, letterSpacing: -0.3 },
+    headerSub: { color: Colors.iron[400], fontSize: 11, fontWeight: '700', marginTop: 2 },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    timerChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: Colors.iron[700] },
+    timerText: { color: Colors.primary.DEFAULT, marginLeft: 6, fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
+    statusChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, flexDirection: 'row', alignItems: 'center', borderWidth: 1 },
+    statusFinished: { backgroundColor: '#dcfce7', borderColor: '#22c55e' },
+    statusActive: { backgroundColor: Colors.surface, borderColor: Colors.iron[700] },
+    statusText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 6 },
+    exerciseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    exerciseName: { color: Colors.iron[950], fontWeight: '800', fontSize: 16 },
+    setsHeaderRow: { flexDirection: 'row', marginBottom: 8, paddingHorizontal: 8 },
+    colLabel: { textAlign: 'center', color: Colors.iron[400], fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+    addSetBtn: { backgroundColor: Colors.surface, paddingVertical: 12, borderRadius: 14, alignItems: 'center', marginTop: 8, borderWidth: 1, borderColor: Colors.iron[400], borderStyle: 'dashed' },
+    addSetText: { color: Colors.iron[950], fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+    addExerciseBtn: { backgroundColor: Colors.surface, paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: Colors.primary.DEFAULT, borderStyle: 'dashed', marginBottom: 32 },
+    addExerciseText: { color: Colors.primary.DEFAULT, fontWeight: '800', textTransform: 'uppercase', fontSize: 13 },
+    backBtn: { backgroundColor: Colors.surface, paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: Colors.iron[700], marginBottom: 32 },
+    backBtnText: { color: Colors.iron[950], fontWeight: '800', textTransform: 'uppercase', fontSize: 13 },
+});

@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { Category, Exercise, ExerciseType, Workout, WorkoutSet } from '../types/db';
+import { uuidV4 } from '../utils/uuid';
 
 const DB_NAME = 'irontrain_v1.db';
 
@@ -50,6 +51,7 @@ export class DatabaseService {
         default_increment REAL DEFAULT 2.5,
         notes TEXT,
         is_system INTEGER DEFAULT 0,
+        origin_id TEXT, -- For Social P2P
         FOREIGN KEY (category_id) REFERENCES categories (id)
       );
 
@@ -104,6 +106,7 @@ export class DatabaseService {
         count INTEGER DEFAULT 0,
         type TEXT DEFAULT 'standard', -- 'standard', 'bumper', 'calibrated'
         unit TEXT DEFAULT 'kg',
+        color TEXT,
         PRIMARY KEY (weight, type, unit)
       );
 
@@ -112,6 +115,47 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_sets_exercise ON workout_sets(exercise_id);
       CREATE INDEX IF NOT EXISTS idx_sets_workout ON workout_sets(workout_id);
       CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
+
+      -- NEW: Routines
+      CREATE TABLE IF NOT EXISTS routines (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        is_public INTEGER DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS routine_days (
+        id TEXT PRIMARY KEY NOT NULL,
+        routine_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        order_index INTEGER NOT NULL,
+        FOREIGN KEY (routine_id) REFERENCES routines (id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS routine_exercises (
+        id TEXT PRIMARY KEY NOT NULL,
+        routine_day_id TEXT NOT NULL,
+        exercise_id TEXT NOT NULL,
+        order_index INTEGER NOT NULL,
+        notes TEXT,
+        FOREIGN KEY (routine_day_id) REFERENCES routine_days (id) ON DELETE CASCADE,
+        FOREIGN KEY (exercise_id) REFERENCES exercises (id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_routine_days_routine ON routine_days(routine_id);
+      CREATE INDEX IF NOT EXISTS idx_routine_exercises_day ON routine_exercises(routine_day_id);
+
+      -- NEW: Sync Queue (Offline-First Architecture)
+      CREATE TABLE IF NOT EXISTS sync_queue (
+        id TEXT PRIMARY KEY NOT NULL,
+        table_name TEXT NOT NULL,
+        record_id TEXT NOT NULL,
+        operation TEXT NOT NULL, -- 'INSERT', 'UPDATE', 'DELETE'
+        payload TEXT, -- JSON payload of the mutation
+        created_at INTEGER NOT NULL,
+        status TEXT DEFAULT 'pending', -- 'pending', 'syncing', 'error'
+        retry_count INTEGER DEFAULT 0
+      );
     `;
 
         await this.db.execAsync(schema);
@@ -136,6 +180,35 @@ export class DatabaseService {
     }
 
     private async runMigrations(): Promise<void> {
+        // Migration 0: Migrate any legacy numeric IDs to UUIDs (Critical Task 1)
+        try {
+            await this.db?.execAsync('PRAGMA foreign_keys = OFF;');
+            await this.db?.execAsync('BEGIN TRANSACTION');
+
+            // Find categories with numeric IDs
+            const numCats = await this.db?.getAllAsync<{ id: string }>("SELECT id FROM categories WHERE length(id) < 15") || [];
+            if (numCats.length > 0) {
+                console.log('Running Critical Migration: Converting numeric IDs to UUIDs');
+                // Since user explicitly allowed data loss if needed (NO IMPORTA QUE SE PIERDA TODO), 
+                // and referential integrity of highly nested numeric IDs is extremely complex to rebuild safely
+                // in TS without custom recursive queries, we perform a clean wipe of legacy numeric data.
+                await this.db?.execAsync('DELETE FROM categories WHERE length(id) < 15;');
+                await this.db?.execAsync('DELETE FROM exercises WHERE length(id) < 15 OR length(category_id) < 15;');
+                await this.db?.execAsync('DELETE FROM workouts WHERE length(id) < 15;');
+                await this.db?.execAsync('DELETE FROM workout_sets WHERE length(id) < 15 OR length(workout_id) < 15 OR length(exercise_id) < 15;');
+                await this.db?.execAsync('DELETE FROM measurements WHERE length(id) < 15;');
+                await this.db?.execAsync('DELETE FROM goals WHERE length(id) < 15;');
+
+                // Note: seedDatabase will repopulate missing default categories on restart
+                console.log('Legacy numeric data cleared for UUID consistency.');
+            }
+            await this.db?.execAsync('COMMIT');
+            await this.db?.execAsync('PRAGMA foreign_keys = ON;');
+        } catch (e) {
+            await this.db?.execAsync('ROLLBACK');
+            console.error('Failed to migrate numeric IDs, rolling back', e);
+        }
+
         // Migration 1: Add superset_id to workout_sets if it doesn't exist
         try {
             const result = await this.db?.getFirstAsync<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('workout_sets') WHERE name='superset_id'");
@@ -178,21 +251,33 @@ export class DatabaseService {
 
         // Migration 4: Ensure "Sin categoría" exists for safe reassignment
         try {
-            const existing = await this.db?.getFirstAsync<{ count: number }>(
-                "SELECT COUNT(*) as count FROM categories WHERE id = ? OR name = ?",
-                ['uncategorized', 'Sin categoría']
-            );
-            if (!existing || existing.count === 0) {
-                await this.db?.runAsync(
-                    'INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, ?, ?)',
-                    ['uncategorized', 'Sin categoría', 9999, '#94a3b8']
-                );
+            const systemCat = await this.db?.getFirstAsync<{ id: string }>("SELECT id FROM categories WHERE name = 'Sin categoría'");
+            if (!systemCat) {
+                console.log('Running Migration Check: Re-creating default category.');
+                await this.db?.execAsync("INSERT INTO categories (id, name, is_system, sort_order, color) VALUES ('sys-cat-1', 'Sin categoría', 1, 999, '#64748b')");
             }
         } catch (e) {
-            console.log('Migration check failed (uncategorized category):', e);
+            console.log('Migration check failed (create system cat):', e);
         }
 
-        // Migration 5: Fix plate_inventory PK to include unit (weight,type,unit)
+        // Migration 5: Add origin_id to exercises and is_public to routines
+        try {
+            const resultEx = await this.db?.getFirstAsync<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('exercises') WHERE name='origin_id'");
+            if (resultEx && resultEx.count === 0) {
+                console.log('Running Migration: Adding origin_id to exercises');
+                await this.db?.execAsync('ALTER TABLE exercises ADD COLUMN origin_id TEXT');
+            }
+
+            const resultRoutine = await this.db?.getFirstAsync<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('routines') WHERE name='is_public'");
+            if (resultRoutine && resultRoutine.count === 0) {
+                console.log('Running Migration: Adding is_public to routines');
+                await this.db?.execAsync('ALTER TABLE routines ADD COLUMN is_public INTEGER DEFAULT 0');
+            }
+        } catch (e) {
+            console.log('Migration check failed (Migration 5):', e);
+        }
+
+        // Migration 6: Fix plate_inventory PK to include unit (weight,type,unit)
         try {
             const pragma = await this.db?.getAllAsync<{ name: string }>("PRAGMA table_info('plate_inventory')");
             const hasUnitColumn = (pragma ?? []).some((c) => c.name === 'unit');
@@ -214,12 +299,13 @@ export class DatabaseService {
                         count INTEGER DEFAULT 0,
                         type TEXT DEFAULT 'standard',
                         unit TEXT DEFAULT 'kg',
+                        color TEXT,
                         PRIMARY KEY (weight, type, unit)
                     );
                 `);
                 await this.db?.execAsync(`
-                    INSERT OR REPLACE INTO plate_inventory_new (weight, count, type, unit)
-                    SELECT weight, count, type, COALESCE(unit, 'kg') as unit
+                    INSERT OR REPLACE INTO plate_inventory_new (weight, count, type, unit, color)
+                    SELECT weight, count, type, COALESCE(unit, 'kg') as unit, NULL as color
                     FROM plate_inventory;
                 `);
                 await this.db?.execAsync('DROP TABLE plate_inventory;');
@@ -231,6 +317,46 @@ export class DatabaseService {
                 await this.db?.execAsync('ROLLBACK');
             } catch { }
             console.log('Migration check failed (plate_inventory pk/unit):', e);
+        }
+
+        // Migration 6: Add color column to plate_inventory
+        try {
+            const pragma = await this.db?.getAllAsync<{ name: string }>("PRAGMA table_info('plate_inventory')");
+            const hasColorColumn = (pragma ?? []).some((c) => c.name === 'color');
+            if (!hasColorColumn) {
+                console.log('Running Migration: Adding color to plate_inventory');
+                await this.db?.execAsync('ALTER TABLE plate_inventory ADD COLUMN color TEXT');
+            }
+        } catch (e) {
+            console.log('Migration check failed (plate_inventory color):', e);
+        }
+
+        // Migration 7: Add duration column to workouts (elapsed seconds for timer persistence)
+        try {
+            const result = await this.db?.getFirstAsync<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('workouts') WHERE name='duration'");
+            if (result && result.count === 0) {
+                await this.db?.execAsync('ALTER TABLE workouts ADD COLUMN duration INTEGER DEFAULT 0');
+            }
+        } catch (e) {
+            console.log('Migration check failed (workouts duration):', e);
+        }
+
+        // Migration 8: Create sync_queue table if it doesn't exist
+        try {
+            await this.db?.execAsync(`
+                CREATE TABLE IF NOT EXISTS sync_queue (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    table_name TEXT NOT NULL,
+                    record_id TEXT NOT NULL,
+                    operation TEXT NOT NULL,
+                    payload TEXT,
+                    created_at INTEGER NOT NULL,
+                    status TEXT DEFAULT 'pending',
+                    retry_count INTEGER DEFAULT 0
+                )
+            `);
+        } catch (e) {
+            console.log('Migration check failed (sync_queue):', e);
         }
     }
 
@@ -260,7 +386,7 @@ export class DatabaseService {
         // Optimize seeding with a Transaction
         try {
             await this.run('BEGIN TRANSACTION');
-            
+
             for (const [index, cat] of categories.entries()) {
                 const catId = this.generateId();
                 await this.run(
@@ -411,6 +537,7 @@ export class DatabaseService {
                 0 // User created
             ]
         );
+        await this.queueSyncMutation('exercises', id, 'INSERT', { ...exercise, id, is_system: 0 });
         return id;
     }
 
@@ -429,6 +556,7 @@ export class DatabaseService {
 
         values.push(id);
         await this.run(`UPDATE exercises SET ${fields.join(', ')} WHERE id = ?`, values);
+        await this.queueSyncMutation('exercises', id, 'UPDATE', updates);
     }
 
     // --- WORKOUTS ---
@@ -452,6 +580,7 @@ export class DatabaseService {
             'INSERT INTO workouts (id, date, start_time, status, is_template) VALUES (?, ?, ?, ?, ?)',
             [id, date, Date.now(), 'in_progress', 0]
         );
+        await this.queueSyncMutation('workouts', id, 'INSERT', { id, date, start_time: Date.now(), status: 'in_progress', is_template: 0 });
         return id;
     }
 
@@ -492,6 +621,7 @@ export class DatabaseService {
                 set.superset_id ?? null
             ]
         );
+        await this.queueSyncMutation('workout_sets', id, 'INSERT', { ...set, id });
         return id;
     }
 
@@ -510,10 +640,12 @@ export class DatabaseService {
 
         values.push(id);
         await this.run(`UPDATE workout_sets SET ${fields.join(', ')} WHERE id = ?`, values);
+        await this.queueSyncMutation('workout_sets', id, 'UPDATE', updates);
     }
 
     public async deleteSet(id: string): Promise<void> {
         await this.run('DELETE FROM workout_sets WHERE id = ?', [id]);
+        await this.queueSyncMutation('workout_sets', id, 'DELETE');
     }
 
     public async getSetById(id: string): Promise<WorkoutSet | null> {
@@ -563,6 +695,36 @@ export class DatabaseService {
         );
     }
 
+    // --- SYNC QUEUE HELPERS (OFFLINE FIRST) ---
+    /**
+     * Enqueues a mutation representing a locally performed operation.
+     * This ensures any offline changes are eventually synced to the server.
+     */
+    public async queueSyncMutation(
+        tableName: string,
+        recordId: string,
+        operation: 'INSERT' | 'UPDATE' | 'DELETE',
+        payload?: any
+    ): Promise<void> {
+        if (!this.db) return;
+        try {
+            await this.run(
+                `INSERT INTO sync_queue (id, table_name, record_id, operation, payload, created_at, status, retry_count)
+                 VALUES (?, ?, ?, ?, ?, ?, 'pending', 0)`,
+                [
+                    this.generateId(),
+                    tableName,
+                    recordId,
+                    operation,
+                    payload ? JSON.stringify(payload) : null,
+                    Date.now()
+                ]
+            );
+        } catch (e) {
+            console.error('[SyncQueue] Failed to enqueue mutation:', e);
+        }
+    }
+
     // Helper Utils
     public getDatabase(): SQLite.SQLiteDatabase {
         if (!this.db) {
@@ -572,10 +734,7 @@ export class DatabaseService {
     }
 
     private generateId(): string {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
+        return uuidV4();
     }
 
     private normalizeParams(params: any[] = []): any[] {

@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import { Measurement, MeasurementType } from '../types/db';
+import { uuidV4 } from '../utils/uuid';
 import { dbService } from './DatabaseService';
 
 export interface BodyMetric {
@@ -59,6 +60,7 @@ export class BodyService {
             'INSERT INTO measurements (id, date, type, value, unit, notes) VALUES (?, ?, ?, ?, ?, ?)',
             [id, timestamp, type, value, unit, notes || null]
         );
+        await dbService.queueSyncMutation('measurements', id, 'INSERT', { id, date: timestamp, type, value, unit, notes: notes || null });
         return id;
     }
 
@@ -70,18 +72,20 @@ export class BodyService {
         // We'll filter measurements by range.
         const start = new Date(dateStr).setHours(0, 0, 0, 0);
         const end = new Date(dateStr).setHours(23, 59, 59, 999);
+        const toDelete = await dbService.getAll<{ id: string }>('SELECT id FROM measurements WHERE date >= ? AND date <= ?', [start, end]);
+        for (const m of toDelete) {
+            await dbService.queueSyncMutation('measurements', m.id, 'DELETE');
+        }
         await dbService.run('DELETE FROM measurements WHERE date >= ? AND date <= ?', [start, end]);
     }
 
     public async deleteMeasurement(id: string): Promise<void> {
         await dbService.run('DELETE FROM measurements WHERE id = ?', [id]);
+        await dbService.queueSyncMutation('measurements', id, 'DELETE');
     }
 
     private generateId(): string {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
+        return uuidV4();
     }
 }
 

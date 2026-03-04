@@ -3,7 +3,7 @@ import { Colors } from '@/src/theme';
 import { AlertTriangle, CheckCircle, Info, X, XCircle } from 'lucide-react-native';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeOutUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const GlobalBanner = () => {
@@ -13,54 +13,68 @@ export const GlobalBanner = () => {
 
     if (!banner) return null;
 
-    const getColors = () => {
+    const getTheme = () => {
         switch (banner.type) {
-            case 'error': return { bg: 'bg-red-100', text: 'text-red-800', icon: <XCircle color={Colors.red} size={18} /> };
-            case 'warning': return { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: <AlertTriangle color={Colors.yellow} size={18} /> };
-            case 'success': return { bg: 'bg-green-100', text: 'text-green-800', icon: <CheckCircle color={Colors.green} size={18} /> };
+            case 'error': return { color: Colors.red, icon: <XCircle color={Colors.red} size={28} /> };
+            case 'warning': return { color: Colors.yellow, icon: <AlertTriangle color={Colors.yellow} size={28} /> };
+            case 'success': return { color: Colors.green, icon: <CheckCircle color={Colors.green} size={28} /> };
             case 'info':
-            default: return { bg: 'bg-primary-light/20', text: 'text-primary-dark', icon: <Info color={Colors.primary.DEFAULT} size={18} /> };
+            default: return { color: Colors.primary.DEFAULT, icon: <Info color={Colors.primary.DEFAULT} size={28} /> };
         }
     };
 
-    const { bg, text, icon } = getColors();
+    const theme = getTheme();
 
     return (
         <Animated.View
-            layout={Layout.springify().damping(15)}
-            entering={FadeIn.duration(300)}
-            exiting={FadeOut.duration(200)}
-            className="absolute left-0 right-0 z-40"
-            style={{ top: Math.max(insets.top, 30) }}
+            pointerEvents="auto"
+            entering={FadeInDown.springify().damping(14).stiffness(150).mass(0.8)}
+            exiting={FadeOutUp.duration(200)}
+            className="absolute left-4 right-4 z-[100] bg-iron-900 rounded-2xl flex-row items-center p-4 border-[1.5px] border-iron-950 shadow-xl"
+            style={{
+                top: Math.max(insets.top, 10) + 10,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.4,
+                shadowRadius: 8,
+                elevation: 10,
+                minHeight: 64,
+            }}
         >
-            <View className={`${bg} border-b border-black/5 flex-row items-center px-4 py-3 elevation-2`}>
-                <View className="mr-3">
-                    {icon}
-                </View>
-                <Text className={`flex-1 text-sm font-medium ${text}`}>
+            <View className="mr-4 items-center justify-center p-2 rounded-full bg-iron-800 border-[1.5px] border-iron-950">
+                {theme.icon}
+            </View>
+
+            <View className="flex-1 justify-center py-1">
+                <Text className="text-base font-bold text-iron-950 leading-tight">
                     {banner.message}
                 </Text>
-
-                {banner.actionLabel && banner.onAction && (
-                    <TouchableOpacity
-                        onPress={() => {
-                            banner.onAction!();
-                            if (banner.dismissible) clearBanner();
-                        }}
-                        className="ml-3 px-3 py-1.5 bg-black/5 rounded-md active:bg-black/10"
-                    >
-                        <Text className={`text-xs font-bold ${text}`}>
-                            {banner.actionLabel}
-                        </Text>
-                    </TouchableOpacity>
-                )}
-
-                {banner.dismissible && (
-                    <TouchableOpacity onPress={clearBanner} className="ml-2 p-1 active:opacity-50">
-                        <X color={Colors.iron[500]} size={16} />
-                    </TouchableOpacity>
-                )}
             </View>
+
+            {banner.actionLabel && banner.onAction && (
+                <TouchableOpacity
+                    onPress={() => {
+                        banner.onAction!();
+                        if (banner.dismissible) clearBanner();
+                    }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    className="ml-4 px-4 py-2.5 bg-iron-950 rounded-xl active:bg-iron-700"
+                >
+                    <Text style={{ color: Colors.iron[900], fontWeight: 'bold', fontSize: 14 }}>
+                        {banner.actionLabel}
+                    </Text>
+                </TouchableOpacity>
+            )}
+
+            {banner.dismissible && (
+                <TouchableOpacity
+                    onPress={clearBanner}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    className="ml-3 active:opacity-50 items-center justify-center bg-iron-950 rounded-full w-8 h-8"
+                >
+                    <X color={Colors.iron[900]} size={18} strokeWidth={3} />
+                </TouchableOpacity>
+            )}
         </Animated.View>
     );
 };

@@ -1,5 +1,32 @@
 import { dbService } from './DatabaseService';
 
+export interface NotificationPreferences {
+    inApp: {
+        enabled: boolean;
+        restTimer: boolean;
+        workoutStatus: boolean;
+        updates: boolean;
+        intervalTimer: boolean;
+    };
+    system: {
+        enabled: boolean;
+        restTimer: boolean;
+        workoutPersistent: boolean;
+        inactivityReminder: boolean;
+        workoutComplete: boolean;
+        intervalTimer: boolean;
+        updateAvailable: boolean;
+        appUpdated: boolean;
+        streakReminder: boolean;
+    };
+    sounds: {
+        restTimer: boolean;
+        intervalTimer: boolean;
+        workoutComplete: boolean;
+        countdown: boolean;
+    };
+}
+
 export interface AppConfig {
     weightUnit: 'kg' | 'lbs';
     defaultRestTimer: number;
@@ -11,6 +38,8 @@ export interface AppConfig {
 
     hapticFeedbackEnabled: boolean;
     soundFeedbackEnabled: boolean;
+    systemNotificationsEnabled: boolean;
+    notificationPreferences: NotificationPreferences;
 
     analyticsDefaultRangeDays: 7 | 30 | 90 | 365;
 
@@ -38,6 +67,12 @@ const DEFAULT_CONFIG: AppConfig = {
 
     hapticFeedbackEnabled: true,
     soundFeedbackEnabled: true,
+    systemNotificationsEnabled: true,
+    notificationPreferences: {
+        inApp: { enabled: true, restTimer: true, workoutStatus: true, updates: true, intervalTimer: true },
+        system: { enabled: true, restTimer: true, workoutPersistent: true, inactivityReminder: true, workoutComplete: true, intervalTimer: true, updateAvailable: true, appUpdated: true, streakReminder: true },
+        sounds: { restTimer: true, intervalTimer: true, workoutComplete: true, countdown: true },
+    },
 
     analyticsDefaultRangeDays: 30,
 
@@ -79,7 +114,8 @@ class ConfigService {
                         s.key === 'autoStartRestTimerOnSetComplete' ||
                         s.key === 'plateCalculatorPreferFewerPlates' ||
                         s.key === 'hapticFeedbackEnabled' ||
-                        s.key === 'soundFeedbackEnabled'
+                        s.key === 'soundFeedbackEnabled' ||
+                        s.key === 'systemNotificationsEnabled'
                     ) loadedConfig[s.key] = s.value === 'true';
                     else if (
                         s.key === 'analyticsDefaultRangeDays' ||
@@ -90,6 +126,16 @@ class ConfigService {
                     ) loadedConfig[s.key] = parseFloat(s.value);
                     else if (s.key === 'exerciseCardioMetricById') loadedConfig[s.key] = JSON.parse(s.value);
                     else if (s.key === 'exerciseCardioPrimaryPRById') loadedConfig[s.key] = JSON.parse(s.value);
+                    else if (s.key === 'notificationPreferences') {
+                        try {
+                            const parsed = JSON.parse(s.value);
+                            loadedConfig[s.key] = {
+                                inApp: { ...DEFAULT_CONFIG.notificationPreferences.inApp, ...(parsed?.inApp ?? {}) },
+                                system: { ...DEFAULT_CONFIG.notificationPreferences.system, ...(parsed?.system ?? {}) },
+                                sounds: { ...DEFAULT_CONFIG.notificationPreferences.sounds, ...(parsed?.sounds ?? {}) },
+                            };
+                        } catch { /* fallback to default */ }
+                    }
                     else loadedConfig[s.key] = s.value;
                 } catch (e) {
                     console.warn(`Failed to parse setting ${s.key}`, e);

@@ -1,14 +1,12 @@
-import { dbService } from './DatabaseService';
 import { DOTS_COEFFS, WILKS_COEFFS } from '../constants/Formulas';
+import { dbService } from './DatabaseService';
 
 class StatsService {
-    // ... (rest of methods)
-
     public calculateWilks(bodyWeightKg: number, liftedTotalKg: number, isFemale: boolean = false): number {
         if (bodyWeightKg <= 0) return 0;
 
         if (isFemale) {
-            // Placeholder for female coeffs
+            // Placeholder for female coefficients
         }
 
         const { a, b, c, d, e, f } = WILKS_COEFFS;
@@ -26,31 +24,27 @@ class StatsService {
         return (liftedTotalKg * 500) / denominator;
     }
 
-
-    // --- VOLUME DENSITY ---
-
     /**
-     * Calculate Volume Density (kg / minute) for a specific workout
+     * Calculate Volume Density (kg / minute) for a specific workout.
+     * Uses persisted duration field, falling back to start_time → end_time.
      */
     public async getWorkoutDensity(workoutId: string): Promise<number> {
         const workout = await dbService.getWorkoutById(workoutId);
-        if (!workout || !workout.duration || workout.duration <= 0) return 0;
+        if (!workout) return 0;
 
         const sets = await dbService.getSetsForWorkout(workoutId);
         const totalVolume = sets
             .filter((s) => (s as any).exercise_type === 'weight_reps')
             .reduce((acc, s) => acc + ((s.weight || 0) * (s.reps || 0)), 0);
 
-        // Duration is usually in seconds (from end_time - start_time) or stored as minutes? 
-        // Based on previous code, we store start/end timestamps.
-        // If duration is stored (in minutes), use it. Else calculate.
-
-        let minutes = workout.duration; // Assuming duration is in minutes based on my intuition of typical field usage
-        if (!minutes && workout.end_time && workout.start_time) {
-            minutes = (workout.end_time - workout.start_time) / 1000 / 60;
+        // Use persisted duration (seconds), fall back to timestamps
+        let durationSec = workout.duration ?? 0;
+        if (durationSec <= 0 && workout.end_time && workout.start_time) {
+            durationSec = Math.floor((workout.end_time - workout.start_time) / 1000);
         }
 
-        if (!minutes || minutes <= 0) return 0;
+        const minutes = durationSec / 60;
+        if (minutes <= 0) return 0;
 
         return parseFloat((totalVolume / minutes).toFixed(2));
     }

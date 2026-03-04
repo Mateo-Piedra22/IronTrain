@@ -57,6 +57,7 @@ export class SetService {
         if (filtered.time !== undefined && filtered.time !== null && filtered.time < 0) throw new Error('Time cannot be negative');
 
         // Construct dynamic query
+        // Construct dynamic query
         const keys = Object.keys(filtered);
         if (keys.length === 0) return;
 
@@ -67,9 +68,11 @@ export class SetService {
             `UPDATE workout_sets SET ${setString} WHERE id = ?`,
             [...values, id]
         );
+        await dbService.queueSyncMutation('workout_sets', id, 'UPDATE', filtered);
     }
 
     static async delete(id: string): Promise<void> {
         await dbService.run('DELETE FROM workout_sets WHERE id = ?', [id]);
+        await dbService.queueSyncMutation('workout_sets', id, 'DELETE');
     }
 }

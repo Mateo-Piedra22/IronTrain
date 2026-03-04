@@ -18,6 +18,7 @@ export class ExerciseService {
             'INSERT INTO exercises (id, category_id, name, type, notes) VALUES (?, ?, ?, ?, ?)',
             [id, data.category_id, data.name, data.type, data.notes ?? null]
         );
+        await dbService.queueSyncMutation('exercises', id, 'INSERT', { id, category_id: data.category_id, name: data.name, type: data.type, notes: data.notes ?? null, is_system: 0 });
         return id;
     }
 
@@ -89,6 +90,7 @@ export class ExerciseService {
             }
 
             await dbService.run('COMMIT');
+            await dbService.queueSyncMutation('exercises', id, 'UPDATE', data);
         } catch (e) {
             try { await dbService.run('ROLLBACK'); } catch { }
             throw e;
@@ -110,6 +112,7 @@ export class ExerciseService {
             throw new Error('Cannot delete exercise with existing history');
         }
         await dbService.run('DELETE FROM exercises WHERE id = ?', [id]);
+        await dbService.queueSyncMutation('exercises', id, 'DELETE');
     }
 
     static async search(query: string, categoryId?: string): Promise<(Exercise & { category_name: string; category_color: string })[]> {

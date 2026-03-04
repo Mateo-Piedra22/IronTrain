@@ -1,7 +1,7 @@
-import { PlateInventory } from '../types/db';
+import { PlateInventory, PlateType } from '../types/db';
 
 export interface PlateLoadout {
-    perSide: { plate: number; pairs: number }[];
+    perSide: { plate: number; pairs: number; color?: string; type?: PlateType }[];
     totalWeight: number;
     barWeight: number;
 }
@@ -24,21 +24,24 @@ function toFloat(weightInt: number): number {
     return Math.round((weightInt / SCALE) * 100) / 100;
 }
 
-function normalizeInventory(inventory: PlateInventory[]): { weightInt: number; weight: number; pairs: number }[] {
+function normalizeInventory(inventory: PlateInventory[]): { weightInt: number; weight: number; pairs: number; color?: string; type?: PlateType }[] {
     return inventory
         .filter((p) => Number.isFinite(p.weight) && p.weight > 0 && p.count > 0)
         .map((p) => {
             const pairs = Math.floor((p.count ?? 0) / 2);
-            return { weightInt: toInt(p.weight), weight: p.weight, pairs };
+            return { weightInt: toInt(p.weight), weight: p.weight, pairs, color: p.color, type: p.type };
         })
         .filter((p) => p.pairs > 0)
         .sort((a, b) => b.weightInt - a.weightInt);
 }
 
-function buildLoadout(chosen: Map<number, number>, barInt: number): PlateLoadout {
+function buildLoadout(chosen: Map<number, number>, barInt: number, metadataMap: Map<number, { color?: string; type?: PlateType }>): PlateLoadout {
     const perSide = Array.from(chosen.entries())
         .filter(([, pairs]) => pairs > 0)
-        .map(([weightInt, pairs]) => ({ plate: toFloat(weightInt), pairs }))
+        .map(([weightInt, pairs]) => {
+            const meta = metadataMap.get(weightInt);
+            return { plate: toFloat(weightInt), pairs, color: meta?.color, type: meta?.type };
+        })
         .sort((a, b) => b.plate - a.plate);
 
     const sideSumInt = perSide.reduce((acc, p) => acc + toInt(p.plate) * p.pairs, 0);
@@ -79,6 +82,8 @@ export class PlateCalculatorService {
 
         const sideTargetInt = Math.floor((targetInt - barInt) / 2);
         const items = normalizeInventory(options.inventory);
+        const metadataMap = new Map<number, { color?: string; type?: PlateType }>();
+        items.forEach(item => metadataMap.set(item.weightInt, { color: item.color, type: item.type }));
 
         const chosen = new Map<number, number>();
         const exact: PlateLoadout[] = [];
@@ -92,7 +97,7 @@ export class PlateCalculatorService {
 
             if (idx >= items.length) {
                 const sideSumInt = Array.from(chosen.entries()).reduce((acc, [w, k]) => acc + (w * k), 0);
-                const loadout = buildLoadout(chosen, barInt);
+                const loadout = buildLoadout(chosen, barInt, metadataMap);
                 const diff = sideTargetInt - sideSumInt;
 
                 if (diff === 0) {

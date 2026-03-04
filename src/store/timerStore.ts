@@ -1,52 +1,7 @@
-import notifee, { AndroidImportance, TimestampTrigger, TriggerType } from '@notifee/react-native';
 import { create } from 'zustand';
+import { configService } from '../services/ConfigService';
 import { feedbackService } from '../services/FeedbackService';
-
-const TIMER_NOTIFICATION_ID = 'rest-timer-alert';
-
-async function scheduleTimerNotification(endAtMs: number) {
-    try {
-        await notifee.createChannel({
-            id: 'timers',
-            name: 'Temporizadores de Descanso',
-            sound: 'default',
-            importance: AndroidImportance.HIGH,
-        });
-
-        const trigger: TimestampTrigger = {
-            type: TriggerType.TIMESTAMP,
-            timestamp: endAtMs,
-        };
-
-        await notifee.createTriggerNotification(
-            {
-                id: TIMER_NOTIFICATION_ID,
-                title: '¡Descanso Terminado!',
-                body: 'Es hora de tu próxima serie. ¡Vamos!',
-                android: {
-                    channelId: 'timers',
-                    pressAction: {
-                        id: 'default',
-                    },
-                },
-                ios: {
-                    sound: 'default',
-                }
-            },
-            trigger
-        );
-    } catch (e) {
-        console.warn('Failed to schedule timer notification', e);
-    }
-}
-
-async function cancelTimerNotification() {
-    try {
-        await notifee.cancelNotification(TIMER_NOTIFICATION_ID);
-    } catch (e) {
-        // ignore
-    }
-}
+import { systemNotificationService } from '../services/SystemNotificationService';
 
 interface TimerState {
     timeLeft: number;
@@ -72,15 +27,18 @@ export const useTimerStore = create<TimerState>((set, get) => ({
         const now = Date.now();
         const endAtMs = now + s * 1000;
         set({ timeLeft: s, duration: s, isRunning: s > 0, endAtMs: s > 0 ? endAtMs : null });
-        if (s > 0) scheduleTimerNotification(endAtMs);
-        else cancelTimerNotification();
+        if (s > 0) {
+            systemNotificationService.scheduleRestTimerNotification(endAtMs);
+        } else {
+            systemNotificationService.cancelRestTimerNotification();
+        }
     },
     stopTimer: () => {
-        cancelTimerNotification();
+        systemNotificationService.cancelRestTimerNotification();
         set({ isRunning: false, timeLeft: 0, duration: 0, endAtMs: null });
     },
     pauseTimer: () => {
-        cancelTimerNotification();
+        systemNotificationService.cancelRestTimerNotification();
         set((state) => {
             if (!state.isRunning || state.timeLeft <= 0) return state;
             return { isRunning: false, endAtMs: null };
@@ -90,7 +48,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
         if (state.isRunning || state.timeLeft <= 0) return state;
         const now = Date.now();
         const endAtMs = now + state.timeLeft * 1000;
-        scheduleTimerNotification(endAtMs);
+        systemNotificationService.scheduleRestTimerNotification(endAtMs);
         return { isRunning: true, endAtMs };
     }),
     restartTimer: () => set((state) => {
@@ -98,7 +56,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
         if (s <= 0) return state;
         const now = Date.now();
         const endAtMs = now + s * 1000;
-        scheduleTimerNotification(endAtMs);
+        systemNotificationService.scheduleRestTimerNotification(endAtMs);
         return { timeLeft: s, isRunning: true, endAtMs };
     }),
     tick: () => {
@@ -107,8 +65,14 @@ export const useTimerStore = create<TimerState>((set, get) => ({
         const now = Date.now();
         const left = Math.max(0, Math.ceil((endAtMs - now) / 1000));
         if (left <= 0) {
-            cancelTimerNotification();
-            feedbackService.restTimerExpired();
+            systemNotificationService.cancelRestTimerNotification();
+            const prefs = configService.get('notificationPreferences');
+            if (prefs.sounds.restTimer) {
+                feedbackService.restTimerExpired();
+            } else {
+                // Still provide haptic even if sound for rest timer is off
+                feedbackService.timerComplete();
+            }
             set({ timeLeft: 0, isRunning: false, endAtMs: null });
         } else {
             set({ timeLeft: left });
@@ -119,7 +83,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
         if (s <= 0) return state;
         if (state.isRunning && state.endAtMs) {
             const endAtMs = state.endAtMs + s * 1000;
-            scheduleTimerNotification(endAtMs);
+            systemNotificationService.scheduleRestTimerNotification(endAtMs);
             const now = Date.now();
             const timeLeft = Math.max(0, Math.ceil((endAtMs - now) / 1000));
             return { endAtMs, timeLeft };

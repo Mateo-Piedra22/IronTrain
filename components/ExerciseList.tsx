@@ -1,24 +1,27 @@
 // @ts-nocheck
 import { Colors } from '@/src/theme';
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { CategoryService } from '../src/services/CategoryService';
 import { ExerciseService } from '../src/services/ExerciseService';
+import { confirm } from '../src/store/confirmStore';
 import { Category, Exercise } from '../src/types/db';
 import { ExerciseFormModal } from './ExerciseFormModal';
 
 interface ExerciseListProps {
     onSelect?: (exerciseId: string) => void;
+    inModal?: boolean;
 }
 
 type ExerciseItem = Exercise & { category_name: string; category_color: string };
 type CategoryItem = Category | { id: string; name: string; color: string };
 
-export function ExerciseList({ onSelect }: ExerciseListProps) {
+export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
     const [exercises, setExercises] = useState<ExerciseItem[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -68,21 +71,19 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
     };
 
     const handleDelete = (ex: Exercise) => {
-        Alert.alert('Eliminar ejercicio', `¿Eliminar "${ex.name}"?`, [
-            { text: 'Cancelar', style: 'cancel' },
-            {
-                text: 'Eliminar',
-                style: 'destructive',
-                onPress: async () => {
-                    try {
-                        await ExerciseService.delete(ex.id);
-                        await loadData();
-                    } catch (e: any) {
-                        Alert.alert('No se pudo eliminar', e?.message ?? 'Error');
-                    }
+        confirm.destructive(
+            'Eliminar ejercicio',
+            `¿Eliminar "${ex.name}"?`,
+            async () => {
+                try {
+                    await ExerciseService.delete(ex.id);
+                    await loadData();
+                } catch (e: any) {
+                    confirm.error('No se pudo eliminar', e?.message ?? 'Error');
                 }
-            }
-        ]);
+            },
+            'Eliminar'
+        );
     };
 
     const handlePress = (ex: Exercise) => {
@@ -103,38 +104,44 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
     };
 
     return (
-        <View className="flex-1 bg-iron-900">
+        <View style={{ flex: 1, backgroundColor: inModal ? Colors.iron[100] : Colors.iron[900] }}>
             {/* Search Header */}
-            <View className="p-4 border-b border-iron-800">
-                <View className="flex-row items-center bg-iron-800 px-4 py-3 rounded-xl border border-iron-700">
-                    <Search size={20} color={Colors.iron[950]} />
+            <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: inModal ? Colors.iron[200] : Colors.iron[800] }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, gap: 10 }}>
+                    <Search size={20} color={Colors.iron[400]} />
                     <TextInput
-                        className="flex-1 ml-3 text-iron-950 text-base"
-                        placeholder="Search exercises..."
-                        placeholderTextColor={Colors.iron[500]}
+                        style={{ flex: 1, fontSize: 16, color: Colors.iron[950], padding: 0, fontWeight: '500' }}
+                        placeholder="Buscar ejercicio…"
+                        placeholderTextColor={Colors.iron[400]}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                     />
                 </View>
 
-                {/* Category Tabs */}
-                <View className="mt-4">
+                {/* Category Chips */}
+                <View style={{ marginTop: 12 }}>
                     <FlatList<CategoryItem>
                         horizontal
-                        data={[{ id: 'all', name: 'All', color: Colors.iron[950] }, ...categories]}
+                        data={[{ id: 'all', name: 'Todos', color: Colors.iron[950] }, ...categories]}
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={{ paddingRight: 20 }}
                         keyExtractor={(item) => item.id}
                         renderItem={({ item }) => (
                             <TouchableOpacity
                                 onPress={() => setSelectedCategory(item.id)}
-                                className={`mr-2 px-4 py-2 rounded-full border ${selectedCategory === item.id
-                                    ? 'bg-iron-800 border-primary'
-                                    : 'bg-transparent border-iron-700'
-                                    }`}
+                                style={{
+                                    marginRight: 8, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100,
+                                    borderWidth: 1,
+                                    backgroundColor: selectedCategory === item.id ? Colors.primary.DEFAULT : Colors.surface,
+                                    borderColor: selectedCategory === item.id ? Colors.primary.DEFAULT : Colors.iron[300],
+                                    elevation: selectedCategory === item.id ? 2 : 1,
+                                    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2,
+                                }}
                             >
-                                <Text className={`text-sm font-semibold ${selectedCategory === item.id ? 'text-primary' : 'text-iron-950'
-                                    }`}>
+                                <Text style={{
+                                    fontSize: 13, fontWeight: '800',
+                                    color: selectedCategory === item.id ? '#fff' : Colors.iron[500]
+                                }}>
                                     {item.name}
                                 </Text>
                             </TouchableOpacity>
@@ -145,49 +152,61 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
 
             {/* List */}
             {loading ? (
-                <View className="flex-1 items-center justify-center">
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                     <ActivityIndicator color={Colors.primary.dark} />
                 </View>
             ) : (
                 <FlatList<ExerciseItem>
                     data={exercises}
-                    contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-                    // Lazy Loading Optimization
-                    onEndReachedThreshold={0.5} // Preload when halfway down
+                    contentContainerStyle={{ padding: 16, paddingBottom: inModal ? 40 : 100 }}
+                    onEndReachedThreshold={0.5}
                     keyExtractor={(item) => item.id}
                     renderItem={({ item }) => (
                         <TouchableOpacity
                             onPress={() => handlePress(item)}
-                            className="flex-row items-center justify-between p-4 mb-3 bg-surface rounded-xl border border-iron-700 elevation-1 active:opacity-70"
+                            style={{
+                                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                                padding: 16, marginBottom: 12, backgroundColor: Colors.surface,
+                                borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], elevation: 2,
+                                shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6,
+                            }}
                             accessibilityRole="button"
                             accessibilityLabel={`Abrir ejercicio ${item.name}`}
                         >
-                            <View className="flex-1">
-                                <Text className="text-iron-950 font-bold text-base">{item.name}</Text>
-                                <View className="flex-row items-center mt-1">
-                                    <View className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: item.category_color || '#fff' }} />
-                                    <Text className="text-iron-950/60 text-xs uppercase">{item.category_name}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
+                                <View style={{
+                                    width: 40, height: 40, borderRadius: 12,
+                                    backgroundColor: (item.category_color || Colors.iron[400]) + '20',
+                                    borderWidth: 1, borderColor: (item.category_color || Colors.iron[400]) + '40',
+                                    justifyContent: 'center', alignItems: 'center',
+                                }}>
+                                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: item.category_color || Colors.iron[400] }} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 }} numberOfLines={1}>{item.name}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                                        <Text style={{ color: Colors.iron[500], fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>{item.category_name}</Text>
+                                    </View>
                                 </View>
                             </View>
                             {!onSelect && (
-                                <View className="flex-row items-center gap-2">
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                     <TouchableOpacity
                                         onPress={() => handleEdit(item)}
-                                        className="p-2 bg-iron-200 rounded-lg active:opacity-50"
+                                        style={{ padding: 8, backgroundColor: Colors.iron[200], borderRadius: 10, borderWidth: 1, borderColor: Colors.iron[300] }}
                                         accessibilityRole="button"
                                         accessibilityLabel={`Editar ejercicio ${item.name}`}
                                     >
-                                        <Pencil size={18} color={Colors.iron[500]} />
+                                        <Pencil size={14} color={Colors.iron[500]} />
                                     </TouchableOpacity>
-
                                     {!item.is_system && (
                                         <TouchableOpacity
                                             onPress={() => handleDelete(item)}
-                                            className="p-2 bg-red-100 rounded-lg active:opacity-50"
+                                            style={{ padding: 8, backgroundColor: '#ef444412', borderRadius: 10, borderWidth: 1, borderColor: '#ef444425' }}
                                             accessibilityRole="button"
                                             accessibilityLabel={`Eliminar ejercicio ${item.name}`}
                                         >
-                                            <Trash2 size={18} color={Colors.red} />
+                                            <Trash2 size={14} color="#ef4444" />
                                         </TouchableOpacity>
                                     )}
                                 </View>
@@ -197,17 +216,29 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
                 />
             )}
 
-            {/* FAB for creation (Only visible in Management Mode) */}
+            {/* FAB */}
             {!onSelect && (
                 <TouchableOpacity
                     onPress={handleCreate}
-                    className="absolute w-14 h-14 bg-primary rounded-full items-center justify-center shadow-lg border border-iron-700 active:opacity-90"
-                    style={{ right: 24, bottom: bottomOffset }}
+                    style={{
+                        position: 'absolute', right: 24, bottom: bottomOffset, zIndex: 10,
+                        width: 56, height: 56, borderRadius: 16,
+                        backgroundColor: Colors.primary.DEFAULT, alignItems: 'center', justifyContent: 'center',
+                        shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
+                    }}
                     accessibilityRole="button"
                     accessibilityLabel="Crear ejercicio"
                 >
-                    <Plus color="white" />
+                    <Plus color="white" size={24} />
                 </TouchableOpacity>
+            )}
+
+            {!inModal && (
+                <LinearGradient
+                    colors={['transparent', Colors.iron[900]]}
+                    style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: bottomOffset + 60, zIndex: 1 }}
+                    pointerEvents="none"
+                />
             )}
 
             <ExerciseFormModal
@@ -219,3 +250,4 @@ export function ExerciseList({ onSelect }: ExerciseListProps) {
         </View>
     );
 }
+

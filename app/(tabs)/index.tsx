@@ -3,22 +3,24 @@ import { DateStrip } from '@/components/DateStrip';
 import { ExerciseList } from '@/components/ExerciseList';
 import { HistoryModal } from '@/components/HistoryModal';
 import { IntervalTimerModal } from '@/components/IntervalTimerModal';
+import { LoadRoutineModal } from '@/components/LoadRoutineModal';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { WorkoutLog } from '@/components/WorkoutLog';
+import { WorkoutStatusBar } from '@/components/WorkoutStatusBar';
 import { ChangelogService } from '@/src/services/ChangelogService';
 import { configService } from '@/src/services/ConfigService';
+import { RoutineDayWithExercises } from '@/src/services/RoutineService';
 import { useTimerStore } from '@/src/store/timerStore';
 import { Colors } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import { addDays, subDays } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
-import { Copy, Info, Plus, Timer, X } from 'lucide-react-native';
+import { Info, Plus, Timer, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { workoutService } from '../../src/services/WorkoutService';
 import { ExerciseType, Workout, WorkoutSet } from '../../src/types/db';
 
@@ -30,6 +32,7 @@ export default function DailyLogScreen() {
   const [loading, setLoading] = useState(true);
   const [markedDates, setMarkedDates] = useState<Record<string, any>>({});
   const [copyModalVisible, setCopyModalVisible] = useState(false);
+  const [loadRoutineModalVisible, setLoadRoutineModalVisible] = useState(false);
   const [timerVisible, setTimerVisible] = useState(false);
 
   // History State
@@ -38,6 +41,7 @@ export default function DailyLogScreen() {
   const [historyExerciseName, setHistoryExerciseName] = useState('');
   const [historyExerciseType, setHistoryExerciseType] = useState<ExerciseType>('weight_reps');
   const [hasNewChangelog, setHasNewChangelog] = useState(false);
+  const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -57,6 +61,18 @@ export default function DailyLogScreen() {
       console.error('Failed to load workout data', e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Lightweight refresh — updates workout + calendar without showing loading spinner
+  const refreshWorkoutOnly = async () => {
+    try {
+      const activeWorkout = await workoutService.getActiveWorkout(selectedDate);
+      setWorkout(activeWorkout);
+      const events = await workoutService.getCalendarEvents();
+      setMarkedDates(events);
+    } catch (e) {
+      console.error('Failed to refresh workout', e);
     }
   };
 
@@ -80,24 +96,50 @@ export default function DailyLogScreen() {
 
   const handleAddSet = async (exerciseId: string) => {
     if (!workout) return;
-    await workoutService.addSet(workout.id, exerciseId, 'normal');
-    loadData(); // Refresh
-    setIsPickerVisible(false); // Close picker if open
+    try {
+      await workoutService.addSet(workout.id, exerciseId, 'normal');
+      loadData();
+      setIsPickerVisible(false);
+      notify.success('Serie agregada', 'Ejercicio añadido al entrenamiento.');
+    } catch (e: any) {
+      notify.error('Fallo de conexión', e?.message || 'No se pudo agregar el ejercicio.');
+    }
+  };
+
+  const handleLoadRoutineDay = async (day: RoutineDayWithExercises) => {
+    if (!workout) return;
+    try {
+      for (const ex of day.exercises) {
+        await workoutService.addSet(workout.id, ex.exercise_id, 'normal', {
+          notes: ex.notes || undefined
+        });
+      }
+      loadData();
+      notify.success('Rutina cargada', `${day.name} fue añadido al entrenamiento.`);
+    } catch (e: any) {
+      notify.error('Fallo de carga', e?.message || 'No se pudo cargar la rutina.');
+    }
   };
 
   const handleCopySet = async (originalSetId: string) => {
     if (!workout) return;
     const originalSet = sets.find(s => s.id === originalSetId);
     if (!originalSet) return;
-    await workoutService.addSet(workout.id, originalSet.exercise_id, originalSet.type, {
-      weight: originalSet.weight,
-      reps: originalSet.reps,
-      distance: (originalSet as any).distance,
-      time: (originalSet as any).time,
-      notes: originalSet.notes,
-      rpe: originalSet.rpe
-    });
-    loadData();
+
+    try {
+      await workoutService.addSet(workout.id, originalSet.exercise_id, originalSet.type, {
+        weight: originalSet.weight,
+        reps: originalSet.reps,
+        distance: (originalSet as any).distance,
+        time: (originalSet as any).time,
+        notes: originalSet.notes,
+        rpe: originalSet.rpe
+      });
+      loadData();
+      notify.success('Serie multiplicada', 'Los valores se han copiado exitosamente.');
+    } catch (e: any) {
+      notify.error('Error al clonar', e?.message || 'Fallo general de base de datos.');
+    }
   };
 
   const handleUpdateSet = async (setId: string, updates: Partial<WorkoutSet>) => {
@@ -118,19 +160,18 @@ export default function DailyLogScreen() {
       }
     } catch (e: any) {
       setSets(prevSetsSnapshot);
-      notify.error('Error', e?.message ?? 'No se pudo actualizar la serie');
+      notify.error('Datos revertidos', e?.message || 'Fallo de integridad al actualizar.');
     }
   };
 
   const handleDeleteSet = async (setId: string) => {
-    await workoutService.deleteSet(setId);
-    loadData();
-  };
-
-  const handleFinishWorkout = async () => {
-    if (!workout) return;
-    await workoutService.finishWorkout(workout.id);
-    loadData();
+    try {
+      await workoutService.deleteSet(setId);
+      loadData();
+      notify.success('Descartada', 'La serie fue eliminada.');
+    } catch (e: any) {
+      notify.error('Operación fallida', e?.message || 'No se pudo borrar la serie.');
+    }
   };
 
   const handleLinkExercise = async (exerciseId: string) => {
@@ -141,7 +182,7 @@ export default function DailyLogScreen() {
     const currentIndex = uniqueExercises.indexOf(exerciseId);
 
     if (currentIndex === -1 || currentIndex >= uniqueExercises.length - 1) {
-      notify.warning('No hay un ejercicio debajo para enlazar.');
+      notify.warning('Movimiento inválido', 'No hay un ejercicio debajo para enlazar.');
       return;
     }
 
@@ -154,27 +195,34 @@ export default function DailyLogScreen() {
     if (!currentSet || !nextSet) return;
 
     if (currentSet.superset_id && nextSet.superset_id && currentSet.superset_id === nextSet.superset_id) {
-      notify.warning('Ya están enlazados.');
+      notify.warning('Atención', 'Estos ejercicios ya están enlazados.');
       return;
     }
 
-    if (currentSet.superset_id) {
-      // Add next to current's superset
-      await workoutService.addToSuperset(workout.id, currentSet.superset_id, nextExerciseId);
-    } else if (nextSet.superset_id) {
-      // Add current to next's superset
-      await workoutService.addToSuperset(workout.id, nextSet.superset_id, exerciseId);
-    } else {
-      // Create new superset
-      await workoutService.createSuperset(workout.id, [exerciseId, nextExerciseId]);
+    try {
+      if (currentSet.superset_id) {
+        await workoutService.addToSuperset(workout.id, currentSet.superset_id, nextExerciseId);
+      } else if (nextSet.superset_id) {
+        await workoutService.addToSuperset(workout.id, nextSet.superset_id, exerciseId);
+      } else {
+        await workoutService.createSuperset(workout.id, [exerciseId, nextExerciseId]);
+      }
+      loadData();
+      notify.success('Ejercicios unidos', 'Superset configurado.');
+    } catch (e: any) {
+      notify.error('Error en Superset', e?.message || 'No fue posible unirlos.');
     }
-    loadData();
   };
 
   const handleUnlinkExercise = async (exerciseId: string) => {
     if (!workout) return;
-    await workoutService.removeFromSuperset(workout.id, exerciseId);
-    loadData();
+    try {
+      await workoutService.removeFromSuperset(workout.id, exerciseId);
+      loadData();
+      notify.success('Desvinculado', 'El ejercicio es independiente de nuevo.');
+    } catch (e: any) {
+      notify.error('No se pudo desvincular', e?.message || 'Error general de red.');
+    }
   };
 
   const handleViewHistory = async (exerciseId: string) => {
@@ -201,6 +249,7 @@ export default function DailyLogScreen() {
   };
 
   const panGesture = Gesture.Pan()
+    .enabled(!isCalendarExpanded)
     .activeOffsetX([-20, 20]) // Only activate on horizontal swipe
     .onEnd((e) => {
       if (e.translationX < -50) {
@@ -214,56 +263,38 @@ export default function DailyLogScreen() {
     <SafeAreaWrapper edges={['top', 'left', 'right']} className="bg-iron-900">
       <GestureDetector gesture={panGesture}>
         <View>
-          <View className="px-4 py-3 flex-row justify-between items-center bg-iron-900 border-b border-iron-700">
-            <View className="flex-row items-center">
-              <Text className="text-xl font-bold text-iron-950 mr-4">Registro diario</Text>
-            </View>
-            <View className="absolute inset-0 items-center justify-center pointer-events-none">
+          <DateStrip
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            onExpandedChange={setIsCalendarExpanded}
+            markedDates={markedDates}
+            headerCenter={
               <Image
                 source={require('../../assets/images/icon.png')}
-                style={{ width: 60, height: 60, resizeMode: 'contain', transform: [{ scale: 1.2 }] }}
+                style={{ width: 100, height: 100, resizeMode: 'contain' }}
               />
-            </View>
-            <View className="w-10 items-end">
+            }
+            headerRight={
               <Link href="/changelog" asChild>
-                <TouchableOpacity className="relative">
-                  <Info size={28} color={Colors.iron[950]} />
+                <TouchableOpacity className="relative p-1 active:opacity-50">
+                  <Info size={24} color={Colors.iron[50]} />
                   {hasNewChangelog && (
-                    <View className="absolute top-0 -right-1 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-iron-100" />
+                    <View className="absolute top-0 -right-1 w-3 h-3 rounded-full bg-red-500 border-2 border-iron-900" />
                   )}
                 </TouchableOpacity>
               </Link>
-            </View>
-          </View>
-          <DateStrip selectedDate={selectedDate} onSelectDate={setSelectedDate} markedDates={markedDates} />
+            }
+          />
         </View>
       </GestureDetector>
 
-      {/* Workout Status Toggle */}
+      {/* Workout Status Bar — Tri-state: idle → active → completed */}
       {workout && (
-        <View className="flex-row items-center justify-between px-4 py-3 bg-iron-900 border-b border-iron-700">
-          <Text className="text-iron-950 font-bold uppercase text-xs">Estado del entrenamiento</Text>
-          <View className="flex-row items-center gap-3">
-            <Text className={`font-bold ${workout.status === 'completed' ? 'text-green-600' : 'text-iron-950'}`}>
-              {workout.status === 'completed' ? 'FINALIZADO' : 'ACTIVO'}
-            </Text>
-            <Switch
-              value={workout.status === 'completed'}
-              onValueChange={async (val) => {
-                if (val) {
-                  await workoutService.finishWorkout(workout.id);
-                  import('expo-haptics').then(H => H.notificationAsync(H.NotificationFeedbackType.Success));
-                } else {
-                  await workoutService.resumeWorkout(workout.id);
-                  import('expo-haptics').then(H => H.impactAsync(H.ImpactFeedbackStyle.Medium));
-                }
-                loadData();
-              }}
-              trackColor={{ false: Colors.iron[300], true: Colors.green }}
-              thumbColor={'#ffffff'}
-            />
-          </View>
-        </View>
+        <WorkoutStatusBar
+          workout={workout}
+          sets={sets}
+          onStatusChange={refreshWorkoutOnly}
+        />
       )}
 
       {loading ? (
@@ -272,20 +303,6 @@ export default function DailyLogScreen() {
         </View>
       ) : (
         <>
-          <View className="items-center mt-4 mb-2">
-            <TouchableOpacity
-              onPress={() => setCopyModalVisible(true)}
-              className="bg-surface px-4 py-2 rounded-full border border-iron-700 flex-row items-center border-dashed active:bg-iron-200"
-              accessibilityRole="button"
-              accessibilityLabel="Copiar ejercicios desde otro día"
-            >
-              <Copy size={14} color={Colors.iron[500]} />
-              <Text className="text-iron-950 text-xs font-bold ml-2 uppercase">
-                {sets.length === 0 ? 'Copiar del historial' : 'Copiar (agregar/reemplazar)'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
           <WorkoutLog
             sets={sets}
             onExercisePress={(exId, exName) => {
@@ -296,6 +313,8 @@ export default function DailyLogScreen() {
             }}
             workoutId={workout?.id || ''}
             onRefresh={loadData}
+            onCopyPress={() => setCopyModalVisible(true)}
+            onLoadRoutinePress={() => setLoadRoutineModalVisible(true)}
           />
         </>
       )}
@@ -304,29 +323,40 @@ export default function DailyLogScreen() {
       {!loading && (
         <TouchableOpacity
           onPress={handleAddButton}
-          className="absolute bottom-6 right-6 w-14 h-14 bg-primary rounded-full items-center justify-center elevation-3 active:scale-95"
+          style={{ position: 'absolute', bottom: 24, right: 24, zIndex: 20, width: 56, height: 56, backgroundColor: Colors.primary.DEFAULT, borderRadius: 28, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
         >
-          <Plus color="white" size={30} />
+          <Plus color="white" size={28} />
         </TouchableOpacity>
       )}
 
       {/* ... Pickers ... */}
-      <Modal visible={isPickerVisible} animationType="slide" presentationStyle="pageSheet">
-        {/* ... */}
-        <View className="flex-1 bg-iron-900">
-          <SafeAreaView edges={['top']} className="bg-iron-800 border-b border-iron-800">
-            <View className="flex-row justify-between items-center p-4">
-              <Text className="text-iron-950 font-bold text-lg">Seleccionar ejercicio</Text>
+      <Modal visible={isPickerVisible} transparent animationType="fade" onRequestClose={() => setIsPickerVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 48 }}>
+          <View style={{
+            backgroundColor: Colors.iron[900], borderWidth: 1, borderColor: Colors.iron[700],
+            borderRadius: 20, flex: 1, maxHeight: '95%', width: '100%', overflow: 'hidden',
+          }}>
+            {/* Modal Header — CopyWorkoutModal pattern */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.iron[200] }}>
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: '900', color: Colors.iron[950], letterSpacing: -0.3 }}>Seleccionar ejercicio</Text>
+                <Text style={{ fontSize: 11, color: Colors.iron[400], marginTop: 2 }}>Tocá uno para agregarlo al entrenamiento</Text>
+              </View>
               <TouchableOpacity
                 onPress={() => setIsPickerVisible(false)}
+                style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: Colors.primary.DEFAULT, justifyContent: 'center', alignItems: 'center' }}
                 accessibilityRole="button"
                 accessibilityLabel="Cerrar selector de ejercicios"
               >
-                <X color={Colors.iron[950]} size={24} />
+                <X color="#fff" size={18} />
               </TouchableOpacity>
             </View>
-          </SafeAreaView>
-          <ExerciseList onSelect={handleAddSet} />
+
+            {/* List */}
+            <View style={{ flex: 1 }}>
+              <ExerciseList onSelect={handleAddSet} inModal />
+            </View>
+          </View>
         </View>
       </Modal>
 
@@ -347,6 +377,12 @@ export default function DailyLogScreen() {
         markedDates={markedDates}
       />
 
+      <LoadRoutineModal
+        visible={loadRoutineModalVisible}
+        onClose={() => setLoadRoutineModalVisible(false)}
+        onLoadDay={handleLoadRoutineDay}
+      />
+
       <IntervalTimerModal
         visible={timerVisible}
         onClose={() => setTimerVisible(false)}
@@ -356,9 +392,9 @@ export default function DailyLogScreen() {
       {!loading && (
         <TouchableOpacity
           onPress={() => setTimerVisible(true)}
-          className="absolute bottom-6 left-6 w-12 h-12 bg-iron-800 rounded-full items-center justify-center shadow-lg border border-iron-700"
+          style={{ position: 'absolute', bottom: 24, left: 24, zIndex: 20, width: 48, height: 48, backgroundColor: Colors.iron[800], borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[700], elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6 }}
         >
-          <Timer color="#94a3b8" size={24} />
+          <Timer color="#94a3b8" size={22} />
         </TouchableOpacity>
       )}
     </SafeAreaWrapper>

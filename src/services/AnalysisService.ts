@@ -27,6 +27,8 @@ export interface WorkoutSummary {
     workoutCount: number;
     totalVolume: number;
     avgDurationMin: number | null;
+    totalSets: number;
+    totalReps: number;
 }
 
 export interface CardioSummary {
@@ -75,12 +77,16 @@ export interface PowerliftingPRs {
     bench: ExercisePR | null;
     deadlift: ExercisePR | null;
     totalKg: number;
+    squatName: string | null;
+    benchName: string | null;
+    deadliftName: string | null;
 }
 
 export interface VolumeSeriesPoint {
     label: string;
     dateMs: number;
     volume: number;
+    sets: number;
 }
 
 export interface CategoryVolumeRow {
@@ -89,6 +95,7 @@ export interface CategoryVolumeRow {
     categoryColor: string | null;
     volume: number;
     setCount: number;
+    maxWeight: number;
 }
 
 export interface ExerciseVolumeRow {
@@ -115,13 +122,12 @@ export class AnalysisService {
         try {
             const cutoff = days ? Date.now() - (days * 86400 * 1000) : null;
 
-            // Get generic results
-            const results = await dbService.getAll<RawAnalysisRow>(`
-            SELECT e.id as exerciseId, e.name as exerciseName, s.weight, s.reps, w.date
+            const results = await dbService.getAll<any>(`
+            SELECT s.exercise_id as exerciseId, e.name as exerciseName, s.weight, s.reps, w.date
             FROM workout_sets s
             JOIN exercises e ON s.exercise_id = e.id
             JOIN workouts w ON s.workout_id = w.id
-            WHERE s.completed = 1 AND s.weight > 0 AND s.reps > 0
+            WHERE s.completed = 1 AND s.weight > 0 AND s.reps > 0 AND s.type != 'warmup'
             ${cutoff ? 'AND w.date > ?' : ''}
             ORDER BY s.weight DESC
         `, cutoff ? [cutoff] : []);
@@ -129,13 +135,16 @@ export class AnalysisService {
             // Process in JS to find max 1RM per exercise
             const maxes: Record<string, OneRepMax> = {};
 
-            results.forEach(r => {
+            results.forEach(raw => {
+                const r: any = raw;
+                const eIdStr = String(r.exercise_id || r.exerciseId || r.exerciseid || r.id);
+                const eNameStr = String(r.exerciseName || r.exercisename || r.name);
                 // Epley: weight * (1 + reps/30)
                 const epley = Math.round(r.weight * (1 + r.reps / 30));
-                if (!maxes[r.exerciseName] || epley > maxes[r.exerciseName].estimated1RM) {
-                    maxes[r.exerciseName] = {
-                        exerciseId: r.exerciseId,
-                        exerciseName: r.exerciseName,
+                if (!maxes[eNameStr] || epley > maxes[eNameStr].estimated1RM) {
+                    maxes[eNameStr] = {
+                        exerciseId: eIdStr,
+                        exerciseName: eNameStr,
                         weight: r.weight,
                         reps: r.reps,
                         estimated1RM: epley,
@@ -174,7 +183,8 @@ export class AnalysisService {
             JOIN workout_sets s ON s.workout_id = w.id
             JOIN exercises e ON e.id = s.exercise_id
             WHERE w.status = 'completed' 
-            AND s.completed = 1 
+            AND s.completed = 1
+            AND s.type != 'warmup'
             AND e.type = 'weight_reps'
             AND s.weight < 1000
             AND s.reps < 500
@@ -197,15 +207,18 @@ export class AnalysisService {
             'SELECT COUNT(*) as count FROM workouts WHERE status = ? AND date > ?',
             ['completed', cutoffMs]
         );
-        const volumeRow = await dbService.getFirst<{ total: number }>(
+        const volumeRow = await dbService.getFirst<{ total: number; sets: number; reps: number }>(
             `
-                SELECT COALESCE(SUM(s.weight * s.reps), 0) as total
+                SELECT COALESCE(SUM(s.weight * s.reps), 0) as total,
+                       COUNT(s.id) as total_sets,
+                       COALESCE(SUM(s.reps), 0) as total_reps
                 FROM workout_sets s
                 JOIN workouts w ON s.workout_id = w.id
                 JOIN exercises e ON e.id = s.exercise_id
                 WHERE w.status = 'completed' 
                 AND w.date > ? 
                 AND s.completed = 1 
+                AND s.type != 'warmup'
                 AND e.type = 'weight_reps'
                 AND s.weight < 1000 -- Guard against typos/outliers
                 AND s.reps < 500 -- Guard against typos/outliers
@@ -214,13 +227,15 @@ export class AnalysisService {
         );
         const avgDurationRow = await dbService.getFirst<{ avgMin: number | null }>(
             `
-                SELECT AVG((end_time - start_time) / 60000.0) as avgMin
+                SELECT AVG(
+                    COALESCE(
+                        CASE WHEN duration > 0 THEN duration / 60.0 ELSE NULL END,
+                        CASE WHEN end_time > start_time THEN (end_time - start_time) / 60000.0 ELSE NULL END
+                    )
+                ) as avgMin
                 FROM workouts
                 WHERE status = 'completed'
                 AND date > ?
-                AND end_time IS NOT NULL
-                AND start_time IS NOT NULL
-                AND end_time > start_time
             `,
             [cutoffMs]
         );
@@ -229,7 +244,9 @@ export class AnalysisService {
             days,
             workoutCount: workoutCountRow?.count ?? 0,
             totalVolume: Math.round(volumeRow?.total ?? 0),
-            avgDurationMin: avgDurationRow?.avgMin ?? null
+            avgDurationMin: avgDurationRow?.avgMin ?? null,
+            totalSets: (volumeRow as any)?.total_sets ?? 0,
+            totalReps: (volumeRow as any)?.total_reps ?? 0
         };
     }
 
@@ -267,6 +284,7 @@ export class AnalysisService {
                 WHERE w.status = 'completed'
                   AND w.date > ?
                   AND s.completed = 1
+                  AND s.type != 'warmup'
                   AND e.type = 'distance_time'
             `,
             [cutoffMs]
@@ -302,6 +320,7 @@ export class AnalysisService {
                 WHERE w.status = 'completed'
                   AND w.date > ?
                   AND s.completed = 1
+                  AND s.type != 'warmup'
                   AND e.type = 'reps_only'
             `,
             [cutoffMs]
@@ -333,6 +352,7 @@ export class AnalysisService {
                 WHERE w.status = 'completed'
                   AND w.date > ?
                   AND s.completed = 1
+                  AND s.type != 'warmup'
                   AND e.type = 'weight_only'
             `,
             [cutoffMs]
@@ -350,9 +370,11 @@ export class AnalysisService {
             'SELECT COUNT(*) as count FROM workouts WHERE status = ? AND date > ? AND date <= ?',
             ['completed', startMs, endMs]
         );
-        const volumeRow = await dbService.getFirst<{ total: number }>(
+        const volumeRow = await dbService.getFirst<{ total: number; sets: number; reps: number }>(
             `
-                SELECT COALESCE(SUM(s.weight * s.reps), 0) as total
+                SELECT COALESCE(SUM(s.weight * s.reps), 0) as total,
+                       COUNT(s.id) as total_sets,
+                       COALESCE(SUM(s.reps), 0) as total_reps
                 FROM workout_sets s
                 JOIN workouts w ON s.workout_id = w.id
                 JOIN exercises e ON e.id = s.exercise_id
@@ -360,20 +382,23 @@ export class AnalysisService {
                 AND w.date > ?
                 AND w.date <= ?
                 AND s.completed = 1
+                AND s.type != 'warmup'
                 AND e.type = 'weight_reps'
             `,
             [startMs, endMs]
         );
         const avgDurationRow = await dbService.getFirst<{ avgMin: number | null }>(
             `
-                SELECT AVG((end_time - start_time) / 60000.0) as avgMin
+                SELECT AVG(
+                    COALESCE(
+                        CASE WHEN duration > 0 THEN duration / 60.0 ELSE NULL END,
+                        CASE WHEN end_time > start_time THEN (end_time - start_time) / 60000.0 ELSE NULL END
+                    )
+                ) as avgMin
                 FROM workouts
                 WHERE status = 'completed'
                 AND date > ?
                 AND date <= ?
-                AND end_time IS NOT NULL
-                AND start_time IS NOT NULL
-                AND end_time > start_time
             `,
             [startMs, endMs]
         );
@@ -383,7 +408,9 @@ export class AnalysisService {
             endMs,
             workoutCount: workoutCountRow?.count ?? 0,
             totalVolume: Math.round(volumeRow?.total ?? 0),
-            avgDurationMin: avgDurationRow?.avgMin ?? null
+            avgDurationMin: avgDurationRow?.avgMin ?? null,
+            totalSets: (volumeRow as any)?.total_sets ?? 0,
+            totalReps: (volumeRow as any)?.total_reps ?? 0
         };
     }
 
@@ -401,13 +428,17 @@ export class AnalysisService {
             days,
             workoutCount: currentRaw.workoutCount,
             totalVolume: currentRaw.totalVolume,
-            avgDurationMin: currentRaw.avgDurationMin
+            avgDurationMin: currentRaw.avgDurationMin,
+            totalSets: currentRaw.totalSets,
+            totalReps: currentRaw.totalReps
         };
         const previous: WorkoutSummary = {
             days,
             workoutCount: previousRaw.workoutCount,
             totalVolume: previousRaw.totalVolume,
-            avgDurationMin: previousRaw.avgDurationMin
+            avgDurationMin: previousRaw.avgDurationMin,
+            totalSets: previousRaw.totalSets,
+            totalReps: previousRaw.totalReps
         };
 
         const volumeChangePct = previous.totalVolume > 0
@@ -424,15 +455,16 @@ export class AnalysisService {
         const now = Date.now();
         const cutoffMs = now - (days * 86400 * 1000);
 
-        const rows = await dbService.getAll<{ date: number; volume: number }>(
+        const rows = await dbService.getAll<{ date: number; volume: number; total_sets: number }>(
             `
-                SELECT w.date as date, COALESCE(SUM(s.weight * s.reps), 0) as volume
+                SELECT w.date as date, COALESCE(SUM(s.weight * s.reps), 0) as volume, COUNT(s.id) as total_sets
                 FROM workouts w
                 JOIN workout_sets s ON s.workout_id = w.id
                 JOIN exercises e ON s.exercise_id = e.id
                 WHERE w.status = 'completed' 
                 AND w.date > ? 
                 AND s.completed = 1
+                AND s.type != 'warmup'
                 AND e.type = 'weight_reps' -- Strict type check
                 AND s.weight < 1000
                 AND s.reps < 500
@@ -457,16 +489,17 @@ export class AnalysisService {
             return `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`;
         };
 
-        const bucketMap = new Map<string, { dateMs: number; volume: number }>();
+        const bucketMap = new Map<string, { dateMs: number; volume: number; sets: number }>();
         for (const r of rows) {
             const key = keyFor(r.date);
             if (!bucketMap.has(key)) {
                 const dateMs = bucket === 'month'
                     ? new Date(Number(key.split('-')[0]), Number(key.split('-')[1]) - 1, 1).getTime()
                     : new Date(Number(key.split('-')[0]), Number(key.split('-')[1]) - 1, Number(key.split('-')[2])).getTime();
-                bucketMap.set(key, { dateMs, volume: 0 });
+                bucketMap.set(key, { dateMs, volume: 0, sets: 0 });
             }
             bucketMap.get(key)!.volume += r.volume || 0;
+            bucketMap.get(key)!.sets += (r as any).total_sets || 0;
         }
 
         const points = Array.from(bucketMap.entries())
@@ -480,7 +513,7 @@ export class AnalysisService {
                 } else {
                     label = d.toLocaleDateString('es-ES', { month: 'short' });
                 }
-                return { label, dateMs: v.dateMs, volume: Math.round(v.volume) };
+                return { label, dateMs: v.dateMs, volume: Math.round(v.volume), sets: v.sets };
             })
             .sort((a, b) => a.dateMs - b.dateMs);
 
@@ -498,7 +531,8 @@ export class AnalysisService {
                     c.name as categoryName,
                     c.color as categoryColor,
                     COALESCE(SUM(CASE WHEN s.weight > 0 AND s.reps > 0 THEN (s.weight * s.reps) ELSE 0 END), 0) as volume,
-                    COALESCE(COUNT(CASE WHEN s.weight > 0 AND s.reps > 0 THEN 1 END), 0) as setCount
+                    COALESCE(COUNT(CASE WHEN s.weight > 0 AND s.reps > 0 THEN 1 END), 0) as total_sets,
+                    COALESCE(MAX(CASE WHEN s.weight > 0 AND s.reps > 0 THEN s.weight ELSE 0 END), 0) as max_weight
                 FROM workout_sets s
                 JOIN workouts w ON s.workout_id = w.id
                 JOIN exercises e ON s.exercise_id = e.id
@@ -506,6 +540,7 @@ export class AnalysisService {
                 WHERE w.status = 'completed'
                 AND w.date > ?
                 AND s.completed = 1
+                AND s.type != 'warmup'
                 AND e.type = 'weight_reps'
                 GROUP BY c.id
                 ORDER BY volume DESC
@@ -517,7 +552,8 @@ export class AnalysisService {
         return rows.map((r) => ({
             ...r,
             volume: Math.round((r as any).volume ?? 0),
-            setCount: (r as any).setCount ?? 0,
+            setCount: (r as any).total_sets ?? 0,
+            maxWeight: (r as any).max_weight ?? 0,
         }));
     }
 
@@ -533,7 +569,7 @@ export class AnalysisService {
                     c.name as categoryName,
                     c.color as categoryColor,
                     COALESCE(SUM(CASE WHEN s.weight > 0 AND s.reps > 0 THEN (s.weight * s.reps) ELSE 0 END), 0) as volume,
-                    COALESCE(COUNT(CASE WHEN s.weight > 0 AND s.reps > 0 THEN 1 END), 0) as setCount
+                    COALESCE(COUNT(CASE WHEN s.weight > 0 AND s.reps > 0 THEN 1 END), 0) as total_sets
                 FROM workout_sets s
                 JOIN workouts w ON s.workout_id = w.id
                 JOIN exercises e ON s.exercise_id = e.id
@@ -541,6 +577,7 @@ export class AnalysisService {
                 WHERE w.status = 'completed'
                 AND w.date > ?
                 AND s.completed = 1
+                AND s.type != 'warmup'
                 AND e.type = 'weight_reps'
                 GROUP BY e.id
                 ORDER BY volume DESC
@@ -552,7 +589,7 @@ export class AnalysisService {
         return rows.map((r) => ({
             ...r,
             volume: Math.round((r as any).volume ?? 0),
-            setCount: (r as any).setCount ?? 0,
+            setCount: (r as any).total_sets ?? 0,
         }));
     }
 
@@ -575,6 +612,7 @@ export class AnalysisService {
                 WHERE w.status = 'completed'
                 AND w.date > ?
                 AND s.completed = 1
+                AND s.type != 'warmup'
                 AND s.weight > 0
                 AND s.reps > 0
             `,
@@ -622,48 +660,44 @@ export class AnalysisService {
             ['completed', oneYearAgo]
         );
 
-        const dayKeys = Array.from(
-            new Set(
-                rows.map((r) => {
-                    const d = new Date(r.date);
-                    const localMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-                    return Math.floor(localMidnight / 86400000);
-                })
-            )
-        ).sort((a, b) => a - b);
+        const trainedKeys = new Set(rows.map(r => {
+            const d = new Date(r.date);
+            return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        }));
 
-        if (dayKeys.length === 0) {
-            return { current: 0, best: 0 };
-        }
-
-        let best = 1;
-        let run = 1;
-        for (let i = 1; i < dayKeys.length; i++) {
-            if (dayKeys[i] === dayKeys[i - 1] + 1) {
-                run += 1;
-                if (run > best) best = run;
-            } else {
-                run = 1;
-            }
+        const { configService } = await import('./ConfigService');
+        const rawDays = await configService.get('training_days' as any);
+        let trainingDays = [1, 2, 3, 4, 5, 6]; // default Mon-Sat
+        if (rawDays) {
+            try { trainingDays = typeof rawDays === 'string' ? JSON.parse(rawDays) : rawDays; } catch (e) { }
         }
 
         const today = new Date();
-        const todayKey = Math.floor(new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() / 86400000);
-        const latestKey = dayKeys[dayKeys.length - 1];
+        const todayMidnightMs = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
 
-        let current = 0;
-        if (latestKey === todayKey || latestKey === todayKey - 1) {
-            current = 1;
-            for (let i = dayKeys.length - 2; i >= 0; i--) {
-                if (dayKeys[i] === dayKeys[i + 1] - 1) {
-                    current += 1;
-                } else {
-                    break;
-                }
+        let iteratorMs = todayMidnightMs - 365 * 86400000;
+        let currentRun = 0;
+        let best = 0;
+
+        for (let i = 0; i <= 365; i++) {
+            const date = new Date(iteratorMs);
+            const dow = date.getDay();
+            const isTrained = trainedKeys.has(iteratorMs);
+            const isTrainingDay = trainingDays.includes(dow);
+
+            if (isTrained) {
+                currentRun++;
+                if (currentRun > best) best = currentRun;
+            } else if (isTrainingDay && i !== 365) {
+                // We missed a training day!
+                // We exclude today (i === 365) to give them until midnight.
+                currentRun = 0;
             }
+
+            iteratorMs += 86400000;
         }
 
-        return { current, best };
+        return { current: currentRun, best };
     }
 
     static async getExercisePR(exerciseId: string): Promise<ExercisePR | null> {
@@ -674,6 +708,7 @@ export class AnalysisService {
                 JOIN workouts w ON s.workout_id = w.id
                 WHERE s.exercise_id = ?
                 AND s.completed = 1
+                AND s.type != 'warmup'
                 AND s.weight IS NOT NULL
                 ORDER BY s.weight DESC, COALESCE(s.reps, 0) DESC, w.date DESC
                 LIMIT 1
@@ -693,27 +728,33 @@ export class AnalysisService {
         const exercises = await dbService.getAll<{ id: string; name: string }>('SELECT id, name FROM exercises ORDER BY name ASC');
         const normalized = exercises.map((e) => ({ ...e, norm: e.name.toLowerCase() }));
 
-        const findBy = (include: string[], exclude: string[] = []) => {
-            return normalized.find((e) => include.some((k) => e.norm.includes(k)) && !exclude.some((k) => e.norm.includes(k)))?.id ?? null;
+        const findBy = (include: string[], exclude: string[] = []): { id: string; name: string } | null => {
+            const found = normalized.find((e) => include.some((k) => e.norm.includes(k)) && !exclude.some((k) => e.norm.includes(k)));
+            return found ? { id: found.id, name: found.name } : null;
         };
 
-        const squatId =
+        const squatMatch =
             findBy(['squat', 'sentadilla'], ['split', 'bulgar', 'hack']) ??
             findBy(['front squat', 'sentadilla frontal'], []);
-        const benchId =
+        const benchMatch =
             findBy(['bench press', 'press banca', 'banca'], ['dumb', 'mancuern', 'incline', 'inclinado']) ??
             findBy(['press'], ['military', 'overhead', 'hombro']);
-        const deadliftId =
+        const deadliftMatch =
             findBy(['deadlift', 'peso muerto'], ['romanian', 'rumano', 'rdl']) ??
             findBy(['peso muerto convencional'], []);
 
-        const squat = squatId ? await AnalysisService.getExercisePR(squatId) : null;
-        const bench = benchId ? await AnalysisService.getExercisePR(benchId) : null;
-        const deadlift = deadliftId ? await AnalysisService.getExercisePR(deadliftId) : null;
+        const squat = squatMatch ? await AnalysisService.getExercisePR(squatMatch.id) : null;
+        const bench = benchMatch ? await AnalysisService.getExercisePR(benchMatch.id) : null;
+        const deadlift = deadliftMatch ? await AnalysisService.getExercisePR(deadliftMatch.id) : null;
 
         const totalKg = (squat?.weight ?? 0) + (bench?.weight ?? 0) + (deadlift?.weight ?? 0);
 
-        return { squat, bench, deadlift, totalKg };
+        return {
+            squat, bench, deadlift, totalKg,
+            squatName: squatMatch?.name ?? null,
+            benchName: benchMatch?.name ?? null,
+            deadliftName: deadliftMatch?.name ?? null,
+        };
     }
 
 }

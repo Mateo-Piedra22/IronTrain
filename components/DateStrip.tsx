@@ -3,7 +3,7 @@ import { FlashList, ViewToken } from '@shopify/flash-list';
 import { addDays, differenceInDays, format, isSameDay, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as Haptics from 'expo-haptics';
-import { Calendar as CalendarIcon, Check, ChevronUp } from 'lucide-react-native';
+import { Calendar as CalendarIcon, Check, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, DateData, LocaleConfig } from 'react-native-calendars';
@@ -36,10 +36,13 @@ interface DailyStatus {
 interface DateStripProps {
     selectedDate: Date;
     onSelectDate: (date: Date) => void;
+    onExpandedChange?: (expanded: boolean) => void;
     markedDates?: Record<string, DailyStatus>;
+    headerCenter?: React.ReactNode;
+    headerRight?: React.ReactNode;
 }
 
-export function DateStrip({ selectedDate, onSelectDate, markedDates = {} }: DateStripProps) {
+export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, markedDates = {}, headerCenter, headerRight }: DateStripProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [visibleMonth, setVisibleMonth] = useState(selectedDate);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,8 +67,6 @@ export function DateStrip({ selectedDate, onSelectDate, markedDates = {} }: Date
         if (isExpanded || !listRef.current) return;
 
         const index = getIndexForDate(selectedDate);
-
-        // Perform scroll safely
         listRef.current.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
         setVisibleMonth(selectedDate);
     }, [selectedDate, isExpanded, getIndexForDate]);
@@ -77,17 +78,21 @@ export function DateStrip({ selectedDate, onSelectDate, markedDates = {} }: Date
         onSelectDate(date);
         if (isExpanded) {
             setIsExpanded(false);
+            onExpandedChange?.(false);
         }
-    }, [onSelectDate, isExpanded]);
+    }, [onSelectDate, isExpanded, onExpandedChange]);
 
     const toggleExpand = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setIsExpanded(prev => {
             const nextState = !prev;
-            if (!nextState) setVisibleMonth(selectedDate);
+            if (nextState) {
+                setVisibleMonth(selectedDate);
+            }
+            onExpandedChange?.(nextState);
             return nextState;
         });
-    }, [selectedDate]);
+    }, [selectedDate, onExpandedChange]);
 
     const handleViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken<Date>[] }) => {
         if (viewableItems.length > 0) {
@@ -112,101 +117,57 @@ export function DateStrip({ selectedDate, onSelectDate, markedDates = {} }: Date
         const containerStyle = [
             styles.stripItem,
             styles.stripItemBorder,
-            isSelected ? styles.stripItemSelected :
+            isSelected ? (isCompleted ? styles.stripItemSelectedCompleted : styles.stripItemSelected) :
                 isCompleted ? styles.stripItemCompleted : styles.stripItemDefault
         ];
 
-        const dayNameStyle = [
-            styles.stripDayName,
-            isSelected ? styles.textWhite : styles.textMuted
-        ];
-
-        const dayNumStyle = [
-            styles.stripDayNum,
-            isSelected ? styles.textWhite : isToday ? styles.textPrimary : styles.textIron200
-        ];
+        const dayNameStyle = [styles.stripDayName, isSelected ? styles.textWhite : styles.textMuted];
+        const dayNumStyle = [styles.stripDayNum, isSelected ? styles.textWhite : isToday ? styles.textPrimary : styles.textIron200];
 
         return (
-            <TouchableOpacity
-                onPress={() => handleDateSelect(item)}
-                style={containerStyle}
-                activeOpacity={0.7}
-            >
-                {/* Completed Indicator */}
-                {isCompleted && !isSelected && (
+            <TouchableOpacity onPress={() => handleDateSelect(item)} style={containerStyle} activeOpacity={0.7}>
+                {isCompleted && (
                     <View style={styles.completedBadge}>
                         <Check size={8} color={Colors.green} />
                     </View>
                 )}
-
-                <Text style={dayNameStyle}>
-                    {format(item, 'EEE', { locale: es })}
-                </Text>
-                <Text style={dayNumStyle}>
-                    {format(item, 'd')}
-                </Text>
-
-                {/* Workout Category Dots */}
-                <View style={styles.dotsContainer}>
-                    {marks?.colors?.slice(0, 3).map((color, i) => (
-                        <View
-                            key={`${dateStr}-dot-${i}`}
-                            style={[styles.dot, { backgroundColor: color }]}
-                        />
-                    ))}
-                    {(marks?.colors?.length ?? 0) > 3 && (
-                        <View style={[styles.dot, { backgroundColor: Colors.iron[600] }]} />
-                    )}
-                </View>
+                <Text style={dayNameStyle}>{format(item, 'EEE', { locale: es })}</Text>
+                <Text style={dayNumStyle}>{format(item, 'd')}</Text>
             </TouchableOpacity>
         );
     }, [selectedDate, markedDates, handleDateSelect]);
 
-    const renderCalendarDay = useCallback(({ date, state }: DayProps & { date?: DateData }) => {
-        if (!date) return <View />;
+    const renderCalendarDay = useCallback((props: DayProps & { date?: DateData }) => {
+        const { date } = props;
+        if (!date) return <View style={styles.calendarDay} />;
 
-        const d = new Date(date.year, date.month - 1, date.day, 12);
+        const dayDate = new Date(date.year, date.month - 1, date.day);
+        const isSelected = isSameDay(dayDate, selectedDate);
+        const isToday = isSameDay(dayDate, new Date());
         const dateStr = date.dateString;
-        const isSelected = isSameDay(d, selectedDate);
-        const isToday = isSameDay(d, new Date());
         const marks = markedDates[dateStr];
         const isCompleted = marks?.status === 'completed';
-        const isDisabled = state === 'disabled';
 
-        // Styles
         const containerStyle = [
             styles.calendarDay,
-            isSelected ? styles.bgPrimary :
+            isSelected ? (isCompleted ? styles.bgPrimaryCompleted : styles.bgPrimary) :
                 isCompleted ? styles.bgIron800Completed : {}
         ];
 
         const textStyle = [
             styles.calendarDayText,
-            isSelected ? styles.textWhiteBold :
-                isToday ? styles.textPrimaryBold :
-                    isDisabled ? styles.textIron700 : styles.textIron200
+            isSelected ? styles.textWhiteBold : isToday ? styles.textPrimaryBold : styles.textIron200
         ];
 
         return (
-            <TouchableOpacity
-                onPress={() => handleDateSelect(d)}
-                style={containerStyle}
-                disabled={isDisabled}
-            >
-                <Text style={textStyle}>
-                    {date.day}
-                </Text>
-
+            <TouchableOpacity onPress={() => handleDateSelect(dayDate)} style={containerStyle} activeOpacity={0.7}>
+                <Text style={textStyle}>{date.day}</Text>
                 <View style={styles.calendarDotsContainer}>
                     {marks?.colors?.slice(0, 4).map((color, i) => (
-                        <View
-                            key={`${dateStr}-cal-dot-${i}`}
-                            style={[styles.calDot, { backgroundColor: color }]}
-                        />
+                        <View key={`${dateStr}-cal-dot-${i}`} style={[styles.calDot, { backgroundColor: color }]} />
                     ))}
                 </View>
-
-                {isCompleted && !isSelected && (
+                {isCompleted && (
                     <View style={styles.calendarCompletedTick}>
                         <View style={styles.tickDot} />
                     </View>
@@ -221,65 +182,85 @@ export function DateStrip({ selectedDate, onSelectDate, markedDates = {} }: Date
         <View style={styles.wrapper}>
             {/* Header */}
             <View style={styles.header}>
-                <Text style={styles.monthTitle}>
-                    {format(visibleMonth, 'MMMM yyyy', { locale: es })}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
+                    <Text style={styles.monthTitle}>
+                        {format(visibleMonth, 'MMMM yyyy', { locale: es })}
+                    </Text>
 
-                <TouchableOpacity
-                    onPress={toggleExpand}
-                    style={styles.expandButton}
-                    accessibilityLabel={isExpanded ? "Colapsar calendario" : "Expandir calendario"}
-                >
-                    {isExpanded ? (
-                        <ChevronUp color={Colors.primary.DEFAULT} size={20} />
-                    ) : (
-                        <CalendarIcon color={Colors.iron[400]} size={20} />
-                    )}
-                </TouchableOpacity>
+                    <TouchableOpacity onPress={toggleExpand} style={[styles.expandButton, { marginLeft: 8 }]} accessibilityLabel={isExpanded ? "Colapsar calendario" : "Expandir calendario"}>
+                        {isExpanded ? (
+                            <ChevronUp color={Colors.primary.DEFAULT} size={20} />
+                        ) : (
+                            <CalendarIcon color={Colors.iron[400]} size={20} />
+                        )}
+                    </TouchableOpacity>
+                </View>
+
+                {headerCenter && (
+                    <View style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }}>
+                        {headerCenter}
+                    </View>
+                )}
+
+                <View style={{ zIndex: 10 }}>
+                    {headerRight}
+                </View>
             </View>
 
-            {isExpanded ? (
-                <View style={styles.calendarContainer}>
-                    <Calendar
-                        current={format(visibleMonth, 'yyyy-MM-dd')}
-                        key={isExpanded ? 'expanded' : 'collapsed'}
-                        onMonthChange={(date: DateData) => {
-                            setVisibleMonth(new Date(date.year, date.month - 1, date.day));
-                        }}
-                        dayComponent={renderCalendarDay}
-                        renderHeader={() => null}
-                        hideArrows={true}
-                        enableSwipeMonths={true}
-                        theme={{
-                            backgroundColor: Colors.iron[900],
-                            calendarBackground: Colors.iron[900],
-                            textSectionTitleColor: Colors.iron[500],
-                            todayTextColor: Colors.primary.DEFAULT,
-                            dayTextColor: Colors.iron[50],
-                        }}
-                        markingType={'custom'}
-                    />
-                </View>
-            ) : (
-                <View style={styles.stripContainer}>
-                    <FlashList
-                        ref={listRef}
-                        data={dates}
-                        renderItem={renderStripItem}
-                        // @ts-ignore
-                        estimatedItemSize={FULL_ITEM_SIZE}
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        drawDistance={ITEM_WIDTH * 10}
-                        onViewableItemsChanged={handleViewableItemsChanged}
-                        viewabilityConfig={{
-                            itemVisiblePercentThreshold: 50,
-                            minimumViewTime: 100
-                        }}
-                        contentContainerStyle={styles.listContent}
-                    />
-                </View>
-            )}
+            <View style={[styles.calendarContainer, { paddingBottom: 16, display: isExpanded ? 'flex' : 'none' }]}>
+                <Calendar
+                    initialDate={format(selectedDate, 'yyyy-MM-dd')}
+                    key="calendar-view"
+                    onMonthChange={(date: DateData) => {
+                        setVisibleMonth(new Date(date.year, date.month - 1, date.day));
+                    }}
+                    dayComponent={renderCalendarDay}
+                    renderArrow={(direction: string) => (direction === 'left' ? <ChevronLeft color={Colors.iron[400]} size={24} /> : <ChevronRight color={Colors.iron[400]} size={24} />)}
+                    enableSwipeMonths={true}
+                    theme={{
+                        backgroundColor: Colors.iron[900],
+                        calendarBackground: Colors.iron[900],
+                        textSectionTitleColor: Colors.iron[500],
+                        todayTextColor: Colors.primary.DEFAULT,
+                        dayTextColor: Colors.iron[50],
+                        monthTextColor: Colors.iron[950],
+                        textMonthFontWeight: '900',
+                        textMonthFontSize: 16,
+                        'stylesheet.calendar.header': {
+                            header: {
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                paddingLeft: 10,
+                                paddingRight: 10,
+                                marginTop: 6,
+                            },
+                        }
+                    } as any}
+                    markingType={'custom'}
+                />
+            </View>
+
+            <View style={[styles.stripContainer, { display: !isExpanded ? 'flex' : 'none' }]}>
+                <FlashList
+                    ref={listRef}
+                    data={dates}
+                    extraData={[selectedDate, markedDates]}
+                    renderItem={renderStripItem}
+                    // @ts-ignore
+                    estimatedItemSize={FULL_ITEM_SIZE}
+                    initialScrollIndex={getIndexForDate(selectedDate)}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    drawDistance={ITEM_WIDTH * 10}
+                    onViewableItemsChanged={handleViewableItemsChanged}
+                    viewabilityConfig={{
+                        itemVisiblePercentThreshold: 50,
+                        minimumViewTime: 100
+                    }}
+                    contentContainerStyle={styles.listContent}
+                />
+            </View>
         </View>
     );
 }
@@ -301,8 +282,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         backgroundColor: Colors.iron[900],
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.iron[800],
     },
     monthTitle: {
         color: Colors.iron[50],
@@ -339,8 +318,12 @@ const styles = StyleSheet.create({
         // dynamic override
     },
     stripItemSelected: {
-        backgroundColor: Colors.primary.DEFAULT,
-        borderColor: Colors.primary.DEFAULT,
+        backgroundColor: Colors.primary.DEFAULT + 'E6', // slightly translucent
+        borderColor: Colors.primary.light,
+    },
+    stripItemSelectedCompleted: {
+        backgroundColor: Colors.primary.DEFAULT + 'E6',
+        borderColor: Colors.green,
     },
     stripItemCompleted: {
         backgroundColor: Colors.iron[900],
@@ -348,7 +331,7 @@ const styles = StyleSheet.create({
     },
     stripItemDefault: {
         backgroundColor: Colors.iron[900],
-        borderColor: Colors.iron[800],
+        borderColor: 'rgba(156, 110, 100, 0.4)', // marroncito/bordó clarito
     },
     textWhite: { color: Colors.white },
     textMuted: { color: Colors.iron[500] },
@@ -398,7 +381,8 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         margin: 2,
     },
-    bgPrimary: { backgroundColor: Colors.primary.DEFAULT },
+    bgPrimary: { backgroundColor: Colors.primary.DEFAULT + 'E6', borderWidth: 1, borderColor: Colors.primary.light },
+    bgPrimaryCompleted: { backgroundColor: Colors.primary.DEFAULT + 'E6', borderWidth: 1, borderColor: Colors.green },
     bgIron800Completed: {
         backgroundColor: Colors.iron[800],
         borderWidth: 1,

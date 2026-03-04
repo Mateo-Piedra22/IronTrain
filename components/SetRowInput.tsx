@@ -1,9 +1,8 @@
 import { Colors } from '@/src/theme';
 import { WorkoutSet } from '@/src/types/db';
-import { clsx } from 'clsx';
 import { LucideCheck } from 'lucide-react-native';
 import React, { memo } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { configService } from '../src/services/ConfigService';
 import { UnitService } from '../src/services/UnitService';
 
@@ -18,19 +17,21 @@ interface SetRowInputProps {
 export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disabled }: SetRowInputProps) => {
     const unit = configService.get('weightUnit');
     const displayWeight = unit === 'kg' ? (set.weight || 0) : UnitService.kgToLbs(set.weight || 0);
+    const isCompleted = !!set.completed;
+
     return (
-        <View className={clsx("flex-row items-center mb-2 p-2 rounded-xl border", set.completed ? "bg-green-100 border-green-200" : "bg-surface border-iron-700 elevation-1")}>
+        <View style={[ss.row, isCompleted ? ss.rowCompleted : ss.rowDefault]}>
             {/* Index */}
-            <View className="w-8 items-center justify-center">
-                <Text className={clsx("font-bold text-lg", set.completed ? "text-green-800" : "text-iron-500")}>{index + 1}</Text>
+            <View style={ss.indexCol}>
+                <Text style={[ss.indexText, isCompleted && { color: '#166534' }]}>{index + 1}</Text>
             </View>
 
             {/* Weight */}
-            <View className="flex-1 px-2">
+            <View style={ss.inputCol}>
                 <TextInput
                     accessibilityLabel={`Serie ${index + 1} peso`}
                     keyboardType="numeric"
-                    className="bg-iron-200 text-iron-950 p-3 rounded-lg text-center font-bold text-lg"
+                    style={ss.input}
                     value={(Math.round(displayWeight * 100) / 100).toString()}
                     editable={!disabled}
                     onChangeText={(t) => {
@@ -42,15 +43,15 @@ export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disab
                     }}
                     selectTextOnFocus
                 />
-                <Text className="text-[10px] text-iron-500 font-bold mt-1 text-center">{unit.toUpperCase()}</Text>
+                <Text style={ss.unitLabel}>{unit.toUpperCase()}</Text>
             </View>
 
             {/* Reps */}
-            <View className="flex-1 px-2">
+            <View style={ss.inputCol}>
                 <TextInput
                     accessibilityLabel={`Serie ${index + 1} repeticiones`}
                     keyboardType="numeric"
-                    className="bg-iron-200 text-iron-950 p-3 rounded-lg text-center font-bold text-lg"
+                    style={ss.input}
                     value={(set.reps || 0).toString()}
                     editable={!disabled}
                     onChangeText={(t) => {
@@ -62,11 +63,11 @@ export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disab
             </View>
 
             {/* RPE */}
-            <View className="flex-1 px-2">
+            <View style={ss.inputCol}>
                 <TextInput
                     accessibilityLabel={`Serie ${index + 1} RPE`}
                     keyboardType="numeric"
-                    className="bg-iron-200 text-iron-950 p-3 rounded-lg text-center font-bold text-lg"
+                    style={ss.input}
                     value={set.rpe?.toString() ?? ''}
                     placeholder="-"
                     placeholderTextColor={Colors.iron[400]}
@@ -81,23 +82,19 @@ export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disab
 
             {/* Complete Button */}
             <Pressable
-                accessibilityLabel={set.completed ? "Marcar serie como incompleta" : "Marcar serie como completada"}
+                accessibilityLabel={isCompleted ? "Marcar serie como incompleta" : "Marcar serie como completada"}
                 accessibilityRole="button"
                 onPress={() => {
                     if (disabled) return;
                     onToggleComplete(set.id);
                 }}
-                className={clsx(
-                    "w-12 h-12 rounded-xl items-center justify-center ml-2 shadow-sm",
-                    disabled ? "bg-iron-300" : (set.completed ? "bg-green-500" : "bg-iron-200")
-                )}
+                style={[ss.checkBtn, disabled ? ss.checkDisabled : (isCompleted ? ss.checkActive : ss.checkInactive)]}
             >
-                <LucideCheck size={24} color={set.completed ? "white" : Colors.iron[400]} />
+                <LucideCheck size={22} color={isCompleted ? "white" : Colors.iron[400]} strokeWidth={3} />
             </Pressable>
         </View>
     );
 }, (prev, next) => {
-    // Custom comparison for performance
     return (
         prev.set.weight === next.set.weight &&
         prev.set.reps === next.set.reps &&
@@ -106,4 +103,19 @@ export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disab
         prev.index === next.index &&
         prev.disabled === next.disabled
     );
+});
+
+const ss = StyleSheet.create({
+    row: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, padding: 8, borderRadius: 14, borderWidth: 1 },
+    rowDefault: { backgroundColor: Colors.surface, borderColor: Colors.iron[700], elevation: 1 },
+    rowCompleted: { backgroundColor: '#dcfce7', borderColor: '#bbf7d0' },
+    indexCol: { width: 32, alignItems: 'center', justifyContent: 'center' },
+    indexText: { fontWeight: '800', fontSize: 16, color: Colors.iron[400] },
+    inputCol: { flex: 1, paddingHorizontal: 6 },
+    input: { backgroundColor: Colors.iron[200], color: Colors.iron[950], padding: 10, borderRadius: 10, textAlign: 'center', fontWeight: '800', fontSize: 16 },
+    unitLabel: { fontSize: 9, color: Colors.iron[400], fontWeight: '800', marginTop: 3, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 },
+    checkBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
+    checkActive: { backgroundColor: '#22c55e', shadowColor: '#22c55e', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2 },
+    checkInactive: { backgroundColor: Colors.iron[200], borderWidth: 1, borderColor: Colors.iron[300] },
+    checkDisabled: { backgroundColor: Colors.iron[300] },
 });

@@ -1,14 +1,15 @@
 import { workoutService } from '@/src/services/WorkoutService';
 import { Colors } from '@/src/theme';
 import { ExerciseType, Workout, WorkoutSet } from '@/src/types/db';
+import { notify } from '@/src/utils/notify';
 import { format, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Copy, Tag, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 import { DayProps } from 'react-native-calendars/src/calendar/day/index';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { confirm, useConfirmStore } from '../src/store/confirmStore';
 
 interface CopyWorkoutModalProps {
     visible: boolean;
@@ -53,7 +54,7 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
     const handleCopy = async () => {
         if (!sourceWorkout) return;
         if (!targetWorkoutId) {
-            Alert.alert('Error', 'No se pudo identificar el entrenamiento destino.');
+            notify.error('Datos incompletos', 'No se pudo identificar el entrenamiento destino.');
             return;
         }
 
@@ -75,17 +76,14 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
                 onCopyComplete();
                 onClose();
                 const skipped = (result.skippedMissingExercises ?? 0) + (result.skippedExistingExercises ?? 0);
-                Alert.alert(
-                    'Copiado',
-                    [
-                        `Copiados: ${result.copied} set(s).`,
-                        skipped ? `Omitidos: ${skipped} set(s).` : null,
-                        result.skippedExistingExercises ? `- ${result.skippedExistingExercises} por ejercicios ya existentes en el destino.` : null,
-                        result.skippedMissingExercises ? `- ${result.skippedMissingExercises} por ejercicios faltantes en la biblioteca.` : null,
-                    ].filter(Boolean).join('\n')
-                );
-            } catch (e) {
-                Alert.alert('Error', (e as Error).message);
+
+                if (skipped > 0) {
+                    notify.warning('Copiado parcial', `Se copiaron ${result.copied} series. Se omitieron ${skipped}.`);
+                } else {
+                    notify.success('Rutina pegada', `Se copiaron las ${result.copied} series sin problemas.`);
+                }
+            } catch (e: any) {
+                notify.error('Error de copiado', e?.message || 'Fallo general al intentar migrar.');
             } finally {
                 setLoading(false);
             }
@@ -93,7 +91,7 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
 
         const targetWorkout = await workoutService.getWorkout(targetWorkoutId);
         if (!targetWorkout) {
-            Alert.alert('Error', 'No se encontró el entrenamiento destino.');
+            notify.error('Destino inválido', 'No se encontró el entrenamiento destino.');
             return;
         }
 
@@ -104,64 +102,63 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
         const targetLabel = format(targetDate, 'd MMM');
 
         const askContent = (mode: 'replace' | 'append', dedupeByExercise: boolean, resumeTargetIfCompleted: boolean) => {
-            Alert.alert(
-                '¿Qué querés copiar?',
-                'Elegí el nivel de copiado:',
-                [
-                    { text: 'Cancelar', style: 'cancel' },
-                    { text: 'Completo (valores)', onPress: () => doCopy(mode, 'full', dedupeByExercise, resumeTargetIfCompleted) },
-                    { text: 'Estructura (vacío)', onPress: () => doCopy(mode, 'structure', dedupeByExercise, resumeTargetIfCompleted) },
-                    { text: 'Solo ejercicios (1 set)', onPress: () => doCopy(mode, 'exercises_only', dedupeByExercise, resumeTargetIfCompleted) },
-                ]
-            );
+            const hide = useConfirmStore.getState().hide;
+            confirm.custom({
+                title: '¿Qué querés copiar?',
+                message: 'Elegí el nivel de copiado:',
+                variant: 'info',
+                buttons: [
+                    { label: 'Cancelar', onPress: hide, variant: 'ghost' },
+                    { label: 'Completo', onPress: () => { hide(); doCopy(mode, 'full', dedupeByExercise, resumeTargetIfCompleted); }, variant: 'solid' },
+                    { label: 'Estructura', onPress: () => { hide(); doCopy(mode, 'structure', dedupeByExercise, resumeTargetIfCompleted); }, variant: 'outline' },
+                    { label: 'Solo ejercicios', onPress: () => { hide(); doCopy(mode, 'exercises_only', dedupeByExercise, resumeTargetIfCompleted); }, variant: 'outline' },
+                ],
+            });
         };
 
         const askMode = (resumeTargetIfCompleted: boolean) => {
+            const hide = useConfirmStore.getState().hide;
             if (!targetHasSets) {
-                Alert.alert(
+                confirm.ask(
                     'Copiar entrenamiento',
                     `¿Copiar el entrenamiento del ${sourceLabel} al ${targetLabel}?`,
-                    [
-                        { text: 'Cancelar', style: 'cancel' },
-                        { text: 'Continuar', onPress: () => askContent('replace', false, resumeTargetIfCompleted) },
-                    ]
+                    () => askContent('replace', false, resumeTargetIfCompleted),
+                    'Continuar'
                 );
                 return;
             }
 
-            Alert.alert(
-                'Este día ya tiene ejercicios',
-                `El día ${targetLabel} tiene ${targetSets.length} set(s). ¿Qué querés hacer?`,
-                [
-                    { text: 'Cancelar', style: 'cancel' },
-                    { text: 'Agregar al final', onPress: () => askContent('append', false, resumeTargetIfCompleted) },
-                    { text: 'Agregar sin duplicar ejercicios', onPress: () => askContent('append', true, resumeTargetIfCompleted) },
+            confirm.custom({
+                title: 'Este día ya tiene ejercicios',
+                message: `El día ${targetLabel} tiene ${targetSets.length} set(s). ¿Qué querés hacer?`,
+                variant: 'warning',
+                buttons: [
+                    { label: 'Cancelar', onPress: hide, variant: 'ghost' },
+                    { label: 'Agregar', onPress: () => { hide(); askContent('append', false, resumeTargetIfCompleted); }, variant: 'solid' },
+                    { label: 'Sin duplicar', onPress: () => { hide(); askContent('append', true, resumeTargetIfCompleted); }, variant: 'outline' },
                     {
-                        text: 'Reemplazar todo',
-                        style: 'destructive',
+                        label: 'Reemplazar',
+                        destructive: true,
                         onPress: () => {
-                            Alert.alert(
+                            hide();
+                            confirm.destructive(
                                 'Confirmar reemplazo',
                                 `Esto eliminará ${targetSets.length} set(s) del ${targetLabel}.`,
-                                [
-                                    { text: 'Cancelar', style: 'cancel' },
-                                    { text: 'Reemplazar', style: 'destructive', onPress: () => askContent('replace', false, resumeTargetIfCompleted) },
-                                ]
+                                () => askContent('replace', false, resumeTargetIfCompleted),
+                                'Reemplazar'
                             );
                         }
                     },
-                ]
-            );
+                ],
+            });
         };
 
         if (targetWorkout.status === 'completed') {
-            Alert.alert(
+            confirm.ask(
                 'Día finalizado',
                 `El día ${targetLabel} está marcado como FINALIZADO. Para copiar, hay que reanudarlo.`,
-                [
-                    { text: 'Cancelar', style: 'cancel' },
-                    { text: 'Reanudar y continuar', onPress: () => askMode(true) },
-                ]
+                () => askMode(true),
+                'Reanudar y continuar'
             );
             return;
         }
@@ -235,90 +232,99 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
     };
 
     return (
-        <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-            <View className="flex-1 bg-surface">
-                <SafeAreaView edges={['top']} className="bg-white border-b border-iron-200">
-                    <View className="flex-row justify-between items-center p-4">
-                        <Text className="text-iron-950 font-bold text-lg">Copiar desde fecha</Text>
-                        <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Cerrar copiar entrenamiento">
-                            <X color={Colors.iron[950]} size={24} />
+        <Modal visible={visible} animationType="fade" transparent>
+            <View style={styles.overlay}>
+                <View style={styles.sheet}>
+                    <View style={styles.header}>
+                        <View>
+                            <Text style={styles.headerTitle}>Copiar rutina</Text>
+                            <Text style={styles.headerSub}>Buscar desde historial</Text>
+                        </View>
+                        <TouchableOpacity onPress={onClose} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Cerrar ventana">
+                            <X size={18} color="#fff" />
                         </TouchableOpacity>
                     </View>
-                </SafeAreaView>
 
-                <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-                    <Calendar
-                        current={format(targetDate, 'yyyy-MM-dd')}
-                        dayComponent={renderCalendarDay}
-                        theme={{
-                            backgroundColor: Colors.surface,
-                            calendarBackground: Colors.surface,
-                            textSectionTitleColor: Colors.iron[500],
-                            arrowColor: Colors.primary.DEFAULT,
-                            monthTextColor: Colors.iron[950],
-                            textMonthFontWeight: 'bold',
-                        }}
-                    />
+                    <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+                        <Calendar
+                            current={format(targetDate, 'yyyy-MM-dd')}
+                            dayComponent={renderCalendarDay}
+                            theme={{
+                                backgroundColor: Colors.surface,
+                                calendarBackground: Colors.surface,
+                                textSectionTitleColor: Colors.iron[500],
+                                arrowColor: Colors.primary.DEFAULT,
+                                monthTextColor: Colors.iron[950],
+                                textMonthFontWeight: 'bold',
+                            }}
+                        />
 
-                    <View className="p-4 bg-iron-100 min-h-full">
-                        <Text className="text-iron-500 text-xs mb-3 uppercase font-bold tracking-wider">Entrenamiento seleccionado</Text>
+                        <View style={{ padding: 16, backgroundColor: Colors.iron[100], minHeight: '100%' }}>
+                            <Text style={{ color: Colors.iron[400], fontSize: 10, marginBottom: 12, textTransform: 'uppercase', fontWeight: '800', letterSpacing: 1 }}>Entrenamiento seleccionado</Text>
 
-                        {loading ? (
-                            <Text className="text-iron-500 italic">Buscando en el historial...</Text>
-                        ) : sourceWorkout ? (
-                            <View className="bg-white p-5 rounded-2xl shadow-sm border border-iron-200 elevation-1">
-                                <View className="mb-4">
-                                    <Text className="text-iron-950 font-black text-xl mb-1">{sourceWorkout.name || 'Entrenamiento'}</Text>
-                                    <Text className="text-primary font-bold">
-                                        {format(new Date(selectedDateStr), 'EEEE, d MMMM yyyy', { locale: es })}
-                                    </Text>
-                                </View>
-
-                                {sourceSets.length > 0 ? (
-                                    <View className="mb-5 bg-iron-50 rounded-xl p-3 border border-iron-200">
-                                        <Text className="text-iron-950 font-bold mb-2">Ejercicios ({getGroupedSets().length})</Text>
-                                        <View className="gap-2">
-                                            {getGroupedSets().map((grp, i) => (
-                                                <View key={i} className="flex-row items-center gap-2">
-                                                    <View
-                                                        className="w-2 h-2 rounded-full"
-                                                        style={{ backgroundColor: grp.category_color || Colors.primary.dark }}
-                                                    />
-                                                    <Text className="text-iron-700 font-medium flex-1" numberOfLines={1}>{grp.exercise_name}</Text>
-                                                    <Text className="text-iron-500 text-xs font-bold bg-white px-2 py-0.5 rounded-full border border-iron-200">{grp.count} sets</Text>
-                                                </View>
-                                            ))}
-                                        </View>
+                            {loading ? (
+                                <Text style={{ color: Colors.iron[400], fontStyle: 'italic' }}>Buscando en el historial...</Text>
+                            ) : sourceWorkout ? (
+                                <View style={{ backgroundColor: Colors.surface, padding: 20, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], elevation: 1 }}>
+                                    <View style={{ marginBottom: 16 }}>
+                                        <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 20, marginBottom: 4 }}>{sourceWorkout.name || 'Entrenamiento'}</Text>
+                                        <Text style={{ color: Colors.primary.DEFAULT, fontWeight: '700', fontSize: 13 }}>
+                                            {format(new Date(selectedDateStr), 'EEEE, d MMMM yyyy', { locale: es })}
+                                        </Text>
                                     </View>
-                                ) : (
-                                    <Text className="text-iron-500 italic mb-4">Este entrenamiento no tiene ejercicios.</Text>
-                                )}
 
-                                <TouchableOpacity
-                                    onPress={handleCopy}
-                                    className="bg-primary p-4 rounded-xl flex-row justify-center items-center active:opacity-90 mt-2"
-                                    disabled={sourceSets.length === 0}
-                                >
-                                    <Copy color="white" size={20} />
-                                    <Text className="text-white font-bold ml-2 uppercase tracking-wide">Copiar rutina</Text>
-                                </TouchableOpacity>
-                            </View>
-                        ) : selectedDateStr ? (
-                            <View className="bg-white p-6 rounded-2xl border border-iron-200 border-dashed items-center mt-2">
-                                <Tag size={32} color={Colors.iron[300]} className="mb-3" />
-                                <Text className="text-iron-700 font-medium text-center">No hay entrenamiento registrado en esta fecha.</Text>
-                            </View>
-                        ) : (
-                            <Text className="text-iron-500 italic">Selecciona un día en el calendario para ver detalles.</Text>
-                        )}
-                    </View>
-                </ScrollView>
+                                    {sourceSets.length > 0 ? (
+                                        <View style={{ marginBottom: 20, backgroundColor: Colors.iron[100], borderRadius: 14, padding: 14, borderWidth: 1, borderColor: Colors.iron[200] }}>
+                                            <Text style={{ color: Colors.iron[950], fontWeight: '800', marginBottom: 10, fontSize: 13 }}>Ejercicios ({getGroupedSets().length})</Text>
+                                            <View style={{ gap: 8 }}>
+                                                {getGroupedSets().map((grp, i) => (
+                                                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: grp.category_color || Colors.primary.dark }} />
+                                                        <Text style={{ color: Colors.iron[700], fontWeight: '600', flex: 1, fontSize: 13 }} numberOfLines={1}>{grp.exercise_name}</Text>
+                                                        <View style={{ backgroundColor: Colors.surface, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, borderWidth: 1, borderColor: Colors.iron[200] }}>
+                                                            <Text style={{ color: Colors.iron[400], fontSize: 11, fontWeight: '800' }}>{grp.count} sets</Text>
+                                                        </View>
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        </View>
+                                    ) : (
+                                        <Text style={{ color: Colors.iron[400], fontStyle: 'italic', marginBottom: 16 }}>Este entrenamiento no tiene ejercicios.</Text>
+                                    )}
+
+                                    <TouchableOpacity
+                                        onPress={handleCopy}
+                                        style={{ backgroundColor: Colors.primary.DEFAULT, paddingVertical: 14, borderRadius: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 8, shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
+                                        disabled={sourceSets.length === 0}
+                                    >
+                                        <Copy color="white" size={18} />
+                                        <Text style={{ color: '#fff', fontWeight: '900', marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 14 }}>Copiar rutina</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : selectedDateStr ? (
+                                <View style={{ backgroundColor: Colors.surface, padding: 24, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], borderStyle: 'dashed', alignItems: 'center', marginTop: 8 }}>
+                                    <Tag size={32} color={Colors.iron[300]} style={{ marginBottom: 12 }} />
+                                    <Text style={{ color: Colors.iron[500], fontWeight: '600', textAlign: 'center' }}>No hay entrenamiento registrado en esta fecha.</Text>
+                                </View>
+                            ) : (
+                                <Text style={{ color: Colors.iron[400], fontStyle: 'italic' }}>Seleccioná un día en el calendario para ver detalles.</Text>
+                            )}
+                        </View>
+                    </ScrollView>
+                </View>
             </View>
         </Modal>
     );
 }
 
 const styles = StyleSheet.create({
+    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 48 },
+    sheet: { backgroundColor: Colors.iron[900], borderWidth: 1, borderColor: Colors.iron[700], borderRadius: 20, flex: 1, maxHeight: '95%', width: '100%', overflow: 'hidden' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.iron[200], backgroundColor: Colors.surface },
+    headerTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
+    headerSub: { color: Colors.iron[400], fontSize: 11, marginTop: 2 },
+    closeBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: Colors.primary.DEFAULT, justifyContent: 'center', alignItems: 'center' },
+
     calendarDay: {
         width: 45,
         height: 45,

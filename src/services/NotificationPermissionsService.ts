@@ -1,5 +1,6 @@
 import notifee, { AuthorizationStatus } from '@notifee/react-native';
-import { Alert, Linking, Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
+import { confirm } from '../store/confirmStore';
 
 class NotificationPermissionsService {
     /**
@@ -23,22 +24,17 @@ class NotificationPermissionsService {
 
             if (settings.authorizationStatus === AuthorizationStatus.DENIED) {
                 if (explainContext) {
-                    Alert.alert(
+                    confirm.ask(
                         'Permiso Necesario',
                         'Para alertarte cuando termine tu descanso, necesitas habilitar las notificaciones en la configuración de tu dispositivo.',
-                        [
-                            { text: 'Ahora no', style: 'cancel' },
-                            {
-                                text: 'Ir a Configuración',
-                                onPress: () => {
-                                    if (Platform.OS === 'ios') {
-                                        Linking.openURL('app-settings:');
-                                    } else {
-                                        Linking.openSettings();
-                                    }
-                                }
+                        () => {
+                            if (Platform.OS === 'ios') {
+                                Linking.openURL('app-settings:');
+                            } else {
+                                Linking.openSettings();
                             }
-                        ]
+                        },
+                        'Ir a Configuración'
                     );
                 }
                 return false;

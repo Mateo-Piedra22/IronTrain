@@ -1,11 +1,13 @@
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
 import { ExerciseService } from '@/src/services/ExerciseService';
+import { Colors } from '@/src/theme';
 import { ExerciseType } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Dumbbell, FileText, Tag } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function ExerciseModal() {
     const router = useRouter();
@@ -18,106 +20,124 @@ export default function ExerciseModal() {
     const [notes, setNotes] = useState('');
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        if (exerciseId) {
-            loadExercise();
-        }
-    }, [exerciseId]);
+    useEffect(() => { if (exerciseId) loadExercise(); }, [exerciseId]);
 
     const loadExercise = async () => {
         try {
-            const exercises = await ExerciseService.getAll(); // Imperfect but works for now. Better to have getById
-            // In a real app we'd add getById to service. For now, filter local or fetch all.
+            const exercises = await ExerciseService.getAll();
             const ex = exercises.find(e => e.id === exerciseId);
-            if (ex) {
-                setName(ex.name);
-                setType(ex.type);
-                setNotes(ex.notes || '');
-            }
-        } catch (e) {
-            console.error(e);
+            if (ex) { setName(ex.name); setType(ex.type); setNotes(ex.notes || ''); }
+        } catch (e: any) {
+            notify.error('Error', 'No se pudo cargar el ejercicio.');
         }
     };
 
     const handleSave = async () => {
-        if (!name.trim()) {
-            notify.error('El nombre es obligatorio.');
-            return;
-        }
-
+        if (!name.trim()) { notify.error('Falta el nombre', 'El nombre es obligatorio para guardar el ejercicio.'); return; }
         setLoading(true);
         try {
             if (exerciseId) {
                 await ExerciseService.update(exerciseId, { name, type, notes });
+                notify.success('Actualizado', `"${name}" fue modificado.`);
             } else {
-                await ExerciseService.create({
-                    category_id: categoryId,
-                    name,
-                    type,
-                    notes
-                });
+                await ExerciseService.create({ category_id: categoryId, name, type, notes });
+                notify.success('Creado', `"${name}" fue añadido.`);
             }
             router.back();
-            //Ideally trigger refresh on previous screen
-        } catch (e) {
-            notify.error((e as Error).message);
-        } finally {
-            setLoading(false);
-        }
+        } catch (e: any) {
+            notify.error('Error al guardar', e?.message || 'Error tratando de guardar tu progreso.');
+        } finally { setLoading(false); }
     };
 
+    const typeOptions: { id: ExerciseType; label: string; icon: string }[] = [
+        { id: 'weight_reps', label: 'Peso + reps', icon: '🏋️' },
+        { id: 'distance_time', label: 'Distancia + tiempo', icon: '🏃' },
+        { id: 'weight_only', label: 'Solo peso', icon: '⚖️' },
+        { id: 'reps_only', label: 'Solo reps', icon: '🔄' },
+    ];
+
     return (
-        <View className="flex-1 bg-iron-900 p-4">
+        <View style={s.container}>
             <Stack.Screen options={{
                 title: exerciseId ? 'Editar ejercicio' : 'Nuevo ejercicio',
-                presentation: 'modal'
+                presentation: 'modal',
+                headerTitleStyle: { fontWeight: '900', color: Colors.iron[950] },
+                headerStyle: { backgroundColor: Colors.iron[900] },
+                headerTintColor: Colors.primary.DEFAULT,
             }} />
 
-            <IronInput
-                label="Nombre del ejercicio"
-                placeholder="Ej: Press de banca"
-                value={name}
-                onChangeText={setName}
-            />
+            {/* Exercise Name */}
+            <View style={s.section}>
+                <View style={s.sectionHeader}>
+                    <View style={s.sectionIconCircle}><Tag size={14} color={Colors.primary.DEFAULT} /></View>
+                    <Text style={s.sectionLabel}>Nombre del ejercicio</Text>
+                </View>
+                <IronInput
+                    placeholder="Ej: Press de banca"
+                    value={name}
+                    onChangeText={setName}
+                    autoFocus={!exerciseId}
+                />
+            </View>
 
-            <View className="mb-4">
-                <Text className="text-textMuted mb-2 text-sm font-medium">Tipo</Text>
-                <View className="flex-row flex-wrap gap-2">
-                    {(['weight_reps', 'distance_time', 'weight_only', 'reps_only'] as ExerciseType[]).map((t) => (
-                        <IronButton
-                            key={t}
-                            label={
-                                t === 'weight_reps'
-                                    ? 'Peso + reps'
-                                    : t === 'distance_time'
-                                        ? 'Distancia + tiempo'
-                                        : t === 'weight_only'
-                                            ? 'Solo peso'
-                                            : 'Solo reps'
-                            }
-                            variant={type === t ? 'solid' : 'outline'}
-                            size="sm"
-                            onPress={() => setType(t)}
-                        />
+            {/* Type */}
+            <View style={s.section}>
+                <View style={s.sectionHeader}>
+                    <View style={s.sectionIconCircle}><Dumbbell size={14} color={Colors.primary.DEFAULT} /></View>
+                    <Text style={s.sectionLabel}>Tipo</Text>
+                </View>
+                <View style={s.typeGrid}>
+                    {typeOptions.map((t) => (
+                        <TouchableOpacity
+                            key={t.id}
+                            onPress={() => setType(t.id)}
+                            style={[s.typeCard, type === t.id && s.typeCardActive]}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Seleccionar tipo ${t.label}`}
+                        >
+                            <Text style={s.typeIcon}>{t.icon}</Text>
+                            <Text style={[s.typeLabel, type === t.id && s.typeLabelActive]}>{t.label}</Text>
+                        </TouchableOpacity>
                     ))}
                 </View>
             </View>
 
-            <IronInput
-                label="Notas (opcional)"
-                placeholder="Ej: ancho de agarre..."
-                value={notes}
-                onChangeText={setNotes}
-                multiline
-                numberOfLines={3}
-            />
+            {/* Notes */}
+            <View style={s.section}>
+                <View style={s.sectionHeader}>
+                    <View style={s.sectionIconCircle}><FileText size={14} color={Colors.primary.DEFAULT} /></View>
+                    <Text style={s.sectionLabel}>Notas (opcional)</Text>
+                </View>
+                <IronInput
+                    placeholder="Ej: ancho de agarre…"
+                    value={notes}
+                    onChangeText={setNotes}
+                    multiline
+                    numberOfLines={3}
+                />
+            </View>
 
-            <IronButton
-                label={exerciseId ? "Actualizar ejercicio" : "Crear ejercicio"}
-                onPress={handleSave}
-                loading={loading}
-                className="mt-4"
-            />
+            <View style={{ marginTop: 'auto', paddingTop: 16, paddingBottom: 16 }}>
+                <IronButton
+                    label={exerciseId ? "Actualizar ejercicio" : "Crear ejercicio"}
+                    onPress={handleSave}
+                    loading={loading}
+                />
+            </View>
         </View>
     );
 }
+
+const s = StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.iron[900], padding: 16 },
+    section: { marginBottom: 20 },
+    sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+    sectionIconCircle: { width: 28, height: 28, borderRadius: 8, backgroundColor: Colors.primary.DEFAULT + '15', justifyContent: 'center', alignItems: 'center' },
+    sectionLabel: { fontSize: 12, fontWeight: '800', color: Colors.iron[500], textTransform: 'uppercase', letterSpacing: 0.5 },
+    typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    typeCard: { width: '48%' as any, flexBasis: '48%', flexGrow: 0, paddingVertical: 14, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: Colors.iron[700], backgroundColor: Colors.surface, flexDirection: 'row', alignItems: 'center', gap: 10 },
+    typeCardActive: { borderColor: Colors.primary.DEFAULT, backgroundColor: Colors.primary.DEFAULT + '12' },
+    typeIcon: { fontSize: 18 },
+    typeLabel: { fontSize: 12, fontWeight: '700', color: Colors.iron[500], flex: 1 },
+    typeLabelActive: { color: Colors.primary.DEFAULT, fontWeight: '800' },
+});

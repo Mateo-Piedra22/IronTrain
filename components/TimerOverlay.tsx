@@ -3,7 +3,7 @@ import { Colors } from '@/src/theme';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { Pause, Play, RotateCcw, X } from 'lucide-react-native';
 import React, { useContext, useEffect } from 'react';
-import { AppState, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export function TimerOverlay() {
@@ -14,17 +14,12 @@ export function TimerOverlay() {
 
     useEffect(() => {
         let interval: any;
-        if (isRunning) {
-            tick();
-            interval = setInterval(tick, 1000);
-        }
+        if (isRunning) { tick(); interval = setInterval(tick, 1000); }
         return () => clearInterval(interval);
     }, [isRunning, tick]);
 
     useEffect(() => {
-        const sub = AppState.addEventListener('change', (s) => {
-            if (s === 'active') tick();
-        });
+        const sub = AppState.addEventListener('change', (s) => { if (s === 'active') tick(); });
         return () => sub.remove();
     }, [tick]);
 
@@ -36,80 +31,60 @@ export function TimerOverlay() {
         return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
 
-    return (
-        <View
-            className="absolute bg-iron-950 border border-iron-600 rounded-2xl flex-row items-center p-3 shadow-xl z-50"
-            style={{ right: 16, bottom: bottomOffset }}
+    const addTimeBtn = (secs: number) => (
+        <TouchableOpacity
+            onPress={() => addTime(secs)}
+            style={ss.addBtn}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Agregar ${secs} segundos`}
         >
-            <View className="pr-3">
-                <Text className="text-iron-300 text-[10px] font-bold uppercase">Descanso</Text>
-                <Text className="text-iron-100 font-black text-2xl">{formatTime(Math.max(0, timeLeft))}</Text>
+            <Text style={ss.addBtnText}>+{secs}</Text>
+        </TouchableOpacity>
+    );
+
+    return (
+        <View style={[ss.container, { right: 16, bottom: bottomOffset }]}>
+            <View style={{ paddingRight: 12 }}>
+                <Text style={ss.label}>Descanso</Text>
+                <Text style={ss.time}>{formatTime(Math.max(0, timeLeft))}</Text>
             </View>
 
-            <View className="flex-row items-center border-l border-iron-600 pl-3 gap-2">
-                <TouchableOpacity
-                    onPress={() => addTime(15)}
-                    className="px-2 py-2 bg-iron-600 rounded-xl active:opacity-80"
-                    accessibilityRole="button"
-                    accessibilityLabel="Agregar 15 segundos"
-                >
-                    <Text className="text-iron-100 font-bold">+15</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    onPress={() => addTime(30)}
-                    className="px-2 py-2 bg-iron-600 rounded-xl active:opacity-80"
-                    accessibilityRole="button"
-                    accessibilityLabel="Agregar 30 segundos"
-                >
-                    <Text className="text-iron-100 font-bold">+30</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    onPress={() => addTime(60)}
-                    className="px-2 py-2 bg-iron-600 rounded-xl active:opacity-80"
-                    accessibilityRole="button"
-                    accessibilityLabel="Agregar 60 segundos"
-                >
-                    <Text className="text-iron-100 font-bold">+60</Text>
-                </TouchableOpacity>
+            <View style={ss.controls}>
+                {addTimeBtn(15)}
+                {addTimeBtn(30)}
+                {addTimeBtn(60)}
 
                 {timeLeft <= 0 && duration > 0 ? (
-                    <TouchableOpacity
-                        onPress={restartTimer}
-                        className="p-2 bg-primary rounded-xl active:opacity-80"
-                        accessibilityRole="button"
-                        accessibilityLabel="Reiniciar descanso"
-                    >
-                        <RotateCcw size={18} color={Colors.white} />
+                    <TouchableOpacity onPress={restartTimer} style={ss.actionBtnPrimary} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Reiniciar descanso">
+                        <RotateCcw size={16} color={Colors.white} />
                     </TouchableOpacity>
                 ) : isRunning ? (
-                    <TouchableOpacity
-                        onPress={pauseTimer}
-                        className="p-2 bg-iron-600 rounded-xl active:opacity-80"
-                        accessibilityRole="button"
-                        accessibilityLabel="Pausar descanso"
-                    >
-                        <Pause size={18} color={Colors.white} />
+                    <TouchableOpacity onPress={pauseTimer} style={ss.actionBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Pausar descanso">
+                        <Pause size={16} color={Colors.white} />
                     </TouchableOpacity>
                 ) : (
-                    <TouchableOpacity
-                        onPress={resumeTimer}
-                        className="p-2 bg-iron-600 rounded-xl active:opacity-80"
-                        accessibilityRole="button"
-                        accessibilityLabel="Reanudar descanso"
-                    >
-                        <Play size={18} color={Colors.white} />
+                    <TouchableOpacity onPress={resumeTimer} style={ss.actionBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Reanudar descanso">
+                        <Play size={16} color={Colors.white} />
                     </TouchableOpacity>
                 )}
 
-                <TouchableOpacity
-                    onPress={stopTimer}
-                    className="p-2 bg-red-600 rounded-xl active:opacity-80"
-                    accessibilityRole="button"
-                    accessibilityLabel="Cancelar descanso"
-                >
-                    <X size={18} color={Colors.white} />
+                <TouchableOpacity onPress={stopTimer} style={ss.stopBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Cancelar descanso">
+                    <X size={16} color={Colors.white} />
                 </TouchableOpacity>
             </View>
         </View>
     );
 }
+
+const ss = StyleSheet.create({
+    container: { position: 'absolute', backgroundColor: Colors.iron[950], borderWidth: 1, borderColor: Colors.iron[600], borderRadius: 16, flexDirection: 'row', alignItems: 'center', padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 10, zIndex: 50 },
+    label: { color: Colors.iron[400], fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+    time: { color: Colors.iron[100], fontWeight: '900', fontSize: 22, fontVariant: ['tabular-nums'] },
+    controls: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: Colors.iron[600], paddingLeft: 12, gap: 6 },
+    addBtn: { paddingHorizontal: 8, paddingVertical: 8, backgroundColor: Colors.iron[600], borderRadius: 10 },
+    addBtnText: { color: Colors.iron[100], fontWeight: '800', fontSize: 12 },
+    actionBtn: { padding: 8, backgroundColor: Colors.iron[600], borderRadius: 10 },
+    actionBtnPrimary: { padding: 8, backgroundColor: Colors.primary.DEFAULT, borderRadius: 10 },
+    stopBtn: { padding: 8, backgroundColor: '#dc2626', borderRadius: 10 },
+});

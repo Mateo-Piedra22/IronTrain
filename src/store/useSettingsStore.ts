@@ -1,35 +1,41 @@
 import { create } from 'zustand';
-import { DatabaseService } from '../services/db';
+import { settingsService } from '../services/SettingsService';
 
 interface SettingsState {
     unitSystem: 'metric' | 'imperial';
     alwaysOn: boolean;
+    trainingDays: number[];
     loadSettings: () => Promise<void>;
     setUnitSystem: (val: 'metric' | 'imperial') => Promise<void>;
     setAlwaysOn: (val: boolean) => Promise<void>;
+    setTrainingDays: (days: number[]) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
     unitSystem: 'metric',
     alwaysOn: false,
+    trainingDays: [1, 2, 3, 4, 5, 6], // default to Mon-Sat 
     loadSettings: async () => {
-        const db = DatabaseService.getDb();
-        const s = await db.getFirstAsync<{ unit_system: string, always_on: number }>('SELECT * FROM settings WHERE id = 1');
-        if (s) {
-            set({
-                unitSystem: s.unit_system as 'metric' | 'imperial',
-                alwaysOn: !!s.always_on
-            });
-        }
+        const unitSystem = await settingsService.getSetting('unit_system');
+        const alwaysOn = await settingsService.getSetting('always_on');
+        const trainingDaysRaw = await settingsService.getSetting('training_days');
+
+        set({
+            unitSystem: (unitSystem as 'metric' | 'imperial') || 'metric',
+            alwaysOn: alwaysOn === 'true',
+            trainingDays: trainingDaysRaw ? JSON.parse(trainingDaysRaw) : [1, 2, 3, 4, 5, 6]
+        });
     },
     setUnitSystem: async (val) => {
-        const db = DatabaseService.getDb();
-        await db.runAsync('UPDATE settings SET unit_system = ? WHERE id = 1', [val]);
+        await settingsService.setSetting('unit_system', val);
         set({ unitSystem: val });
     },
     setAlwaysOn: async (val) => {
-        const db = DatabaseService.getDb();
-        await db.runAsync('UPDATE settings SET always_on = ? WHERE id = 1', [val ? 1 : 0]);
+        await settingsService.setSetting('always_on', val ? 'true' : 'false');
         set({ alwaysOn: val });
+    },
+    setTrainingDays: async (days) => {
+        await settingsService.setSetting('training_days', JSON.stringify(days));
+        set({ trainingDays: days });
     }
 }));

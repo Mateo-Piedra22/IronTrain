@@ -1,58 +1,41 @@
 import { IronInput } from '@/components/IronInput';
 import { CalculatorService, OneRMFormula } from '@/src/services/CalculatorService';
 import { configService } from '@/src/services/ConfigService';
-import { PlateCalculatorService } from '@/src/services/PlateCalculatorService';
 import { statsService } from '@/src/services/StatsService';
 import { UnitService } from '@/src/services/UnitService';
-import { PlateInventory } from '@/src/types/db';
+import { Colors } from '@/src/theme';
 import { X } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface CalculatorsModalProps {
     visible: boolean;
     onClose: () => void;
-    initialTab?: 'oneRm' | 'warmup' | 'plates' | 'power';
+    initialTab?: 'oneRm' | 'warmup' | 'power';
 }
 
 export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: CalculatorsModalProps) {
     const unit = configService.get('weightUnit');
     const rounding = unit === 'kg' ? configService.get('calculatorsRoundingKg') : configService.get('calculatorsRoundingLbs');
 
-    const [activeTab, setActiveTab] = useState<'oneRm' | 'warmup' | 'plates' | 'power'>('oneRm');
+    const [activeTab, setActiveTab] = useState<'oneRm' | 'warmup' | 'power'>('oneRm');
 
     React.useEffect(() => {
-        if (visible && initialTab) {
-            setActiveTab(initialTab);
-        }
+        if (visible && initialTab) { setActiveTab(initialTab); }
     }, [visible, initialTab]);
 
     const [formula, setFormula] = useState<OneRMFormula>(configService.get('calculatorsDefault1RMFormula'));
     const [setWeight, setSetWeight] = useState('');
     const [setReps, setSetReps] = useState('');
     const [oneRmManual, setOneRmManual] = useState(unit === 'kg' ? '100' : '225');
-
     const [warmupWorking, setWarmupWorking] = useState(unit === 'kg' ? '100' : '225');
-    const [warmupBar, setWarmupBar] = useState(
-        String(unit === 'kg' ? configService.get('plateCalculatorDefaultBarWeightKg') : configService.get('plateCalculatorDefaultBarWeightLbs'))
-    );
-
+    const [warmupBar, setWarmupBar] = useState(String(unit === 'kg' ? configService.get('plateCalculatorDefaultBarWeightKg') : configService.get('plateCalculatorDefaultBarWeightLbs')));
     const [bw, setBw] = useState('');
     const [total, setTotal] = useState('');
 
-    const [calcPlateTarget, setCalcPlateTarget] = useState('');
-    const [calcPlateBar, setCalcPlateBar] = useState(
-        String(unit === 'kg' ? configService.get('plateCalculatorDefaultBarWeightKg') : configService.get('plateCalculatorDefaultBarWeightLbs'))
-    );
-
     const percentages = [0.95, 0.90, 0.875, 0.85, 0.825, 0.80, 0.75, 0.70, 0.65, 0.60, 0.50];
-
-    const estFromSet = CalculatorService.estimate1RM(
-        formula,
-        parseFloat(setWeight) || 0,
-        parseFloat(setReps) || 0
-    );
+    const estFromSet = CalculatorService.estimate1RM(formula, parseFloat(setWeight) || 0, parseFloat(setReps) || 0);
     const oneRm = Math.max(parseFloat(oneRmManual) || 0, estFromSet || 0);
     const table = CalculatorService.percentTable(oneRm, percentages, rounding);
 
@@ -63,314 +46,149 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
     const wilks = statsService.calculateWilks(bwKg, totalKg);
     const dots = statsService.calculateDOTS(bwKg, totalKg);
 
-    const warmup = CalculatorService.warmupSuggestions({
-        workingWeight: parseFloat(warmupWorking) || 0,
-        barWeight: parseFloat(warmupBar) || 0,
-        rounding
-    });
+    const warmup = CalculatorService.warmupSuggestions({ workingWeight: parseFloat(warmupWorking) || 0, barWeight: parseFloat(warmupBar) || 0, rounding });
 
-    const plateResult = React.useMemo(() => {
-        if (activeTab !== 'plates') return null;
-        const target = parseFloat(calcPlateTarget);
-        if (isNaN(target) || target <= 0) return null;
-        const bar = parseFloat(calcPlateBar) || 0;
 
-        // Standard Inventory
-        const inventory: PlateInventory[] = unit === 'kg'
-            ? [25, 20, 15, 10, 5, 2.5, 1.25].map(w => ({ weight: w, count: 10, type: 'standard', unit: 'kg' }))
-            : [45, 35, 25, 10, 5, 2.5].map(w => ({ weight: w, count: 10, type: 'standard', unit: 'lbs' }));
 
-        return PlateCalculatorService.calculate({
-            targetWeight: target,
-            barWeight: bar,
-            inventory,
-            maxSolutions: 1
-        });
-    }, [calcPlateTarget, calcPlateBar, unit, activeTab]);
-
-    const getPlateColor = (weight: number) => {
-        if (unit === 'kg') {
-            if (weight >= 25) return '#ef4444'; // Red
-            if (weight >= 20) return '#3b82f6'; // Blue
-            if (weight >= 15) return '#eab308'; // Yellow
-            if (weight >= 10) return '#22c55e'; // Green
-            if (weight >= 5) return '#f4f4f5'; // White
-            if (weight >= 2.5) return '#000000'; // Black
-            return '#d4d4d8'; // Silver
-        } else {
-            if (weight >= 55) return '#ef4444';
-            if (weight >= 45) return '#3b82f6';
-            if (weight >= 35) return '#eab308';
-            if (weight >= 25) return '#22c55e';
-            if (weight >= 10) return '#f4f4f5';
-            if (weight >= 5) return '#000000';
-            return '#d4d4d8';
-        }
-    };
+    const tabs = [
+        { id: 'oneRm', label: '1RM' },
+        { id: 'warmup', label: 'Warm-up' },
+        { id: 'power', label: 'Scores' },
+    ] as const;
 
     return (
         <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-            <SafeAreaView edges={['top', 'bottom', 'left', 'right']} className="flex-1 bg-iron-900">
-                <View className="flex-1 p-4">
-                    <View className="flex-row justify-between items-center mb-6">
-                        <Text className="text-iron-950 font-bold text-lg">Calculadoras</Text>
-                        <TouchableOpacity
-                            onPress={onClose}
-                            className="p-2 bg-primary rounded-full active:opacity-80"
-                            accessibilityRole="button"
-                            accessibilityLabel="Cerrar calculadoras"
-                        >
-                            <X color="white" size={24} />
+            <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={s.container}>
+                <View style={s.inner}>
+                    {/* Header */}
+                    <View style={s.header}>
+                        <View>
+                            <Text style={s.headerTitle}>Calculadoras</Text>
+                            <Text style={s.headerSubtitle}>Herramientas de entrenamiento</Text>
+                        </View>
+                        <TouchableOpacity onPress={onClose} style={s.closeBtn} accessibilityRole="button" accessibilityLabel="Cerrar calculadoras">
+                            <X color="white" size={20} />
                         </TouchableOpacity>
                     </View>
 
-                    <View className="flex-row mb-6 bg-iron-800 p-1 rounded-lg">
-                        <TouchableOpacity
-                            className={`flex-1 py-2 rounded-md ${activeTab === 'oneRm' ? 'bg-iron-700' : ''}`}
-                            onPress={() => setActiveTab('oneRm')}
-                            accessibilityRole="button"
-                            accessibilityLabel="Abrir calculadora 1RM"
-                        >
-                            <Text className={`text-center font-bold ${activeTab === 'oneRm' ? 'text-iron-950' : 'text-iron-500'}`}>1RM</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            className={`flex-1 py-2 rounded-md ${activeTab === 'warmup' ? 'bg-iron-700' : ''}`}
-                            onPress={() => setActiveTab('warmup')}
-                            accessibilityRole="button"
-                            accessibilityLabel="Abrir warm-up"
-                        >
-                            <Text className={`text-center font-bold ${activeTab === 'warmup' ? 'text-iron-950' : 'text-iron-500'}`}>Warm-up</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            className={`flex-1 py-2 rounded-md ${activeTab === 'power' ? 'bg-iron-700' : ''}`}
-                            onPress={() => setActiveTab('power')}
-                            accessibilityRole="button"
-                            accessibilityLabel="Abrir scores powerlifting"
-                        >
-                            <Text className={`text-center font-bold ${activeTab === 'power' ? 'text-iron-950' : 'text-iron-500'}`}>Scores</Text>
-                        </TouchableOpacity>
+                    {/* Tabs */}
+                    <View style={s.tabTrack}>
+                        {tabs.map((t) => (
+                            <TouchableOpacity
+                                key={t.id}
+                                style={[s.tab, activeTab === t.id && s.tabActive]}
+                                onPress={() => setActiveTab(t.id)}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Abrir ${t.label}`}
+                            >
+                                <Text style={[s.tabText, activeTab === t.id && s.tabTextActive]}>{t.label}</Text>
+                            </TouchableOpacity>
+                        ))}
                     </View>
 
-                    <ScrollView>
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
                         {activeTab === 'oneRm' ? (
                             <View>
-                                <Text className="text-iron-950 font-bold text-lg mb-3">Estimación de 1RM</Text>
-
-                                <View className="bg-surface p-4 rounded-xl border border-iron-700 mb-6">
-                                    <Text className="text-iron-500 text-xs font-bold uppercase mb-2">Fórmula</Text>
-                                    <View className="flex-row gap-2 mb-4">
-                                        {([
-                                            { id: 'epley', label: 'Epley' },
-                                            { id: 'brzycki', label: 'Brzycki' },
-                                            { id: 'lombardi', label: 'Lombardi' }
-                                        ] as const).map((f) => (
+                                <Text style={s.sectionTitle}>Estimación de 1RM</Text>
+                                <View style={s.card}>
+                                    <Text style={s.cardLabel}>Fórmula</Text>
+                                    <View style={s.chipRow}>
+                                        {([{ id: 'epley', label: 'Epley' }, { id: 'brzycki', label: 'Brzycki' }, { id: 'lombardi', label: 'Lombardi' }] as const).map((f) => (
                                             <TouchableOpacity
                                                 key={f.id}
-                                                onPress={() => {
-                                                    setFormula(f.id);
-                                                    configService.set('calculatorsDefault1RMFormula', f.id);
-                                                }}
-                                                className={`flex-1 px-3 py-2 rounded-lg border ${formula === f.id ? 'bg-primary border-primary' : 'bg-white border-iron-200'}`}
+                                                onPress={() => { setFormula(f.id); configService.set('calculatorsDefault1RMFormula', f.id); }}
+                                                style={[s.chip, formula === f.id && s.chipActive]}
                                                 accessibilityRole="button"
-                                                accessibilityLabel={`Seleccionar fórmula ${f.label}`}
                                             >
-                                                <Text className={`text-center font-bold ${formula === f.id ? 'text-white' : 'text-iron-950'}`}>{f.label}</Text>
+                                                <Text style={[s.chipText, formula === f.id && s.chipTextActive]}>{f.label}</Text>
                                             </TouchableOpacity>
                                         ))}
                                     </View>
 
-                                    <Text className="text-iron-500 text-xs font-bold uppercase mb-2">Desde una serie</Text>
-                                    <View className="flex-row gap-3">
-                                        <View className="flex-1">
-                                            <IronInput
-                                                value={setWeight}
-                                                onChangeText={setSetWeight}
-                                                keyboardType="numeric"
-                                                placeholder={unit === 'kg' ? 'Peso (kg)' : 'Peso (lbs)'}
-                                                accessibilityLabel="Ingresar peso de la serie"
-                                            />
-                                        </View>
-                                        <View className="flex-1">
-                                            <IronInput
-                                                value={setReps}
-                                                onChangeText={setSetReps}
-                                                keyboardType="numeric"
-                                                placeholder="Reps"
-                                                accessibilityLabel="Ingresar repeticiones de la serie"
-                                            />
-                                        </View>
+                                    <Text style={[s.cardLabel, { marginTop: 16 }]}>Desde una serie</Text>
+                                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                                        <View style={{ flex: 1 }}><IronInput value={setWeight} onChangeText={setSetWeight} keyboardType="numeric" placeholder={`Peso (${unit})`} /></View>
+                                        <View style={{ flex: 1 }}><IronInput value={setReps} onChangeText={setSetReps} keyboardType="numeric" placeholder="Reps" /></View>
                                     </View>
 
-                                    <Text className="text-iron-500 text-xs font-bold uppercase mt-4 mb-2">1RM manual</Text>
-                                    <IronInput
-                                        value={oneRmManual}
-                                        onChangeText={setOneRmManual}
-                                        keyboardType="numeric"
-                                        placeholder={unit === 'kg' ? '1RM (kg)' : '1RM (lbs)'}
-                                        accessibilityLabel="Ingresar 1RM manual"
-                                    />
+                                    <Text style={[s.cardLabel, { marginTop: 16 }]}>1RM manual</Text>
+                                    <IronInput value={oneRmManual} onChangeText={setOneRmManual} keyboardType="numeric" placeholder={`1RM (${unit})`} />
 
-                                    <View className="mt-4 bg-iron-100 p-4 rounded-xl border border-iron-200">
-                                        <Text className="text-iron-500 text-xs font-bold uppercase">1RM usado</Text>
-                                        <Text className="text-iron-950 text-3xl font-black mt-1">{Math.round(oneRm)}</Text>
-                                        <Text className="text-iron-500 text-xs font-bold">{unit}</Text>
+                                    {/* Result */}
+                                    <View style={s.resultBox}>
+                                        <Text style={s.resultLabel}>1RM USADO</Text>
+                                        <Text style={s.resultValue}>{Math.round(oneRm)}</Text>
+                                        <Text style={s.resultUnit}>{unit}</Text>
                                     </View>
                                 </View>
 
-                                <Text className="text-iron-950 font-bold text-lg mb-3">Porcentajes</Text>
-                                <View className="bg-surface rounded-xl overflow-hidden border border-iron-700 mb-8">
-                                    {table.map((row) => (
-                                        <View key={row.pct} className="flex-row justify-between p-4 border-b border-iron-200">
-                                            <Text className="text-iron-500 font-bold">{Math.round(row.pct * 100)}%</Text>
-                                            <Text className="text-iron-950 font-bold text-lg">{row.weight} {unit}</Text>
+                                <Text style={s.sectionTitle}>Porcentajes</Text>
+                                <View style={s.tableCard}>
+                                    <View style={s.tableHeader}>
+                                        <Text style={s.tableHeaderText}>%</Text>
+                                        <Text style={[s.tableHeaderText, { textAlign: 'right' }]}>PESO</Text>
+                                    </View>
+                                    {table.map((row, idx) => (
+                                        <View key={row.pct} style={[s.tableRow, idx < table.length - 1 && s.tableRowBorder]}>
+                                            <Text style={s.tablePct}>{Math.round(row.pct * 100)}%</Text>
+                                            <Text style={s.tableWeight}>{row.weight} {unit}</Text>
                                         </View>
                                     ))}
                                 </View>
                             </View>
                         ) : activeTab === 'warmup' ? (
                             <View>
-                                <Text className="text-iron-950 font-bold text-lg mb-3">Warm-up</Text>
-                                <View className="bg-surface p-4 rounded-xl border border-iron-700 mb-6">
-                                    <Text className="text-iron-500 text-xs font-bold uppercase mb-2">Peso de trabajo</Text>
-                                    <IronInput
-                                        value={warmupWorking}
-                                        onChangeText={setWarmupWorking}
-                                        keyboardType="numeric"
-                                        placeholder={unit === 'kg' ? 'p. ej. 100' : 'p. ej. 225'}
-                                        accessibilityLabel="Ingresar peso de trabajo"
-                                    />
-                                    <Text className="text-iron-500 text-xs font-bold uppercase mt-4 mb-2">Barra</Text>
-                                    <IronInput
-                                        value={warmupBar}
-                                        onChangeText={setWarmupBar}
-                                        keyboardType="numeric"
-                                        placeholder={unit === 'kg' ? '20' : '45'}
-                                        accessibilityLabel="Ingresar peso de barra"
-                                    />
-                                    <Text className="text-iron-500 text-xs mt-3">
-                                        Redondeo: {rounding} {unit}
-                                    </Text>
+                                <Text style={s.sectionTitle}>Warm-up</Text>
+                                <View style={s.card}>
+                                    <Text style={s.cardLabel}>Peso de trabajo</Text>
+                                    <IronInput value={warmupWorking} onChangeText={setWarmupWorking} keyboardType="numeric" placeholder={unit === 'kg' ? '100' : '225'} />
+                                    <Text style={[s.cardLabel, { marginTop: 16 }]}>Barra</Text>
+                                    <IronInput value={warmupBar} onChangeText={setWarmupBar} keyboardType="numeric" placeholder={unit === 'kg' ? '20' : '45'} />
+                                    <Text style={s.hintText}>Redondeo: {rounding} {unit}</Text>
                                 </View>
 
-                                <View className="bg-surface rounded-xl overflow-hidden border border-iron-700">
-                                    {warmup.length > 0 ? (
-                                        warmup.map((s, idx) => (
-                                            <View key={`${s.weight}-${idx}`} className="flex-row justify-between p-4 border-b border-iron-200">
-                                                <View className="flex-row items-center">
-                                                    <View className="w-2 h-2 rounded-full bg-yellow-500 mr-2" />
-                                                    <Text className="text-iron-950 font-bold">{s.weight} {unit}</Text>
-                                                </View>
-                                                <Text className="text-iron-500 font-bold">{s.reps} reps</Text>
+                                <View style={s.tableCard}>
+                                    {warmup.length > 0 ? warmup.map((ws, idx) => (
+                                        <View key={`${ws.weight}-${idx}`} style={[s.tableRow, idx < warmup.length - 1 && s.tableRowBorder]}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#eab308' }} />
+                                                <Text style={s.tableWeight}>{ws.weight} {unit}</Text>
                                             </View>
-                                        ))
-                                    ) : (
-                                        <View className="p-4">
-                                            <Text className="text-iron-500">Ingresa un peso de trabajo válido.</Text>
+                                            <Text style={s.tablePct}>{ws.reps} reps</Text>
+                                        </View>
+                                    )) : (
+                                        <View style={{ padding: 20 }}>
+                                            <Text style={s.emptyText}>Ingresa un peso de trabajo válido.</Text>
                                         </View>
                                     )}
                                 </View>
                             </View>
-                        ) : activeTab === 'plates' ? (
-                            <View>
-                                <Text className="text-iron-950 font-bold text-lg mb-3">Calculadora de Discos</Text>
-
-                                <View className="flex-row gap-4 mb-6">
-                                    <View className="flex-1">
-                                        <Text className="text-iron-500 mb-2">Peso Objetivo ({unit})</Text>
-                                        <IronInput
-                                            value={calcPlateTarget}
-                                            onChangeText={setCalcPlateTarget}
-                                            keyboardType="numeric"
-                                            placeholder={unit === 'kg' ? '100' : '225'}
-                                            autoFocus
-                                        />
-                                    </View>
-                                    <View className="flex-1">
-                                        <Text className="text-iron-500 mb-2">Barra ({unit})</Text>
-                                        <IronInput
-                                            value={calcPlateBar}
-                                            onChangeText={setCalcPlateBar}
-                                            keyboardType="numeric"
-                                            placeholder={unit === 'kg' ? '20' : '45'}
-                                        />
-                                    </View>
-                                </View>
-
-                                {plateResult && plateResult.exact.length > 0 ? (
-                                    <View className="bg-surface rounded-xl border border-iron-700 p-4">
-                                        <Text className="text-iron-500 font-bold uppercase text-xs mb-4 text-center">Por lado</Text>
-                                        <View className="flex-row items-center justify-center h-24 relative mb-4">
-                                            {/* Bar End */}
-                                            <View className="h-4 w-full absolute bg-iron-300 rounded-full" />
-
-                                            {/* Plates */}
-                                            <View className="flex-row items-center gap-1 z-10">
-                                                <View className="w-4 h-16 bg-iron-400 rounded-sm" /> {/* Collar */}
-                                                {plateResult.exact[0].perSide.map((p, i) => (
-                                                    <View key={i} className="flex-row items-center gap-0.5">
-                                                        {Array.from({ length: p.pairs }).map((_, j) => (
-                                                            <View
-                                                                key={`${i}-${j}`}
-                                                                style={{
-                                                                    height: Math.min(80, 25 + (p.plate * 1.5)),
-                                                                    width: Math.max(8, p.plate / 1.5),
-                                                                    backgroundColor: getPlateColor(p.plate),
-                                                                    borderColor: '#00000020',
-                                                                    borderWidth: 1
-                                                                }}
-                                                                className="rounded-sm"
-                                                            />
-                                                        ))}
-                                                    </View>
-                                                ))}
-                                            </View>
-                                        </View>
-
-                                        <View>
-                                            {plateResult.exact[0].perSide.map((p, idx) => (
-                                                <View key={idx} className="flex-row justify-between border-b border-iron-100 py-2">
-                                                    <View className="flex-row items-center gap-2">
-                                                        <View className="w-3 h-3 rounded-full" style={{ backgroundColor: getPlateColor(p.plate), borderWidth: 1, borderColor: '#00000020' }} />
-                                                        <Text className="text-iron-950 font-bold">{p.plate} {unit}</Text>
-                                                    </View>
-                                                    <Text className="text-iron-500 font-bold">x{p.pairs}</Text>
-                                                </View>
-                                            ))}
-                                        </View>
-                                    </View>
-                                ) : calcPlateTarget ? (
-                                    <View className="p-4 bg-iron-200 rounded-xl">
-                                        <Text className="text-iron-500 text-center">No es posible armar este peso exacto.</Text>
-                                    </View>
-                                ) : null}
-                            </View>
                         ) : (
                             <View>
-                                <View className="flex-row gap-4 mb-6">
-                                    <View className="flex-1">
-                                        <Text className="text-iron-500 mb-2">Peso corporal ({unit})</Text>
-                                        <IronInput value={bw} onChangeText={setBw} keyboardType="numeric" placeholder={unit === 'kg' ? '80' : '180'} accessibilityLabel="Ingresar peso corporal" />
+                                <Text style={s.sectionTitle}>Power Scores</Text>
+                                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={s.inputLabel}>Peso corporal ({unit})</Text>
+                                        <IronInput value={bw} onChangeText={setBw} keyboardType="numeric" placeholder={unit === 'kg' ? '80' : '180'} />
                                     </View>
-                                    <View className="flex-1">
-                                        <Text className="text-iron-500 mb-2">Total (SBD)</Text>
-                                        <IronInput value={total} onChangeText={setTotal} keyboardType="numeric" placeholder={unit === 'kg' ? '500' : '1100'} accessibilityLabel="Ingresar total SBD" />
-                                    </View>
-                                </View>
-
-                                <View className="flex-row gap-4">
-                                    <View className="flex-1 bg-iron-200 p-4 rounded-xl border border-iron-300 items-center">
-                                        <Text className="text-iron-950 font-bold text-xs uppercase mb-1">Wilks</Text>
-                                        <Text className="text-iron-950 font-black text-2xl">{Number.isFinite(wilks) ? wilks.toFixed(2) : '0.00'}</Text>
-                                    </View>
-                                    <View className="flex-1 bg-iron-200 p-4 rounded-xl border border-iron-300 items-center">
-                                        <Text className="text-iron-950 font-bold text-xs uppercase mb-1">DOTS</Text>
-                                        <Text className="text-iron-950 font-black text-2xl">{Number.isFinite(dots) ? dots.toFixed(2) : '0.00'}</Text>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={s.inputLabel}>Total SBD</Text>
+                                        <IronInput value={total} onChangeText={setTotal} keyboardType="numeric" placeholder={unit === 'kg' ? '500' : '1100'} />
                                     </View>
                                 </View>
 
-                                <Text className="text-iron-500 text-xs mt-4 text-center">
-                                    *Wilks/DOTS se calculan en kg internamente.
-                                </Text>
+                                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                                    <View style={s.scoreCard}>
+                                        <Text style={s.scoreLabel}>WILKS</Text>
+                                        <Text style={s.scoreValue}>{Number.isFinite(wilks) ? wilks.toFixed(2) : '0.00'}</Text>
+                                    </View>
+                                    <View style={s.scoreCard}>
+                                        <Text style={s.scoreLabel}>DOTS</Text>
+                                        <Text style={s.scoreValue}>{Number.isFinite(dots) ? dots.toFixed(2) : '0.00'}</Text>
+                                    </View>
+                                </View>
+
+                                <Text style={s.hintText}>*Wilks/DOTS se calculan en kg internamente.</Text>
                             </View>
                         )}
                     </ScrollView>
@@ -379,3 +197,43 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
         </Modal>
     );
 }
+
+const s = StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors.iron[900] },
+    inner: { flex: 1, padding: 16 },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    headerTitle: { fontSize: 22, fontWeight: '900', color: Colors.iron[950], letterSpacing: -0.5 },
+    headerSubtitle: { fontSize: 11, fontWeight: '600', color: Colors.iron[400], marginTop: 2 },
+    closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary.DEFAULT, justifyContent: 'center', alignItems: 'center' },
+    tabTrack: { flexDirection: 'row', backgroundColor: Colors.surface, padding: 4, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[700], marginBottom: 20 },
+    tab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
+    tabActive: { backgroundColor: Colors.primary.DEFAULT, shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2 },
+    tabText: { fontWeight: '800', fontSize: 13, color: Colors.iron[500] },
+    tabTextActive: { color: '#fff' },
+    sectionTitle: { fontSize: 17, fontWeight: '900', color: Colors.iron[950], marginBottom: 12, letterSpacing: -0.3 },
+    card: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], padding: 20, marginBottom: 20, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 },
+    cardLabel: { fontSize: 10, fontWeight: '800', color: Colors.iron[500], textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+    chipRow: { flexDirection: 'row', gap: 8 },
+    chip: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: Colors.iron[300], backgroundColor: Colors.iron[200], alignItems: 'center' },
+    chipActive: { backgroundColor: Colors.primary.DEFAULT, borderColor: Colors.primary.DEFAULT },
+    chipText: { fontWeight: '800', fontSize: 13, color: Colors.iron[500] },
+    chipTextActive: { color: '#fff' },
+    resultBox: { marginTop: 20, backgroundColor: Colors.iron[200], padding: 20, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[300], alignItems: 'center' },
+    resultLabel: { fontSize: 10, fontWeight: '800', color: Colors.iron[500], textTransform: 'uppercase', letterSpacing: 1 },
+    resultValue: { fontSize: 40, fontWeight: '900', color: Colors.iron[950], letterSpacing: -1, marginTop: 4 },
+    resultUnit: { fontSize: 12, fontWeight: '700', color: Colors.iron[400], textTransform: 'uppercase' },
+    tableCard: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], overflow: 'hidden', marginBottom: 24, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 },
+    tableHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: Colors.iron[200], borderBottomWidth: 1, borderBottomColor: Colors.iron[300] },
+    tableHeaderText: { fontSize: 10, fontWeight: '800', color: Colors.iron[500], textTransform: 'uppercase', letterSpacing: 1, flex: 1 },
+    tableRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
+    tableRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.iron[200] },
+    tablePct: { fontSize: 14, fontWeight: '700', color: Colors.iron[500] },
+    tableWeight: { fontSize: 16, fontWeight: '900', color: Colors.iron[950] },
+    inputLabel: { fontSize: 12, fontWeight: '700', color: Colors.iron[500], marginBottom: 6 },
+    hintText: { fontSize: 11, color: Colors.iron[400], marginTop: 12, fontStyle: 'italic' },
+    emptyCard: { padding: 24, backgroundColor: Colors.iron[200], borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300] },
+    emptyText: { color: Colors.iron[500], textAlign: 'center', fontSize: 13 },
+    scoreCard: { flex: 1, backgroundColor: Colors.iron[200], padding: 20, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[300], alignItems: 'center' },
+    scoreLabel: { fontSize: 10, fontWeight: '800', color: Colors.primary.DEFAULT, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
+    scoreValue: { fontSize: 28, fontWeight: '900', color: Colors.iron[950], letterSpacing: -0.5 },
+});

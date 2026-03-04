@@ -1,9 +1,10 @@
-import { IronCard } from '@/components/IronCard';
+import { EmptyChartPlaceholder } from '@/components/EmptyChartPlaceholder';
 import { ExerciseVolumeRow, VolumeSeriesPoint } from '@/src/services/AnalysisService';
 import { Colors } from '@/src/theme';
 import { useRouter } from 'expo-router';
+import { ChevronRight, Minus, TrendingDown, TrendingUp, Zap } from 'lucide-react-native';
 import React, { useMemo } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 interface AnalysisTrendsProps {
     volumeSeries: VolumeSeriesPoint[];
@@ -38,72 +39,126 @@ export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, 
         return { slopePerPoint, first, last, changePct };
     }, [volumeSeries]);
 
+    const isUp = volumeTrend.slopePerPoint > 0.01;
+    const isDown = volumeTrend.slopePerPoint < -0.01;
+
     return (
-        <View className="pb-8">
-            <View className="flex-row gap-2 mb-6">
+        <View style={{ paddingBottom: 32 }}>
+            {/* Range Selector */}
+            <View style={styles.rangeRow}>
                 {[7, 30, 90, 365].map((d) => (
                     <Pressable
                         key={d}
                         onPress={() => handleRangeChange(d as any)}
-                        className={`px-3 py-2 rounded-full border ${rangeDays === d ? 'bg-surface border-primary' : 'bg-transparent border-iron-700'}`}
+                        style={[styles.rangeChip, rangeDays === d && styles.rangeChipActive]}
                     >
-                        <Text className={`font-bold ${rangeDays === d ? 'text-primary' : 'text-iron-950'}`}>{d}D</Text>
+                        <Text style={[styles.rangeChipText, rangeDays === d && styles.rangeChipTextActive]}>
+                            {d}D
+                        </Text>
                     </Pressable>
                 ))}
             </View>
 
-            <IronCard className="mb-6">
-                <Text className="text-iron-950 font-bold text-lg mb-4">Tendencia de volumen</Text>
-                <View className="flex-row items-center justify-between">
-                    <Text className="text-iron-500 text-xs font-bold uppercase">Dirección</Text>
-                    <Text className="text-iron-950 font-black text-xl">
-                        {volumeTrend.slopePerPoint > 0.01 ? 'Subiendo 📈' : volumeTrend.slopePerPoint < -0.01 ? 'Bajando 📉' : 'Estable ➡️'}
-                    </Text>
+            {/* Volume Trend Card */}
+            <View style={styles.trendCard}>
+                <View style={styles.trendHeader}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={styles.trendAccent} />
+                        <Text style={styles.trendTitle}>Tendencia de carga</Text>
+                    </View>
                 </View>
-                <View className="flex-row items-center justify-between mt-4">
-                    <Text className="text-iron-500 text-xs font-bold uppercase">Cambio</Text>
-                    <Text className={`font-black text-xl ${volumeTrend.changePct && volumeTrend.changePct > 0 ? 'text-green-600' : volumeTrend.changePct && volumeTrend.changePct < 0 ? 'text-red-600' : 'text-iron-950'}`}>
-                        {volumeTrend.changePct == null ? '—' : `${volumeTrend.changePct >= 0 ? '+' : ''}${volumeTrend.changePct}%`}
-                    </Text>
-                </View>
-                {volumeSeries.length < 2 && (
-                    <Text className="text-iron-500 text-xs mt-4 italic">
-                        Registra más entrenamientos para ver tu tendencia.
-                    </Text>
-                )}
-            </IronCard>
 
-            <View className="mb-8">
-                <Text className="text-lg text-primary font-bold mb-4">Top ejercicios (volumen)</Text>
-                {topExercisesByVolume.length === 0 ? (
-                    <View className="bg-surface p-6 rounded-xl border border-iron-200 items-center border-dashed">
-                        <Text className="text-iron-400 font-bold mb-1">Sin datos</Text>
-                        <Text className="text-iron-300 text-xs text-center">
-                            Completa entrenamientos para ver tus ejercicios más frecuentes.
+                <View style={styles.trendGrid}>
+                    {/* Direction */}
+                    <View style={styles.trendCell}>
+                        <Text style={styles.trendCellLabel}>Dirección</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <View style={[
+                                styles.trendIconCircle,
+                                { backgroundColor: isUp ? '#dcfce7' : isDown ? '#fee2e2' : Colors.iron[200] }
+                            ]}>
+                                {isUp ? <TrendingUp size={16} color="#166534" />
+                                    : isDown ? <TrendingDown size={16} color="#991b1b" />
+                                        : <Minus size={16} color={Colors.iron[500]} />}
+                            </View>
+                            <Text style={[styles.trendCellValue, {
+                                color: isUp ? '#166534' : isDown ? '#991b1b' : Colors.iron[950]
+                            }]}>
+                                {isUp ? 'Subiendo' : isDown ? 'Bajando' : 'Estable'}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Change */}
+                    <View style={[styles.trendCell, { borderLeftWidth: 1, borderLeftColor: Colors.iron[300], paddingLeft: 16 }]}>
+                        <Text style={styles.trendCellLabel}>Cambio</Text>
+                        <Text style={[styles.trendCellValue, styles.trendChangeValue, {
+                            color: volumeTrend.changePct && volumeTrend.changePct > 0 ? '#166534'
+                                : volumeTrend.changePct && volumeTrend.changePct < 0 ? '#991b1b'
+                                    : Colors.iron[950]
+                        }]}>
+                            {volumeTrend.changePct == null ? '—' : `${volumeTrend.changePct >= 0 ? '+' : ''}${volumeTrend.changePct}%`}
                         </Text>
                     </View>
+                </View>
+
+                {volumeSeries.length < 2 && (
+                    <View style={styles.insufficientData}>
+                        <Text style={styles.insufficientDataText}>
+                            Registra más entrenamientos para ver tu tendencia.
+                        </Text>
+                    </View>
+                )}
+            </View>
+
+            {/* Top Exercises */}
+            <View style={{ marginBottom: 28 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                    <View style={{ width: 3, height: 18, borderRadius: 2, backgroundColor: Colors.primary.DEFAULT }} />
+                    <Zap size={16} color={Colors.iron[950]} />
+                    <Text style={styles.sectionTitle}>Mejores ejercicios por carga</Text>
+                </View>
+                {topExercisesByVolume.length === 0 ? (
+                    <EmptyChartPlaceholder
+                        title="Sin datos"
+                        message="Completa entrenamientos para ver tus ejercicios más frecuentes."
+                        height={140}
+                    />
                 ) : (
-                    topExercisesByVolume.map((e) => (
+                    topExercisesByVolume.map((e, idx) => (
                         <Pressable
                             key={e.exerciseId}
-                            onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: e.exerciseId, exerciseName: e.exerciseName } } as any)}
-                            className="bg-surface p-4 mb-3 rounded-xl border border-iron-700 elevation-1 active:bg-iron-200"
+                            onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: e.exerciseId, exerciseId: e.exerciseId, exerciseName: e.exerciseName } } as any)}
+                            style={[styles.exerciseCard, idx < topExercisesByVolume.length - 1 && { marginBottom: 10 }]}
                         >
-                            <View className="flex-row items-center justify-between">
-                                <View className="flex-1 pr-3">
-                                    <View className="flex-row items-center gap-2">
-                                        <View className="w-2 h-2 rounded-full" style={{ backgroundColor: e.categoryColor || Colors.iron[500] }} />
-                                        <Text className="text-iron-500 text-xs font-bold uppercase">{e.categoryName}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                {/* Rank */}
+                                <View style={styles.rankBadge}>
+                                    <Text style={styles.rankText}>{idx + 1}</Text>
+                                </View>
+
+                                {/* Info */}
+                                <View style={{ flex: 1, marginLeft: 12 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <View style={{
+                                            width: 8, height: 8, borderRadius: 4,
+                                            backgroundColor: e.categoryColor || Colors.iron[500]
+                                        }} />
+                                        <Text style={styles.exerciseCategory}>{e.categoryName}</Text>
                                     </View>
-                                    <Text className="text-iron-950 font-bold text-base mt-1">{e.exerciseName}</Text>
-                                    <Text className="text-iron-500 text-xs font-bold mt-1">{e.setCount} series</Text>
+                                    <Text style={styles.exerciseName} numberOfLines={1}>{e.exerciseName}</Text>
+                                    <Text style={styles.exerciseSets}>{e.setCount} series</Text>
                                 </View>
-                                <View>
-                                    <Text className="text-iron-950 font-black text-lg text-right">
-                                        {(e.volume / 1000).toFixed(1)}k
+
+                                {/* Volume */}
+                                <View style={{ alignItems: 'flex-end' }}>
+                                    <Text style={styles.exerciseVolume}>
+                                        {e.volume >= 1000 ? `${(e.volume / 1000).toFixed(1)}k` : Math.round(e.volume)}
                                     </Text>
-                                    <Text className="text-iron-500 text-[10px] text-right">VOL</Text>
+                                    <Text style={styles.exerciseVolUnit}>KG</Text>
                                 </View>
+
+                                <ChevronRight size={16} color={Colors.iron[400]} style={{ marginLeft: 8 }} />
                             </View>
                         </Pressable>
                     ))
@@ -112,3 +167,60 @@ export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, 
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    rangeRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
+    rangeChip: {
+        paddingHorizontal: 14, paddingVertical: 8,
+        borderRadius: 20, borderWidth: 1, borderColor: Colors.iron[700],
+    },
+    rangeChipActive: { backgroundColor: Colors.primary.DEFAULT, borderColor: Colors.primary.DEFAULT },
+    rangeChipText: { fontWeight: '800', fontSize: 13, color: Colors.iron[950] },
+    rangeChipTextActive: { color: Colors.surface },
+
+    trendCard: {
+        backgroundColor: Colors.surface, borderRadius: 16,
+        borderWidth: 1, borderColor: Colors.iron[700],
+        padding: 20, marginBottom: 24,
+        elevation: 2, shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8,
+    },
+    trendHeader: { marginBottom: 16 },
+    trendAccent: { width: 3, height: 18, borderRadius: 2, backgroundColor: Colors.primary.DEFAULT },
+    trendTitle: { fontSize: 17, fontWeight: '900', color: Colors.iron[950], letterSpacing: -0.3 },
+    trendGrid: {
+        flexDirection: 'row',
+        backgroundColor: Colors.iron[200], borderRadius: 12,
+        borderWidth: 1, borderColor: Colors.iron[300],
+        padding: 16,
+    },
+    trendCell: { flex: 1 },
+    trendCellLabel: { fontSize: 10, fontWeight: '700', color: Colors.iron[500], textTransform: 'uppercase', marginBottom: 8 },
+    trendCellValue: { fontSize: 18, fontWeight: '900', color: Colors.iron[950] },
+    trendChangeValue: { fontSize: 24, letterSpacing: -0.5 },
+    trendIconCircle: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+    insufficientData: {
+        marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.iron[300],
+    },
+    insufficientDataText: { fontSize: 12, color: Colors.iron[400], fontStyle: 'italic' },
+
+    sectionTitle: { fontSize: 17, fontWeight: '900', color: Colors.iron[950], letterSpacing: -0.3 },
+
+    exerciseCard: {
+        backgroundColor: Colors.surface, padding: 14, borderRadius: 14,
+        borderWidth: 1, borderColor: Colors.iron[700],
+        elevation: 1, shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4,
+    },
+    rankBadge: {
+        width: 28, height: 28, borderRadius: 14,
+        backgroundColor: Colors.primary.DEFAULT + '15',
+        justifyContent: 'center', alignItems: 'center',
+    },
+    rankText: { fontSize: 13, fontWeight: '900', color: Colors.primary.DEFAULT },
+    exerciseCategory: { fontSize: 10, fontWeight: '700', color: Colors.iron[500], textTransform: 'uppercase' },
+    exerciseName: { fontSize: 14, fontWeight: '700', color: Colors.iron[950], marginTop: 2 },
+    exerciseSets: { fontSize: 11, fontWeight: '600', color: Colors.iron[400], marginTop: 2 },
+    exerciseVolume: { fontSize: 18, fontWeight: '900', color: Colors.iron[950] },
+    exerciseVolUnit: { fontSize: 9, fontWeight: '700', color: Colors.iron[400], textTransform: 'uppercase' },
+});

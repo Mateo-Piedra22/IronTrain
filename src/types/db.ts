@@ -16,6 +16,7 @@ export interface Exercise {
     default_increment?: number;
     notes?: string;
     is_system: number; // 1 | 0
+    origin_id?: string;
 }
 
 export type WorkoutStatus = 'in_progress' | 'completed';
@@ -28,11 +29,11 @@ export interface Workout {
     end_time?: number; // Unix Timestamp
     notes?: string;
     status: WorkoutStatus;
-    duration?: number;
+    duration?: number; // Elapsed seconds, persisted for timer state
     is_template: number; // 1 | 0
 }
 
-export type SetType = 'normal' | 'warmup' | 'failure' | 'drop' | 'pr';
+export type SetType = 'normal' | 'warmup' | 'failure' | 'drop' | 'pr' | 'myo_reps' | 'rest_pause';
 
 export interface WorkoutSet {
     id: string; // UUID
@@ -72,6 +73,7 @@ export interface PlateInventory {
     count: number;
     type: PlateType;
     unit: 'kg' | 'lbs';
+    color?: string;
 }
 
 export interface Setting {
@@ -89,4 +91,26 @@ export interface Goal {
     type: 'exercise_weight' | 'body_weight' | 'total_volume' | 'workout_count';
     reference_id?: string; // e.g. exercise_id
     completed: number; // 0 or 1
+}
+
+export interface Routine {
+    id: string; // UUID
+    name: string;
+    description?: string;
+    is_public?: number; // 1 | 0
+}
+
+export interface RoutineDay {
+    id: string; // UUID
+    routine_id: string;
+    name: string;
+    order_index: number;
+}
+
+export interface RoutineExercise {
+    id: string; // UUID
+    routine_day_id: string;
+    exercise_id: string;
+    order_index: number;
+    notes?: string;
 }

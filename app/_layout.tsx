@@ -1,5 +1,6 @@
 import { ChangelogService } from '@/src/services/ChangelogService';
 import { Colors } from '@/src/theme';
+import NetInfo from '@react-native-community/netinfo';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
@@ -14,12 +15,16 @@ import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../components/TimerOverlay';
 import { TimerOverlay } from '../components/TimerOverlay';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { GlobalBanner } from '../components/ui/GlobalBanner';
 import { ToastContainer } from '../components/ui/ToastContainer';
 import '../global.css';
 import { configService } from '../src/services/ConfigService';
 import { dbService } from '../src/services/DatabaseService';
+import { syncService } from '../src/services/SyncService';
 import { updateService } from '../src/services/UpdateService';
+import { useAuthStore } from '../src/store/authStore';
+import { useConfirmStore } from '../src/store/confirmStore';
 import { useUpdateStore } from '../src/store/updateStore';
 import { notify } from '../src/utils/notify';
 
@@ -51,6 +56,23 @@ const IronTrainTheme = {
   },
 };
 
+function GlobalConfirmModal() {
+  const { visible, config, hide } = useConfirmStore();
+  return (
+    <ConfirmModal
+      visible={visible}
+      onClose={hide}
+      title={config.title}
+      message={config.message}
+      variant={config.variant}
+      buttons={config.buttons?.map((b: any) => ({
+        ...b,
+        onPress: b.onPress ?? hide,
+      }))}
+    />
+  );
+}
+
 export default function RootLayout() {
   const router = useRouter();
   const [dbInitialized, setDbInitialized] = useState(false);
@@ -59,15 +81,16 @@ export default function RootLayout() {
     // Add custom fonts here if required (e.g., Inter/Roboto)
   });
 
-  // Database Initialization Logic
+  // Database and Auth Initialization Logic
   useEffect(() => {
     async function initInfo() {
       try {
+        await useAuthStore.getState().initialize();
         await dbService.init();
         await configService.init();
         setDbInitialized(true);
       } catch (e) {
-        console.error('CRITICAL: Database init failed:', e);
+        console.error('CRITICAL: Initialization failed:', e);
         // In production, we should log this to a crash reporting service (Sentry)
       }
     }
@@ -81,18 +104,31 @@ export default function RootLayout() {
       const lastAppVersion = configService.get('lastViewedChangelogVersion') || '0.0.0';
       if (lastAppVersion !== '0.0.0' && currentVersion !== lastAppVersion) {
         notify.banner(
-          `¡Actualizado a v${currentVersion}! Toca para ver qué hay de nuevo. 🎉`,
+          `¡Actualizado a v${currentVersion}! Toca para ver qué hay de nuevo.`,
           'success',
           'Novedades',
           () => router.push('/changelog'),
           true
         );
       }
-      if (lastAppVersion !== currentVersion) {
-        configService.set('lastViewedChangelogVersion', currentVersion);
-      }
     }
   }, [dbInitialized, router]);
+
+  // Network Monitoring for Sync
+  useEffect(() => {
+    if (!dbInitialized) return;
+
+    const unsubscribe = NetInfo.addEventListener(state => {
+      // If we go from offline to online, trigger bidirectional sync
+      if (state.isConnected && state.isInternetReachable) {
+        syncService.syncBidirectional().catch(e => {
+          console.error('Background sync failed:', e);
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [dbInitialized]);
 
   // Splash Screen Hiding Logic
   useEffect(() => {
@@ -148,18 +184,18 @@ export default function RootLayout() {
   if (updateStatus === 'deprecated') {
     return (
       <SafeAreaProvider>
-        <View className="flex-1 bg-iron-900 items-center justify-center p-6">
+        <View style={{ flex: 1, backgroundColor: Colors.iron[900], alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <StatusBar style="light" />
-          <View className="items-center mb-8">
+          <View style={{ alignItems: 'center', marginBottom: 32 }}>
             <AlertTriangle size={64} color={Colors.primary.DEFAULT} />
-            <Text className="text-iron-950 text-2xl font-bold mt-4 text-center">
+            <Text style={{ color: Colors.iron[950], fontSize: 22, fontWeight: '900', marginTop: 16, textAlign: 'center' }}>
               Actualización Requerida
             </Text>
-            <Text className="text-iron-600 text-center mt-2 px-4">
+            <Text style={{ color: Colors.iron[500], textAlign: 'center', marginTop: 8, paddingHorizontal: 16, lineHeight: 20 }}>
               Tu versión de IronTrain es demasiado antigua y ya no es compatible. Por favor, actualiza para continuar.
             </Text>
-            <Text className="text-iron-500 text-xs mt-4 font-mono">
-              v{updateInfo.installedVersion} {'->'} v{updateInfo.latestVersion}
+            <Text style={{ color: Colors.iron[400], fontSize: 11, marginTop: 16, fontVariant: ['tabular-nums'], fontWeight: '600' }}>
+              v{updateInfo.installedVersion} {'->'}  v{updateInfo.latestVersion}
             </Text>
           </View>
 
@@ -168,10 +204,10 @@ export default function RootLayout() {
               const url = updateInfo.downloadUrl ?? updateInfo.notesUrl;
               if (url) Linking.openURL(url);
             }}
-            className="bg-primary w-full py-4 rounded-xl flex-row items-center justify-center gap-2"
+            style={{ backgroundColor: Colors.primary.DEFAULT, width: '100%', paddingVertical: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
             <Download size={20} color="white" />
-            <Text className="text-white font-bold text-lg">Descargar Actualización</Text>
+            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>Descargar Actualización</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaProvider>
@@ -184,9 +220,9 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider value={IronTrainTheme}>
           <StatusBar style="dark" backgroundColor={Colors.iron[900]} />
-          <ToastContainer />
           <GlobalBanner />
           <TimerOverlay />
+          <GlobalConfirmModal />
           <Stack
             screenOptions={{
               headerStyle: {
@@ -226,7 +262,17 @@ export default function RootLayout() {
                 headerBackTitle: 'Atrás'
               }}
             />
+            {/* Social Share Preview Modal */}
+            <Stack.Screen
+              name="share/routine/[id]"
+              options={{
+                presentation: 'modal',
+                title: 'Descargar Rutina',
+                headerBackTitle: 'Cancelar'
+              }}
+            />
           </Stack>
+          <ToastContainer />
         </ThemeProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>

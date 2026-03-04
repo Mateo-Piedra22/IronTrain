@@ -26,10 +26,10 @@ const primaryLinks = [
 
 export default function MarketingLayout({ children }: MarketingLayoutProps) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const currentDate = new Date().toLocaleDateString('es-AR', { 
-        day: '2-digit', 
-        month: '2-digit', 
-        year: 'numeric' 
+    const currentDate = new Date().toLocaleDateString('es-AR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
     });
 
     const leftPanelContent = (
@@ -53,8 +53,8 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
             <nav className="flex-1 space-y-1">
                 <div className="text-[10px] opacity-40 mb-3">━━ NAVEGACIÓN ━━</div>
                 {primaryLinks.map((item) => (
-                    <Link 
-                        key={item.code} 
+                    <Link
+                        key={item.code}
                         href={item.href}
                         className="group flex items-center justify-between py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-current"
                     >
@@ -65,24 +65,31 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
             </nav>
 
             <div className="border-t border-current pt-4 mt-6 space-y-3">
+                {/* TODO: Change this link to official stores when officially deployed to stores. Currently points to /downloads. */}
                 <Link
-                    href="https://play.google.com/store/apps/details?id=com.irontrain"
+                    href="/downloads"
                     className="block py-2 px-3 text-center border border-current hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all"
                 >
                     → DESCARGAR APP
                 </Link>
                 <Link
-                    href="https://apps.apple.com/app/irontrain"
+                    href="/downloads"
                     className="block py-2 px-3 text-center bg-[#1a1a2e] text-[#f5f1e8] hover:opacity-90 transition-opacity"
                 >
-                    ▸ APP STORE
+                    ▸ DESCARGA DIRECTA
+                </Link>
+                <Link href="/feed" className="block py-2 px-3 text-center border border-current hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all">
+                    FEED SOCIAL P2P
+                </Link>
+                <Link href="#pricing" className="block py-2 px-3 text-center border border-current hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all">
+                    PRO
                 </Link>
             </div>
 
             <div className="mt-6 pt-5 border-t border-[#1a1a2e]/10">
-                <Link 
-                    href="https://motiona.xyz" 
-                    target="_blank" 
+                <Link
+                    href="https://motiona.xyz"
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 group mb-3"
                 >
@@ -141,6 +148,9 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
                     <Link href="/privacy" className="block hover:opacity-70 transition-opacity">
                         Política de Privacidad
                     </Link>
+                    <Link href="/downloads" className="block hover:opacity-70 transition-opacity">DESCARGAS</Link>
+                    <Link href="/feed" className="block hover:opacity-70 transition-opacity">FEED P2P</Link>
+                    <Link href="#pricing" className="block hover:opacity-70 transition-opacity">PRO</Link>
                 </div>
             </div>
 
@@ -172,8 +182,8 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
             <div className="lg:hidden fixed top-0 left-0 right-0 bg-[#f5f1e8] border-b border-[#1a1a2e]/20 px-4 py-3 z-[60] flex items-center justify-between font-mono">
                 <div className="text-lg font-bold">IRONTRAIN</div>
                 <div className="flex items-center gap-2">
-                    <Link href="https://play.google.com/store" className="text-sm border border-[#1a1a2e] px-3 py-1">ANDROID</Link>
-                    <Link href="https://apps.apple.com" className="text-sm bg-[#1a1a2e] text-[#f5f1e8] px-3 py-1">iOS</Link>
+                    {/* TODO: Change this link to official stores when officially deployed to stores. Currently points to /downloads. */}
+                    <Link href="/downloads" className="text-sm border border-[#1a1a2e] px-3 py-1">DESCARGAR</Link>
                     <button
                         type="button"
                         aria-label={isMobileMenuOpen ? "Cerrar menú" : "Abrir menú"}

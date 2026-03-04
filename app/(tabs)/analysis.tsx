@@ -10,9 +10,10 @@ import { configService } from '@/src/services/ConfigService';
 import { UnitService } from '@/src/services/UnitService';
 import { workoutService } from '@/src/services/WorkoutService';
 import { Colors } from '@/src/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 
 interface RangeAnalysisState {
     summary7: WorkoutSummary | null;
@@ -50,7 +51,7 @@ const INITIAL_RANGE_STATE: RangeAnalysisState = {
 export default function AnalysisScreen() {
     const [unit, setUnit] = useState(configService.get('weightUnit'));
     const [calcVisible, setCalcVisible] = useState(false);
-    const [calcTab, setCalcTab] = useState<'oneRm' | 'warmup' | 'plates' | 'power'>('oneRm');
+    const [calcTab, setCalcTab] = useState<'oneRm' | 'warmup' | 'power'>('oneRm');
     const [coreLoading, setCoreLoading] = useState(true);
     const [rangeLoading, setRangeLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -84,6 +85,7 @@ export default function AnalysisScreen() {
     const mappedVolumeSeries = useMemo(() => {
         return rangeData.volumeSeries.map(p => ({
             value: p.volume,
+            sets: p.sets,
             label: p.label,
             dateMs: p.dateMs
         }));
@@ -104,6 +106,15 @@ export default function AnalysisScreen() {
                 heatmapData: dates,
                 streak: st
             });
+
+            // Schedule daily streak reminder based on current data
+            try {
+                const todayStart = new Date();
+                todayStart.setHours(0, 0, 0, 0);
+                const hasTrainedToday = dates.some(d => d >= todayStart.getTime());
+                const { systemNotificationService } = await import('../../src/services/SystemNotificationService');
+                systemNotificationService.scheduleStreakReminder(st.current, hasTrainedToday);
+            } catch { /* non-critical, streak notification scheduling failure should not block UI */ }
         } catch (e) {
             if (coreRequestIdRef.current !== requestId) return;
             console.error('Failed to load stats', e);
@@ -174,6 +185,29 @@ export default function AnalysisScreen() {
 
     return (
         <SafeAreaWrapper className="flex-1 bg-iron-900" edges={['top', 'left', 'right']}>
+            {/* Unified Header */}
+            <View style={{
+                flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                paddingHorizontal: 16, height: 60,
+                backgroundColor: Colors.iron[900],
+                zIndex: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 4
+            }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
+                    <Text style={{ color: Colors.iron[50], fontWeight: 'bold', fontSize: 18 }}>
+                        Análisis
+                    </Text>
+                </View>
+
+                <View style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center', pointerEvents: 'none' }}>
+                    <Image
+                        source={require('../../assets/images/icon.png')}
+                        style={{ width: 100, height: 100, resizeMode: 'contain' }}
+                    />
+                </View>
+
+                <View style={{ zIndex: 10, width: 24 }} />
+            </View>
+
             <View className="flex-1 px-4 mt-2">
                 <View style={{ height: 48, marginBottom: 16 }}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-4 px-4" contentContainerStyle={{ paddingRight: 20, alignItems: 'center' }}>
@@ -196,67 +230,74 @@ export default function AnalysisScreen() {
                     </ScrollView>
                 </View>
 
-                <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-                    {isLoading && !rangeData.summary7 ? (
-                        <View className="flex-1 justify-center items-center py-20 pb-0">
-                            <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
-                            <Text className="text-iron-500 mt-4 font-bold">Analizando datos...</Text>
-                        </View>
-                    ) : error ? (
-                        <IronCard className="mb-6 border-red-900/50 bg-red-900/10">
-                            <Text className="text-red-400 font-bold text-lg mb-2">Error de carga</Text>
-                            <Text className="text-iron-400 mb-4">{error}</Text>
-                            <Pressable onPress={loadStats} className="bg-red-900/40 px-4 py-2 rounded-lg items-center self-start">
-                                <Text className="text-red-200 font-bold">Reintentar</Text>
-                            </Pressable>
-                        </IronCard>
-                    ) : (
-                        <>
-                            {tab === 'overview' && (
-                                <AnalysisOverview
-                                    rangeDays={rangeDays}
-                                    setRangeDays={handleRangeChange}
-                                    summary7={rangeData.summary7}
-                                    streak={coreData.streak}
-                                    summaryRange={rangeData.summaryRange}
-                                    comparison={rangeData.comparison}
-                                    heatmapData={coreData.heatmapData}
-                                    volumeSeries={mappedVolumeSeries}
-                                    bucket={bucket}
-                                    categoryVolume={rangeData.categoryVolume}
-                                    cardioSummary={rangeData.cardioSummary}
-                                    repsOnlySummary={rangeData.repsOnlySummary}
-                                    weightOnlySummary={rangeData.weightOnlySummary}
-                                    unit={unit}
-                                    displayWeight={displayWeight}
-                                />
-                            )}
+                <View className="flex-1 relative">
+                    <LinearGradient
+                        colors={[Colors.iron[900], 'transparent']}
+                        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 16, zIndex: 10 }}
+                        pointerEvents="none"
+                    />
+                    <ScrollView contentContainerStyle={{ paddingBottom: 100, paddingTop: 16 }} showsVerticalScrollIndicator={false}>
+                        {isLoading && !rangeData.summary7 ? (
+                            <View className="flex-1 justify-center items-center py-20 pb-0">
+                                <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
+                                <Text className="text-iron-500 mt-4 font-bold">Analizando datos...</Text>
+                            </View>
+                        ) : error ? (
+                            <IronCard className="mb-6 border-red-900/50 bg-red-900/10">
+                                <Text className="text-red-400 font-bold text-lg mb-2">Error de carga</Text>
+                                <Text className="text-iron-400 mb-4">{error}</Text>
+                                <Pressable onPress={loadStats} className="bg-red-900/40 px-4 py-2 rounded-lg items-center self-start">
+                                    <Text className="text-red-200 font-bold">Reintentar</Text>
+                                </Pressable>
+                            </IronCard>
+                        ) : (
+                            <>
+                                {tab === 'overview' && (
+                                    <AnalysisOverview
+                                        rangeDays={rangeDays}
+                                        setRangeDays={handleRangeChange}
+                                        summary7={rangeData.summary7}
+                                        streak={coreData.streak}
+                                        summaryRange={rangeData.summaryRange}
+                                        comparison={rangeData.comparison}
+                                        heatmapData={coreData.heatmapData}
+                                        volumeSeries={mappedVolumeSeries}
+                                        bucket={bucket}
+                                        categoryVolume={rangeData.categoryVolume}
+                                        cardioSummary={rangeData.cardioSummary}
+                                        repsOnlySummary={rangeData.repsOnlySummary}
+                                        weightOnlySummary={rangeData.weightOnlySummary}
+                                        unit={unit}
+                                        displayWeight={displayWeight}
+                                    />
+                                )}
 
-                            {tab === 'trends' && (
-                                <AnalysisTrends
-                                    volumeSeries={rangeData.volumeSeries}
-                                    topExercisesByVolume={rangeData.topExercisesByVolume}
-                                    rangeDays={rangeDays}
-                                    handleRangeChange={handleRangeChange}
-                                />
-                            )}
+                                {tab === 'trends' && (
+                                    <AnalysisTrends
+                                        volumeSeries={rangeData.volumeSeries}
+                                        topExercisesByVolume={rangeData.topExercisesByVolume}
+                                        rangeDays={rangeDays}
+                                        handleRangeChange={handleRangeChange}
+                                    />
+                                )}
 
-                            {tab === 'records' && (
-                                <AnalysisRecords
-                                    oneRepMaxes={rangeData.oneRepMaxes}
-                                    rangeDays={rangeDays}
-                                />
-                            )}
+                                {tab === 'records' && (
+                                    <AnalysisRecords
+                                        oneRepMaxes={rangeData.oneRepMaxes}
+                                        rangeDays={rangeDays}
+                                    />
+                                )}
 
-                            {tab === 'tools' && (
-                                <AnalysisTools setCalcVisible={(v, t) => {
-                                    if (t) setCalcTab(t);
-                                    setCalcVisible(v);
-                                }} />
-                            )}
-                        </>
-                    )}
-                </ScrollView>
+                                {tab === 'tools' && (
+                                    <AnalysisTools setCalcVisible={(v, t) => {
+                                        if (t) setCalcTab(t);
+                                        setCalcVisible(v);
+                                    }} />
+                                )}
+                            </>
+                        )}
+                    </ScrollView>
+                </View>
             </View>
             <CalculatorsModal visible={calcVisible} onClose={() => setCalcVisible(false)} initialTab={calcTab} />
         </SafeAreaWrapper>

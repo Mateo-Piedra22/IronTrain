@@ -1,3 +1,5 @@
+import { configService } from '@/src/services/ConfigService';
+import { systemNotificationService } from '@/src/services/SystemNotificationService';
 import { useUpdateStore } from '@/src/store/updateStore';
 import Constants from 'expo-constants';
 import { AppState, AppStateStatus } from 'react-native';
@@ -46,13 +48,22 @@ class UpdateServiceManager {
         const installedVersion = Constants.expoConfig?.version ?? '0.0.0';
         useUpdateStore.getState().setUpdateInfo({ installedVersion });
 
+        // Detect version change (app updated)
+        try {
+            await configService.init();
+            const lastKnown = configService.get('lastViewedChangelogVersion');
+            if (lastKnown && lastKnown !== '0.0.0' && lastKnown !== installedVersion) {
+                systemNotificationService.showAppUpdated({ newVersion: installedVersion });
+            }
+        } catch { /* non-critical */ }
+
         // Initial check (immediate)
         await this.checkForUpdate();
 
         // Setup periodic polling check
         if (this.checkInterval) clearInterval(this.checkInterval);
         this.checkInterval = setInterval(() => {
-            if (this.currentAppState === 'active') { // Only check if active
+            if (this.currentAppState === 'active') {
                 this.checkForUpdate();
             }
         }, this.POLLING_INTERVAL);
@@ -194,8 +205,14 @@ class UpdateServiceManager {
             if (downloadUrl) {
                 useUpdateStore.getState().setStatus('update_available');
             } else {
-                useUpdateStore.getState().setStatus('update_pending'); // No direct APK yet
+                useUpdateStore.getState().setStatus('update_pending');
             }
+
+            // Fire system notification
+            systemNotificationService.showUpdateAvailable({
+                latestVersion: remoteVersion,
+                releaseDate,
+            });
         } else {
             useUpdateStore.getState().setStatus('up_to_date');
             useUpdateStore.getState().setUpdateInfo({
