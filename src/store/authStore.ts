@@ -9,9 +9,8 @@ const WEBSITE_URL = 'https://irontrain.motiona.xyz';
 
 interface UserData {
     id: string;
-    email: string;
+    email?: string;
     exp?: number;
-    [key: string]: any;
 }
 
 interface AuthState {
@@ -27,7 +26,29 @@ interface AuthState {
 
 WebBrowser.maybeCompleteAuthSession();
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+type TokenPayload = {
+    id?: string;
+    sub?: string;
+    email?: string;
+    exp?: number;
+};
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'string') return error;
+    return fallback;
+};
+
+const normalizeUserData = (payload: TokenPayload): UserData | null => {
+    const userId = payload.id ?? payload.sub;
+    if (!userId || typeof userId !== 'string' || userId.trim().length === 0) return null;
+    const email = typeof payload.email === 'string' ? payload.email : undefined;
+    return { id: userId, email, exp: payload.exp };
+};
+
+const isExpired = (exp?: number) => (typeof exp === 'number' ? exp * 1000 < Date.now() : false);
+
+export const useAuthStore = create<AuthState>((set) => ({
     token: null,
     user: null,
     isLoading: true,
@@ -38,20 +59,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             set({ isLoading: true, error: null });
             const token = await SecureStore.getItemAsync(TOKEN_KEY);
             if (token) {
-                const decoded = jwtDecode<UserData>(token);
-                // Check if expired
-                if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+                const decoded = jwtDecode<TokenPayload>(token);
+                const userData = normalizeUserData(decoded);
+                if (!userData || isExpired(userData.exp)) {
                     await SecureStore.deleteItemAsync(TOKEN_KEY);
                     set({ token: null, user: null, isLoading: false });
                     return;
                 }
-                set({ token, user: decoded, isLoading: false });
+                set({ token, user: userData, isLoading: false });
             } else {
                 set({ token: null, user: null, isLoading: false });
             }
-        } catch (e: any) {
-            console.error('Failed to initialize auth:', e);
-            set({ token: null, user: null, isLoading: false, error: e.message });
+        } catch (e: unknown) {
+            set({ token: null, user: null, isLoading: false, error: getErrorMessage(e, 'Error desconocido') });
         }
     },
 
@@ -59,29 +79,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         try {
             set({ isLoading: true, error: null });
 
-            // Create deep linking return URL
             const returnUrl = Linking.createURL('auth/callback');
 
-            // Construct auth URL for the website
             const authUrl = `${WEBSITE_URL}/auth/sign-in?redirectUri=${encodeURIComponent(returnUrl)}`;
 
-            // Open browser and wait for redirect back
             const result = await WebBrowser.openAuthSessionAsync(authUrl, returnUrl);
 
             if (result.type === 'success' && result.url) {
-                // Parse the URL to get the token query parameter
                 const parsedUrl = Linking.parse(result.url);
-                const token = parsedUrl.queryParams?.token as string;
+                const rawToken = parsedUrl.queryParams?.token;
+                const token = typeof rawToken === 'string' ? rawToken : Array.isArray(rawToken) ? rawToken[0] : undefined;
 
                 if (token) {
-                    // Valid token received
-                    const decoded = jwtDecode<UserData>(token);
+                    const decoded = jwtDecode<TokenPayload>(token);
+                    const userData = normalizeUserData(decoded);
+                    if (!userData || isExpired(userData.exp)) {
+                        throw new Error('Token inválido o expirado.');
+                    }
 
                     await SecureStore.setItemAsync(TOKEN_KEY, token);
 
                     set({
                         token,
-                        user: decoded,
+                        user: userData,
                         isLoading: false,
                         error: null
                     });
@@ -93,9 +113,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             } else {
                 throw new Error('Error de autenticación.');
             }
-        } catch (e: any) {
-            console.error('Login error:', e);
-            set({ isLoading: false, error: e.message || 'Error desconocido' });
+        } catch (e: unknown) {
+            set({ isLoading: false, error: getErrorMessage(e, 'Error desconocido') });
         }
     },
 
@@ -104,9 +123,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             set({ isLoading: true });
             await SecureStore.deleteItemAsync(TOKEN_KEY);
             set({ token: null, user: null, isLoading: false });
-        } catch (e: any) {
-            console.error('Logout error:', e);
-            set({ isLoading: false, error: e.message });
+        } catch (e: unknown) {
+            set({ isLoading: false, error: getErrorMessage(e, 'Error desconocido') });
         }
     }
 }));

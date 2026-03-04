@@ -6,6 +6,12 @@ import { dbService } from './DatabaseService';
 const API_BASE_URL = 'https://irontrain.motiona.xyz/api/sync';
 const MAX_BATCH_SIZE = 50;
 const MAX_RETRIES = 3;
+const ALLOWED_TABLES = [
+    'exercises', 'categories', 'workouts', 'workout_sets',
+    'routines', 'routine_days', 'routine_exercises',
+    'measurements', 'goals', 'plate_inventory', 'settings',
+    'body_metrics'
+];
 
 interface SyncPayload {
     id: number;
@@ -18,6 +24,24 @@ interface SyncPayload {
 
 export class SyncService {
     private isSyncing = false;
+
+    private async wait(ms: number): Promise<void> {
+        await new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    private async requestWithRetry(input: RequestInfo, init: RequestInit): Promise<Response> {
+        let lastError: unknown = null;
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            try {
+                return await fetch(input, init);
+            } catch (e) {
+                lastError = e;
+                const delay = 300 * Math.pow(2, attempt);
+                await this.wait(delay);
+            }
+        }
+        throw lastError instanceof Error ? lastError : new Error('Network error');
+    }
 
     /**
      * Executes a full bidirectional sync: Push local changes, then Pull remote changes.
@@ -62,29 +86,55 @@ export class SyncService {
                 break;
             }
 
-            // Mark processing
             const ids = pendingOps.map(op => op.id);
             await db.runAsync(`UPDATE sync_queue SET status = 'processing' WHERE id IN (${ids.map(() => '?').join(',')})`, ids);
 
             try {
-                // Prepare request payload
-                const operations = pendingOps.map(op => ({
-                    id: op.id,
-                    table: op.table_name,
-                    recordId: op.record_id,
-                    operation: op.operation,
-                    payload: op.payload ? JSON.parse(op.payload) : null,
-                    timestamp: op.created_at
-                }));
+                const validOperations: {
+                    id: number;
+                    table: string;
+                    recordId: string;
+                    operation: 'INSERT' | 'UPDATE' | 'DELETE';
+                    payload: Record<string, unknown> | null;
+                    timestamp: number;
+                }[] = [];
+                const invalidIds: number[] = [];
 
-                // Call backend (simulated here as HTTP POST)
-                const response = await fetch(`${API_BASE_URL}/push`, {
+                for (const op of pendingOps) {
+                    if (!ALLOWED_TABLES.includes(op.table_name)) {
+                        invalidIds.push(op.id);
+                        continue;
+                    }
+                    try {
+                        const parsed = op.payload ? JSON.parse(op.payload) : null;
+                        validOperations.push({
+                            id: op.id,
+                            table: op.table_name,
+                            recordId: op.record_id,
+                            operation: op.operation,
+                            payload: parsed,
+                            timestamp: op.created_at
+                        });
+                    } catch {
+                        invalidIds.push(op.id);
+                    }
+                }
+
+                if (invalidIds.length > 0) {
+                    await db.runAsync(`UPDATE sync_queue SET status = 'failed', retry_count = retry_count + 1 WHERE id IN (${invalidIds.map(() => '?').join(',')})`, invalidIds);
+                }
+
+                if (validOperations.length === 0) {
+                    continue;
+                }
+
+                const response = await this.requestWithRetry(`${API_BASE_URL}/push`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({ operations })
+                    body: JSON.stringify({ operations: validOperations })
                 });
 
                 if (!response.ok) {
@@ -93,12 +143,10 @@ export class SyncService {
 
                 const result = await response.json();
 
-                // If success, we mark them as synced
-                await db.runAsync(`UPDATE sync_queue SET status = 'synced', synced_at = ? WHERE id IN (${ids.map(() => '?').join(',')})`, [Date.now(), ...ids]);
+                await db.runAsync(`UPDATE sync_queue SET status = 'synced', synced_at = ? WHERE id IN (${validOperations.map(() => '?').join(',')})`, [Date.now(), ...validOperations.map(op => op.id)]);
             } catch (error) {
                 console.error(`Sync push error:`, error);
 
-                // If failed, increment retry_count and set back to failed
                 await db.runAsync(`UPDATE sync_queue SET status = 'failed', retry_count = retry_count + 1 WHERE id IN (${ids.map(() => '?').join(',')})`, ids);
             }
         }
@@ -115,7 +163,7 @@ export class SyncService {
         const lastSyncAt = lastSyncRecord?.value ? parseInt(lastSyncRecord.value, 10) : 0;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/pull?since=${lastSyncAt}`, {
+            const response = await this.requestWithRetry(`${API_BASE_URL}/pull?since=${lastSyncAt}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -128,13 +176,21 @@ export class SyncService {
             }
 
             const data = await response.json();
-            const changes = data.changes || []; // Array of [{table, operation, payload}]
+            const changes = Array.isArray(data?.changes) ? data.changes : [];
 
             if (changes.length > 0) {
                 await db.runAsync('BEGIN TRANSACTION');
                 try {
                     for (const change of changes) {
-                        const { table, operation, payload } = change;
+                        const table = typeof change?.table === 'string' ? change.table : null;
+                        const operation = typeof change?.operation === 'string' ? change.operation : null;
+                        const payload = change?.payload && typeof change.payload === 'object' ? change.payload : null;
+                        if (!table || !operation || !payload) {
+                            continue;
+                        }
+                        if (!ALLOWED_TABLES.includes(table)) {
+                            continue;
+                        }
 
                         if (operation === 'INSERT' || operation === 'UPDATE') {
                             const keys = Object.keys(payload);
@@ -146,7 +202,9 @@ export class SyncService {
                                 values as any
                             );
                         } else if (operation === 'DELETE') {
-                            await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, [payload.id]);
+                            if (typeof payload.id === 'string' && payload.id.length > 0) {
+                                await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, [payload.id]);
+                            }
                         }
                     }
                     await db.runAsync('COMMIT');

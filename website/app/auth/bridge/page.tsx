@@ -9,14 +9,16 @@ import { auth } from '../../../src/lib/auth/server';
 
 export const revalidate = 0;
 
-// Session helper moved to using official SDK
 async function getAuthenticatedSession() {
     const { data } = await auth.getSession();
-    if (!data) return null;
+    if (!data?.session || !data.user) return null;
+    const sessionData = data.session as { access_token?: string; token?: string } | null;
+    const token = sessionData?.access_token ?? sessionData?.token;
+    if (!token) return null;
     return {
         id: data.user.id,
         email: data.user.email,
-        token: data.session.token
+        token
     };
 }
 

@@ -75,12 +75,26 @@ export async function GET(
                 );
         }
 
+        const categoryIds = [...new Set(exercises.map(ex => ex.categoryId))];
+        let categories: typeof schema.categories.$inferSelect[] = [];
+        if (categoryIds.length > 0) {
+            categories = await db.select()
+                .from(schema.categories)
+                .where(
+                    and(
+                        inArray(schema.categories.id, categoryIds),
+                        isNull(schema.categories.deletedAt)
+                    )
+                );
+        }
+
         // Return fully packaged JSON payload for Mobile P2P consumption
         const payload = {
             routine: toSnakeCase(routine as unknown as Record<string, unknown>),
             routine_days: routineDays.map(d => toSnakeCase(d as unknown as Record<string, unknown>)),
             routine_exercises: routineExercises.map(re => toSnakeCase(re as unknown as Record<string, unknown>)),
             exercises: exercises.map(ex => toSnakeCase(ex as unknown as Record<string, unknown>)),
+            categories: categories.map(cat => toSnakeCase(cat as unknown as Record<string, unknown>)),
         };
 
         return NextResponse.json({ success: true, data: payload });

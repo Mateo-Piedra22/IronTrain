@@ -1,5 +1,6 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Linking from 'expo-linking';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import { dbService } from './DatabaseService';
@@ -23,10 +24,10 @@ interface BackupData {
 
 export const TABLE_SCHEMAS: Record<string, string[]> = {
     categories: ['id', 'name', 'is_system', 'sort_order', 'color'],
-    exercises: ['id', 'category_id', 'name', 'type', 'default_increment', 'notes', 'is_system'],
+    exercises: ['id', 'category_id', 'name', 'type', 'default_increment', 'notes', 'is_system', 'origin_id'],
     workouts: ['id', 'date', 'start_time', 'end_time', 'name', 'notes', 'status', 'duration', 'is_template'],
     workout_sets: ['id', 'workout_id', 'exercise_id', 'type', 'weight', 'reps', 'distance', 'time', 'rpe', 'order_index', 'completed', 'notes', 'superset_id'],
-    routines: ['id', 'name', 'description'],
+    routines: ['id', 'name', 'description', 'is_public'],
     routine_days: ['id', 'routine_id', 'name', 'order_index'],
     routine_exercises: ['id', 'routine_day_id', 'exercise_id', 'order_index', 'notes'],
     body_metrics: ['id', 'date', 'weight', 'body_fat', 'notes'], // Legacy table, keeping for compatibility
@@ -65,47 +66,54 @@ class BackupService {
         return await dbService.getAll(`SELECT * FROM ${tableName}`);
     }
 
+    private async buildBackupPayload(): Promise<{ backup: BackupData; json: string; fileName: string }> {
+        const categories = await this.safeGetAll('categories');
+        const exercises = await this.safeGetAll('exercises');
+        const workouts = await this.safeGetAll('workouts');
+        const workout_sets = await this.safeGetAll('workout_sets');
+        const routines = await this.safeGetAll('routines');
+        const routine_days = await this.safeGetAll('routine_days');
+        const routine_exercises = await this.safeGetAll('routine_exercises');
+        const body_metrics = await this.safeGetAll('body_metrics');
+        const settings = await this.safeGetAll('settings');
+        const measurements = await this.safeGetAll('measurements');
+        const plate_inventory = await this.safeGetAll('plate_inventory');
+        const goals = await this.safeGetAll('goals');
+
+        const backup: BackupData = {
+            version: 4,
+            timestamp: Date.now(),
+            categories,
+            exercises,
+            workouts,
+            workout_sets,
+            routines,
+            routine_days,
+            routine_exercises,
+            body_metrics,
+            settings,
+            measurements,
+            plate_inventory,
+            goals
+        };
+
+        const json = JSON.stringify(backup, null, 2);
+        const fileName = `irontrain_backup_${new Date().toISOString().split('T')[0]}.json`;
+        return { backup, json, fileName };
+    }
+
+    private async writeBackupFile(json: string, fileName: string): Promise<string> {
+        const baseDir = FileSystem.documentDirectory ?? FileSystem.cacheDirectory;
+        if (!baseDir) throw new Error('No writable directory available');
+        const filePath = `${baseDir}${fileName}`;
+        await FileSystem.writeAsStringAsync(filePath, json, { encoding: FileSystem.EncodingType.UTF8 });
+        return filePath;
+    }
+
     public async exportData(): Promise<ExportResult> {
         try {
-            const categories = await this.safeGetAll('categories');
-            const exercises = await this.safeGetAll('exercises');
-            const workouts = await this.safeGetAll('workouts');
-            const workout_sets = await this.safeGetAll('workout_sets');
-            const routines = await this.safeGetAll('routines');
-            const routine_days = await this.safeGetAll('routine_days');
-            const routine_exercises = await this.safeGetAll('routine_exercises');
-            const body_metrics = await this.safeGetAll('body_metrics');
-            const settings = await this.safeGetAll('settings');
-            const measurements = await this.safeGetAll('measurements');
-            const plate_inventory = await this.safeGetAll('plate_inventory');
-            const goals = await this.safeGetAll('goals');
-
-            const backup: BackupData = {
-                version: 4,
-                timestamp: Date.now(),
-                categories,
-                exercises,
-                workouts,
-                workout_sets,
-                routines,
-                routine_days,
-                routine_exercises,
-                body_metrics,
-                settings,
-                measurements,
-                plate_inventory,
-                goals
-            };
-
-            // 2. Wrap in JSON
-            const json = JSON.stringify(backup, null, 2);
-
-            const fileName = `irontrain_backup_${new Date().toISOString().split('T')[0]}.json`;
-            const baseDir = FileSystem.documentDirectory ?? FileSystem.cacheDirectory;
-            if (!baseDir) throw new Error('No writable directory available');
-            const filePath = `${baseDir}${fileName}`;
-
-            await FileSystem.writeAsStringAsync(filePath, json, { encoding: FileSystem.EncodingType.UTF8 });
+            const { json, fileName } = await this.buildBackupPayload();
+            const filePath = await this.writeBackupFile(json, fileName);
 
             let shared = false;
             try {
@@ -136,6 +144,29 @@ class BackupService {
             const message = (e as any)?.message ? String((e as any).message) : 'Error desconocido';
             console.error('Export Failed:', message);
             throw new Error('No se pudo exportar el backup');
+        }
+    }
+
+    public async downloadData(): Promise<string> {
+        try {
+            const { json, fileName } = await this.buildBackupPayload();
+
+            if (Platform.OS === 'android') {
+                const permission = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+                if (permission.granted) {
+                    const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(permission.directoryUri, fileName, 'application/json');
+                    await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
+                    return fileUri;
+                }
+            }
+
+            const filePath = await this.writeBackupFile(json, fileName);
+            await Linking.openURL(filePath);
+            return filePath;
+        } catch (e) {
+            const message = (e as any)?.message ? String((e as any).message) : 'Error desconocido';
+            console.error('Download Failed:', message);
+            throw new Error('No se pudo descargar el backup');
         }
     }
 

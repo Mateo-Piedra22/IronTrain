@@ -2,6 +2,49 @@ import * as SecureStore from 'expo-secure-store';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://irontrain.motiona.xyz';
 
+export interface SocialProfile {
+    id: string;
+    displayName: string | null;
+    username: string | null;
+    shareStats?: number | null;
+    isPublic?: number | null;
+    updatedAt?: string | number | Date | null;
+}
+
+export interface SocialFriend {
+    id: string;
+    friendId: string;
+    displayName: string;
+    username: string | null;
+    status: 'pending' | 'accepted' | 'blocked';
+    isSender: boolean;
+}
+
+export interface SocialInboxItem {
+    id: string;
+    senderId: string;
+    senderName: string;
+    type: 'routine';
+    payload: unknown;
+    status: 'pending' | 'accepted' | 'rejected';
+    createdAt: string | number | Date;
+}
+
+export interface SocialLeaderboardEntry {
+    id: string;
+    displayName: string;
+    score: number;
+    workouts: number;
+    routines: number;
+    shares: number;
+}
+
+export interface SocialSearchUser {
+    id: string;
+    displayName: string | null;
+    username: string | null;
+}
+
 export class SocialService {
     static async getToken(): Promise<string | null> {
         return await SecureStore.getItemAsync('irontrain_auth_token');
@@ -20,7 +63,7 @@ export class SocialService {
 
     // -- PROFILE --
 
-    static async getProfile() {
+    static async getProfile(): Promise<SocialProfile> {
         const headers = await this.getHeaders();
         const res = await fetch(`${API_URL}/api/social/profile`, { headers });
         const data = await res.json();
@@ -42,7 +85,7 @@ export class SocialService {
 
     // -- SEARCH --
 
-    static async searchUsers(query: string) {
+    static async searchUsers(query: string): Promise<SocialSearchUser[]> {
         if (!query || query.trim().length === 0) return [];
         const headers = await this.getHeaders();
         const res = await fetch(`${API_URL}/api/social/search?q=${encodeURIComponent(query.trim())}`, { headers });
@@ -53,7 +96,7 @@ export class SocialService {
 
     // -- FRIENDS --
 
-    static async getFriends() {
+    static async getFriends(): Promise<SocialFriend[]> {
         const headers = await this.getHeaders();
         const res = await fetch(`${API_URL}/api/social/friends`, { headers });
         const data = await res.json();
@@ -90,7 +133,7 @@ export class SocialService {
 
     // -- INBOX --
 
-    static async getInbox() {
+    static async getInbox(): Promise<SocialInboxItem[]> {
         const headers = await this.getHeaders();
         const res = await fetch(`${API_URL}/api/social/inbox`, { headers });
         const data = await res.json();
@@ -124,7 +167,7 @@ export class SocialService {
 
     // -- ANALYTICS --
 
-    static async getAnalytics() {
+    static async getAnalytics(): Promise<SocialLeaderboardEntry[]> {
         const headers = await this.getHeaders();
         const res = await fetch(`${API_URL}/api/social/analytics`, { headers });
         const data = await res.json();

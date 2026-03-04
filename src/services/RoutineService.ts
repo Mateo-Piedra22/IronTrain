@@ -10,6 +10,54 @@ export interface RoutineDayWithExercises extends RoutineDay {
     exercises: (RoutineExercise & { exercise_name: string; category_name?: string })[];
 }
 
+type SharedRoutinePayload = {
+    routine?: Record<string, unknown>;
+    routine_days?: Record<string, unknown>[];
+    routine_exercises?: Record<string, unknown>[];
+    exercises?: Record<string, unknown>[];
+    categories?: Record<string, unknown>[];
+};
+
+type SharedExercise = {
+    id?: unknown;
+    origin_id?: unknown;
+    name?: unknown;
+    type?: unknown;
+    default_increment?: unknown;
+    notes?: unknown;
+    category_id?: unknown;
+    category_name?: unknown;
+};
+
+type SharedRoutineDay = {
+    id?: unknown;
+    name?: unknown;
+    order_index?: unknown;
+};
+
+type SharedRoutineExercise = {
+    routine_day_id?: unknown;
+    exercise_id?: unknown;
+    order_index?: unknown;
+    notes?: unknown;
+};
+
+type SharedCategory = {
+    id?: unknown;
+    name?: unknown;
+    color?: unknown;
+    sort_order?: unknown;
+    is_system?: unknown;
+};
+
+const toArray = <T>(value: unknown): T[] => Array.isArray(value) ? value as T[] : [];
+
+const getString = (value: unknown): string | null =>
+    typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+
+const getNumber = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isFinite(value) ? value : null;
+
 class RoutineService {
     // --- ROUTINES ---
     public async getAllRoutines(): Promise<Routine[]> {
@@ -156,67 +204,177 @@ class RoutineService {
     }
 
     // --- P2P IMPORTATION ---
-    public async importSharedRoutine(payload: any): Promise<string> {
-        // payload = { routine, routine_days, routine_exercises, exercises }
-        const { routine, routine_days, routine_exercises, exercises } = payload;
+    public async importSharedRoutine(payload: SharedRoutinePayload): Promise<string> {
+        const routine = payload?.routine;
+        const routineDays = toArray<SharedRoutineDay>(payload?.routine_days);
+        const routineExercises = toArray<SharedRoutineExercise>(payload?.routine_exercises);
+        const exercises = toArray<SharedExercise>(payload?.exercises);
+        const categories = toArray<SharedCategory>(payload?.categories);
+        const routineName = getString(routine?.name) || 'Rutina importada';
+        const routineDescription = getString(routine?.description);
 
         try {
             await dbService.run('BEGIN TRANSACTION');
+            const db = dbService.getDatabase();
+
+            const ensureDefaultCategoryId = async (): Promise<string> => {
+                const existing = await db.getFirstAsync<{ id: string }>('SELECT id FROM categories ORDER BY sort_order ASC LIMIT 1');
+                if (existing?.id) return existing.id;
+                const newId = uuidV4();
+                await dbService.run('INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, ?, ?, ?)', [newId, 'General', 0, 9999, null]);
+                await dbService.queueSyncMutation('categories', newId, 'INSERT', { id: newId, name: 'General', is_system: 0, sort_order: 9999, color: null });
+                return newId;
+            };
+
+            const defaultCategoryId = await ensureDefaultCategoryId();
+            const categoryMap = new Map<string, string>();
+            const categoryNameCache = new Map<string, string>();
+
+            for (const cat of categories) {
+                const remoteId = getString(cat.id);
+                const name = getString(cat.name);
+                if (!remoteId || !name) continue;
+                const existing = await db.getFirstAsync<{ id: string }>(
+                    'SELECT id FROM categories WHERE name COLLATE NOCASE = ?',
+                    [name]
+                );
+                if (existing?.id) {
+                    categoryMap.set(remoteId, existing.id);
+                    categoryNameCache.set(name.toLowerCase(), existing.id);
+                    continue;
+                }
+                const newCatId = uuidV4();
+                const color = getString(cat.color);
+                const sortOrder = getNumber(cat.sort_order) ?? 0;
+                const isSystem = getNumber(cat.is_system) ?? 0;
+                await dbService.run(
+                    'INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, ?, ?, ?)',
+                    [newCatId, name, isSystem, sortOrder, color]
+                );
+                await dbService.queueSyncMutation('categories', newCatId, 'INSERT', {
+                    id: newCatId,
+                    name,
+                    is_system: isSystem,
+                    sort_order: sortOrder,
+                    color
+                });
+                categoryMap.set(remoteId, newCatId);
+                categoryNameCache.set(name.toLowerCase(), newCatId);
+            }
+
+            const resolveCategoryId = async (exercise: SharedExercise): Promise<string> => {
+                const remoteCategoryId = getString(exercise.category_id);
+                if (remoteCategoryId && categoryMap.has(remoteCategoryId)) {
+                    return categoryMap.get(remoteCategoryId) as string;
+                }
+                const categoryName = getString(exercise.category_name);
+                if (categoryName) {
+                    const cached = categoryNameCache.get(categoryName.toLowerCase());
+                    if (cached) return cached;
+                    const existing = await db.getFirstAsync<{ id: string }>(
+                        'SELECT id FROM categories WHERE name COLLATE NOCASE = ?',
+                        [categoryName]
+                    );
+                    if (existing?.id) {
+                        categoryNameCache.set(categoryName.toLowerCase(), existing.id);
+                        return existing.id;
+                    }
+                    const newCatId = uuidV4();
+                    await dbService.run(
+                        'INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, ?, ?, ?)',
+                        [newCatId, categoryName, 0, 9999, null]
+                    );
+                    await dbService.queueSyncMutation('categories', newCatId, 'INSERT', {
+                        id: newCatId,
+                        name: categoryName,
+                        is_system: 0,
+                        sort_order: 9999,
+                        color: null
+                    });
+                    categoryNameCache.set(categoryName.toLowerCase(), newCatId);
+                    return newCatId;
+                }
+                return defaultCategoryId;
+            };
 
             // 1. Resolve Exercises (De-duplication by origin_id or name matching)
             const exerciseMap = new Map<string, string>(); // Maps old remote ID => new local ID
             for (const ex of exercises) {
-                // Check if we have an exercise with this originId OR same name
-                const originTarget = ex.origin_id || ex.id;
-                const existing = await dbService.getDatabase().getFirstAsync<{ id: string }>(
+                const originTarget = getString(ex.origin_id) || getString(ex.id);
+                const exerciseName = getString(ex.name);
+                const remoteExerciseId = getString(ex.id);
+                if (!originTarget || !exerciseName || !remoteExerciseId) continue;
+                const existing = await db.getFirstAsync<{ id: string }>(
                     'SELECT id FROM exercises WHERE origin_id = ? OR name COLLATE NOCASE = ?',
-                    [originTarget, ex.name]
+                    [originTarget, exerciseName]
                 );
 
-                if (existing) {
-                    exerciseMap.set(ex.id, existing.id);
+                if (existing?.id) {
+                    exerciseMap.set(remoteExerciseId, existing.id);
                 } else {
+                    const categoryId = await resolveCategoryId(ex);
                     const newExId = uuidV4();
-                    // Assumes uncategorized, can be handled better if we import categories too, but lets fallback to 'uncategorized' or generic system category
-                    const defaultCat = await dbService.getDatabase().getFirstAsync<{ id: string }>('SELECT id FROM categories LIMIT 1');
+                    const exerciseType = getString(ex.type) || 'weight_reps';
+                    const defaultIncrement = getNumber(ex.default_increment) ?? 2.5;
+                    const notes = getString(ex.notes);
                     await dbService.run(
                         'INSERT INTO exercises (id, category_id, name, type, default_increment, notes, is_system, origin_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                        [newExId, defaultCat?.id || 'sys-cat-1', ex.name, ex.type, ex.default_increment, ex.notes, 0, originTarget]
+                        [newExId, categoryId, exerciseName, exerciseType, defaultIncrement, notes, 0, originTarget]
                     );
                     await dbService.queueSyncMutation('exercises', newExId, 'INSERT', {
-                        id: newExId, category_id: defaultCat?.id || 'sys-cat-1', name: ex.name, type: ex.type, default_increment: ex.default_increment, notes: ex.notes, is_system: 0, origin_id: originTarget
+                        id: newExId,
+                        category_id: categoryId,
+                        name: exerciseName,
+                        type: exerciseType,
+                        default_increment: defaultIncrement,
+                        notes,
+                        is_system: 0,
+                        origin_id: originTarget
                     });
-                    exerciseMap.set(ex.id, newExId);
+                    exerciseMap.set(remoteExerciseId, newExId);
                 }
             }
 
             // 2. Insert Routine (New ID to avoid overriding user's own if it's identical UUID)
             const newRoutineId = uuidV4();
-            await dbService.run('INSERT INTO routines (id, name, description) VALUES (?, ?, ?)', [newRoutineId, routine.name, routine.description]);
-            await dbService.queueSyncMutation('routines', newRoutineId, 'INSERT', { id: newRoutineId, name: routine.name, description: routine.description });
+            await dbService.run('INSERT INTO routines (id, name, description) VALUES (?, ?, ?)', [newRoutineId, routineName, routineDescription]);
+            await dbService.queueSyncMutation('routines', newRoutineId, 'INSERT', { id: newRoutineId, name: routineName, description: routineDescription });
 
             // 3. Insert Days
             const dayMap = new Map<string, string>();
-            for (const day of routine_days) {
+            for (const day of routineDays) {
+                const remoteDayId = getString(day.id);
+                const dayName = getString(day.name);
+                const orderIndex = getNumber(day.order_index);
+                if (!remoteDayId || !dayName || orderIndex === null) continue;
                 const newDayId = uuidV4();
-                await dbService.run('INSERT INTO routine_days (id, routine_id, name, order_index) VALUES (?, ?, ?, ?)', [newDayId, newRoutineId, day.name, day.order_index]);
-                await dbService.queueSyncMutation('routine_days', newDayId, 'INSERT', { id: newDayId, routine_id: newRoutineId, name: day.name, order_index: day.order_index });
-                dayMap.set(day.id, newDayId);
+                await dbService.run('INSERT INTO routine_days (id, routine_id, name, order_index) VALUES (?, ?, ?, ?)', [newDayId, newRoutineId, dayName, orderIndex]);
+                await dbService.queueSyncMutation('routine_days', newDayId, 'INSERT', { id: newDayId, routine_id: newRoutineId, name: dayName, order_index: orderIndex });
+                dayMap.set(remoteDayId, newDayId);
             }
 
             // 4. Insert Routine Exercises
-            for (const re of routine_exercises) {
-                const mappedDayId = dayMap.get(re.routine_day_id);
-                const mappedExId = exerciseMap.get(re.exercise_id);
+            for (const re of routineExercises) {
+                const remoteDayId = getString(re.routine_day_id);
+                const remoteExerciseId = getString(re.exercise_id);
+                const orderIndex = getNumber(re.order_index);
+                if (!remoteDayId || !remoteExerciseId || orderIndex === null) continue;
+                const mappedDayId = dayMap.get(remoteDayId);
+                const mappedExId = exerciseMap.get(remoteExerciseId);
 
                 if (mappedDayId && mappedExId) {
+                    const notes = getString(re.notes);
                     const newReId = uuidV4();
                     await dbService.run(
                         'INSERT INTO routine_exercises (id, routine_day_id, exercise_id, order_index, notes) VALUES (?, ?, ?, ?, ?)',
-                        [newReId, mappedDayId, mappedExId, re.order_index, re.notes]
+                        [newReId, mappedDayId, mappedExId, orderIndex, notes]
                     );
                     await dbService.queueSyncMutation('routine_exercises', newReId, 'INSERT', {
-                        id: newReId, routine_day_id: mappedDayId, exercise_id: mappedExId, order_index: re.order_index, notes: re.notes
+                        id: newReId,
+                        routine_day_id: mappedDayId,
+                        exercise_id: mappedExId,
+                        order_index: orderIndex,
+                        notes
                     });
                 }
             }
@@ -239,6 +397,7 @@ class RoutineService {
         const routine_days = await db.getAllAsync('SELECT * FROM routine_days WHERE routine_id = ?', [routineId]);
         let routine_exercises: any[] = [];
         let exercises: any[] = [];
+        let categories: any[] = [];
 
         if (routine_days.length > 0) {
             const dayIds = routine_days.map((d: any) => d.id);
@@ -258,7 +417,18 @@ class RoutineService {
             }
         }
 
-        return { routine, routine_days, routine_exercises, exercises };
+        if (exercises.length > 0) {
+            const categoryIds = Array.from(new Set(exercises.map((ex: any) => ex.category_id).filter(Boolean)));
+            if (categoryIds.length > 0) {
+                const categoryPlaceholders = categoryIds.map(() => '?').join(',');
+                categories = await db.getAllAsync(
+                    `SELECT * FROM categories WHERE id IN (${categoryPlaceholders})`,
+                    categoryIds
+                );
+            }
+        }
+
+        return { routine, routine_days, routine_exercises, exercises, categories };
     }
 }
 

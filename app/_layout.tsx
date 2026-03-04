@@ -77,6 +77,8 @@ export default function RootLayout() {
   const router = useRouter();
   const [dbInitialized, setDbInitialized] = useState(false);
   const updatePromptShown = useRef(false);
+  const authToken = useAuthStore((s) => s.token);
+  const lastSyncedTokenRef = useRef<string | null>(null);
   const [fontsLoaded, fontError] = useFonts({
     // Add custom fonts here if required (e.g., Inter/Roboto)
   });
@@ -96,6 +98,16 @@ export default function RootLayout() {
     }
     initInfo();
   }, []);
+
+  useEffect(() => {
+    if (!dbInitialized || !authToken) return;
+    if (lastSyncedTokenRef.current === authToken) return;
+    lastSyncedTokenRef.current = authToken;
+    dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', '0']).catch(() => null);
+    syncService.syncBidirectional().catch(() => {
+      notify.error('Sync fallido', 'No se pudo sincronizar con Neon');
+    });
+  }, [dbInitialized, authToken]);
 
   // What's new proactive banner
   useEffect(() => {

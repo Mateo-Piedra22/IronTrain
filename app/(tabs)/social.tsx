@@ -1,5 +1,6 @@
+import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { routineService } from '@/src/services/RoutineService';
-import { SocialService } from '@/src/services/SocialService';
+import { SocialFriend, SocialInboxItem, SocialLeaderboardEntry, SocialProfile, SocialSearchUser, SocialService } from '@/src/services/SocialService';
 import { useAuthStore } from '@/src/store/authStore';
 import { Colors } from '@/src/theme';
 import * as Clipboard from 'expo-clipboard';
@@ -17,16 +18,18 @@ import {
     View,
 } from 'react-native';
 
+type SocialTabKey = 'leaderboard' | 'friends' | 'inbox' | 'search';
+
 export default function SocialTab() {
-    const [profile, setProfile] = useState<any>(null);
-    const [friends, setFriends] = useState<any[]>([]);
-    const [inbox, setInbox] = useState<any[]>([]);
-    const [leaderboard, setLeaderboard] = useState<any[]>([]);
+    const [profile, setProfile] = useState<SocialProfile | null>(null);
+    const [friends, setFriends] = useState<SocialFriend[]>([]);
+    const [inbox, setInbox] = useState<SocialInboxItem[]>([]);
+    const [leaderboard, setLeaderboard] = useState<SocialLeaderboardEntry[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [searchResults, setSearchResults] = useState<SocialSearchUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [activeTab, setActiveTab] = useState<'leaderboard' | 'friends' | 'inbox' | 'search'>('leaderboard');
+    const [activeTab, setActiveTab] = useState<SocialTabKey>('leaderboard');
 
     const authState = useAuthStore();
 
@@ -100,11 +103,13 @@ export default function SocialTab() {
         }
     };
 
-    const handleInboxResponse = async (inboxId: string, action: 'accept' | 'reject', payload?: string) => {
+    const handleInboxResponse = async (inboxId: string, action: 'accept' | 'reject', payload?: unknown) => {
         try {
             if (action === 'accept' && payload) {
-                const parsed = JSON.parse(payload);
-                await routineService.importSharedRoutine(parsed);
+                const parsedPayload = typeof payload === 'string'
+                    ? JSON.parse(payload)
+                    : payload;
+                await routineService.importSharedRoutine(parsedPayload);
                 Alert.alert('Rutina importada', 'La rutina ha sido añadida a tu biblioteca local.');
             }
             await SocialService.respondInbox(inboxId, action);
@@ -117,16 +122,16 @@ export default function SocialTab() {
 
     if (!authState.token) {
         return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+            <SafeAreaWrapper style={styles.container} centered contentClassName="items-center justify-center">
                 <Text style={styles.title}>Iniciá sesión para usar IronSocial</Text>
-            </View>
+            </SafeAreaWrapper>
         );
     }
 
     const pendingInboxCount = inbox.filter(i => i.status === 'pending').length;
 
     return (
-        <View style={styles.container}>
+        <SafeAreaWrapper style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.title}>IronSocial</Text>
                 {loading && <ActivityIndicator color={Colors.primary.DEFAULT} />}
@@ -136,20 +141,18 @@ export default function SocialTab() {
                 contentContainerStyle={styles.scrollContent}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
             >
-                {/* Profile Card */}
                 {profile && (
                     <View style={styles.profileCard}>
                         <Text style={styles.profileName}>{profile.displayName}</Text>
-                        <Text style={styles.profileStats}>Rutinas Compartidas: {profile.shareStats || 0}</Text>
+                        <Text style={styles.profileStats}>Rutinas compartidas: {profile.shareStats || 0}</Text>
                         <TouchableOpacity style={styles.idBox} onPress={handleCopyId}>
                             <Text style={styles.idText} numberOfLines={1} ellipsizeMode="middle">ID: {profile.id}</Text>
-                            <Copy size={16} color={Colors.iron[400]} />
+                            <Copy size={16} color={Colors.iron[500]} />
                         </TouchableOpacity>
                     </View>
                 )}
 
-                {/* Tabs */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsMenuWrapper}>
+                <View style={styles.tabsMenuWrapper}>
                     <View style={styles.tabsMenu}>
                         <TouchableOpacity style={[styles.tabBtn, activeTab === 'leaderboard' && styles.tabBtnActive]} onPress={() => setActiveTab('leaderboard')}>
                             <Text style={[styles.tabText, activeTab === 'leaderboard' && styles.tabTextActive]}>Ranking</Text>
@@ -166,9 +169,8 @@ export default function SocialTab() {
                             <Text style={[styles.tabText, activeTab === 'search' && styles.tabTextActive]}>Buscar</Text>
                         </TouchableOpacity>
                     </View>
-                </ScrollView>
+                </View>
 
-                {/* Content */}
                 <View style={styles.tabContent}>
                     {activeTab === 'leaderboard' && (
                         <View>
@@ -177,13 +179,13 @@ export default function SocialTab() {
                             ) : (
                                 leaderboard.map((user, i) => (
                                     <View key={user.id} style={[styles.friendRow, user.id === profile?.id && styles.highlightRow]}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                        <View style={styles.rankRow}>
                                             <Text style={[styles.rankNumber, { color: i === 0 ? '#ffd700' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : Colors.iron[500] }]}>
                                                 {i + 1}
                                             </Text>
                                             <View>
                                                 <Text style={styles.friendName}>{user.id === profile?.id ? 'Tú' : user.displayName}</Text>
-                                                <Text style={styles.friendStatus}>IronScore: {user.score}</Text>
+                                                <Text style={styles.friendStatus}>IronScore {user.score}</Text>
                                             </View>
                                         </View>
                                     </View>
@@ -241,7 +243,7 @@ export default function SocialTab() {
                                                     <Text style={styles.btnSmallText}>Importar</Text>
                                                 </TouchableOpacity>
                                                 <TouchableOpacity style={styles.btnSmallReject} onPress={() => handleInboxResponse(item.id, 'reject')}>
-                                                    <Text style={styles.btnSmallText}>X</Text>
+                                                    <Text style={styles.btnSmallTextReject}>Rechazar</Text>
                                                 </TouchableOpacity>
                                             </View>
                                         ) : (
@@ -259,7 +261,7 @@ export default function SocialTab() {
                                 <TextInput
                                     style={styles.searchInput}
                                     placeholder="Buscar por ID o username..."
-                                    placeholderTextColor={Colors.iron[600]}
+                                    placeholderTextColor={Colors.iron[500]}
                                     value={searchQuery}
                                     onChangeText={setSearchQuery}
                                     autoCapitalize="none"
@@ -289,19 +291,19 @@ export default function SocialTab() {
                     )}
                 </View>
             </ScrollView>
-        </View>
+        </SafeAreaWrapper>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.iron[900],
-        paddingTop: 60,
+        backgroundColor: Colors.background,
     },
     header: {
         paddingHorizontal: 20,
-        marginBottom: 20,
+        paddingTop: 12,
+        marginBottom: 16,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -316,11 +318,11 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     profileCard: {
-        backgroundColor: Colors.iron[900],
+        backgroundColor: Colors.surface,
         padding: 20,
-        borderRadius: 12,
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: Colors.iron[300],
+        borderColor: Colors.iron[700],
         marginBottom: 24,
     },
     profileName: {
@@ -331,7 +333,7 @@ const styles = StyleSheet.create({
     },
     profileStats: {
         fontSize: 14,
-        color: Colors.iron[400],
+        color: Colors.iron[500],
         marginBottom: 16,
     },
     idBox: {
@@ -340,9 +342,9 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         backgroundColor: Colors.iron[950],
         padding: 12,
-        borderRadius: 8,
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: Colors.iron[300],
+        borderColor: Colors.iron[700],
     },
     idText: {
         color: Colors.iron[400],
@@ -352,33 +354,37 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     tabsMenuWrapper: {
-        marginBottom: 16,
+        marginBottom: 20,
     },
     tabsMenu: {
         flexDirection: 'row',
-        backgroundColor: Colors.iron[900],
-        borderRadius: 8,
-        padding: 4,
+        backgroundColor: Colors.surface,
+        borderRadius: 14,
+        padding: 6,
         borderWidth: 1,
-        borderColor: Colors.iron[300],
+        borderColor: Colors.iron[700],
+        gap: 6,
     },
     tabBtn: {
-        paddingHorizontal: 16,
+        flex: 1,
+        paddingHorizontal: 10,
         paddingVertical: 10,
-        borderRadius: 6,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
     },
     tabBtnActive: {
-        backgroundColor: Colors.iron[800],
+        backgroundColor: Colors.primary.DEFAULT,
     },
     tabText: {
-        color: Colors.iron[400],
-        fontWeight: '600',
-        fontSize: 14,
+        color: Colors.iron[500],
+        fontWeight: '800',
+        fontSize: 12,
+        letterSpacing: 0.6,
+        textTransform: 'uppercase',
     },
     tabTextActive: {
-        color: Colors.primary.DEFAULT,
+        color: Colors.white,
     },
     tabContent: {
         minHeight: 200,
@@ -393,16 +399,21 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: Colors.iron[900],
+        backgroundColor: Colors.surface,
         padding: 16,
-        borderRadius: 8,
+        borderRadius: 14,
         marginBottom: 8,
         borderWidth: 1,
-        borderColor: Colors.iron[300],
+        borderColor: Colors.iron[700],
     },
     highlightRow: {
         borderColor: Colors.primary.DEFAULT,
         borderWidth: 2,
+    },
+    rankRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
     },
     friendName: {
         color: Colors.iron[950],
@@ -427,16 +438,22 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.primary.DEFAULT,
         paddingHorizontal: 12,
         paddingVertical: 8,
-        borderRadius: 6,
+        borderRadius: 10,
     },
     btnSmallReject: {
-        backgroundColor: Colors.iron[300],
+        backgroundColor: Colors.iron[700],
         paddingHorizontal: 12,
         paddingVertical: 8,
-        borderRadius: 6,
+        borderRadius: 10,
     },
     btnSmallText: {
-        color: '#fff',
+        color: Colors.white,
+        fontWeight: '900',
+        fontSize: 12,
+        textTransform: 'uppercase',
+    },
+    btnSmallTextReject: {
+        color: Colors.iron[950],
         fontWeight: '900',
         fontSize: 12,
         textTransform: 'uppercase',
@@ -448,19 +465,19 @@ const styles = StyleSheet.create({
     },
     searchInput: {
         flex: 1,
-        backgroundColor: Colors.iron[900],
+        backgroundColor: Colors.surface,
         borderWidth: 1,
-        borderColor: Colors.iron[300],
+        borderColor: Colors.iron[700],
         paddingHorizontal: 16,
         paddingVertical: 12,
-        borderRadius: 8,
+        borderRadius: 12,
         color: Colors.iron[950],
     },
     searchBtn: {
         backgroundColor: Colors.primary.DEFAULT,
         justifyContent: 'center',
         paddingHorizontal: 20,
-        borderRadius: 8,
+        borderRadius: 12,
     },
     searchBtnText: {
         color: '#fff',

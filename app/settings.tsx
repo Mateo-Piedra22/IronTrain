@@ -113,6 +113,15 @@ export default function SettingsScreen() {
         } catch (e: any) { notify.error('Error al exportar', e?.message || 'No se pudo crear el archivo de respaldo.'); }
     };
 
+    const handleDownloadBackup = async () => {
+        try {
+            await backupService.downloadData();
+            notify.success('Backup descargado', 'El archivo JSON fue guardado correctamente.');
+        } catch (e: any) {
+            notify.error('Error al descargar', e?.message || 'No se pudo descargar el backup.');
+        }
+    };
+
     const handleCloudSnapshot = async () => {
         try {
             notify.info('Sincronizando nube...', 'Calculando reconciliación de datos local-nube, esto puede tardar unos segundos.');
@@ -535,6 +544,14 @@ export default function SettingsScreen() {
                         <View style={s.settingLeft}>
                             <View style={s.settingIconCircle}><Database size={16} color={Colors.primary.DEFAULT} /></View>
                             <Text style={s.settingLabel}>Exportar backup (JSON)</Text>
+                        </View>
+                        <ChevronRight size={16} color={Colors.iron[400]} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={handleDownloadBackup} style={[s.settingRow, s.settingRowBorder]}>
+                        <View style={s.settingLeft}>
+                            <View style={s.settingIconCircle}><Download size={16} color={Colors.primary.DEFAULT} /></View>
+                            <Text style={s.settingLabel}>Descargar backup (JSON)</Text>
                         </View>
                         <ChevronRight size={16} color={Colors.iron[400]} />
                     </TouchableOpacity>

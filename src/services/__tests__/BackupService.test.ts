@@ -1,5 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 import { backupService } from '../BackupService';
 import { dbService } from '../DatabaseService';
 
@@ -19,10 +21,18 @@ jest.mock('expo-file-system/legacy', () => ({
   cacheDirectory: 'file:///cache/',
   EncodingType: { UTF8: 'utf8' },
   getContentUriAsync: jest.fn(),
+  StorageAccessFramework: {
+    requestDirectoryPermissionsAsync: jest.fn(),
+    createFileAsync: jest.fn(),
+  },
 }));
 
 jest.mock('expo-document-picker', () => ({
   getDocumentAsync: jest.fn(),
+}));
+
+jest.mock('expo-linking', () => ({
+  openURL: jest.fn(),
 }));
 
 jest.mock('expo-sharing', () => ({
@@ -109,6 +119,25 @@ describe('BackupService', () => {
       const calls = (dbService.run as jest.Mock).mock.calls;
       const hackCall = calls.find(call => call[0].includes('hack_table'));
       expect(hackCall).toBeUndefined();
+    });
+  });
+
+  describe('downloadData', () => {
+    it('should write backup using StorageAccessFramework when granted', async () => {
+      Object.defineProperty(Platform, 'OS', { value: 'android' });
+      (FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync as jest.Mock).mockResolvedValue({
+        granted: true,
+        directoryUri: 'content://downloads',
+      });
+      (FileSystem.StorageAccessFramework.createFileAsync as jest.Mock).mockResolvedValue('content://downloads/backup.json');
+      (dbService.getAll as jest.Mock).mockResolvedValue([]);
+
+      await backupService.downloadData();
+
+      expect(FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync).toHaveBeenCalled();
+      expect(FileSystem.StorageAccessFramework.createFileAsync).toHaveBeenCalled();
+      expect(FileSystem.writeAsStringAsync).toHaveBeenCalled();
+      expect(Linking.openURL).not.toHaveBeenCalled();
     });
   });
 });

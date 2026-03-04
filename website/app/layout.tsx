@@ -82,7 +82,7 @@ export default function RootLayout({
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
             </head>
             <body className="min-h-screen antialiased" data-brand="irontrain">
-                <NeonAuthUIProvider authClient={authClient as any} redirectTo="/account/settings" emailOTP>
+                <NeonAuthUIProvider authClient={authClient as any} redirectTo="/auth/bridge" emailOTP>
                     {children}
                 </NeonAuthUIProvider>
             </body>
