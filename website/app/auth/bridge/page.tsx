@@ -41,22 +41,10 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
     const redirectUri = cookieStore.get('redirect_uri')?.value;
 
     const profileResult = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, session.id));
-    let profile = profileResult[0];
+    const profile = profileResult[0];
 
-    if (!profile) {
-        // Use name from session if available, otherwise default to 'Atleta Iron'
-        await db.insert(schema.userProfiles).values({
-            id: session.id,
-            displayName: session.name || 'Atleta Iron',
-            isPublic: 1,
-            updatedAt: new Date(),
-        }).onConflictDoNothing();
-        const newProfile = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, session.id));
-        profile = newProfile[0];
-    }
-
-    // ONBOARDING STEP: Set Username
-    if (!profile.username) {
+    // ONBOARDING STEP: Set Identity if no profile or no username exists
+    if (!profile || !profile.username) {
         async function setUsernameAction(formData: FormData) {
             'use server';
             const sessionId = session?.id;
@@ -69,6 +57,7 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
 
             // Rules
             if (username.length < 3 || username.length > 20) return redirect('/auth/bridge?error=Debe_tener_entre_3_y_20_caracteres');
+            // Valid pattern: lowercase, numbers, and underscores (e.g. "mateo_fitness")
             if (!/^[a-z0-9_]+$/.test(username)) return redirect('/auth/bridge?error=Solo_minusculas_numeros_y_guiones');
 
             const blacklist = ['admin', 'irontrain', 'motiona', 'put', 'mierd', 'fuck', 'shit', 'bitch', 'conch', 'verg', 'pij', 'bolud', 'pelotud', 'trol', 'sex', 'porn'];
@@ -81,12 +70,23 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
             // Get display name from form
             const displayName = formData.get('display_name') as string;
 
-            // Update with both username and display name
-            await db.update(schema.userProfiles).set({
-                username,
-                displayName: displayName?.trim() || profile.displayName || 'Atleta Iron',
-                updatedAt: new Date()
-            }).where(eq(schema.userProfiles.id, sessionId));
+            // Create or update profile with both username and display name
+            // By doing this only here, we ensure the account isn't 'created' in our DB until after the setup
+            if (!profile) {
+                await db.insert(schema.userProfiles).values({
+                    id: sessionId,
+                    username,
+                    displayName: displayName?.trim() || session.name || 'Atleta Iron',
+                    isPublic: 1,
+                    updatedAt: new Date()
+                });
+            } else {
+                await db.update(schema.userProfiles).set({
+                    username,
+                    displayName: displayName?.trim() || profile.displayName || 'Atleta Iron',
+                    updatedAt: new Date()
+                }).where(eq(schema.userProfiles.id, sessionId));
+            }
 
             // Re-run bridge logic
             redirect('/auth/bridge');
@@ -120,7 +120,7 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
                                         required
                                         minLength={1}
                                         maxLength={50}
-                                        defaultValue={profile.displayName || ''}
+                                        defaultValue={profile?.displayName || session.name || ''}
                                         placeholder="Tu nombre"
                                         className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-4 py-4 text-sm font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20 transition-all"
                                     />
@@ -140,7 +140,7 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
                                         required
                                         minLength={3}
                                         maxLength={20}
-                                        pattern="^[a-z0-9_]+$"
+                                        pattern="[a-z0-9_]+"
                                         title="Solo letras minúsculas, números y guiones bajos (3-20 caracteres)"
                                         placeholder="atleta_iron"
                                         className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl pl-10 pr-4 py-4 text-sm font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20 transition-all lowercase"
