@@ -173,7 +173,6 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
 
     // NORMAL SUCCESS / REDIRECT BRIDGE
     if (redirectUri) {
-        cookieStore.delete('redirect_uri');
         const appUrl = `${redirectUri}${redirectUri.includes('?') ? '&' : '?'}token=${session.token}`;
 
         return (
@@ -189,7 +188,7 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
                     <div className="space-y-3">
                         <h1 className="text-4xl font-black tracking-tighter uppercase italic">¡Acceso Concedido!</h1>
                         <p className="text-sm opacity-50 max-w-[280px] mx-auto leading-relaxed">
-                            @{profile.username} ha sido sincronizado. Volviendo a la terminal de IronTrain...
+                            {profile.username ? `@${profile.username} ha sido sincronizado.` : 'Tu cuenta ha sido sincronizada.'} Volviendo a la terminal de IronTrain...
                         </p>
                     </div>
 
@@ -207,7 +206,12 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
                         </p>
                     </div>
 
-                    <script dangerouslySetInnerHTML={{ __html: `setTimeout(() => { window.location.href = "${appUrl}"; }, 1000);` }} />
+                    <script dangerouslySetInnerHTML={{
+                        __html: `
+                        // Clear cookie via document.cookie since we can't do it on server during render
+                        document.cookie = "redirect_uri=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                        setTimeout(() => { window.location.href = "${appUrl}"; }, 1500);
+                    ` }} />
                 </div>
             </div>
         );

@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, ArrowRight, Check, Loader2, Lock, Mail, User } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Check, Eye, EyeOff, Loader2, Lock, Mail, User } from 'lucide-react';
 import { useState } from 'react';
 import { authClient } from '../../../src/lib/auth/client';
 import { createProfileAfterSignUp } from '../actions';
@@ -10,6 +10,7 @@ export function SignUpFlow() {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     // Form states
     const [email, setEmail] = useState('');
@@ -57,7 +58,6 @@ export function SignUpFlow() {
             }
 
             // STEP 2: Create Profile in our DB
-            // We wait a bit or just call it since signUp usually sets the session
             const profileResult = await createProfileAfterSignUp(cleanUser, displayName || name);
             if (profileResult.error) {
                 setError(profileResult.error);
@@ -132,14 +132,21 @@ export function SignUpFlow() {
                         <div className="relative">
                             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 opacity-30" />
                             <input
-                                type="password"
+                                type={showPassword ? 'text' : 'password'}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="••••••••"
                                 required
                                 minLength={8}
-                                className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-[1rem] pl-12 pr-4 py-4 text-sm font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20 transition-all"
+                                className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-[1rem] pl-12 pr-12 py-4 text-sm font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20 transition-all"
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:opacity-70 transition-opacity"
+                            >
+                                {showPassword ? <EyeOff className="w-4 h-4 opacity-30" /> : <Eye className="w-4 h-4 opacity-30" />}
+                            </button>
                         </div>
                     </div>
 

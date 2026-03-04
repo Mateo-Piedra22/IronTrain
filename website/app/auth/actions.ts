@@ -38,3 +38,12 @@ export async function createProfileAfterSignUp(username: string, displayName: st
         return { error: 'Error al guardar el perfil' };
     }
 }
+
+/**
+ * Safely clears the redirect cookie from a server action context
+ */
+export async function clearRedirectCookie() {
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    cookieStore.delete('redirect_uri');
+}
