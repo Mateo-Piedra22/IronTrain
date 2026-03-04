@@ -1,11 +1,12 @@
-import { dbService } from '../DatabaseService';
 import { CategoryService } from '../CategoryService';
+import { dbService } from '../DatabaseService';
 
 jest.mock('../DatabaseService', () => ({
   dbService: {
     run: jest.fn(),
     getAll: jest.fn(),
     getFirst: jest.fn(),
+    queueSyncMutation: jest.fn(),
   },
 }));
 

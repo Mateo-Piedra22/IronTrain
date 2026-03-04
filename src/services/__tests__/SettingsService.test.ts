@@ -1,5 +1,5 @@
-import { SettingsService } from '../SettingsService';
 import { dbService } from '../DatabaseService';
+import { SettingsService } from '../SettingsService';
 
 jest.mock('../DatabaseService', () => ({
   dbService: {
@@ -27,8 +27,8 @@ describe('SettingsService', () => {
       .filter((c) => String(c[0]).startsWith('INSERT INTO plate_inventory'));
 
     expect(calls.length).toBe(2);
-    expect(calls[0][1]).toEqual([20, 2, 'standard', 'kg']);
-    expect(calls[1][1]).toEqual([20, 2, 'standard', 'lbs']);
+    expect(calls[0][1]).toEqual([20, 2, 'standard', 'kg', null]);
+    expect(calls[1][1]).toEqual([20, 2, 'standard', 'lbs', null]);
   });
 });
 

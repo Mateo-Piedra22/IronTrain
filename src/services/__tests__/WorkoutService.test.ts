@@ -6,6 +6,7 @@ jest.mock('../DatabaseService', () => ({
   dbService: {
     run: jest.fn(),
     getAll: jest.fn(),
+    queueSyncMutation: jest.fn(),
     getWorkoutById: jest.fn(),
     getWorkoutByDate: jest.fn(),
     createWorkout: jest.fn(),
@@ -191,7 +192,7 @@ describe('WorkoutService', () => {
 
   describe('finishWorkout', () => {
     it('should mark workout as completed and set end_time', async () => {
-        // @ts-ignore
+      // @ts-ignore
       (dbService.getWorkoutById as jest.Mock).mockResolvedValue({ id: 'w1', status: 'in_progress' });
 
       await workoutService.finishWorkout('w1');
@@ -203,7 +204,7 @@ describe('WorkoutService', () => {
     });
 
     it('should do nothing if already completed', async () => {
-        // @ts-ignore
+      // @ts-ignore
       (dbService.getWorkoutById as jest.Mock).mockResolvedValue({ id: 'w1', status: 'completed' });
 
       await workoutService.finishWorkout('w1');

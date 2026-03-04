@@ -115,7 +115,7 @@ describe('AnalysisService', () => {
   describe('getCategoryVolume', () => {
     it('should round volumes', async () => {
       (dbService.getAll as jest.Mock).mockResolvedValueOnce([
-        { categoryId: 'c1', categoryName: 'Pecho', categoryColor: '#fff', volume: 1234.6, setCount: 12 },
+        { categoryId: 'c1', categoryName: 'Pecho', categoryColor: '#fff', volume: 1234.6, total_sets: 12 },
       ]);
 
       const rows = await AnalysisService.getCategoryVolume(30, 6);
@@ -128,7 +128,7 @@ describe('AnalysisService', () => {
   describe('getTopExercisesByVolume', () => {
     it('should round volumes and return exercises', async () => {
       (dbService.getAll as jest.Mock).mockResolvedValueOnce([
-        { exerciseId: 'e1', exerciseName: 'Bench', categoryName: 'Pecho', categoryColor: '#fff', volume: 1000.4, setCount: 9 },
+        { exerciseId: 'e1', exerciseName: 'Bench', categoryName: 'Pecho', categoryColor: '#fff', volume: 1000.4, total_sets: 9 },
       ]);
 
       const rows = await AnalysisService.getTopExercisesByVolume(30, 8);

@@ -13,3 +13,12 @@ jest.mock('@notifee/react-native', () => ({
     TriggerType: { TIMESTAMP: 0 },
     AuthorizationStatus: { AUTHORIZED: 1, DENIED: 0, PROVISIONAL: 2, NOT_DETERMINED: -1 },
 }));
+
+jest.mock('expo-av', () => ({
+    Audio: {
+        Sound: {
+            createAsync: jest.fn(() => Promise.resolve({ sound: { playAsync: jest.fn(), unloadAsync: jest.fn() } })),
+        },
+        setAudioModeAsync: jest.fn(),
+    },
+}));

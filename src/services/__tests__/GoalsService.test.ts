@@ -5,6 +5,7 @@ jest.mock('../DatabaseService', () => ({
   dbService: {
     run: jest.fn(),
     getAll: jest.fn(),
+    queueSyncMutation: jest.fn(),
   },
 }));
 
