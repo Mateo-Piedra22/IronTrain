@@ -63,7 +63,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             const returnUrl = Linking.createURL('auth/callback');
 
             // Construct auth URL for the website
-            const authUrl = `${WEBSITE_URL}/auth/login?redirectUri=${encodeURIComponent(returnUrl)}`;
+            const authUrl = `${WEBSITE_URL}/auth/sign-in?redirectUri=${encodeURIComponent(returnUrl)}`;
 
             // Open browser and wait for redirect back
             const result = await WebBrowser.openAuthSessionAsync(authUrl, returnUrl);

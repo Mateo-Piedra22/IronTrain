@@ -141,7 +141,7 @@ export default async function AdminPanel() {
             </div>
 
             <div className="mt-8 text-xs opacity-40 text-center uppercase tracking-widest">
-                IronHub &bull; Zero Trust Moderation Engine
+                IronTrain &bull; Zero Trust Moderation Engine
             </div>
         </div>
     );

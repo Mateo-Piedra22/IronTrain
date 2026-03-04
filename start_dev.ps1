@@ -62,7 +62,8 @@ if (-not $scrcpyPath) {
 if ($scrcpyPath) {
     Write-Host "Starting screen mirroring (scrcpy)..."
     Start-Process $scrcpyPath -ArgumentList "-s $serial" -WindowStyle Hidden
-} else {
+}
+else {
     Write-Host "scrcpy not found. Installing via winget so you can see your phone on PC..."
     try {
         winget install --id Genymobile.scrcpy --silent --accept-package-agreements --accept-source-agreements
@@ -73,21 +74,24 @@ if ($scrcpyPath) {
             Write-Host "Installation successful! Starting screen mirroring..."
             $scrcpyPath = $scrcpyExe.FullName
             Start-Process $scrcpyPath -ArgumentList "-s $serial" -WindowStyle Hidden
-        } else {
+        }
+        else {
             Write-Host "Warning: Could not automatically locate scrcpy after install."
         }
-    } catch {
+    }
+    catch {
         Write-Host "Failed to install scrcpy automatically. Screen mirroring won't be available."
     }
 }
 
 # 4. Start Expo Native Build
-Write-Host "Creating Junction to resolve CMake MAX_PATH (260 characters) limits..."
-$junctionPath = "C:\IronTrain"
+Write-Host "Creating Short-Path Junction to bypass CMake MAX_PATH (260 characters) limits..."
+$junctionPath = "C:\IT"
 if (Test-Path $junctionPath) {
+    # If it's a junction, we must use rmdir to remove it properly on Windows
     cmd /c rmdir $junctionPath
 }
-cmd /c mklink /J $junctionPath . | Out-Null
+cmd /c mklink /J $junctionPath $PSScriptRoot | Out-Null
 
 Write-Host "Starting IronTrain (Native Build) from Short-Path root ($junctionPath)..."
 Set-Location $junctionPath
@@ -95,5 +99,6 @@ npx expo run:android
 
 # 5. Cleanup
 Set-Location "$PSScriptRoot"
+# Only remove the junction, not the content
 cmd /c rmdir $junctionPath | Out-Null
 Write-Host "Development Session Ended."

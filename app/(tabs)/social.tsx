@@ -296,7 +296,7 @@ export default function SocialTab() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.iron[950],
+        backgroundColor: Colors.iron[900],
         paddingTop: 60,
     },
     header: {
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: Colors.iron[50],
+        color: Colors.iron[950],
     },
     scrollContent: {
         paddingHorizontal: 20,
@@ -320,13 +320,13 @@ const styles = StyleSheet.create({
         padding: 20,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: Colors.iron[800],
+        borderColor: Colors.iron[300],
         marginBottom: 24,
     },
     profileName: {
         fontSize: 22,
         fontWeight: 'bold',
-        color: Colors.iron[100],
+        color: Colors.iron[950],
         marginBottom: 4,
     },
     profileStats: {
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
         padding: 12,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: Colors.iron[800],
+        borderColor: Colors.iron[300],
     },
     idText: {
         color: Colors.iron[400],
@@ -359,6 +359,8 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.iron[900],
         borderRadius: 8,
         padding: 4,
+        borderWidth: 1,
+        borderColor: Colors.iron[300],
     },
     tabBtn: {
         paddingHorizontal: 16,
@@ -396,14 +398,14 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         marginBottom: 8,
         borderWidth: 1,
-        borderColor: Colors.iron[800],
+        borderColor: Colors.iron[300],
     },
     highlightRow: {
         borderColor: Colors.primary.DEFAULT,
         borderWidth: 2,
     },
     friendName: {
-        color: Colors.iron[100],
+        color: Colors.iron[950],
         fontSize: 16,
         fontWeight: '600',
         marginBottom: 4,
@@ -428,15 +430,16 @@ const styles = StyleSheet.create({
         borderRadius: 6,
     },
     btnSmallReject: {
-        backgroundColor: Colors.iron[800],
+        backgroundColor: Colors.iron[300],
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: 6,
     },
     btnSmallText: {
         color: '#fff',
-        fontWeight: 'bold',
+        fontWeight: '900',
         fontSize: 12,
+        textTransform: 'uppercase',
     },
     searchBox: {
         flexDirection: 'row',
@@ -447,11 +450,11 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: Colors.iron[900],
         borderWidth: 1,
-        borderColor: Colors.iron[800],
+        borderColor: Colors.iron[300],
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderRadius: 8,
-        color: Colors.iron[100],
+        color: Colors.iron[950],
     },
     searchBtn: {
         backgroundColor: Colors.primary.DEFAULT,

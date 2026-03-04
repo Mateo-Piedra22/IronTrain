@@ -29,7 +29,7 @@ export default function ShareRoutineScreen() {
 
                 if (!response.ok) {
                     if (response.status === 404) throw new Error('La rutina fue eliminada o no está disponible.');
-                    throw new Error('No se pudo establecer conexión con IronHub.');
+                    throw new Error('No se pudo establecer conexión con IronTrain.');
                 }
 
                 const responseData = await response.json();
@@ -66,7 +66,7 @@ export default function ShareRoutineScreen() {
         return (
             <View style={{ flex: 1, backgroundColor: Colors.iron[900], justifyContent: 'center', alignItems: 'center' }}>
                 <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
-                <Text style={{ marginTop: 16, color: Colors.iron[500], fontFamily: 'mono' }}>Conectando con IronHub...</Text>
+                <Text style={{ marginTop: 16, color: Colors.iron[500], fontFamily: 'mono' }}>Conectando con IronTrain...</Text>
             </View>
         );
     }

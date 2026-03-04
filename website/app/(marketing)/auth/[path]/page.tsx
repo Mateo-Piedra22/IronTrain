@@ -1,4 +1,5 @@
 import { AuthView } from '@neondatabase/auth/react';
+import { cookies } from 'next/headers';
 
 export const dynamicParams = false;
 
@@ -12,16 +13,28 @@ export function generateStaticParams() {
 }
 
 export default async function AuthPage({
-    params
+    params,
+    searchParams
 }: {
-    params: Promise<{ path: string }>
+    params: Promise<{ path: string }>;
+    searchParams: Promise<{ redirectUri?: string }>;
 }) {
     const { path } = await params;
+    const { redirectUri } = await searchParams;
+
+    if (redirectUri) {
+        (await cookies()).set('redirect_uri', redirectUri, {
+            path: '/',
+            maxAge: 600, // 10 minutes
+            httpOnly: true,
+            sameSite: 'lax',
+        });
+    }
 
     return (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)] p-6">
             <div className="w-full max-w-sm mb-8 text-center">
-                <h1 className="text-3xl font-bold tracking-tighter mb-2">Bienvenido a IronHub</h1>
+                <h1 className="text-3xl font-bold tracking-tighter mb-2">Bienvenido a IronTrain</h1>
                 <p className="text-sm opacity-60">
                     Sincroniza tus rutinas de IronTrain, descarga plantillas y conecta con la comunidad.
                 </p>

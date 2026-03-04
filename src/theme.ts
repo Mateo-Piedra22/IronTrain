@@ -1,6 +1,6 @@
 export const Colors = {
     iron: {
-        50: '#321414',
+        50: '#fffcf9',
         100: '#fcfcfc',
         200: '#fafafa',
         300: '#e0e0e0',
@@ -22,7 +22,7 @@ export const Colors = {
     red: '#ef4444',
     green: '#22c55e',
     yellow: '#d97706',
-    
+
     // Semantic
     background: '#fff7f1',
     surface: '#ffffff',

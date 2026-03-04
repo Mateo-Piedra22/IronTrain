@@ -117,7 +117,7 @@ export default function SettingsScreen() {
         try {
             notify.info('Sincronizando nube...', 'Calculando reconciliación de datos local-nube, esto puede tardar unos segundos.');
             await syncService.syncBidirectional();
-            notify.success('Sincronización completa', 'Todos los datos están respaldados en la nube Neon de IronHub de manera exitosa.');
+            notify.success('Sincronización completa', 'Todos los datos están respaldados en la nube Neon de IronTrain de manera exitosa.');
         } catch (error: any) {
             notify.error('Fallo en sincronización', error?.message || 'Revisa tu conexión o inicia sesión.');
         }
