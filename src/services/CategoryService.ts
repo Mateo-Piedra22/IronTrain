@@ -108,20 +108,17 @@ export class CategoryService {
             throw new Error('Cannot reassign to the same category');
         }
 
-        await dbService.run('BEGIN TRANSACTION');
         try {
-            await dbService.run('UPDATE exercises SET category_id = ? WHERE category_id = ?', [toCategoryId, id]);
+            await dbService.withTransaction(async () => {
+                await dbService.run('UPDATE exercises SET category_id = ? WHERE category_id = ?', [toCategoryId, id]);
 
-            // Queue exercise category updates
-            const updatedExercises = await dbService.getAll<{ id: string }>('SELECT id FROM exercises WHERE category_id = ?', [toCategoryId]);
-            // (Note: we can't easily filter ONLY the ones that were just updated if there were previous ones, but we know they end up targeting toCategoryId so it's safer to sync all or just assume bulk updates are handled if requested)
-            // Given the complexity of finding only the affected rows in SQLite after the fact, we will capture them beforehand.
+                // Queue exercise category updates
+                const updatedExercises = await dbService.getAll<{ id: string }>('SELECT id FROM exercises WHERE category_id = ?', [toCategoryId]);
 
-            await dbService.run('DELETE FROM categories WHERE id = ?', [id]);
-            await dbService.queueSyncMutation('categories', id, 'DELETE');
-            await dbService.run('COMMIT');
+                await dbService.run('DELETE FROM categories WHERE id = ?', [id]);
+                await dbService.queueSyncMutation('categories', id, 'DELETE');
+            });
         } catch (e) {
-            await dbService.run('ROLLBACK');
             throw e;
         }
     }

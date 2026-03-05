@@ -7,6 +7,7 @@ jest.mock('../DatabaseService', () => ({
     getAll: jest.fn(),
     getFirst: jest.fn(),
     queueSyncMutation: jest.fn(),
+    withTransaction: jest.fn(async (cb: () => Promise<void>) => { await cb(); }),
   },
 }));
 
@@ -37,13 +38,12 @@ describe('CategoryService', () => {
         'INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, ?, ?)',
         ['uncategorized', 'Sin categoría', 9999, '#94a3b8']
       );
-      expect(dbService.run).toHaveBeenCalledWith('BEGIN TRANSACTION');
+      expect(dbService.withTransaction).toHaveBeenCalled();
       expect(dbService.run).toHaveBeenCalledWith(
         'UPDATE exercises SET category_id = ? WHERE category_id = ?',
         ['uncategorized', 'c1']
       );
       expect(dbService.run).toHaveBeenCalledWith('DELETE FROM categories WHERE id = ?', ['c1']);
-      expect(dbService.run).toHaveBeenCalledWith('COMMIT');
     });
   });
 

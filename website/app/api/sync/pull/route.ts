@@ -66,7 +66,11 @@ export async function GET(req: NextRequest) {
                     changes.push({
                         table: tableName,
                         operation: 'DELETE',
-                        payload: { id: record.id },
+                        payload: {
+                            id: record.id,
+                            updated_at: record.updatedAt instanceof Date ? record.updatedAt.getTime() : Date.now(),
+                            deleted_at: record.deletedAt instanceof Date ? record.deletedAt.getTime() : (record.updatedAt instanceof Date ? record.updatedAt.getTime() : Date.now()),
+                        },
                     });
                 } else if (!record.deletedAt) {
                     changes.push({
@@ -78,7 +82,8 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        return NextResponse.json({ success: true, changes });
+        const serverTime = Date.now();
+        return NextResponse.json({ success: true, changes, serverTime });
 
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Internal server error';

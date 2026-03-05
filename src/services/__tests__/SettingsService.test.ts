@@ -4,10 +4,9 @@ import { SettingsService } from '../SettingsService';
 jest.mock('../DatabaseService', () => ({
   dbService: {
     run: jest.fn(),
-    getDatabase: jest.fn(() => ({
-      getAllAsync: jest.fn(),
-      getFirstAsync: jest.fn(),
-    })),
+    getAll: jest.fn(),
+    getFirst: jest.fn(),
+    withTransaction: jest.fn(async (cb: () => Promise<void>) => { await cb(); }),
   },
 }));
 
@@ -27,8 +26,8 @@ describe('SettingsService', () => {
       .filter((c) => String(c[0]).startsWith('INSERT INTO plate_inventory'));
 
     expect(calls.length).toBe(2);
-    expect(calls[0][1]).toEqual([20, 2, 'standard', 'kg', null]);
-    expect(calls[1][1]).toEqual([20, 2, 'standard', 'lbs', null]);
+    expect(calls[0][1]).toEqual([expect.any(String), 20, 2, 2, 'standard', 'kg', null]);
+    expect(calls[1][1]).toEqual([expect.any(String), 20, 2, 2, 'standard', 'lbs', null]);
   });
 });
 

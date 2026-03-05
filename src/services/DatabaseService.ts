@@ -12,33 +12,52 @@ export class DatabaseService {
     public async init(): Promise<void> {
         if (this.isInitialized) return;
         if (this.initPromise) {
-            await this.initPromise;
-            return;
+            return await this.initPromise;
         }
 
         this.initPromise = (async () => {
             try {
                 this.db = await SQLite.openDatabaseAsync(DB_NAME);
 
-                // Enable foreign keys
+                // Enable foreign keys, set busy timeout and use WAL mode for better concurrency
                 await this.db.execAsync('PRAGMA foreign_keys = ON;');
+                await this.db.execAsync('PRAGMA busy_timeout = 10000;');
+                await this.db.execAsync('PRAGMA journal_mode = WAL;');
 
-                // Create Schema
+                // Create Schema (calls runMigrations internally)
                 await this.createTables();
 
                 // Seed if empty
                 await this.seedDatabase();
 
                 this.isInitialized = true;
-
-                this.initPromise = null;
             } catch (error) {
                 console.error('[Error] Database initialization failed:', error);
-                this.initPromise = null;
                 throw error;
+            } finally {
+                this.initPromise = null;
             }
         })();
         await this.initPromise;
+    }
+
+    /**
+     * Internal check to ensure DB is initialized before any non-init query.
+     */
+    private async ensureInitialized(): Promise<void> {
+        if (this.isInitialized) return;
+
+        // If the DB is already open and we are in the middle of initialization,
+        // allow the call (likely an internal recursive call from init -> createTables -> run).
+        if (this.db && this.initPromise) {
+            return;
+        }
+
+        if (this.initPromise) {
+            await this.initPromise;
+        } else {
+            await this.init();
+        }
     }
 
     private async createTables(): Promise<void> {
@@ -136,22 +155,14 @@ export class DatabaseService {
       );
 
       CREATE TABLE IF NOT EXISTS plate_inventory (
-        weight REAL NOT NULL,
-        count INTEGER DEFAULT 0,
-        type TEXT DEFAULT 'standard',
-        unit TEXT DEFAULT 'kg',
-        color TEXT,
-        updated_at INTEGER DEFAULT 0,
-        PRIMARY KEY (weight, type, unit)
-      );
-
-      CREATE TABLE IF NOT EXISTS routines (
         id TEXT PRIMARY KEY NOT NULL,
-        name TEXT NOT NULL,
-        description TEXT,
-        is_public INTEGER DEFAULT 0,
-        updated_at INTEGER DEFAULT 0,
-        deleted_at INTEGER
+        weight REAL NOT NULL,
+        count INTEGER NOT NULL,
+        available INTEGER NOT NULL,
+        type TEXT DEFAULT 'standard',
+        unit TEXT NOT NULL,
+        color TEXT,
+        updated_at INTEGER DEFAULT 0
       );
 
       CREATE TABLE IF NOT EXISTS routine_days (
@@ -176,6 +187,15 @@ export class DatabaseService {
         FOREIGN KEY (exercise_id) REFERENCES exercises (id)
       );
 
+      CREATE TABLE IF NOT EXISTS routines (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        is_public INTEGER DEFAULT 0,
+        updated_at INTEGER DEFAULT 0,
+        deleted_at INTEGER
+      );
+
       CREATE TABLE IF NOT EXISTS sync_queue (
         id TEXT PRIMARY KEY NOT NULL,
         table_name TEXT NOT NULL,
@@ -196,13 +216,13 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_routine_exercises_day ON routine_exercises(routine_day_id);
     `;
 
-        await this.db.execAsync(schema);
+        await this.executeRaw(schema);
 
         // Safety check for settings table - ensure IT EXISTS
         try {
-            const check = await this.db.getFirstAsync<{ count: number }>("SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='settings'");
+            const check = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='settings'");
             if (!check || check.count === 0) {
-                await this.db.execAsync(`
+                await this.executeRaw(`
                     CREATE TABLE IF NOT EXISTS settings (
                         key TEXT PRIMARY KEY NOT NULL,
                         value TEXT NOT NULL,
@@ -220,46 +240,45 @@ export class DatabaseService {
     private async runMigrations(): Promise<void> {
         // Migration 0: Migrate any legacy numeric IDs to UUIDs (Critical Task 1)
         try {
-            await this.db?.execAsync('PRAGMA foreign_keys = OFF;');
-            await this.db?.withTransactionAsync(async () => {
-                // Find categories with numeric IDs
-                const numCats = await this.db?.getAllAsync<{ id: string }>("SELECT id FROM categories WHERE length(id) < 15") || [];
-                if (numCats.length > 0) {
-                    console.log('Running Critical Migration: Converting numeric IDs to UUIDs');
+            // Check if we need to migrate first to avoid taking a lock if unnecessary
+            const hasLegacy = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM categories WHERE length(id) < 15");
 
-                    await this.db?.execAsync('DELETE FROM categories WHERE length(id) < 15;');
-                    await this.db?.execAsync('DELETE FROM exercises WHERE length(id) < 15 OR length(category_id) < 15;');
-                    await this.db?.execAsync('DELETE FROM workouts WHERE length(id) < 15;');
-                    await this.db?.execAsync('DELETE FROM workout_sets WHERE length(id) < 15 OR length(workout_id) < 15 OR length(exercise_id) < 15;');
-                    await this.db?.execAsync('DELETE FROM measurements WHERE length(id) < 15;');
-                    await this.db?.execAsync('DELETE FROM goals WHERE length(id) < 15;');
-
-                    console.log('Legacy numeric data cleared for UUID consistency.');
-                }
-            });
-            await this.db?.execAsync('PRAGMA foreign_keys = ON;');
+            if (hasLegacy && hasLegacy.count > 0) {
+                console.log('Running Critical Migration: Converting numeric IDs to UUIDs');
+                await this.executeRaw('PRAGMA foreign_keys = OFF;');
+                await this.withTransaction(async () => {
+                    await this.run('DELETE FROM categories WHERE length(id) < 15;');
+                    await this.run('DELETE FROM exercises WHERE length(id) < 15 OR length(category_id) < 15;');
+                    await this.run('DELETE FROM workouts WHERE length(id) < 15;');
+                    await this.run('DELETE FROM workout_sets WHERE length(id) < 15 OR length(workout_id) < 15 OR length(exercise_id) < 15;');
+                    await this.run('DELETE FROM measurements WHERE length(id) < 15;');
+                    await this.run('DELETE FROM goals WHERE length(id) < 15;');
+                });
+                await this.executeRaw('PRAGMA foreign_keys = ON;');
+                console.log('Legacy numeric data cleared for UUID consistency.');
+            }
         } catch (e) {
             console.error('Failed to migrate numeric IDs, rolling back', e);
         }
 
         // Migration 1: Add superset_id to workout_sets if it doesn't exist
         try {
-            const result = await this.db?.getFirstAsync<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('workout_sets') WHERE name='superset_id'");
+            const result = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('workout_sets') WHERE name='superset_id'");
             if (result && result.count === 0) {
                 console.log('Running Migration: Adding superset_id to workout_sets');
-                await this.db?.execAsync('ALTER TABLE workout_sets ADD COLUMN superset_id TEXT');
+                await this.executeRaw('ALTER TABLE workout_sets ADD COLUMN superset_id TEXT');
             }
         } catch (e) {
-            console.log('Migration check failed (superset_id):', e);
+            console.warn('Migration check failed (superset_id):', e);
         }
 
         // Migration to fix goals table schema
         try {
-            const result = await this.db?.getFirstAsync<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('goals') WHERE name='title'");
+            const result = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('goals') WHERE name='title'");
             if (result && result.count === 0) {
                 console.log('Running Migration: Fixing goals table schema');
-                await this.db?.execAsync('DROP TABLE IF EXISTS goals');
-                await this.db?.execAsync(`
+                await this.executeRaw('DROP TABLE IF EXISTS goals');
+                await this.executeRaw(`
                     CREATE TABLE IF NOT EXISTS goals (
                         id TEXT PRIMARY KEY NOT NULL,
                         title TEXT NOT NULL,
@@ -281,18 +300,18 @@ export class DatabaseService {
 
         // Migration 2: Add rpe to workout_sets if it doesn't exist (Legacy DB support)
         try {
-            const result = await this.db?.getFirstAsync<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('workout_sets') WHERE name='rpe'");
+            const result = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('workout_sets') WHERE name='rpe'");
             if (result && result.count === 0) {
                 console.log('Running Migration: Adding rpe to workout_sets');
-                await this.db?.execAsync('ALTER TABLE workout_sets ADD COLUMN rpe REAL');
+                await this.executeRaw('ALTER TABLE workout_sets ADD COLUMN rpe REAL');
             }
         } catch (e) {
-            console.log('Migration check failed (rpe):', e);
+            console.warn('Migration check failed (rpe):', e);
         }
 
         // Migration 3: Create goals table
         try {
-            await this.db?.execAsync(`
+            await this.executeRaw(`
                 CREATE TABLE IF NOT EXISTS goals (
                     id TEXT PRIMARY KEY,
                     title TEXT NOT NULL,
@@ -305,99 +324,96 @@ export class DatabaseService {
                 )
             `);
         } catch (e) {
-            console.log('Migration check failed (goals table):', e);
+            console.warn('Migration check failed (goals table):', e);
         }
 
         // Migration 4: Ensure "Sin categoría" exists for safe reassignment
         try {
-            const systemCat = await this.db?.getFirstAsync<{ id: string }>("SELECT id FROM categories WHERE name = 'Sin categoría'");
+            const systemCat = await this.getFirst<{ id: string }>("SELECT id FROM categories WHERE name = 'Sin categoría'");
             if (!systemCat) {
                 console.log('Running Migration Check: Re-creating default category.');
-                await this.db?.execAsync("INSERT INTO categories (id, name, is_system, sort_order, color) VALUES ('sys-cat-1', 'Sin categoría', 1, 999, '#64748b')");
+                await this.run("INSERT INTO categories (id, name, is_system, sort_order, color) VALUES ('sys-cat-1', 'Sin categoría', 1, 999, '#64748b')");
             }
         } catch (e) {
-            console.log('Migration check failed (create system cat):', e);
+            console.warn('Migration check failed (create system cat):', e);
         }
 
         // Migration 5: Add origin_id to exercises and is_public to routines
         try {
-            const resultEx = await this.db?.getFirstAsync<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('exercises') WHERE name='origin_id'");
+            const resultEx = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('exercises') WHERE name='origin_id'");
             if (resultEx && resultEx.count === 0) {
                 console.log('Running Migration: Adding origin_id to exercises');
-                await this.db?.execAsync('ALTER TABLE exercises ADD COLUMN origin_id TEXT');
+                await this.executeRaw('ALTER TABLE exercises ADD COLUMN origin_id TEXT');
             }
 
-            const resultRoutine = await this.db?.getFirstAsync<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('routines') WHERE name='is_public'");
+            const resultRoutine = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('routines') WHERE name='is_public'");
             if (resultRoutine && resultRoutine.count === 0) {
                 console.log('Running Migration: Adding is_public to routines');
-                await this.db?.execAsync('ALTER TABLE routines ADD COLUMN is_public INTEGER DEFAULT 0');
+                await this.executeRaw('ALTER TABLE routines ADD COLUMN is_public INTEGER DEFAULT 0');
             }
         } catch (e) {
-            console.log('Migration check failed (Migration 5):', e);
+            console.warn('Migration check failed (Migration 5):', e);
         }
 
         // Migration 6: Fix plate_inventory PK to include unit (weight,type,unit)
         try {
-            const pragma = await this.db?.getAllAsync<{ name: string }>("PRAGMA table_info('plate_inventory')");
-            const hasUnitColumn = (pragma ?? []).some((c) => c.name === 'unit');
-            if (!hasUnitColumn) {
-                await this.db?.execAsync("ALTER TABLE plate_inventory ADD COLUMN unit TEXT DEFAULT 'kg'");
+            const info = await this.getAll<{ name: string }>("PRAGMA table_info('plate_inventory')");
+            const columns = info.map(c => c.name);
+            if (!columns.includes('unit')) {
+                await this.executeRaw("ALTER TABLE plate_inventory ADD COLUMN unit TEXT DEFAULT 'kg'");
             }
 
-            const createSql = await this.db?.getAllAsync<{ sql: string | null }>(
+            const createSql = await this.getAll<{ sql: string | null }>(
                 "SELECT sql FROM sqlite_master WHERE type='table' AND name='plate_inventory'"
             );
             const sqlText = createSql?.[0]?.sql ?? '';
             const pkHasUnit = /PRIMARY KEY\s*\(\s*weight\s*,\s*type\s*,\s*unit\s*\)/i.test(sqlText);
 
             if (!pkHasUnit) {
-                await this.db?.execAsync('BEGIN TRANSACTION');
-                await this.db?.execAsync(`
-                    CREATE TABLE IF NOT EXISTS plate_inventory_new (
-                        weight REAL NOT NULL,
-                        count INTEGER DEFAULT 0,
-                        type TEXT DEFAULT 'standard',
-                        unit TEXT DEFAULT 'kg',
-                        color TEXT,
-                        PRIMARY KEY (weight, type, unit)
-                    );
-                `);
-                await this.db?.execAsync(`
-                    INSERT OR REPLACE INTO plate_inventory_new (weight, count, type, unit, color)
-                    SELECT weight, count, type, COALESCE(unit, 'kg') as unit, NULL as color
-                    FROM plate_inventory;
-                `);
-                await this.db?.execAsync('DROP TABLE plate_inventory;');
-                await this.db?.execAsync('ALTER TABLE plate_inventory_new RENAME TO plate_inventory;');
-                await this.db?.execAsync('COMMIT');
+                await this.withTransaction(async () => {
+                    await this.executeRaw(`
+                        CREATE TABLE IF NOT EXISTS plate_inventory_new (
+                            weight REAL NOT NULL,
+                            count INTEGER DEFAULT 0,
+                            type TEXT DEFAULT 'standard',
+                            unit TEXT DEFAULT 'kg',
+                            color TEXT,
+                            PRIMARY KEY (weight, type, unit)
+                        );
+                    `);
+                    await this.executeRaw(`
+                        INSERT OR REPLACE INTO plate_inventory_new (weight, count, type, unit, color)
+                        SELECT weight, count, type, COALESCE(unit, 'kg') as unit, NULL as color
+                        FROM plate_inventory;
+                    `);
+                    await this.executeRaw('DROP TABLE plate_inventory;');
+                    await this.executeRaw('ALTER TABLE plate_inventory_new RENAME TO plate_inventory;');
+                });
             }
         } catch (e) {
-            try {
-                await this.db?.execAsync('ROLLBACK');
-            } catch { }
-            console.log('Migration check failed (plate_inventory pk/unit):', e);
+            console.warn('Migration check failed (plate_inventory pk/unit):', e);
         }
 
         // Migration 6: Add color column to plate_inventory
         try {
-            const pragma = await this.db?.getAllAsync<{ name: string }>("PRAGMA table_info('plate_inventory')");
-            const hasColorColumn = (pragma ?? []).some((c) => c.name === 'color');
-            if (!hasColorColumn) {
+            const info = await this.getAll<{ name: string }>("PRAGMA table_info('plate_inventory')");
+            const columns = info.map(c => c.name);
+            if (!columns.includes('color')) {
                 console.log('Running Migration: Adding color to plate_inventory');
-                await this.db?.execAsync('ALTER TABLE plate_inventory ADD COLUMN color TEXT');
+                await this.executeRaw('ALTER TABLE plate_inventory ADD COLUMN color TEXT');
             }
         } catch (e) {
-            console.log('Migration check failed (plate_inventory color):', e);
+            console.warn('Migration check failed (plate_inventory color):', e);
         }
 
         // Migration 7: Add duration column to workouts (elapsed seconds for timer persistence)
         try {
-            const result = await this.db?.getFirstAsync<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('workouts') WHERE name='duration'");
+            const result = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('workouts') WHERE name='duration'");
             if (result && result.count === 0) {
-                await this.db?.execAsync('ALTER TABLE workouts ADD COLUMN duration INTEGER DEFAULT 0');
+                await this.executeRaw('ALTER TABLE workouts ADD COLUMN duration INTEGER DEFAULT 0');
             }
         } catch (e) {
-            console.log('Migration check failed (workouts duration):', e);
+            console.warn('Migration check failed (workouts duration):', e);
         }
 
         // Migration 9: Add updated_at and deleted_at to all syncable tables for cloud sync
@@ -409,40 +425,38 @@ export class DatabaseService {
 
         for (const table of syncableTables) {
             try {
-                const info = await this.db?.getAllAsync<{ name: string }>(`PRAGMA table_info('${table}')`);
-                const columns = (info ?? []).map(c => c.name);
+                const info = await this.getAll<{ name: string }>(`PRAGMA table_info('${table}')`);
+                const columns = info.map(c => c.name);
 
                 if (!columns.includes('updated_at')) {
                     console.log(`Migration 9: Adding updated_at to ${table}`);
-                    await this.db?.execAsync(`ALTER TABLE ${table} ADD COLUMN updated_at INTEGER DEFAULT 0`);
+                    await this.executeRaw(`ALTER TABLE ${table} ADD COLUMN updated_at INTEGER DEFAULT 0`);
                 }
 
                 if (!columns.includes('deleted_at') && !['settings', 'plate_inventory', 'goals'].includes(table)) {
                     console.log(`Migration 9: Adding deleted_at to ${table}`);
-                    await this.db?.execAsync(`ALTER TABLE ${table} ADD COLUMN deleted_at INTEGER`);
+                    await this.executeRaw(`ALTER TABLE ${table} ADD COLUMN deleted_at INTEGER`);
                 }
             } catch (e) {
-                console.log(`Migration 9 failed for ${table}:`, e);
+                console.warn(`Migration 9 failed for ${table}:`, e);
             }
         }
 
         // Migration 10: Ensure synced_at exists in sync_queue
         try {
-            const info = await this.db?.getAllAsync<{ name: string }>("PRAGMA table_info('sync_queue')");
-            const columns = (info ?? []).map(c => c.name);
+            const info = await this.getAll<{ name: string }>("PRAGMA table_info('sync_queue')");
+            const columns = info.map(c => c.name);
             if (!columns.includes('synced_at')) {
                 console.log('Migration 10: Adding synced_at to sync_queue');
-                await this.db?.execAsync('ALTER TABLE sync_queue ADD COLUMN synced_at INTEGER');
+                await this.executeRaw('ALTER TABLE sync_queue ADD COLUMN synced_at INTEGER');
             }
         } catch (e) {
-            console.log('Migration 10 failed:', e);
+            console.warn('Migration 10 failed:', e);
         }
     }
 
     private async seedDatabase(): Promise<void> {
-        if (!this.db) throw new Error('DB not open');
-
-        const result = await this.db.getFirstAsync<{ count: number }>('SELECT count(*) as count FROM categories');
+        const result = await this.getFirst<{ count: number }>('SELECT count(*) as count FROM categories');
         if (result && result.count > 0) {
             return; // Already seeded
         }
@@ -464,29 +478,26 @@ export class DatabaseService {
 
         // Optimize seeding with a Transaction
         try {
-            await this.run('BEGIN TRANSACTION');
-
-            for (const [index, cat] of categories.entries()) {
-                const catId = this.generateId();
-                await this.run(
-                    'INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, ?, ?)',
-                    [catId, cat.name, index, cat.color]
-                );
-
-                // Seed Basic Exercises for each category
-                const exercises = this.getInitialExercises(cat.name);
-                for (const ex of exercises) {
+            await this.withTransaction(async () => {
+                for (const [index, cat] of categories.entries()) {
+                    const catId = this.generateId();
                     await this.run(
-                        'INSERT INTO exercises (id, category_id, name, type, is_system) VALUES (?, ?, ?, ?, 1)',
-                        [this.generateId(), catId, ex.name, ex.type]
+                        'INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, ?, ?)',
+                        [catId, cat.name, index, cat.color]
                     );
-                }
-            }
 
-            await this.run('COMMIT');
+                    // Seed Basic Exercises for each category
+                    const exercises = this.getInitialExercises(cat.name);
+                    for (const ex of exercises) {
+                        await this.run(
+                            'INSERT INTO exercises (id, category_id, name, type, is_system) VALUES (?, ?, ?, ?, 1)',
+                            [this.generateId(), catId, ex.name, ex.type]
+                        );
+                    }
+                }
+            });
         } catch (error) {
-            console.error('Seeding failed, rolling back', error);
-            await this.run('ROLLBACK');
+            console.error('Seeding failed', error);
             throw error;
         }
     }
@@ -554,8 +565,7 @@ export class DatabaseService {
     // --- CATEGORIES ---
 
     public async getCategories(): Promise<Category[]> {
-        const db = this.getDatabase();
-        return await db.getAllAsync<Category>('SELECT * FROM categories ORDER BY sort_order ASC');
+        return await this.getAll<Category>('SELECT * FROM categories ORDER BY sort_order ASC');
     }
 
     // --- EXERCISES ---
@@ -565,7 +575,6 @@ export class DatabaseService {
      * Optional category filtering.
      */
     public async searchExercises(query: string, categoryId?: string): Promise<(Exercise & { category_name: string; category_color: string })[]> {
-        const db = this.getDatabase();
         let sql = `
             SELECT e.*, c.name as category_name, c.color as category_color
             FROM exercises e
@@ -586,7 +595,7 @@ export class DatabaseService {
 
         sql += ` ORDER BY e.name ASC`;
 
-        return await db.getAllAsync(sql, params);
+        return await this.getAll(sql, params);
     }
 
     public async getExercises(): Promise<Exercise[]> {
@@ -604,8 +613,9 @@ export class DatabaseService {
 
     public async createExercise(exercise: Partial<Exercise>): Promise<string> {
         const id = this.generateId();
+        const now = Date.now();
         await this.run(
-            `INSERT INTO exercises (id, category_id, name, type, default_increment, notes, is_system) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO exercises (id, category_id, name, type, default_increment, notes, is_system, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 id,
                 exercise.category_id,
@@ -613,16 +623,19 @@ export class DatabaseService {
                 exercise.type,
                 exercise.default_increment ?? 2.5,
                 exercise.notes ?? null,
-                0 // User created
+                0, // User created
+                now
             ]
         );
-        await this.queueSyncMutation('exercises', id, 'INSERT', { ...exercise, id, is_system: 0 });
+        await this.queueSyncMutation('exercises', id, 'INSERT', { ...exercise, id, is_system: 0, updated_at: now, deleted_at: null });
         return id;
     }
 
     public async updateExercise(id: string, updates: Partial<Exercise>): Promise<void> {
         const fields: string[] = [];
         const values: any[] = [];
+
+        const now = Date.now();
 
         Object.entries(updates).forEach(([key, value]) => {
             if (key !== 'id' && value !== undefined) {
@@ -633,42 +646,43 @@ export class DatabaseService {
 
         if (fields.length === 0) return;
 
+        fields.push('updated_at = ?');
+        values.push(now);
+
         values.push(id);
         await this.run(`UPDATE exercises SET ${fields.join(', ')} WHERE id = ?`, values);
-        await this.queueSyncMutation('exercises', id, 'UPDATE', updates);
+        await this.queueSyncMutation('exercises', id, 'UPDATE', { ...updates, updated_at: now });
     }
 
     // --- WORKOUTS ---
 
     public async getWorkoutByDate(dateStart: number, dateEnd: number): Promise<Workout | null> {
-        const db = this.getDatabase();
-        return await db.getFirstAsync<Workout>(
+        return await this.getFirst<Workout>(
             'SELECT * FROM workouts WHERE date >= ? AND date < ? ORDER BY start_time DESC, date DESC LIMIT 1',
             [dateStart, dateEnd]
         );
     }
 
     public async getWorkoutById(id: string): Promise<Workout | null> {
-        const db = this.getDatabase();
-        return await db.getFirstAsync<Workout>('SELECT * FROM workouts WHERE id = ?', [id]);
+        return await this.getFirst<Workout>('SELECT * FROM workouts WHERE id = ?', [id]);
     }
 
     public async createWorkout(date: number): Promise<string> {
         const id = this.generateId();
+        const now = Date.now();
         await this.run(
-            'INSERT INTO workouts (id, date, start_time, status, is_template) VALUES (?, ?, ?, ?, ?)',
-            [id, date, Date.now(), 'in_progress', 0]
+            'INSERT INTO workouts (id, date, start_time, status, is_template, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [id, date, now, 'in_progress', 0, now]
         );
-        await this.queueSyncMutation('workouts', id, 'INSERT', { id, date, start_time: Date.now(), status: 'in_progress', is_template: 0 });
+        await this.queueSyncMutation('workouts', id, 'INSERT', { id, date, start_time: now, status: 'in_progress', is_template: 0, updated_at: now, deleted_at: null });
         return id;
     }
 
     // --- SETS ---
 
     public async getSetsForWorkout(workoutId: string): Promise<(WorkoutSet & { exercise_name: string; category_color: string; exercise_type: ExerciseType })[]> {
-        const db = this.getDatabase();
         // Join with exercises to get names for the UI
-        return await db.getAllAsync(
+        return await this.getAll(
             `SELECT ws.*, e.name as exercise_name, e.type as exercise_type, c.color as category_color 
        FROM workout_sets ws
        JOIN exercises e ON ws.exercise_id = e.id
@@ -681,9 +695,10 @@ export class DatabaseService {
 
     public async addSet(set: Partial<WorkoutSet> & { workout_id: string; exercise_id: string; order_index: number; type: string }): Promise<string> {
         const id = this.generateId();
+        const now = Date.now();
         await this.run(
-            `INSERT INTO workout_sets (id, workout_id, exercise_id, type, weight, reps, distance, time, rpe, order_index, completed, notes, superset_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO workout_sets (id, workout_id, exercise_id, type, weight, reps, distance, time, rpe, order_index, completed, notes, superset_id, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 id,
                 set.workout_id,
@@ -697,16 +712,19 @@ export class DatabaseService {
                 set.order_index,
                 set.completed ?? 0,
                 set.notes ?? null,
-                set.superset_id ?? null
+                set.superset_id ?? null,
+                now
             ]
         );
-        await this.queueSyncMutation('workout_sets', id, 'INSERT', { ...set, id });
+        await this.queueSyncMutation('workout_sets', id, 'INSERT', { ...set, id, updated_at: now, deleted_at: null });
         return id;
     }
 
     public async updateSet(id: string, updates: Partial<WorkoutSet>): Promise<void> {
         const fields: string[] = [];
         const values: any[] = [];
+
+        const now = Date.now();
 
         Object.entries(updates).forEach(([key, value]) => {
             if (key !== 'id' && value !== undefined) {
@@ -717,9 +735,12 @@ export class DatabaseService {
 
         if (fields.length === 0) return;
 
+        fields.push('updated_at = ?');
+        values.push(now);
+
         values.push(id);
         await this.run(`UPDATE workout_sets SET ${fields.join(', ')} WHERE id = ?`, values);
-        await this.queueSyncMutation('workout_sets', id, 'UPDATE', updates);
+        await this.queueSyncMutation('workout_sets', id, 'UPDATE', { ...updates, updated_at: now });
     }
 
     public async deleteSet(id: string): Promise<void> {
@@ -728,14 +749,11 @@ export class DatabaseService {
     }
 
     public async getSetById(id: string): Promise<WorkoutSet | null> {
-        const db = this.getDatabase();
-        return await db.getFirstAsync<WorkoutSet>('SELECT * FROM workout_sets WHERE id = ?', [id]);
+        return await this.getFirst<WorkoutSet>('SELECT * FROM workout_sets WHERE id = ?', [id]);
     }
 
     public async factoryReset(): Promise<void> {
-        try {
-            await this.run('BEGIN TRANSACTION');
-
+        await this.withTransaction(async () => {
             await this.run('DELETE FROM workout_sets');
             await this.run('DELETE FROM workouts');
 
@@ -746,14 +764,7 @@ export class DatabaseService {
 
             await this.run('DELETE FROM exercises');
             await this.run('DELETE FROM categories');
-
-            await this.run('COMMIT');
-        } catch (e) {
-            try {
-                await this.run('ROLLBACK');
-            } catch { }
-            throw e;
-        }
+        });
 
         await this.seedDatabase();
     }
@@ -765,8 +776,7 @@ export class DatabaseService {
      * Excluding current workout if possible, or just strict history.
      */
     public async getLastSetForExercise(exerciseId: string): Promise<WorkoutSet | null> {
-        const db = this.getDatabase();
-        return await db.getFirstAsync<WorkoutSet>(
+        return await this.getFirst<WorkoutSet>(
             `SELECT * FROM workout_sets 
        WHERE exercise_id = ? AND completed = 1 
        ORDER BY rowid DESC LIMIT 1`,
@@ -821,19 +831,68 @@ export class DatabaseService {
         return params.map((p) => (p === undefined ? null : p));
     }
 
+    // --- UTILITIES ---
+
+    private async executeWithRetry<T>(operation: () => Promise<T>, retries = 3, delay = 150): Promise<T> {
+        let lastError: any;
+        for (let i = 0; i < retries; i++) {
+            try {
+                return await operation();
+            } catch (error: any) {
+                lastError = error;
+                const msg = error?.message || '';
+                const isLocked = msg.includes('database is locked') || error?.code === 'SQLITE_BUSY' || msg.includes('finalizeAsync');
+                if (isLocked) {
+                    console.warn(`[Database] Busy/Locked (attempt ${i + 1}/${retries}). Retrying...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    continue;
+                }
+                throw error;
+            }
+        }
+        throw lastError;
+    }
+
     public async run(sql: string, params: any[] = []): Promise<SQLite.SQLiteRunResult> {
-        const db = this.getDatabase();
-        return await db.runAsync(sql, this.normalizeParams(params));
+        await this.ensureInitialized();
+        return await this.executeWithRetry(async () => {
+            return await this.db!.runAsync(sql, ...this.normalizeParams(params));
+        });
+    }
+
+    public async executeRaw(sql: string): Promise<void> {
+        await this.ensureInitialized();
+        return await this.executeWithRetry(async () => {
+            await this.db!.execAsync(sql);
+        });
+    }
+
+    public async withTransaction(callback: () => Promise<void>): Promise<void> {
+        await this.ensureInitialized();
+        return await this.executeWithRetry(async () => {
+            return await this.db!.withTransactionAsync(callback);
+        });
+    }
+
+    public async withTransactionAsync(callback: (db: SQLite.SQLiteDatabase) => Promise<void>): Promise<void> {
+        await this.ensureInitialized();
+        return await this.executeWithRetry(async () => {
+            return await this.db!.withTransactionAsync(() => callback(this.db!));
+        });
     }
 
     public async getAll<T>(sql: string, params: any[] = []): Promise<T[]> {
-        const db = this.getDatabase();
-        return await db.getAllAsync<T>(sql, this.normalizeParams(params));
+        await this.ensureInitialized();
+        return await this.executeWithRetry(async () => {
+            return await this.db!.getAllAsync(sql, ...this.normalizeParams(params)) as T[];
+        });
     }
 
     public async getFirst<T>(sql: string, params: any[] = []): Promise<T | null> {
-        const db = this.getDatabase();
-        return await db.getFirstAsync<T>(sql, this.normalizeParams(params));
+        await this.ensureInitialized();
+        return await this.executeWithRetry(async () => {
+            return await this.db!.getFirstAsync(sql, ...this.normalizeParams(params)) as T | null;
+        });
     }
 }
 

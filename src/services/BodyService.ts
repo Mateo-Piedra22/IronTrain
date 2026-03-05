@@ -37,16 +37,14 @@ export class BodyService {
 
     /* Original methods preserved/adapted */
     public async getLatestMeasurement(type: MeasurementType): Promise<Measurement | null> {
-        const db = dbService.getDatabase();
-        return await db.getFirstAsync<Measurement>(
+        return await dbService.getFirst<Measurement>(
             'SELECT * FROM measurements WHERE type = ? ORDER BY date DESC LIMIT 1',
             [type]
         );
     }
 
     public async getHistory(type: MeasurementType): Promise<Measurement[]> {
-        const db = dbService.getDatabase();
-        return await db.getAllAsync<Measurement>(
+        return await dbService.getAll<Measurement>(
             'SELECT * FROM measurements WHERE type = ? ORDER BY date DESC',
             [type]
         );

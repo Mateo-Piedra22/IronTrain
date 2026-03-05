@@ -41,58 +41,56 @@ export class ExerciseService {
         const typeChanged = data.type !== undefined && prevType !== nextType;
 
         try {
-            await dbService.run('BEGIN TRANSACTION');
-            values.push(id);
-            await dbService.run(`UPDATE exercises SET ${updates.join(', ')} WHERE id = ?`, values);
+            await dbService.withTransaction(async () => {
+                values.push(id);
+                await dbService.run(`UPDATE exercises SET ${updates.join(', ')} WHERE id = ?`, values);
 
-            if (typeChanged) {
-                if (nextType === 'distance_time') {
-                    await dbService.run(
-                        `UPDATE workout_sets
-                         SET weight = NULL,
-                             reps = NULL,
-                             distance = CASE WHEN distance IS NULL THEN NULL WHEN distance < 0 THEN NULL ELSE distance END,
-                             time = CASE WHEN time IS NULL THEN NULL WHEN time < 0 THEN NULL ELSE time END
-                         WHERE exercise_id = ?`,
-                        [id]
-                    );
-                } else if (nextType === 'reps_only') {
-                    await dbService.run(
-                        `UPDATE workout_sets
-                         SET weight = NULL,
-                             distance = NULL,
-                             time = NULL,
-                             reps = CASE WHEN reps IS NULL THEN NULL WHEN reps < 0 THEN NULL ELSE reps END
-                         WHERE exercise_id = ?`,
-                        [id]
-                    );
-                } else if (nextType === 'weight_only') {
-                    await dbService.run(
-                        `UPDATE workout_sets
-                         SET reps = NULL,
-                             distance = NULL,
-                             time = NULL,
-                             weight = CASE WHEN weight IS NULL THEN NULL WHEN weight < 0 THEN NULL ELSE weight END
-                         WHERE exercise_id = ?`,
-                        [id]
-                    );
-                } else {
-                    await dbService.run(
-                        `UPDATE workout_sets
-                         SET distance = NULL,
-                             time = NULL,
-                             weight = CASE WHEN weight IS NULL THEN NULL WHEN weight < 0 THEN NULL ELSE weight END,
-                             reps = CASE WHEN reps IS NULL THEN NULL WHEN reps < 0 THEN NULL ELSE reps END
-                         WHERE exercise_id = ?`,
-                        [id]
-                    );
+                if (typeChanged) {
+                    if (nextType === 'distance_time') {
+                        await dbService.run(
+                            `UPDATE workout_sets
+                             SET weight = NULL,
+                                 reps = NULL,
+                                 distance = CASE WHEN distance IS NULL THEN NULL WHEN distance < 0 THEN NULL ELSE distance END,
+                                 time = CASE WHEN time IS NULL THEN NULL WHEN time < 0 THEN NULL ELSE time END
+                             WHERE exercise_id = ?`,
+                            [id]
+                        );
+                    } else if (nextType === 'reps_only') {
+                        await dbService.run(
+                            `UPDATE workout_sets
+                             SET weight = NULL,
+                                 distance = NULL,
+                                 time = NULL,
+                                 reps = CASE WHEN reps IS NULL THEN NULL WHEN reps < 0 THEN NULL ELSE reps END
+                             WHERE exercise_id = ?`,
+                            [id]
+                        );
+                    } else if (nextType === 'weight_only') {
+                        await dbService.run(
+                            `UPDATE workout_sets
+                             SET reps = NULL,
+                                 distance = NULL,
+                                 time = NULL,
+                                 weight = CASE WHEN weight IS NULL THEN NULL WHEN weight < 0 THEN NULL ELSE weight END
+                             WHERE exercise_id = ?`,
+                            [id]
+                        );
+                    } else {
+                        await dbService.run(
+                            `UPDATE workout_sets
+                             SET distance = NULL,
+                                 time = NULL,
+                                 weight = CASE WHEN weight IS NULL THEN NULL WHEN weight < 0 THEN NULL ELSE weight END,
+                                 reps = CASE WHEN reps IS NULL THEN NULL WHEN reps < 0 THEN NULL ELSE reps END
+                             WHERE exercise_id = ?`,
+                            [id]
+                        );
+                    }
                 }
-            }
-
-            await dbService.run('COMMIT');
+            });
             await dbService.queueSyncMutation('exercises', id, 'UPDATE', data);
         } catch (e) {
-            try { await dbService.run('ROLLBACK'); } catch { }
             throw e;
         }
     }

@@ -77,6 +77,7 @@ describe('authStore', () => {
     webBrowser.openAuthSessionAsync.mockResolvedValue(authResult);
     linking.parse.mockReturnValue(parsedUrl);
     mockJwtDecode.mockReturnValue({ id: 'user-3', email: 'c@b.com', exp: futureExp });
+    secureStore.getItemAsync.mockResolvedValue('token-xyz');
 
     await useAuthStore.getState().login();
 

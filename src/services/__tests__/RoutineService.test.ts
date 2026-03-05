@@ -1,12 +1,14 @@
+import { uuidV4 } from '../../utils/uuid';
 import { dbService } from '../DatabaseService';
 import { routineService } from '../RoutineService';
-import { uuidV4 } from '../../utils/uuid';
 
 jest.mock('../DatabaseService', () => ({
   dbService: {
     run: jest.fn(),
     queueSyncMutation: jest.fn(),
-    getDatabase: jest.fn(),
+    getAll: jest.fn(),
+    getFirst: jest.fn(),
+    withTransaction: jest.fn(async (cb: () => Promise<void>) => { await cb(); }),
   },
 }));
 
@@ -14,15 +16,9 @@ jest.mock('../../utils/uuid', () => ({
   uuidV4: jest.fn(),
 }));
 
-const dbMock = {
-  getFirstAsync: jest.fn(),
-  getAllAsync: jest.fn(),
-};
-
 describe('RoutineService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (dbService.getDatabase as jest.Mock).mockReturnValue(dbMock);
   });
 
   it('imports shared routines with mapped categories', async () => {
@@ -33,7 +29,7 @@ describe('RoutineService', () => {
       .mockReturnValueOnce('day-new')
       .mockReturnValueOnce('re-new');
 
-    dbMock.getFirstAsync.mockImplementation(async (sql: string) => {
+    (dbService.getFirst as jest.Mock).mockImplementation(async (sql: string) => {
       if (sql.includes('SELECT id FROM categories ORDER BY')) {
         return { id: 'cat-default' };
       }
@@ -71,7 +67,7 @@ describe('RoutineService', () => {
       .mockReturnValueOnce('day-new')
       .mockReturnValueOnce('re-new');
 
-    dbMock.getFirstAsync.mockImplementation(async (sql: string) => {
+    (dbService.getFirst as jest.Mock).mockImplementation(async (sql: string) => {
       if (sql.includes('SELECT id FROM categories ORDER BY')) {
         return { id: 'cat-default' };
       }
@@ -95,8 +91,8 @@ describe('RoutineService', () => {
   });
 
   it('exports routine with categories', async () => {
-    dbMock.getFirstAsync.mockResolvedValue({ id: 'r1', name: 'Rutina' });
-    dbMock.getAllAsync.mockImplementation(async (sql: string) => {
+    (dbService.getFirst as jest.Mock).mockResolvedValue({ id: 'r1', name: 'Rutina' });
+    (dbService.getAll as jest.Mock).mockImplementation(async (sql: string) => {
       if (sql.includes('FROM routine_days')) return [{ id: 'd1', routine_id: 'r1', name: 'Día 1', order_index: 0 }];
       if (sql.includes('FROM routine_exercises')) return [{ id: 're1', routine_day_id: 'd1', exercise_id: 'e1', order_index: 0 }];
       if (sql.includes('FROM exercises')) return [{ id: 'e1', category_id: 'c1', name: 'Sentadilla', type: 'weight_reps' }];

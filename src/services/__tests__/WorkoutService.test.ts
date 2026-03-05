@@ -6,6 +6,7 @@ jest.mock('../DatabaseService', () => ({
   dbService: {
     run: jest.fn(),
     getAll: jest.fn(),
+    withTransaction: jest.fn(async (cb: () => Promise<void>) => { await cb(); }),
     queueSyncMutation: jest.fn(),
     getWorkoutById: jest.fn(),
     getWorkoutByDate: jest.fn(),
@@ -31,8 +32,8 @@ describe('WorkoutService', () => {
 
   describe('getCalendarEvents', () => {
     it('should build events map from grouped query rows', async () => {
-      const d1 = Date.UTC(2026, 0, 2, 12, 0, 0);
-      const d2 = Date.UTC(2026, 0, 3, 12, 0, 0);
+      const d1 = new Date(2026, 0, 2, 12, 0, 0).getTime();
+      const d2 = new Date(2026, 0, 3, 12, 0, 0).getTime();
 
       (dbService.getAll as jest.Mock).mockResolvedValue([
         { id: 'w1', date: d1, status: 'completed', colors: '#111111,#222222' },
@@ -46,7 +47,7 @@ describe('WorkoutService', () => {
     });
 
     it('should cache events briefly to avoid repeated queries', async () => {
-      const d1 = Date.UTC(2026, 0, 2, 12, 0, 0);
+      const d1 = new Date(2026, 0, 2, 12, 0, 0).getTime();
       (dbService.getAll as jest.Mock).mockResolvedValue([
         { id: 'w1', date: d1, status: 'completed', colors: '#111111' },
       ]);
@@ -58,7 +59,7 @@ describe('WorkoutService', () => {
     });
 
     it('should invalidate cache after workout mutation', async () => {
-      const d1 = Date.UTC(2026, 0, 2, 12, 0, 0);
+      const d1 = new Date(2026, 0, 2, 12, 0, 0).getTime();
       (dbService.getAll as jest.Mock).mockResolvedValue([
         { id: 'w1', date: d1, status: 'completed', colors: '#111111' },
       ]);
@@ -198,7 +199,7 @@ describe('WorkoutService', () => {
       await workoutService.finishWorkout('w1');
 
       expect(dbService.run).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE workouts SET status = ?, end_time = ?'),
+        expect.stringContaining('UPDATE workouts SET status = ?, end_time = ?, updated_at = ?'),
         expect.arrayContaining(['completed'])
       );
     });
@@ -245,7 +246,7 @@ describe('WorkoutService', () => {
 
       await workoutService.copyWorkoutToWorkout('source', 'target');
 
-      expect(dbService.run).toHaveBeenCalledWith('BEGIN TRANSACTION');
+      expect(dbService.withTransaction).toHaveBeenCalled();
       expect(dbService.run).toHaveBeenCalledWith(expect.stringContaining('UPDATE workouts SET name = ?'), expect.any(Array));
       expect(dbService.addSet).toHaveBeenCalledTimes(2);
 
@@ -256,7 +257,6 @@ describe('WorkoutService', () => {
       expect(secondAdd.order_index).toBe(1);
       expect(firstAdd.superset_id).toBeTruthy();
       expect(secondAdd.superset_id).toBe(firstAdd.superset_id);
-      expect(dbService.run).toHaveBeenCalledWith('COMMIT');
     });
 
     it('should replace existing target sets by default (no duplicate workouts)', async () => {
@@ -272,10 +272,9 @@ describe('WorkoutService', () => {
 
       await workoutService.copyWorkoutToWorkout('source', 'target');
 
-      expect(dbService.run).toHaveBeenCalledWith('BEGIN TRANSACTION');
+      expect(dbService.withTransaction).toHaveBeenCalled();
       expect(dbService.run).toHaveBeenCalledWith('DELETE FROM workout_sets WHERE workout_id = ?', ['target']);
       expect(dbService.addSet).toHaveBeenCalledTimes(1);
-      expect(dbService.run).toHaveBeenCalledWith('COMMIT');
     });
 
     it('should append sets at the end when mode is append', async () => {
@@ -291,12 +290,11 @@ describe('WorkoutService', () => {
 
       await workoutService.copyWorkoutToWorkoutAdvanced('source', 'target', { mode: 'append' });
 
-      expect(dbService.run).toHaveBeenCalledWith('BEGIN TRANSACTION');
+      expect(dbService.withTransaction).toHaveBeenCalled();
       expect(dbService.run).not.toHaveBeenCalledWith('DELETE FROM workout_sets WHERE workout_id = ?', expect.anything());
       expect(dbService.addSet).toHaveBeenCalledTimes(1);
       const add = (dbService.addSet as jest.Mock).mock.calls[0][0];
       expect(add.order_index).toBe(3);
-      expect(dbService.run).toHaveBeenCalledWith('COMMIT');
     });
 
     it('should require resume or fail when target is completed', async () => {

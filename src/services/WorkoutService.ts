@@ -1,4 +1,4 @@
-import { endOfDay, getUnixTime, startOfDay } from 'date-fns';
+import { endOfDay, format, getUnixTime, startOfDay } from 'date-fns';
 import { ExerciseType, SetType, Workout, WorkoutSet } from '../types/db';
 import { uuidV4 } from '../utils/uuid';
 import { dbService } from './DatabaseService';
@@ -44,7 +44,7 @@ class WorkoutService {
 
         const events: Record<string, { status: string; colors: string[] }> = {};
         for (const r of rows) {
-            const dateStr = new Date(r.date).toISOString().split('T')[0];
+            const dateStr = format(new Date(r.date), 'yyyy-MM-dd');
             const colors = (r.colors || '')
                 .split(',')
                 .map(s => s.trim())
@@ -92,23 +92,21 @@ class WorkoutService {
         const newId = targetWorkoutId ?? this.generateId();
 
         try {
-            await dbService.run('BEGIN TRANSACTION');
+            await dbService.withTransaction(async () => {
+                if (!targetWorkoutId) {
+                    await dbService.run(
+                        'INSERT INTO workouts (id, name, date, start_time, status, is_template) VALUES (?, ?, ?, ?, ?, ?)',
+                        [newId, template.name, newDate, now, 'in_progress', 0]
+                    );
+                    await dbService.queueSyncMutation('workouts', newId, 'INSERT', { id: newId, name: template.name, date: newDate, start_time: now, status: 'in_progress', is_template: 0 });
+                } else if (!existing?.name && template.name) {
+                    await dbService.run('UPDATE workouts SET name = ? WHERE id = ?', [template.name, newId]);
+                    await dbService.queueSyncMutation('workouts', newId, 'UPDATE', { name: template.name });
+                }
 
-            if (!targetWorkoutId) {
-                await dbService.run(
-                    'INSERT INTO workouts (id, name, date, start_time, status, is_template) VALUES (?, ?, ?, ?, ?, ?)',
-                    [newId, template.name, newDate, now, 'in_progress', 0]
-                );
-                await dbService.queueSyncMutation('workouts', newId, 'INSERT', { id: newId, name: template.name, date: newDate, start_time: now, status: 'in_progress', is_template: 0 });
-            } else if (!existing?.name && template.name) {
-                await dbService.run('UPDATE workouts SET name = ? WHERE id = ?', [template.name, newId]);
-                await dbService.queueSyncMutation('workouts', newId, 'UPDATE', { name: template.name });
-            }
-
-            await this.copySetsIntoWorkout(templateId, newId);
-            await dbService.run('COMMIT');
+                await this.copySetsIntoWorkout(templateId, newId);
+            });
         } catch (e) {
-            try { await dbService.run('ROLLBACK'); } catch { }
             throw e;
         }
 
@@ -200,35 +198,33 @@ class WorkoutService {
                 : 0;
 
         try {
-            await dbService.run('BEGIN TRANSACTION');
-
-            if (targetWorkout.status === 'completed' && resumeTargetIfCompleted) {
-                await dbService.run('UPDATE workouts SET status = ?, end_time = NULL WHERE id = ?', ['in_progress', targetWorkoutId]);
-                await dbService.queueSyncMutation('workouts', targetWorkoutId, 'UPDATE', { status: 'in_progress', end_time: null });
-            }
-
-            if (mode === 'replace' && targetExistingSetsRaw.length > 0) {
-                await dbService.run('DELETE FROM workout_sets WHERE workout_id = ?', [targetWorkoutId]);
-                // Emitting bulk deletes for the sets (we don't have all IDs readily here without mapping, but we have targetExistingSetsRaw)
-                for (const set of targetExistingSetsRaw) {
-                    await dbService.queueSyncMutation('workout_sets', set.id, 'DELETE');
+            await dbService.withTransaction(async () => {
+                if (targetWorkout.status === 'completed' && resumeTargetIfCompleted) {
+                    await dbService.run('UPDATE workouts SET status = ?, end_time = NULL WHERE id = ?', ['in_progress', targetWorkoutId]);
+                    await dbService.queueSyncMutation('workouts', targetWorkoutId, 'UPDATE', { status: 'in_progress', end_time: null });
                 }
-            }
 
-            const shouldCopyName =
-                copyName === 'always' || (copyName === 'if_empty' && !targetWorkout.name);
-            if (shouldCopyName && sourceWorkout.name) {
-                await dbService.run('UPDATE workouts SET name = ? WHERE id = ?', [sourceWorkout.name, targetWorkoutId]);
-                await dbService.queueSyncMutation('workouts', targetWorkoutId, 'UPDATE', { name: sourceWorkout.name });
-            }
+                if (mode === 'replace' && targetExistingSetsRaw.length > 0) {
+                    await dbService.run('DELETE FROM workout_sets WHERE workout_id = ?', [targetWorkoutId]);
+                    // Emitting bulk deletes for the sets (we don't have all IDs readily here without mapping, but we have targetExistingSetsRaw)
+                    for (const set of targetExistingSetsRaw) {
+                        await dbService.queueSyncMutation('workout_sets', set.id, 'DELETE');
+                    }
+                }
 
-            const copied = await this.copySetsArrayIntoWorkout(sourceSets, targetWorkoutId, startIndex, content);
-            await dbService.run('COMMIT');
+                const shouldCopyName =
+                    copyName === 'always' || (copyName === 'if_empty' && !targetWorkout.name);
+                if (shouldCopyName && sourceWorkout.name) {
+                    await dbService.run('UPDATE workouts SET name = ? WHERE id = ?', [sourceWorkout.name, targetWorkoutId]);
+                    await dbService.queueSyncMutation('workouts', targetWorkoutId, 'UPDATE', { name: sourceWorkout.name });
+                }
+
+                const copied = await this.copySetsArrayIntoWorkout(sourceSets, targetWorkoutId, startIndex, content);
+            });
 
             this.invalidateCaches();
-            return { copied, skippedMissingExercises, skippedExistingExercises, mode, content };
+            return { copied: sourceSets.length, skippedMissingExercises, skippedExistingExercises, mode, content };
         } catch (e) {
-            try { await dbService.run('ROLLBACK'); } catch { }
             throw e;
         }
     }
@@ -513,20 +509,23 @@ class WorkoutService {
         const workout = await dbService.getWorkoutById(id);
         if (workout?.status === 'completed') return; // Idempotent
 
+        const now = Date.now();
+
         await dbService.run(
-            'UPDATE workouts SET status = ?, end_time = ? WHERE id = ?',
-            ['completed', Date.now(), id]
+            'UPDATE workouts SET status = ?, end_time = ?, updated_at = ? WHERE id = ?',
+            ['completed', now, now, id]
         );
-        await dbService.queueSyncMutation('workouts', id, 'UPDATE', { status: 'completed', end_time: Date.now() });
+        await dbService.queueSyncMutation('workouts', id, 'UPDATE', { status: 'completed', end_time: now, updated_at: now });
         this.invalidateCaches();
     }
 
     public async resumeWorkout(id: string): Promise<void> {
+        const now = Date.now();
         await dbService.run(
-            'UPDATE workouts SET status = ? WHERE id = ?',
-            ['in_progress', id]
+            'UPDATE workouts SET status = ?, updated_at = ? WHERE id = ?',
+            ['in_progress', now, id]
         );
-        await dbService.queueSyncMutation('workouts', id, 'UPDATE', { status: 'in_progress' });
+        await dbService.queueSyncMutation('workouts', id, 'UPDATE', { status: 'in_progress', updated_at: now });
         this.invalidateCaches();
     }
 
@@ -682,19 +681,18 @@ class WorkoutService {
 
     public async delete(id: string): Promise<void> {
         try {
-            await dbService.run('BEGIN TRANSACTION');
-            // Queue deletes before actual deletion so we have the references
-            const sets = await dbService.getAll<{ id: string }>('SELECT id FROM workout_sets WHERE workout_id = ?', [id]);
-            for (const s of sets) await dbService.queueSyncMutation('workout_sets', s.id, 'DELETE');
-            await dbService.queueSyncMutation('workouts', id, 'DELETE');
+            await dbService.withTransaction(async () => {
+                // Queue deletes before actual deletion so we have the references
+                const sets = await dbService.getAll<{ id: string }>('SELECT id FROM workout_sets WHERE workout_id = ?', [id]);
+                for (const s of sets) await dbService.queueSyncMutation('workout_sets', s.id, 'DELETE');
+                await dbService.queueSyncMutation('workouts', id, 'DELETE');
 
-            // Explicitly delete sets first to ensure referential integrity if ON DELETE CASCADE fails or is disabled
-            await dbService.run('DELETE FROM workout_sets WHERE workout_id = ?', [id]);
-            await dbService.run('DELETE FROM workouts WHERE id = ?', [id]);
-            await dbService.run('COMMIT');
+                // Explicitly delete sets first to ensure referential integrity if ON DELETE CASCADE fails or is disabled
+                await dbService.run('DELETE FROM workout_sets WHERE workout_id = ?', [id]);
+                await dbService.run('DELETE FROM workouts WHERE id = ?', [id]);
+            });
             this.invalidateCaches();
         } catch (e) {
-            await dbService.run('ROLLBACK');
             throw e;
         }
     }

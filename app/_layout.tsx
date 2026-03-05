@@ -109,7 +109,12 @@ export default function RootLayout() {
 
     const runInitialSync = async () => {
       try {
-        await dbService.getDatabase().runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', '0']);
+        // We ensure last_pull_sync starts at 0 if it's the first time, 
+        // ensuring we pull EVERYTHING if needed.
+        const res = await dbService.getFirst<{ value: string }>('SELECT value FROM settings WHERE key = ?', ['last_pull_sync']);
+        if (!res) {
+          await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', '0']);
+        }
         await syncService.syncBidirectional();
       } catch (e) {
         notify.error('Sync fallido', 'No se pudo sincronizar con Neon');

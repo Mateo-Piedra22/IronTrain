@@ -5,7 +5,7 @@ import { useAuthStore } from '@/src/store/authStore';
 import { confirm } from '@/src/store/confirmStore';
 import { Colors } from '@/src/theme';
 import * as Clipboard from 'expo-clipboard';
-import { Copy, Dumbbell, Flame, Globe, Info, Scale, Trophy, UserCheck } from 'lucide-react-native';
+import { CheckCircle, Copy, Dumbbell, Flame, Globe, Info, Scale, Trophy, UserCheck, XCircle } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -160,13 +160,13 @@ export default function SocialTab() {
         confirm.info(
             'Sistema IronScore',
             `Tu puntaje mide tu constancia y aporte a la comunidad:\n\n` +
-            `• Cada entrenamiento: +10 pts\n` +
-            `• Rutina creada: +5 pts\n` +
-            `• Compartir rutinas: +20 pts\n\n` +
-            `**Multiplicador por Racha:**\n` +
-            `• 3 días seguidos: x1.1\n` +
-            `• 5 días seguidos: x1.25\n` +
-            `• 10+ días seguidos: x1.50\n\n` +
+            `- Cada entrenamiento: +10 pts\n` +
+            `- Rutina creada: +5 pts\n` +
+            `- Compartir rutinas: +20 pts\n\n` +
+            `Multiplicador por Racha:\n` +
+            `- 3 días seguidos: x1.1\n` +
+            `- 5 días seguidos: x1.25\n` +
+            `- 10+ días seguidos: x1.50\n\n` +
             `¡Entrena sin fallar para empujar tu score al máximo!`
         );
     };
@@ -320,7 +320,7 @@ export default function SocialTab() {
                                                 {user.stats?.currentStreak >= 3 && (
                                                     <View style={styles.streakBadge}>
                                                         <Flame size={12} color="#ef4444" fill="#ef4444" style={{ marginRight: 4 }} />
-                                                        <Text style={styles.streakText}>{user.stats.currentStreak}</Text>
+                                                        <Text style={styles.streakText}>Racha: {user.stats.currentStreak}</Text>
                                                     </View>
                                                 )}
                                             </TouchableOpacity>
@@ -339,16 +339,29 @@ export default function SocialTab() {
                                                         comparisonData.map((comp: any, cidx: number) => {
                                                             const userWon = comp.user1RM > comp.friend1RM;
                                                             const friendWon = comp.friend1RM > comp.user1RM;
+                                                            const diff = Math.abs(comp.user1RM - comp.friend1RM);
+
                                                             return (
                                                                 <View key={cidx} style={styles.compareRow}>
-                                                                    <Text style={styles.compareExerciseName}>{comp.exerciseName}</Text>
+                                                                    <View style={styles.compareRowHeader}>
+                                                                        <Text style={styles.compareExerciseName}>{comp.exerciseName}</Text>
+                                                                        {diff > 0 && (
+                                                                            <Text style={[styles.compareDiff, { color: userWon ? '#16a34a' : '#ef4444' }]}>
+                                                                                {userWon ? '+' : '-'}{diff.toFixed(1)}kg
+                                                                            </Text>
+                                                                        )}
+                                                                    </View>
                                                                     <View style={styles.compareBars}>
-                                                                        <View style={{ flex: 1, alignItems: 'center' }}>
-                                                                            <Text style={[styles.compareValue, userWon && styles.compareValueHighlight]}>{comp.user1RM}kg</Text>
+                                                                        <View style={[styles.compareBarContainer, { flex: 1 }]}>
+                                                                            <View style={[styles.compareValueRow, userWon && styles.compareValueHighlightBox]}>
+                                                                                <Text style={[styles.compareValue, userWon && styles.compareValueHighlight]}>{comp.user1RM}kg</Text>
+                                                                            </View>
                                                                             <Text style={styles.compareLabel}>Tú</Text>
                                                                         </View>
-                                                                        <View style={{ flex: 1, alignItems: 'center' }}>
-                                                                            <Text style={[styles.compareValue, friendWon && styles.compareValueHighlight]}>{comp.friend1RM}kg</Text>
+                                                                        <View style={[styles.compareBarContainer, { flex: 1 }]}>
+                                                                            <View style={[styles.compareValueRow, friendWon && styles.compareValueHighlightBox]}>
+                                                                                <Text style={[styles.compareValue, friendWon && styles.compareValueHighlight]}>{comp.friend1RM}kg</Text>
+                                                                            </View>
                                                                             <Text style={styles.compareLabel}>{user.displayName}</Text>
                                                                         </View>
                                                                     </View>
@@ -436,9 +449,17 @@ export default function SocialTab() {
                                                     </View>
                                                 ) : (
                                                     <View style={styles.premiumResolved}>
-                                                        <Text style={styles.premiumStatusText}>
-                                                            {item.status === 'accepted' ? '✓ Rutina Importada' : '✗ Rutina Rechazada'}
-                                                        </Text>
+                                                        {item.status === 'accepted' ? (
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                                <CheckCircle size={16} color="#16a34a" style={{ marginRight: 6 }} />
+                                                                <Text style={[styles.premiumStatusText, { color: '#16a34a' }]}>Rutina Importada</Text>
+                                                            </View>
+                                                        ) : (
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                                <XCircle size={16} color="#ef4444" style={{ marginRight: 6 }} />
+                                                                <Text style={[styles.premiumStatusText, { color: '#ef4444' }]}>Rutina Rechazada</Text>
+                                                            </View>
+                                                        )}
                                                     </View>
                                                 )}
                                             </View>
@@ -767,13 +788,36 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 12,
     },
+    compareRowHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
     compareExerciseName: {
         color: Colors.white,
         fontSize: 14,
         fontWeight: 'bold',
         textTransform: 'capitalize',
-        marginBottom: 8,
-        textAlign: 'center',
+        flex: 1,
+    },
+    compareDiff: {
+        fontSize: 12,
+        fontWeight: '900',
+    },
+    compareBarContainer: {
+        alignItems: 'center',
+    },
+    compareValueRow: {
+        paddingVertical: 4,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        backgroundColor: 'transparent',
+    },
+    compareValueHighlightBox: {
+        backgroundColor: Colors.primary.DEFAULT + '20',
+        borderColor: Colors.primary.DEFAULT + '40',
+        borderWidth: 1,
     },
     compareBars: {
         flexDirection: 'row',
@@ -813,13 +857,14 @@ const styles = StyleSheet.create({
         marginRight: 12,
     },
     segmentBtn: {
+        backgroundColor: Colors.iron[900],
         flex: 1,
         paddingVertical: 8,
         alignItems: 'center',
         borderRadius: 8,
     },
     segmentBtnActive: {
-        backgroundColor: Colors.iron[700],
+        backgroundColor: Colors.iron[950],
     },
     segmentText: {
         fontSize: 12,

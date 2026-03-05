@@ -15,7 +15,7 @@ const ALLOWED_TABLES = [
 ];
 
 interface SyncPayload {
-    id: number;
+    id: string;
     table_name: string;
     record_id: string;
     operation: 'INSERT' | 'UPDATE' | 'DELETE';
@@ -26,6 +26,19 @@ interface SyncPayload {
 export interface SyncStatus {
     hasData: boolean;
     recordCount: number;
+}
+
+export interface SyncQueueStatus {
+    pending: number;
+    failed: number;
+    processing: number;
+    totalOutstanding: number;
+}
+
+export interface SyncDiagnostics {
+    local: SyncStatus;
+    remote: SyncStatus;
+    queue: SyncQueueStatus;
 }
 
 export class SyncService {
@@ -52,25 +65,28 @@ export class SyncService {
     /**
      * Executes a full bidirectional sync: Push local changes, then Pull remote changes.
      */
-    public async syncBidirectional(): Promise<void> {
+    public async syncBidirectional(options?: { forcePull?: boolean }): Promise<void> {
         if (this.isSyncing) return;
         this.isSyncing = true;
 
         try {
             const token = useAuthStore.getState().token;
-            if (!token) return; // Silent if no network or auth
+            if (!token) {
+                return;
+            }
 
             const netState = await NetInfo.fetch();
-            if (!netState.isConnected || !netState.isInternetReachable) return;
-            const db = dbService.getDatabase();
+            if (!netState.isConnected || !netState.isInternetReachable) {
+                return;
+            }
 
-            // Reintentar los fallidos si es manual
-            await db.runAsync(`UPDATE sync_queue SET status = 'pending', retry_count = 0 WHERE status = 'failed'`);
+            // Reintentar los fallidos que aún no superaron el límite
+            await dbService.run(`UPDATE sync_queue SET status = 'pending' WHERE status = 'failed' AND retry_count < ?`, [MAX_RETRIES]);
 
             await this.pushLocalChanges(token);
-            await this.pullRemoteChanges(token);
+            await this.pullRemoteChanges(token, options?.forcePull);
         } catch (error) {
-            console.error('Bidirectional sync failed', error);
+            console.error('[Sync] Bidirectional sync failed:', error);
             throw error;
         } finally {
             this.isSyncing = false;
@@ -81,11 +97,10 @@ export class SyncService {
      * Pushes pending mutations from the local database out to the remote server.
      */
     private async pushLocalChanges(token: string): Promise<void> {
-        const db = dbService.getDatabase();
 
         let hasMore = true;
         while (hasMore) {
-            const pendingOps = await db.getAllAsync<SyncPayload>(
+            const pendingOps = await dbService.getAll<SyncPayload>(
                 `SELECT id, table_name, record_id, operation, payload, created_at
                  FROM sync_queue
                  WHERE status IN ('pending', 'failed') AND retry_count < ?
@@ -100,18 +115,18 @@ export class SyncService {
             }
 
             const ids = pendingOps.map(op => op.id);
-            await db.runAsync(`UPDATE sync_queue SET status = 'processing' WHERE id IN (${ids.map(() => '?').join(',')})`, ids);
+            await dbService.run(`UPDATE sync_queue SET status = 'processing' WHERE id IN (${ids.map(() => '?').join(',')})`, ids);
 
             try {
                 const validOperations: {
-                    id: number;
+                    id: string;
                     table: string;
                     recordId: string;
                     operation: 'INSERT' | 'UPDATE' | 'DELETE';
                     payload: Record<string, unknown> | null;
                     timestamp: number;
                 }[] = [];
-                const invalidIds: number[] = [];
+                const invalidIds: string[] = [];
 
                 for (const op of pendingOps) {
                     if (!ALLOWED_TABLES.includes(op.table_name)) {
@@ -134,7 +149,7 @@ export class SyncService {
                 }
 
                 if (invalidIds.length > 0) {
-                    await db.runAsync(`UPDATE sync_queue SET status = 'failed', retry_count = retry_count + 1 WHERE id IN (${invalidIds.map(() => '?').join(',')})`, invalidIds);
+                    await dbService.run(`UPDATE sync_queue SET status = 'failed', retry_count = retry_count + 1 WHERE id IN (${invalidIds.map(() => '?').join(',')})`, invalidIds);
                 }
 
                 if (validOperations.length === 0) {
@@ -157,8 +172,8 @@ export class SyncService {
                 const result = await response.json();
 
                 // Track IDs of successfully synced versus failed operations
-                const successIds: number[] = [];
-                const failedIds: number[] = [];
+                const successIds: string[] = [];
+                const failedIds: string[] = [];
 
                 if (result.results && Array.isArray(result.results)) {
                     for (const res of result.results) {
@@ -169,22 +184,22 @@ export class SyncService {
                         }
                     }
                 } else {
-                    // Si no hay detalles (backend no lo respeta), asumimos exitoso si devolvió 200
+                    // Fallback to treat all as successful if the response is OK but contains no detailed results
                     successIds.push(...validOperations.map(op => op.id));
                 }
 
                 if (successIds.length > 0) {
-                    await db.runAsync(`UPDATE sync_queue SET status = 'synced', synced_at = ? WHERE id IN (${successIds.map(() => '?').join(',')})`, [Date.now(), ...successIds]);
+                    await dbService.run(`UPDATE sync_queue SET status = 'synced', synced_at = ? WHERE id IN (${successIds.map(() => '?').join(',')})`, [Date.now(), ...successIds]);
                 }
 
                 if (failedIds.length > 0) {
-                    await db.runAsync(`UPDATE sync_queue SET status = 'failed', retry_count = retry_count + 1 WHERE id IN (${failedIds.map(() => '?').join(',')})`, failedIds);
+                    await dbService.run(`UPDATE sync_queue SET status = 'failed', retry_count = retry_count + 1 WHERE id IN (${failedIds.map(() => '?').join(',')})`, failedIds);
                 }
 
                 hasMore = validOperations.length === MAX_BATCH_SIZE; // Continue if we processed a full batch
             } catch (error) {
                 console.error(`Sync push error:`, error);
-                await db.runAsync(`UPDATE sync_queue SET status = 'failed', retry_count = retry_count + 1 WHERE id IN (${ids.map(() => '?').join(',')})`, ids);
+                await dbService.run(`UPDATE sync_queue SET status = 'failed', retry_count = retry_count + 1 WHERE id IN (${ids.map(() => '?').join(',')})`, ids);
                 throw error; // Throw to abort sync chain if push fails fully
             }
         }
@@ -193,12 +208,10 @@ export class SyncService {
     /**
      * Pulls remote changes that happened after the last sync timestamp.
      */
-    private async pullRemoteChanges(token: string): Promise<void> {
-        const db = dbService.getDatabase();
-
+    private async pullRemoteChanges(token: string, forcePull = false): Promise<void> {
         // Retrieve the last synced timestamp from local settings
-        const lastSyncRecord = await db.getFirstAsync<{ value: string }>('SELECT value FROM settings WHERE key = ?', ['last_pull_sync']);
-        const lastSyncAt = lastSyncRecord?.value ? parseInt(lastSyncRecord.value, 10) : 0;
+        const lastSyncRecord = await dbService.getFirst<{ value: string }>('SELECT value FROM settings WHERE key = ?', ['last_pull_sync']);
+        const lastSyncAt = (lastSyncRecord?.value && !forcePull) ? parseInt(lastSyncRecord.value, 10) : 0;
 
         try {
             const response = await this.requestWithRetry(`${API_BASE_URL}/pull?since=${lastSyncAt}`, {
@@ -215,40 +228,76 @@ export class SyncService {
 
             const data = await response.json();
             const changes = Array.isArray(data?.changes) ? data.changes : [];
+            const serverTime = data?.serverTime;
 
-            if (changes.length > 0) {
-                await db.withTransactionAsync(async () => {
-                    for (const change of changes) {
-                        const table = typeof change?.table === 'string' ? change.table : null;
-                        const operation = typeof change?.operation === 'string' ? change.operation : null;
-                        const payload = change?.payload && typeof change.payload === 'object' ? change.payload : null;
-                        if (!table || !operation || !payload) {
-                            continue;
-                        }
-                        if (!ALLOWED_TABLES.includes(table)) {
-                            continue;
-                        }
+            const byTable = new Map<string, any[]>();
+            for (const change of changes) {
+                const table = typeof change?.table === 'string' ? change.table : null;
+                if (!table || !ALLOWED_TABLES.includes(table)) continue;
+                if (!byTable.has(table)) byTable.set(table, []);
+                byTable.get(table)!.push(change);
+            }
 
-                        if (operation === 'INSERT' || operation === 'UPDATE') {
-                            const keys = Object.keys(payload);
-                            const values = Object.values(payload);
-                            const placeholders = keys.map(() => '?').join(', ');
+            if (byTable.size > 0) {
+                await dbService.withTransaction(async () => {
+                    for (const [table, tableChanges] of byTable.entries()) {
+                        const ids = tableChanges
+                            .map((c) => (c?.payload?.id ?? c?.payload?.recordId) as unknown)
+                            .filter((v): v is string => typeof v === 'string' && v.length > 0);
 
-                            await db.runAsync(
-                                `INSERT OR REPLACE INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`,
-                                values as any
-                            );
-                        } else if (operation === 'DELETE') {
-                            if (typeof payload.id === 'string' && payload.id.length > 0) {
-                                await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, [payload.id]);
+                        const existingRows = ids.length > 0
+                            ? await dbService.getAll<{ id: string; updated_at?: number | null; deleted_at?: number | null }>(
+                                `SELECT id, updated_at, deleted_at FROM ${table} WHERE id IN (${ids.map(() => '?').join(', ')})`,
+                                ids
+                            )
+                            : [];
+
+                        const existingById = new Map(existingRows.map((r) => [r.id, r] as const));
+
+                        for (const change of tableChanges) {
+                            const operation = typeof change?.operation === 'string' ? change.operation : null;
+                            const payload = change?.payload && typeof change.payload === 'object' ? change.payload : null;
+                            if (!operation || !payload) continue;
+
+                            const recordId = payload.id || payload.recordId;
+                            if (typeof recordId !== 'string' || recordId.length === 0) continue;
+
+                            const local = existingById.get(recordId);
+
+                            if (operation === 'INSERT' || operation === 'UPDATE') {
+                                const remoteUpdatedAt = typeof payload.updated_at === 'number' ? payload.updated_at : null;
+                                const localUpdatedAt = typeof local?.updated_at === 'number' ? local.updated_at : null;
+                                if (remoteUpdatedAt !== null && localUpdatedAt !== null && localUpdatedAt >= remoteUpdatedAt) {
+                                    continue;
+                                }
+
+                                const keys = Object.keys(payload);
+                                const values = Object.values(payload);
+                                const placeholders = keys.map(() => '?').join(', ');
+
+                                await dbService.run(
+                                    `INSERT OR REPLACE INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`,
+                                    values as any
+                                );
+                                continue;
+                            }
+
+                            if (operation === 'DELETE') {
+                                const remoteUpdatedAt = typeof payload.updated_at === 'number' ? payload.updated_at : null;
+                                const localUpdatedAt = typeof local?.updated_at === 'number' ? local.updated_at : null;
+                                if (remoteUpdatedAt !== null && localUpdatedAt !== null && localUpdatedAt >= remoteUpdatedAt) {
+                                    continue;
+                                }
+                                await dbService.run(`DELETE FROM ${table} WHERE id = ?`, [recordId]);
                             }
                         }
                     }
                 });
             }
 
-            // Update local sync time
-            await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', Date.now().toString()]);
+            // Update local sync time with SERVER time to avoid clock drift issues
+            const nextSyncTime = serverTime ? serverTime.toString() : Date.now().toString();
+            await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', nextSyncTime]);
 
         } catch (error) {
             console.error('PULL sync failed:', error);
@@ -260,7 +309,6 @@ export class SyncService {
      * Generates a complete JSON snapshot of the local database.
      */
     public async createDatabaseSnapshot(): Promise<string> {
-        const db = dbService.getDatabase();
         const tables = [
             'exercises', 'categories', 'workouts', 'workout_sets',
             'routines', 'routine_days', 'routine_exercises',
@@ -270,7 +318,7 @@ export class SyncService {
         const snapshot: Record<string, any[]> = {};
 
         for (const table of tables) {
-            snapshot[table] = await db.getAllAsync(`SELECT * FROM ${table}`);
+            snapshot[table] = await dbService.getAll(`SELECT * FROM ${table}`);
         }
 
         const jsonString = JSON.stringify(snapshot, null, 2);
@@ -292,9 +340,7 @@ export class SyncService {
             const jsonString = await FileSystem.readAsStringAsync(fileUri, { encoding: FileSystem.EncodingType?.UTF8 || 'utf8' });
             const snapshot = JSON.parse(jsonString);
 
-            const db = dbService.getDatabase();
-
-            await db.withTransactionAsync(async () => {
+            await dbService.withTransaction(async () => {
                 // Wipe current tables
                 const tables = Object.keys(snapshot);
                 for (const table of tables) {
@@ -302,19 +348,19 @@ export class SyncService {
                     if (!['exercises', 'categories', 'workouts', 'workout_sets', 'routines', 'routine_days', 'routine_exercises', 'measurements', 'goals', 'plate_inventory', 'settings'].includes(table)) {
                         continue;
                     }
-                    await db.runAsync(`DELETE FROM ${table}`);
+                    await dbService.run(`DELETE FROM ${table}`);
 
                     const records = snapshot[table];
                     for (const record of records) {
                         const keys = Object.keys(record);
                         const values = Object.values(record);
                         const placeholders = keys.map(() => '?').join(', ');
-                        await db.runAsync(`INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`, values as any);
+                        await dbService.run(`INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`, values as any);
                     }
                 }
 
                 // Append full sync event to avoid pushing this as mutations
-                await db.runAsync('DELETE FROM sync_queue');
+                await dbService.run('DELETE FROM sync_queue');
             });
         } catch (error) {
             console.error('Failed to restore snapshot:', error);
@@ -336,21 +382,48 @@ export class SyncService {
     }
 
     public async checkLocalStatus(): Promise<SyncStatus> {
-        const db = dbService.getDatabase();
         let count = 0;
         const tables = ['workouts', 'routines', 'exercises'];
         for (const t of tables) {
-            const res = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) as count FROM ${t}`);
+            const res = await dbService.getFirst<{ count: number }>(`SELECT COUNT(*) as count FROM ${t}`);
             count += res?.count || 0;
         }
         return { hasData: count > 0, recordCount: count };
+    }
+
+    public async checkQueueStatus(): Promise<SyncQueueStatus> {
+        const [pending, failed, processing] = await Promise.all([
+            dbService.getFirst<{ count: number }>("SELECT COUNT(*) as count FROM sync_queue WHERE status = 'pending'"),
+            dbService.getFirst<{ count: number }>("SELECT COUNT(*) as count FROM sync_queue WHERE status = 'failed'"),
+            dbService.getFirst<{ count: number }>("SELECT COUNT(*) as count FROM sync_queue WHERE status = 'processing'"),
+        ]);
+
+        const pendingCount = pending?.count ?? 0;
+        const failedCount = failed?.count ?? 0;
+        const processingCount = processing?.count ?? 0;
+
+        return {
+            pending: pendingCount,
+            failed: failedCount,
+            processing: processingCount,
+            totalOutstanding: pendingCount + failedCount + processingCount,
+        };
+    }
+
+    public async getDiagnostics(): Promise<SyncDiagnostics> {
+        const [local, remote, queue] = await Promise.all([
+            this.checkLocalStatus(),
+            this.checkRemoteStatus(),
+            this.checkQueueStatus(),
+        ]);
+
+        return { local, remote, queue };
     }
 
     public async pushLocalSnapshot(): Promise<void> {
         const token = useAuthStore.getState().token;
         if (!token) throw new Error('Usuario no autenticado');
 
-        const db = dbService.getDatabase();
         const tables = [
             'exercises', 'categories', 'workouts', 'workout_sets',
             'routines', 'routine_days', 'routine_exercises',
@@ -359,7 +432,7 @@ export class SyncService {
 
         const snapshot: Record<string, any[]> = {};
         for (const table of tables) {
-            snapshot[table] = await db.getAllAsync(`SELECT * FROM ${table}`);
+            snapshot[table] = await dbService.getAll(`SELECT * FROM ${table}`);
         }
 
         const response = await this.requestWithRetry(`${API_BASE_URL}/snapshot`, {
@@ -375,8 +448,8 @@ export class SyncService {
             throw new Error(`Snapshot push failed! status: ${response.status}`);
         }
 
-        await db.runAsync('DELETE FROM sync_queue');
-        await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', Date.now().toString()]);
+        await dbService.run('DELETE FROM sync_queue');
+        await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', Date.now().toString()]);
     }
 
     public async pullCloudSnapshot(): Promise<void> {
@@ -401,8 +474,7 @@ export class SyncService {
 
         await this.restoreDatabaseSnapshot(fileUri);
 
-        const db = dbService.getDatabase();
-        await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', Date.now().toString()]);
+        await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', Date.now().toString()]);
     }
 }
 

@@ -7,7 +7,7 @@ function renderChangelogItem(text: string) {
     if (part.startsWith('**') && part.endsWith('**')) {
       const boldContent = part.slice(2, -2);
       return (
-        <strong key={idx} className="text-base font-bold text-iron-500">
+        <strong key={idx} className="text-base font-bold text-[#1a1a2e]">
           {boldContent}
         </strong>
       );

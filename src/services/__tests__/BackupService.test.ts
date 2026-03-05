@@ -11,6 +11,7 @@ jest.mock('../DatabaseService', () => ({
     run: jest.fn(),
     getAll: jest.fn(),
     getFirst: jest.fn(),
+    withTransaction: jest.fn(async (cb: () => Promise<void>) => { await cb(); }),
   },
 }));
 

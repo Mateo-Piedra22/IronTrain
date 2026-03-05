@@ -1,4 +1,5 @@
 import { PlateInventory, Setting } from '../types/db';
+import { uuidV4 } from '../utils/uuid';
 import { dbService } from './DatabaseService';
 
 export class SettingsService {
@@ -6,8 +7,7 @@ export class SettingsService {
     // --- General Settings ---
 
     public async getSetting(key: string): Promise<string | null> {
-        const db = dbService.getDatabase();
-        const res = await db.getFirstAsync<Setting>('SELECT * FROM settings WHERE key = ?', [key]);
+        const res = await dbService.getFirst<Setting>('SELECT * FROM settings WHERE key = ?', [key]);
         return res ? res.value : null;
     }
 
@@ -23,28 +23,25 @@ export class SettingsService {
     // --- Plate Inventory ---
 
     public async getPlateInventory(): Promise<PlateInventory[]> {
-        const db = dbService.getDatabase();
-        return await db.getAllAsync<PlateInventory>('SELECT * FROM plate_inventory ORDER BY weight DESC');
+        return await dbService.getAll<PlateInventory>('SELECT * FROM plate_inventory ORDER BY weight DESC');
     }
 
     public async updatePlateInventory(plates: PlateInventory[]): Promise<void> {
         try {
-            await dbService.run('BEGIN TRANSACTION');
+            await dbService.withTransaction(async () => {
+                // Clear existing
+                await dbService.run('DELETE FROM plate_inventory');
 
-            // Clear existing
-            await dbService.run('DELETE FROM plate_inventory');
-
-            // Insert new
-            for (const p of plates) {
-                await dbService.run(
-                    'INSERT INTO plate_inventory (weight, count, type, unit, color) VALUES (?, ?, ?, ?, ?)',
-                    [p.weight, p.count, p.type, p.unit, p.color || null]
-                );
-            }
-
-            await dbService.run('COMMIT');
+                // Insert new
+                for (const p of plates) {
+                    const id = uuidV4();
+                    await dbService.run(
+                        'INSERT INTO plate_inventory (id, weight, count, available, type, unit, color) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                        [id, p.weight, p.count, p.count, p.type, p.unit, p.color || null]
+                    );
+                }
+            });
         } catch (error) {
-            await dbService.run('ROLLBACK');
             throw error;
         }
     }

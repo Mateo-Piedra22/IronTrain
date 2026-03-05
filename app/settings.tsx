@@ -125,13 +125,13 @@ export default function SettingsScreen() {
     const handleCloudSnapshot = async () => {
         try {
             notify.info('Verificando estado...', 'Comprobando registros en la nube y en el dispositivo.');
-            const local = await syncService.checkLocalStatus();
-            const remote = await syncService.checkRemoteStatus();
+            const diag = await syncService.getDiagnostics();
+            const { local, remote, queue } = diag;
 
             if (local.hasData && remote.hasData) {
                 confirm.custom({
                     title: 'Resolución de Conflictos',
-                    message: `Tenes datos completos en ambas partes:\nCelular: ${local.recordCount} registros.\nNube Neon: ${remote.recordCount} registros.\n¿Qué base de datos querés utilizar como fuente de verdad?`,
+                    message: `Tenes datos completos en ambas partes:\nCelular: ${local.recordCount} registros.\nNube Neon: ${remote.recordCount} registros.\n\nCola de Sync en el celular (pendiente de subir):\nPendientes: ${queue.pending}\nFallidos: ${queue.failed}\nProcesando: ${queue.processing}\nTotal: ${queue.totalOutstanding}\n\n¿Qué base de datos querés utilizar como fuente de verdad?`,
                     variant: 'warning',
                     buttons: [
                         {
@@ -146,7 +146,7 @@ export default function SettingsScreen() {
                                 confirm.hide();
                                 try {
                                     notify.info('Sincronizando...', 'Fusionando datos local-nube sin perder métricas.');
-                                    await syncService.syncBidirectional();
+                                    await syncService.syncBidirectional({ forcePull: true });
                                     notify.success('Éxito', 'Sincronización híbrida completa.');
                                 } catch (e) { notify.error('Error'); }
                             }

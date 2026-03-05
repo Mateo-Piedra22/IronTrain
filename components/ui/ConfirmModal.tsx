@@ -44,7 +44,7 @@ export function ConfirmModal({ visible, onClose, title, message, variant = 'info
         { label: 'Entendido', onPress: onClose, variant: 'solid' },
     ];
 
-    const isStacked = resolvedButtons.length > 2;
+    const isStacked = resolvedButtons.length >= 2;
 
     return (
         <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
