@@ -3,6 +3,79 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
+
+const toCamelCaseKey = (key: string): string => key.replace(/_([a-z])/g, (_, ch: string) => ch.toUpperCase());
+
+const toDateFromAny = (value: unknown): Date | undefined => {
+    if (value === null || value === undefined) return undefined;
+    if (value instanceof Date) return value;
+    if (typeof value === 'number' && Number.isFinite(value)) return new Date(value);
+    if (typeof value === 'string') {
+        const ms = Date.parse(value);
+        if (!Number.isNaN(ms)) return new Date(ms);
+    }
+    return undefined;
+};
+
+const normalizeSnapshotRecord = (raw: unknown, userId: string): Record<string, unknown> | null => {
+    if (!raw || typeof raw !== 'object') return null;
+    const obj = raw as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+
+    for (const [k, v] of Object.entries(obj)) {
+        if (k === 'userId' || k === 'user_id') continue;
+
+        if (k === 'updated_at' || k === 'updatedAt') {
+            const d = toDateFromAny(v);
+            if (d) out.updatedAt = d;
+            continue;
+        }
+
+        if (k === 'deleted_at' || k === 'deletedAt') {
+            const d = toDateFromAny(v);
+            out.deletedAt = d ?? null;
+            continue;
+        }
+
+        const nextKey = k.includes('_') ? toCamelCaseKey(k) : k;
+        out[nextKey] = v;
+    }
+
+    out.userId = userId;
+    if (!('updatedAt' in out)) {
+        out.updatedAt = new Date();
+    }
+
+    return out;
+};
+
+const normalizeSnapshotArray = <T extends Record<string, unknown>>(
+    raw: unknown,
+    userId: string,
+    requiredKeys: ReadonlyArray<keyof T>
+): T[] => {
+    const rows: unknown[] = Array.isArray(raw) ? raw : [];
+    const out: T[] = [];
+
+    for (const r of rows) {
+        const normalized = normalizeSnapshotRecord(r, userId);
+        if (!normalized) continue;
+
+        let valid = true;
+        for (const key of requiredKeys) {
+            if (normalized[key as string] === undefined || normalized[key as string] === null) {
+                valid = false;
+                break;
+            }
+        }
+        if (!valid) continue;
+
+        out.push(normalized as T);
+    }
+
+    return out;
+};
+
 export async function GET(req: NextRequest) {
     try {
         const userId = await verifyAuth(req);
@@ -40,6 +113,26 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Invalid snapshot payload' }, { status: 400 });
         }
 
+        type CategoryInsert = typeof schema.categories.$inferInsert;
+        type ExerciseInsert = typeof schema.exercises.$inferInsert;
+        type RoutineInsert = typeof schema.routines.$inferInsert;
+        type RoutineDayInsert = typeof schema.routineDays.$inferInsert;
+        type RoutineExerciseInsert = typeof schema.routineExercises.$inferInsert;
+        type WorkoutInsert = typeof schema.workouts.$inferInsert;
+        type WorkoutSetInsert = typeof schema.workoutSets.$inferInsert;
+        type MeasurementInsert = typeof schema.measurements.$inferInsert;
+        type GoalInsert = typeof schema.goals.$inferInsert;
+
+        const categories = normalizeSnapshotArray<CategoryInsert>(snapshot.categories, userId, ['id', 'name', 'userId']);
+        const exercises = normalizeSnapshotArray<ExerciseInsert>(snapshot.exercises, userId, ['id', 'name', 'userId', 'categoryId', 'type']);
+        const routines = normalizeSnapshotArray<RoutineInsert>(snapshot.routines, userId, ['id', 'name', 'userId']);
+        const routineDays = normalizeSnapshotArray<RoutineDayInsert>(snapshot.routine_days, userId, ['id', 'name', 'userId', 'routineId', 'orderIndex']);
+        const routineExercises = normalizeSnapshotArray<RoutineExerciseInsert>(snapshot.routine_exercises, userId, ['id', 'userId', 'routineDayId', 'exerciseId', 'orderIndex']);
+        const workouts = normalizeSnapshotArray<WorkoutInsert>(snapshot.workouts, userId, ['id', 'name', 'userId', 'date', 'startTime']);
+        const workoutSets = normalizeSnapshotArray<WorkoutSetInsert>(snapshot.workout_sets, userId, ['id', 'userId', 'workoutId', 'exerciseId']);
+        const measurements = normalizeSnapshotArray<MeasurementInsert>(snapshot.measurements, userId, ['id', 'userId', 'date', 'type', 'value', 'unit']);
+        const goals = normalizeSnapshotArray<GoalInsert>(snapshot.goals, userId, ['id', 'userId', 'type', 'title', 'targetValue']);
+
         // Wipe all user data transactionally
         await db.transaction(async (tx) => {
             // Delete in reverse dependency order
@@ -54,15 +147,15 @@ export async function POST(req: NextRequest) {
             await tx.delete(schema.goals).where(eq(schema.goals.userId, userId));
 
             // Insert new data
-            if (snapshot.categories?.length) await tx.insert(schema.categories).values(snapshot.categories).onConflictDoNothing();
-            if (snapshot.exercises?.length) await tx.insert(schema.exercises).values(snapshot.exercises).onConflictDoNothing();
-            if (snapshot.routines?.length) await tx.insert(schema.routines).values(snapshot.routines).onConflictDoNothing();
-            if (snapshot.routine_days?.length) await tx.insert(schema.routineDays).values(snapshot.routine_days).onConflictDoNothing();
-            if (snapshot.routine_exercises?.length) await tx.insert(schema.routineExercises).values(snapshot.routine_exercises).onConflictDoNothing();
-            if (snapshot.workouts?.length) await tx.insert(schema.workouts).values(snapshot.workouts).onConflictDoNothing();
-            if (snapshot.workout_sets?.length) await tx.insert(schema.workoutSets).values(snapshot.workout_sets).onConflictDoNothing();
-            if (snapshot.measurements?.length) await tx.insert(schema.measurements).values(snapshot.measurements).onConflictDoNothing();
-            if (snapshot.goals?.length) await tx.insert(schema.goals).values(snapshot.goals).onConflictDoNothing();
+            if (categories.length) await tx.insert(schema.categories).values(categories).onConflictDoNothing();
+            if (exercises.length) await tx.insert(schema.exercises).values(exercises).onConflictDoNothing();
+            if (routines.length) await tx.insert(schema.routines).values(routines).onConflictDoNothing();
+            if (routineDays.length) await tx.insert(schema.routineDays).values(routineDays).onConflictDoNothing();
+            if (routineExercises.length) await tx.insert(schema.routineExercises).values(routineExercises).onConflictDoNothing();
+            if (workouts.length) await tx.insert(schema.workouts).values(workouts).onConflictDoNothing();
+            if (workoutSets.length) await tx.insert(schema.workoutSets).values(workoutSets).onConflictDoNothing();
+            if (measurements.length) await tx.insert(schema.measurements).values(measurements).onConflictDoNothing();
+            if (goals.length) await tx.insert(schema.goals).values(goals).onConflictDoNothing();
         });
 
         return NextResponse.json({ success: true });

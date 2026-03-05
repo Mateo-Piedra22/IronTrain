@@ -503,24 +503,96 @@ export class SyncService {
             const jsonString = await FileSystem.readAsStringAsync(fileUri, { encoding: FileSystem.EncodingType?.UTF8 || 'utf8' });
             const snapshot = JSON.parse(jsonString);
 
-            await dbService.withTransaction(async () => {
-                // Wipe current tables
-                const tables = Object.keys(snapshot);
-                for (const table of tables) {
-                    // Check if table allowed to prevent SQL injections into meta tables like sqlite_master
-                    if (!['exercises', 'categories', 'workouts', 'workout_sets', 'routines', 'routine_days', 'routine_exercises', 'measurements', 'goals', 'plate_inventory', 'settings'].includes(table)) {
+            const TABLES: ReadonlyArray<string> = [
+                'categories',
+                'exercises',
+                'routines',
+                'routine_days',
+                'routine_exercises',
+                'workouts',
+                'workout_sets',
+                'measurements',
+                'goals',
+                'plate_inventory',
+                'settings',
+                'body_metrics',
+            ];
+
+            const toSnakeKey = (k: string): string => k.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+
+            const normalizeRecord = (table: string, raw: unknown): Record<string, unknown> | null => {
+                if (!raw || typeof raw !== 'object') return null;
+                const obj = raw as Record<string, unknown>;
+                const out: Record<string, unknown> = {};
+
+                for (const [key, value] of Object.entries(obj)) {
+                    if (key === 'userId' || key === 'user_id') {
                         continue;
                     }
-                    await dbService.run(`DELETE FROM ${table}`);
 
-                    const records = snapshot[table];
+                    if (key === 'updatedAt' || key === 'updated_at') {
+                        if (typeof value === 'number') {
+                            out.updated_at = value;
+                        } else if (typeof value === 'string') {
+                            const ms = Date.parse(value);
+                            if (!Number.isNaN(ms)) out.updated_at = ms;
+                        }
+                        continue;
+                    }
+
+                    if (key === 'deletedAt' || key === 'deleted_at') {
+                        if (value === null || value === undefined) {
+                            out.deleted_at = null;
+                        } else if (typeof value === 'number') {
+                            out.deleted_at = value;
+                        } else if (typeof value === 'string') {
+                            const ms = Date.parse(value);
+                            if (!Number.isNaN(ms)) out.deleted_at = ms;
+                        }
+                        continue;
+                    }
+
+                    const normalizedKey = key.includes('_') ? key : toSnakeKey(key);
+                    out[normalizedKey] = value;
+                }
+
+                if (table === 'settings') {
+                    // settings has no deleted_at; ensure we don't insert unexpected columns
+                    delete out.deleted_at;
+                }
+
+                return out;
+            };
+
+            await dbService.withTransaction(async () => {
+                // Snapshot restore must be deterministic and FK-safe.
+                // We temporarily disable FK enforcement during restore and rely on correct ordering.
+                await dbService.executeRaw('PRAGMA foreign_keys = OFF;');
+
+                const allowed = new Set(TABLES);
+                const tablesInSnapshot = snapshot && typeof snapshot === 'object' ? Object.keys(snapshot) : [];
+                const presentInOrder = TABLES.filter((t) => allowed.has(t) && tablesInSnapshot.includes(t));
+                const deleteOrder = [...presentInOrder].reverse();
+
+                for (const table of deleteOrder) {
+                    await dbService.run(`DELETE FROM ${table}`);
+                }
+
+                for (const table of presentInOrder) {
+                    const recordsRaw = (snapshot as any)?.[table];
+                    const records: unknown[] = Array.isArray(recordsRaw) ? recordsRaw : [];
                     for (const record of records) {
-                        const keys = Object.keys(record);
-                        const values = Object.values(record);
+                        const normalized = normalizeRecord(table, record);
+                        if (!normalized) continue;
+                        const keys = Object.keys(normalized);
+                        if (keys.length === 0) continue;
+                        const values = Object.values(normalized);
                         const placeholders = keys.map(() => '?').join(', ');
                         await dbService.run(`INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`, values as any);
                     }
                 }
+
+                await dbService.executeRaw('PRAGMA foreign_keys = ON;');
 
                 // Append full sync event to avoid pushing this as mutations
                 await dbService.run('DELETE FROM sync_queue');
