@@ -73,4 +73,110 @@ describe('SyncService', () => {
     const invalidInsert = calls.find(sql => sql.includes('hack_table'));
     expect(invalidInsert).toBeUndefined();
   });
+
+  it('applies pull upserts in dependency order (parents before children)', async () => {
+    (dbService.getFirst as jest.Mock).mockResolvedValue({ value: '0' });
+
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        changes: [
+          {
+            table: 'workout_sets',
+            operation: 'INSERT',
+            payload: {
+              id: 'set-1',
+              workout_id: 'w-1',
+              exercise_id: 'e-1',
+              type: 'weight_reps',
+              order_index: 0,
+              completed: 0,
+              updated_at: 2,
+              deleted_at: null,
+            },
+          },
+          {
+            table: 'workouts',
+            operation: 'INSERT',
+            payload: {
+              id: 'w-1',
+              date: 1,
+              start_time: 1,
+              status: 'in_progress',
+              updated_at: 1,
+              deleted_at: null,
+            },
+          },
+        ],
+        serverTime: 3,
+      }),
+    });
+
+    (dbService.getAll as jest.Mock).mockResolvedValue([]);
+
+    await (syncService as any).pullRemoteChanges('token-1');
+
+    const runSql = (dbService.run as jest.Mock).mock.calls.map((c) => String(c[0]));
+    const workoutIdx = runSql.findIndex((sql) => sql.includes('INSERT OR REPLACE INTO workouts'));
+    const setIdx = runSql.findIndex((sql) => sql.includes('INSERT OR REPLACE INTO workout_sets'));
+
+    expect(workoutIdx).toBeGreaterThanOrEqual(0);
+    expect(setIdx).toBeGreaterThanOrEqual(0);
+    expect(workoutIdx).toBeLessThan(setIdx);
+  });
+
+  it('defers FK-failing upserts and retries them without aborting pull', async () => {
+    (dbService.getFirst as jest.Mock).mockResolvedValue({ value: '0' });
+
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        changes: [
+          {
+            table: 'workout_sets',
+            operation: 'INSERT',
+            payload: {
+              id: 'set-2',
+              workout_id: 'w-2',
+              exercise_id: 'e-2',
+              type: 'weight_reps',
+              order_index: 0,
+              completed: 0,
+              updated_at: 2,
+              deleted_at: null,
+            },
+          },
+          {
+            table: 'workouts',
+            operation: 'INSERT',
+            payload: {
+              id: 'w-2',
+              date: 1,
+              start_time: 1,
+              status: 'in_progress',
+              updated_at: 1,
+              deleted_at: null,
+            },
+          },
+        ],
+        serverTime: 3,
+      }),
+    });
+
+    (dbService.getAll as jest.Mock).mockResolvedValue([]);
+
+    // First attempt to insert workout_sets fails due to FK; retry pass should succeed.
+    (dbService.run as jest.Mock).mockImplementation(async (sql: string) => {
+      if (sql.includes('INSERT OR REPLACE INTO workout_sets')) {
+        const calls = (dbService.run as jest.Mock).mock.calls.filter((c) => String(c[0]).includes('INSERT OR REPLACE INTO workout_sets'));
+        if (calls.length === 0) {
+          const err: any = new Error('FOREIGN KEY constraint failed');
+          throw err;
+        }
+      }
+      return {} as any;
+    });
+
+    await expect((syncService as any).pullRemoteChanges('token-1')).resolves.toBeUndefined();
+  });
 });

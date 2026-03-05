@@ -148,7 +148,16 @@ export class DatabaseService {
         date INTEGER NOT NULL,
         type TEXT NOT NULL,
         value REAL NOT NULL,
-        unit TEXT NOT NULL,
+        notes TEXT,
+        updated_at INTEGER DEFAULT 0,
+        deleted_at INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS body_metrics (
+        id TEXT PRIMARY KEY NOT NULL,
+        date INTEGER NOT NULL,
+        weight REAL,
+        body_fat REAL,
         notes TEXT,
         updated_at INTEGER DEFAULT 0,
         deleted_at INTEGER
@@ -841,7 +850,12 @@ export class DatabaseService {
             } catch (error: any) {
                 lastError = error;
                 const msg = error?.message || '';
-                const isLocked = msg.includes('database is locked') || error?.code === 'SQLITE_BUSY' || msg.includes('finalizeAsync');
+                const isForeignKey = msg.includes('FOREIGN KEY constraint failed');
+                const isLocked = (
+                    msg.includes('database is locked')
+                    || error?.code === 'SQLITE_BUSY'
+                    || (msg.includes('finalizeAsync') && !isForeignKey)
+                );
                 if (isLocked) {
                     console.warn(`[Database] Busy/Locked (attempt ${i + 1}/${retries}). Retrying...`);
                     await new Promise(resolve => setTimeout(resolve, delay));

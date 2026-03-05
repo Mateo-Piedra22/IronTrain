@@ -125,70 +125,101 @@ export default function SettingsScreen() {
     const handleCloudSnapshot = async () => {
         try {
             notify.info('Verificando estado...', 'Comprobando registros en la nube y en el dispositivo.');
-            const diag = await syncService.getDiagnostics();
+
+            confirm.custom({
+                title: 'Verificando estado...',
+                message: 'Consultando registros locales y en la nube.',
+                variant: 'info',
+                buttons: [
+                    {
+                        label: 'Cancelar',
+                        variant: 'ghost',
+                        onPress: confirm.hide,
+                    },
+                ],
+            });
+
+            const token = useAuthStore.getState().token;
+            if (!token) {
+                confirm.hide();
+                notify.error('Sync no disponible', 'Iniciá sesión para usar la sincronización.');
+                return;
+            }
+
+            const diag = await Promise.race([
+                syncService.getDiagnostics(),
+                new Promise<never>((_, reject) => {
+                    setTimeout(() => reject(new Error('Tiempo de espera agotado')), 15000);
+                }),
+            ]);
             const { local, remote, queue } = diag;
 
-            if (local.hasData && remote.hasData) {
-                confirm.custom({
-                    title: 'Resolución de Conflictos',
-                    message: `Tenes datos completos en ambas partes:\nCelular: ${local.recordCount} registros.\nNube Neon: ${remote.recordCount} registros.\n\nCola de Sync en el celular (pendiente de subir):\nPendientes: ${queue.pending}\nFallidos: ${queue.failed}\nProcesando: ${queue.processing}\nTotal: ${queue.totalOutstanding}\n\n¿Qué base de datos querés utilizar como fuente de verdad?`,
-                    variant: 'warning',
-                    buttons: [
-                        {
-                            label: 'Cancelar',
-                            variant: 'ghost',
-                            onPress: confirm.hide
-                        },
-                        {
-                            label: 'Sincronizar (Mezclar)',
-                            variant: 'outline',
-                            onPress: async () => {
-                                confirm.hide();
-                                try {
-                                    notify.info('Sincronizando...', 'Fusionando datos local-nube sin perder métricas.');
-                                    await syncService.syncBidirectional({ forcePull: true });
-                                    notify.success('Éxito', 'Sincronización híbrida completa.');
-                                } catch (e) { notify.error('Error'); }
-                            }
-                        },
-                        {
-                            label: 'Nube -> Celular',
-                            variant: 'outline',
-                            onPress: async () => {
-                                confirm.hide();
-                                try {
-                                    notify.info('Cargando...', 'Descargando Snapshot de la Nube...');
-                                    await syncService.pullCloudSnapshot();
-                                    notify.success('Éxito', 'Celular actualizado con los datos de la nube.');
-                                } catch (e) { notify.error('Error'); }
-                            }
-                        },
-                        {
-                            label: 'Celular -> Nube',
-                            variant: 'solid',
-                            onPress: async () => {
-                                confirm.hide();
-                                try {
-                                    notify.info('Cargando...', 'Subiendo Snapshot a la Nube...');
-                                    await syncService.pushLocalSnapshot();
-                                    notify.success('Éxito', 'Nube actualizada con los datos de tu celular.');
-                                } catch (e) { notify.error('Error'); }
+            confirm.hide();
+
+            const contextLine = local.hasData && remote.hasData
+                ? 'Tenes datos en ambas partes.'
+                : (local.hasData && !remote.hasData)
+                    ? 'La nube parece vacía.'
+                    : (!local.hasData && remote.hasData)
+                        ? 'Este dispositivo parece vacío.'
+                        : 'No hay datos detectados en ninguna parte.';
+
+            confirm.custom({
+                title: 'Resolución de Conflictos',
+                message: `${contextLine}\n\nCelular: ${local.recordCount} registros.\nNube Neon: ${remote.recordCount} registros.\n\nCola de Sync en el celular (pendiente de subir):\nPendientes: ${queue.pending}\nFallidos: ${queue.failed}\nProcesando: ${queue.processing}\nTotal: ${queue.totalOutstanding}\n\n¿Qué querés hacer?`,
+                variant: 'warning',
+                buttons: [
+                    {
+                        label: 'Cancelar',
+                        variant: 'ghost',
+                        onPress: confirm.hide
+                    },
+                    {
+                        label: 'Sincronizar (Mezclar)',
+                        variant: 'outline',
+                        onPress: async () => {
+                            confirm.hide();
+                            try {
+                                notify.info('Sincronizando...', 'Fusionando datos local-nube sin perder métricas.');
+                                await syncService.syncBidirectional({ forcePull: true });
+                                notify.success('Éxito', 'Sincronización híbrida completa.');
+                            } catch (e: any) {
+                                notify.error('Error', e?.message || 'No se pudo sincronizar.');
                             }
                         }
-                    ]
-                });
-            } else if (local.hasData && !remote.hasData) {
-                notify.info('Subiendo (Zero-Trust)...', 'La nube está vacía, forzando subida de datos locales...');
-                await syncService.pushLocalSnapshot();
-                notify.success('Copia Creada', 'Tus datos ahora están respaldados en la nube Neon.');
-            } else if (!local.hasData && remote.hasData) {
-                notify.info('Recuperando...', 'Recuperando tu historial completo desde la nube...');
-                await syncService.pullCloudSnapshot();
-                notify.success('Recuperación Exitosa', 'Toda tu cuenta ha resucitado en este dispositivo.');
-            } else {
-                notify.info('Cuenta Nueva', 'No hay métricas en el celular ni en la nube para procesar todavía.');
-            }
+                    },
+                    {
+                        label: 'Nube -> Celular',
+                        variant: 'outline',
+                        onPress: async () => {
+                            confirm.hide();
+                            try {
+                                notify.info('Cargando...', 'Descargando Snapshot de la Nube...');
+                                await syncService.pullCloudSnapshot();
+                                notify.success('Éxito', 'Celular actualizado con los datos de la nube.');
+                            } catch (e: any) {
+                                notify.error('Error', e?.message || 'No se pudo descargar el snapshot.');
+                            }
+                        }
+                    },
+                    {
+                        label: 'Celular -> Nube',
+                        variant: 'solid',
+                        onPress: async () => {
+                            confirm.hide();
+                            try {
+                                notify.info('Cargando...', 'Subiendo Snapshot a la Nube...');
+                                await syncService.pushLocalSnapshot();
+                                notify.success('Éxito', 'Nube actualizada con los datos de tu celular.');
+                            } catch (e: any) {
+                                notify.error('Error', e?.message || 'No se pudo subir el snapshot.');
+                            }
+                        }
+                    }
+                ]
+            });
         } catch (error: any) {
+            confirm.hide();
             notify.error('Fallo en Reconocimiento', error?.message || 'Error conectando con los servidores Neon. Revisa tu conexión.');
         }
     };

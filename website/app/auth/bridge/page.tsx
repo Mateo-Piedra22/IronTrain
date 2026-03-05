@@ -39,7 +39,24 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
     }
 
     const cookieStore = await cookies();
-    const redirectUri = cookieStore.get('redirect_uri')?.value;
+    const cookieRedirectUri = cookieStore.get('redirect_uri')?.value;
+
+    const redirectUriFromQuery = typeof searchParams?.redirectUri === 'string' ? searchParams.redirectUri : undefined;
+
+    const resolveRedirectUri = (raw: string | undefined): string | null => {
+        if (!raw) return null;
+        try {
+            const parsed = new URL(raw);
+            if (parsed.protocol !== 'irontrain:') return null;
+            return raw;
+        } catch {
+            return null;
+        }
+    };
+
+    const redirectUri = resolveRedirectUri(redirectUriFromQuery)
+        ?? resolveRedirectUri(cookieRedirectUri)
+        ?? 'irontrain://callback';
 
     const profileResult = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, session.id));
     const profile = profileResult[0];

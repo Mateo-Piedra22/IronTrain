@@ -5,8 +5,41 @@ import { useAuthStore } from '../store/authStore';
 import { dbService } from './DatabaseService';
 
 const API_BASE_URL = 'https://irontrain.motiona.xyz/api/sync';
-const MAX_BATCH_SIZE = 50;
 const MAX_RETRIES = 3;
+const RETRY_DELAY = 5000;
+const MAX_BATCH_SIZE = 50;
+const REQUEST_TIMEOUT_MS = 12000;
+
+const PULL_UPSERT_ORDER: ReadonlyArray<string> = [
+    'categories',
+    'routines',
+    'routine_days',
+    'exercises',
+    'workouts',
+    'workout_sets',
+    'routine_exercises',
+    'goals',
+    'measurements',
+    'body_metrics',
+    'plate_inventory',
+    'settings',
+];
+
+const PULL_DELETE_ORDER: ReadonlyArray<string> = [...PULL_UPSERT_ORDER].reverse();
+
+const TABLES_WITH_SOFT_DELETE: ReadonlySet<string> = new Set([
+    'categories',
+    'exercises',
+    'workouts',
+    'workout_sets',
+    'routines',
+    'routine_days',
+    'routine_exercises',
+    'goals',
+    'measurements',
+    'body_metrics',
+]);
+
 const ALLOWED_TABLES = [
     'exercises', 'categories', 'workouts', 'workout_sets',
     'routines', 'routine_days', 'routine_exercises',
@@ -52,7 +85,46 @@ export class SyncService {
         let lastError: unknown = null;
         for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
             try {
-                return await fetch(input, init);
+                const AbortControllerImpl = (globalThis as any).AbortController as typeof AbortController | undefined;
+                if (!AbortControllerImpl) {
+                    return await fetch(input, init);
+                }
+
+                const controller = new AbortControllerImpl();
+                const signal = controller.signal;
+                const outerSignal = init.signal;
+
+                let timeoutId: ReturnType<typeof setTimeout> | null = null;
+                const abortFromOuter = () => {
+                    try {
+                        controller.abort();
+                    } catch {
+                        // ignore
+                    }
+                };
+
+                if (outerSignal) {
+                    if (outerSignal.aborted) {
+                        abortFromOuter();
+                    } else {
+                        outerSignal.addEventListener('abort', abortFromOuter, { once: true });
+                    }
+                }
+
+                timeoutId = setTimeout(() => {
+                    try {
+                        controller.abort();
+                    } catch {
+                        // ignore
+                    }
+                }, REQUEST_TIMEOUT_MS);
+
+                try {
+                    return await fetch(input, { ...init, signal });
+                } finally {
+                    if (timeoutId) clearTimeout(timeoutId);
+                    if (outerSignal) outerSignal.removeEventListener('abort', abortFromOuter);
+                }
             } catch (e) {
                 lastError = e;
                 const delay = 300 * Math.pow(2, attempt);
@@ -240,7 +312,9 @@ export class SyncService {
 
             if (byTable.size > 0) {
                 await dbService.withTransaction(async () => {
-                    for (const [table, tableChanges] of byTable.entries()) {
+                    const deferredUpserts: Array<{ table: string; change: any }> = [];
+
+                    const applyForTable = async (table: string, tableChanges: any[]): Promise<void> => {
                         const ids = tableChanges
                             .map((c) => (c?.payload?.id ?? c?.payload?.recordId) as unknown)
                             .filter((v): v is string => typeof v === 'string' && v.length > 0);
@@ -275,10 +349,20 @@ export class SyncService {
                                 const values = Object.values(payload);
                                 const placeholders = keys.map(() => '?').join(', ');
 
-                                await dbService.run(
-                                    `INSERT OR REPLACE INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`,
-                                    values as any
-                                );
+                                try {
+                                    await dbService.run(
+                                        `INSERT OR REPLACE INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`,
+                                        values as any
+                                    );
+                                } catch (e: any) {
+                                    const msg = e?.message || '';
+                                    const isFk = msg.includes('FOREIGN KEY constraint failed');
+                                    if (isFk) {
+                                        deferredUpserts.push({ table, change });
+                                        continue;
+                                    }
+                                    throw e;
+                                }
                                 continue;
                             }
 
@@ -288,8 +372,87 @@ export class SyncService {
                                 if (remoteUpdatedAt !== null && localUpdatedAt !== null && localUpdatedAt >= remoteUpdatedAt) {
                                     continue;
                                 }
-                                await dbService.run(`DELETE FROM ${table} WHERE id = ?`, [recordId]);
+
+                                if (TABLES_WITH_SOFT_DELETE.has(table)) {
+                                    const deletedAt = typeof payload.deleted_at === 'number'
+                                        ? payload.deleted_at
+                                        : (typeof payload.updated_at === 'number' ? payload.updated_at : Date.now());
+                                    const updatedAt = typeof payload.updated_at === 'number' ? payload.updated_at : deletedAt;
+                                    await dbService.run(
+                                        `UPDATE ${table} SET deleted_at = ?, updated_at = ? WHERE id = ?`,
+                                        [deletedAt, updatedAt, recordId]
+                                    );
+                                } else {
+                                    await dbService.run(`DELETE FROM ${table} WHERE id = ?`, [recordId]);
+                                }
                             }
+                        }
+                    };
+
+                    const upsertTablesInOrder = PULL_UPSERT_ORDER.filter((t) => byTable.has(t));
+                    const deleteTablesInOrder = PULL_DELETE_ORDER.filter((t) => byTable.has(t));
+
+                    for (const table of upsertTablesInOrder) {
+                        const tableChanges = byTable.get(table) ?? [];
+                        const upserts = tableChanges.filter((c) => c?.operation === 'INSERT' || c?.operation === 'UPDATE');
+                        if (upserts.length > 0) {
+                            await applyForTable(table, upserts);
+                        }
+                    }
+
+                    // Retry deferred upserts that failed due to missing parent references.
+                    // This occurs when remote changes reference parents that are also part of the pull set.
+                    if (deferredUpserts.length > 0) {
+                        let pendingDeferred = [...deferredUpserts];
+                        for (let pass = 0; pass < 3 && pendingDeferred.length > 0; pass++) {
+                            const nextPending: Array<{ table: string; change: any }> = [];
+                            for (const item of pendingDeferred) {
+                                const operation = typeof item?.change?.operation === 'string' ? item.change.operation : null;
+                                const payload = item?.change?.payload && typeof item.change.payload === 'object' ? item.change.payload : null;
+                                if (!operation || !payload) continue;
+                                const recordId = payload.id || payload.recordId;
+                                if (typeof recordId !== 'string' || recordId.length === 0) continue;
+
+                                // Re-apply LWW check against current local state
+                                const localRow = await dbService.getFirst<{ updated_at?: number | null }>(
+                                    `SELECT updated_at FROM ${item.table} WHERE id = ?`,
+                                    [recordId]
+                                );
+
+                                const remoteUpdatedAt = typeof payload.updated_at === 'number' ? payload.updated_at : null;
+                                const localUpdatedAt = typeof localRow?.updated_at === 'number' ? localRow.updated_at : null;
+                                if (remoteUpdatedAt !== null && localUpdatedAt !== null && localUpdatedAt >= remoteUpdatedAt) {
+                                    continue;
+                                }
+
+                                const keys = Object.keys(payload);
+                                const values = Object.values(payload);
+                                const placeholders = keys.map(() => '?').join(', ');
+
+                                try {
+                                    await dbService.run(
+                                        `INSERT OR REPLACE INTO ${item.table} (${keys.join(', ')}) VALUES (${placeholders})`,
+                                        values as any
+                                    );
+                                } catch (e: any) {
+                                    const msg = e?.message || '';
+                                    const isFk = msg.includes('FOREIGN KEY constraint failed');
+                                    if (isFk) {
+                                        nextPending.push(item);
+                                        continue;
+                                    }
+                                    throw e;
+                                }
+                            }
+                            pendingDeferred = nextPending;
+                        }
+                    }
+
+                    for (const table of deleteTablesInOrder) {
+                        const tableChanges = byTable.get(table) ?? [];
+                        const deletes = tableChanges.filter((c) => c?.operation === 'DELETE');
+                        if (deletes.length > 0) {
+                            await applyForTable(table, deletes);
                         }
                     }
                 });
