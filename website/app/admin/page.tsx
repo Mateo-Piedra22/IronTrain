@@ -1,5 +1,5 @@
 import { desc, eq, isNull, sql } from 'drizzle-orm';
-import { Activity, CheckCircle, EyeOff, LayoutDashboard, Shield, Smartphone, Trash2, Users } from 'lucide-react';
+import { Activity, CheckCircle, EyeOff, Flame, LayoutDashboard, Shield, Smartphone, Trash2, Trophy, Users, Zap } from 'lucide-react';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '../../src/db';
@@ -61,11 +61,35 @@ export default async function AdminPanel() {
         db.select({ count: sql<number>`count(*)` }).from(schema.userProfiles),
         db.select({ count: sql<number>`count(*)` }).from(schema.appInstalls),
         db.select().from(schema.feedback).orderBy(desc(schema.feedback.createdAt)),
+        db.select({ count: sql<number>`count(*)` }).from(schema.kudos),
+        db.select({ count: sql<number>`count(*)` }).from(schema.activityFeed),
+        db.select({
+            id: schema.userProfiles.id,
+            username: schema.userProfiles.username,
+            currentStreak: schema.userProfiles.currentStreak,
+            highestStreak: schema.userProfiles.highestStreak
+        }).from(schema.userProfiles)
+            .where(sql`${schema.userProfiles.highestStreak} > 0`)
+            .orderBy(desc(schema.userProfiles.highestStreak))
+            .limit(5)
     ]);
 
     const totalUsers = profilesData[0]?.count || 0;
     const totalInstalls = installsData[0]?.count || 0;
     const pendingFeedbackCount = feedbackData.filter(f => f.status === 'open').length;
+
+    // IronSocial metrics
+    const totalKudos = feedbackData.length > 0 ? (await db.select({ count: sql<number>`count(*)` }).from(schema.kudos))[0]?.count || 0 : 0;
+    const totalActivity = feedbackData.length > 0 ? (await db.select({ count: sql<number>`count(*)` }).from(schema.activityFeed))[0]?.count || 0 : 0;
+    const topStreaks = feedbackData.length > 0 ? await db.select({
+        id: schema.userProfiles.id,
+        username: schema.userProfiles.username,
+        currentStreak: schema.userProfiles.currentStreak,
+        highestStreak: schema.userProfiles.highestStreak
+    }).from(schema.userProfiles)
+        .where(sql`${schema.userProfiles.highestStreak} > 0`)
+        .orderBy(desc(schema.userProfiles.highestStreak))
+        .limit(5) : [];
 
     return (
         <div className="min-h-screen bg-[#f8fafc] text-[#0f172a] font-sans p-4 md:p-8 selection:bg-orange-100">
@@ -119,10 +143,51 @@ export default async function AdminPanel() {
                 </div>
             </div>
 
+            {/* IRON SOCIAL METRICS ROW */}
+            <h2 className="text-xl font-black uppercase tracking-tight mb-6 flex items-center gap-4 text-slate-800">
+                <span className="bg-orange-500 text-white p-1 rounded">2</span>
+                IronSocial & Interacciones
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12 text-left">
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="text-slate-400 text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2 text-left">
+                        <Flame className="w-4 h-4 text-orange-500" /> Kudos Enviados
+                    </div>
+                    <div className="text-4xl font-black text-slate-900">{totalKudos}</div>
+                    <div className="text-[10px] text-slate-400 font-bold mt-2 uppercase">Fuegos Diarios</div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="text-slate-400 text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2 text-left">
+                        <Zap className="w-4 h-4 text-blue-500" /> Activity Feed
+                    </div>
+                    <div className="text-4xl font-black text-slate-900">{totalActivity}</div>
+                    <div className="text-[10px] text-slate-400 font-bold mt-2 uppercase">Novedades Globales</div>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="text-slate-400 text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2 text-left">
+                        <Trophy className="w-4 h-4 text-yellow-500" /> Disciplina P2P
+                    </div>
+                    {topStreaks.length > 0 ? (
+                        <div className="space-y-3">
+                            {topStreaks.map((athlete, i) => (
+                                <div key={athlete.id} className="flex items-center justify-between border-b mx-1 pb-1 border-slate-800">
+                                    <span className="text-sm font-bold text-white">#{i + 1} {athlete.username || 'Atleta'}</span>
+                                    <span className="text-xs font-black text-orange-400 max-w-[50px]">🔥 {athlete.highestStreak}d</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-xs text-slate-400">Sin datos de disciplina aún.</div>
+                    )}
+                </div>
+            </div>
+
             {/* FEEDBACK MODULE */}
             <div className="mb-12 text-left">
                 <h2 className="text-xl font-black uppercase tracking-tight mb-6 flex items-center gap-4 text-slate-800">
-                    <span className="bg-red-500 text-white p-1 rounded">1</span>
+                    <span className="bg-red-500 text-white p-1 rounded">3</span>
                     Feedback y Reportes de Usuarios
                 </h2>
                 <div className="bg-white border border-slate-200 shadow-sm rounded-3xl overflow-hidden text-left">

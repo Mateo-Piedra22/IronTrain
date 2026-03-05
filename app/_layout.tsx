@@ -106,10 +106,18 @@ export default function RootLayout() {
     if (!dbInitialized || !authToken) return;
     if (lastSyncedTokenRef.current === authToken) return;
     lastSyncedTokenRef.current = authToken;
-    dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', '0']).catch(() => null);
-    syncService.syncBidirectional().catch(() => {
-      notify.error('Sync fallido', 'No se pudo sincronizar con Neon');
-    });
+
+    const runInitialSync = async () => {
+      try {
+        await dbService.getDatabase().runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', '0']);
+        await syncService.syncBidirectional();
+      } catch (e) {
+        notify.error('Sync fallido', 'No se pudo sincronizar con Neon');
+        console.error('Initial sync trigger failed:', e);
+      }
+    };
+
+    runInitialSync();
   }, [dbInitialized, authToken]);
 
   // What's new proactive banner

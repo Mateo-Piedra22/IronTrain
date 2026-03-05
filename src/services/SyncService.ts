@@ -217,8 +217,7 @@ export class SyncService {
             const changes = Array.isArray(data?.changes) ? data.changes : [];
 
             if (changes.length > 0) {
-                await db.runAsync('BEGIN TRANSACTION');
-                try {
+                await db.withTransactionAsync(async () => {
                     for (const change of changes) {
                         const table = typeof change?.table === 'string' ? change.table : null;
                         const operation = typeof change?.operation === 'string' ? change.operation : null;
@@ -245,11 +244,7 @@ export class SyncService {
                             }
                         }
                     }
-                    await db.runAsync('COMMIT');
-                } catch (e) {
-                    await db.runAsync('ROLLBACK');
-                    throw e;
-                }
+                });
             }
 
             // Update local sync time
@@ -299,8 +294,7 @@ export class SyncService {
 
             const db = dbService.getDatabase();
 
-            await db.runAsync('BEGIN TRANSACTION');
-            try {
+            await db.withTransactionAsync(async () => {
                 // Wipe current tables
                 const tables = Object.keys(snapshot);
                 for (const table of tables) {
@@ -321,12 +315,7 @@ export class SyncService {
 
                 // Append full sync event to avoid pushing this as mutations
                 await db.runAsync('DELETE FROM sync_queue');
-
-                await db.runAsync('COMMIT');
-            } catch (e) {
-                await db.runAsync('ROLLBACK');
-                throw e;
-            }
+            });
         } catch (error) {
             console.error('Failed to restore snapshot:', error);
             throw error;

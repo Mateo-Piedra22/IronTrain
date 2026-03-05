@@ -221,29 +221,24 @@ export class DatabaseService {
         // Migration 0: Migrate any legacy numeric IDs to UUIDs (Critical Task 1)
         try {
             await this.db?.execAsync('PRAGMA foreign_keys = OFF;');
-            await this.db?.execAsync('BEGIN TRANSACTION');
+            await this.db?.withTransactionAsync(async () => {
+                // Find categories with numeric IDs
+                const numCats = await this.db?.getAllAsync<{ id: string }>("SELECT id FROM categories WHERE length(id) < 15") || [];
+                if (numCats.length > 0) {
+                    console.log('Running Critical Migration: Converting numeric IDs to UUIDs');
 
-            // Find categories with numeric IDs
-            const numCats = await this.db?.getAllAsync<{ id: string }>("SELECT id FROM categories WHERE length(id) < 15") || [];
-            if (numCats.length > 0) {
-                console.log('Running Critical Migration: Converting numeric IDs to UUIDs');
-                // Since user explicitly allowed data loss if needed (NO IMPORTA QUE SE PIERDA TODO), 
-                // and referential integrity of highly nested numeric IDs is extremely complex to rebuild safely
-                // in TS without custom recursive queries, we perform a clean wipe of legacy numeric data.
-                await this.db?.execAsync('DELETE FROM categories WHERE length(id) < 15;');
-                await this.db?.execAsync('DELETE FROM exercises WHERE length(id) < 15 OR length(category_id) < 15;');
-                await this.db?.execAsync('DELETE FROM workouts WHERE length(id) < 15;');
-                await this.db?.execAsync('DELETE FROM workout_sets WHERE length(id) < 15 OR length(workout_id) < 15 OR length(exercise_id) < 15;');
-                await this.db?.execAsync('DELETE FROM measurements WHERE length(id) < 15;');
-                await this.db?.execAsync('DELETE FROM goals WHERE length(id) < 15;');
+                    await this.db?.execAsync('DELETE FROM categories WHERE length(id) < 15;');
+                    await this.db?.execAsync('DELETE FROM exercises WHERE length(id) < 15 OR length(category_id) < 15;');
+                    await this.db?.execAsync('DELETE FROM workouts WHERE length(id) < 15;');
+                    await this.db?.execAsync('DELETE FROM workout_sets WHERE length(id) < 15 OR length(workout_id) < 15 OR length(exercise_id) < 15;');
+                    await this.db?.execAsync('DELETE FROM measurements WHERE length(id) < 15;');
+                    await this.db?.execAsync('DELETE FROM goals WHERE length(id) < 15;');
 
-                // Note: seedDatabase will repopulate missing default categories on restart
-                console.log('Legacy numeric data cleared for UUID consistency.');
-            }
-            await this.db?.execAsync('COMMIT');
+                    console.log('Legacy numeric data cleared for UUID consistency.');
+                }
+            });
             await this.db?.execAsync('PRAGMA foreign_keys = ON;');
         } catch (e) {
-            await this.db?.execAsync('ROLLBACK');
             console.error('Failed to migrate numeric IDs, rolling back', e);
         }
 
