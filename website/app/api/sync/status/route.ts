@@ -44,8 +44,8 @@ export async function GET(req: NextRequest) {
                         .where(and(eq((t.table as any).userId, userId), sql`${(t.table as any).deletedAt} is not null`))
                     : [{ count: 0 }];
 
-                const activeCount = active?.count || 0;
-                const deletedCount = deleted?.count || 0;
+                const activeCount = Number(active?.count || 0);
+                const deletedCount = Number(deleted?.count || 0);
                 return [t.key, { active: activeCount, deleted: deletedCount, total: activeCount + deletedCount }] as const;
             })
         );

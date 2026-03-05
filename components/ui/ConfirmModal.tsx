@@ -2,7 +2,7 @@ import { IronButton } from '@/components/IronButton';
 import { Colors } from '@/src/theme';
 import { AlertTriangle, CheckCircle, Info, XCircle } from 'lucide-react-native';
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 type ModalVariant = 'info' | 'warning' | 'error' | 'success' | 'destructive';
 
@@ -59,7 +59,24 @@ export function ConfirmModal({ visible, onClose, title, message, variant = 'info
                     </View>
 
                     {/* Message */}
-                    {message ? <Text style={st.message}>{message}</Text> : null}
+                    {message ? (
+                        <View style={st.messageContainer}>
+                            <ScrollView
+                                style={st.messageScroll}
+                                contentContainerStyle={st.messageContent}
+                                showsVerticalScrollIndicator={true}
+                            >
+                                <Text style={st.message}>
+                                    {message.split(/(\*\*.*?\*\*|\n)/g).map((part, i) => {
+                                        if (part.startsWith('**') && part.endsWith('**')) {
+                                            return <Text key={i} style={st.bold}>{part.slice(2, -2)}</Text>;
+                                        }
+                                        return part;
+                                    })}
+                                </Text>
+                            </ScrollView>
+                        </View>
+                    ) : null}
 
                     {/* Buttons */}
                     <View style={[st.buttonRow, isStacked && st.buttonRowStacked]}>
@@ -137,12 +154,28 @@ const st = StyleSheet.create({
         color: Colors.iron[950],
         letterSpacing: -0.3,
     },
+    messageContainer: {
+        maxHeight: 400, // Reasonable height for a modal body
+        marginBottom: 20,
+        backgroundColor: Colors.iron[50] + '80', // Subtle tint
+        borderRadius: 12,
+        padding: 4,
+    },
+    messageScroll: {
+        flexGrow: 0,
+    },
+    messageContent: {
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+    },
     message: {
         fontSize: 14,
-        lineHeight: 20,
+        lineHeight: 22,
         color: Colors.iron[500],
-        marginBottom: 20,
-        paddingLeft: 52,
+    },
+    bold: {
+        fontWeight: '900',
+        color: Colors.iron[950],
     },
     buttonRow: {
         flexDirection: 'row',

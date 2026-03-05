@@ -164,8 +164,7 @@ export default function SettingsScreen() {
                         ? 'Este dispositivo parece vacío.'
                         : 'No hay datos detectados en ninguna parte.';
 
-            const formatCounts = (counts?: Record<string, { active: number; deleted: number; total: number }>) => {
-                if (!counts) return '';
+            const formatMergedDetail = () => {
                 const order = [
                     'categories', 'exercises',
                     'routines', 'routine_days', 'routine_exercises',
@@ -173,18 +172,34 @@ export default function SettingsScreen() {
                     'measurements', 'goals',
                     'body_metrics', 'plate_inventory', 'settings'
                 ];
+                const labels: Record<string, string> = {
+                    categories: 'Categorías',
+                    exercises: 'Ejercicios',
+                    routines: 'Rutinas',
+                    routine_days: 'Días de Rutina',
+                    routine_exercises: 'Ejercicios en Rutina',
+                    workouts: 'Entrenamientos',
+                    workout_sets: 'Series',
+                    measurements: 'Mediciones',
+                    goals: 'Objetivos',
+                    body_metrics: 'Métricas Corporales',
+                    plate_inventory: 'Inventario de Discos',
+                    settings: 'Ajustes'
+                };
+
                 const lines: string[] = [];
                 for (const k of order) {
-                    const v = counts[k];
-                    if (!v) continue;
-                    lines.push(`${k}: activos ${v.active} | borrados ${v.deleted} | total ${v.total}`);
+                    const l = Number(local.counts?.[k]?.active || 0);
+                    const r = Number(remote.counts?.[k]?.active || 0);
+                    if (l === 0 && r === 0) continue;
+                    lines.push(`**${labels[k] || k}**: Cel ${l} vs Nube ${r}`);
                 }
-                return lines.length > 0 ? `\n\nDetalle (activos/borrados/total):\n${lines.join('\n')}` : '';
+                return lines.length > 0 ? `\n\n**Comparativa por tabla (activos):**\n${lines.join('\n')}` : '';
             };
 
             confirm.custom({
                 title: 'Resolución de Conflictos',
-                message: `${contextLine}\n\nCelular (activos): ${local.recordCount} registros.\nNube Neon (activos): ${remote.recordCount} registros.${formatCounts(local.counts)}${formatCounts(remote.counts)}\n\nCola de Sync en el celular (pendiente de subir):\nPendientes: ${queue.pending}\nFallidos: ${queue.failed}\nProcesando: ${queue.processing}\nTotal: ${queue.totalOutstanding}\n\n¿Qué querés hacer?`,
+                message: `${contextLine}\n\n**Resumen Global:**\n**Celular**: ${Number(local.recordCount)} registros\n**Nube Neon**: ${Number(remote.recordCount)} registros${formatMergedDetail()}\n\n**Estado de la Cola de Sync:**\n**Pendientes**: ${queue.pending}\n**Fallidos**: ${queue.failed}\n**Procesando**: ${queue.processing}\n**Total**: ${queue.totalOutstanding}\n\n¿Qué querés hacer?`,
                 variant: 'warning',
                 buttons: [
                     {
