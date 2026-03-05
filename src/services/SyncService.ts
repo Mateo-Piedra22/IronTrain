@@ -238,7 +238,9 @@ export class SyncService {
                 });
 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const bodyText = await response.text().catch(() => '');
+                    const suffix = bodyText ? ` body=${bodyText}` : '';
+                    throw new Error(`HTTP error! status: ${response.status}${suffix}`);
                 }
 
                 const result = await response.json();
@@ -564,39 +566,74 @@ export class SyncService {
                 return out;
             };
 
-            await dbService.withTransaction(async () => {
-                // Snapshot restore must be deterministic and FK-safe.
-                // We temporarily disable FK enforcement during restore and rely on correct ordering.
-                await dbService.executeRaw('PRAGMA foreign_keys = OFF;');
+            // IMPORTANT:
+            // Keep PRAGMA foreign_keys=OFF for the entire restore transaction.
+            // If we re-enable inside the transaction, SQLite may still validate at COMMIT and fail.
+            await dbService.executeRaw('PRAGMA foreign_keys = OFF;');
 
-                const allowed = new Set(TABLES);
-                const tablesInSnapshot = snapshot && typeof snapshot === 'object' ? Object.keys(snapshot) : [];
-                const presentInOrder = TABLES.filter((t) => allowed.has(t) && tablesInSnapshot.includes(t));
-                const deleteOrder = [...presentInOrder].reverse();
+            try {
+                await dbService.withTransaction(async () => {
+                    const allowed = new Set(TABLES);
+                    const tablesInSnapshot = snapshot && typeof snapshot === 'object' ? Object.keys(snapshot) : [];
+                    const presentInOrder = TABLES.filter((t) => allowed.has(t) && tablesInSnapshot.includes(t));
+                    const deleteOrder = [...presentInOrder].reverse();
 
-                for (const table of deleteOrder) {
-                    await dbService.run(`DELETE FROM ${table}`);
-                }
-
-                for (const table of presentInOrder) {
-                    const recordsRaw = (snapshot as any)?.[table];
-                    const records: unknown[] = Array.isArray(recordsRaw) ? recordsRaw : [];
-                    for (const record of records) {
-                        const normalized = normalizeRecord(table, record);
-                        if (!normalized) continue;
-                        const keys = Object.keys(normalized);
-                        if (keys.length === 0) continue;
-                        const values = Object.values(normalized);
-                        const placeholders = keys.map(() => '?').join(', ');
-                        await dbService.run(`INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`, values as any);
+                    for (const table of deleteOrder) {
+                        await dbService.run(`DELETE FROM ${table}`);
                     }
-                }
 
+                    for (const table of presentInOrder) {
+                        const recordsRaw = (snapshot as any)?.[table];
+                        const records: unknown[] = Array.isArray(recordsRaw) ? recordsRaw : [];
+                        for (const record of records) {
+                            const normalized = normalizeRecord(table, record);
+                            if (!normalized) continue;
+                            const keys = Object.keys(normalized);
+                            if (keys.length === 0) continue;
+                            const values = Object.values(normalized);
+                            const placeholders = keys.map(() => '?').join(', ');
+                            await dbService.run(
+                                `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`,
+                                values as any
+                            );
+                        }
+                    }
+
+                    await dbService.run(
+                        `DELETE FROM exercises
+                         WHERE category_id IS NOT NULL
+                           AND category_id NOT IN (SELECT id FROM categories)`
+                    );
+
+                    await dbService.run(
+                        `DELETE FROM routine_days
+                         WHERE routine_id NOT IN (SELECT id FROM routines)`
+                    );
+
+                    await dbService.run(
+                        `DELETE FROM routine_exercises
+                         WHERE routine_day_id NOT IN (SELECT id FROM routine_days)
+                            OR exercise_id NOT IN (SELECT id FROM exercises)`
+                    );
+
+                    await dbService.run(
+                        `DELETE FROM workout_sets
+                         WHERE workout_id NOT IN (SELECT id FROM workouts)
+                            OR exercise_id NOT IN (SELECT id FROM exercises)`
+                    );
+
+                    // Append full sync event to avoid pushing this as mutations
+                    await dbService.run('DELETE FROM sync_queue');
+                });
+            } finally {
                 await dbService.executeRaw('PRAGMA foreign_keys = ON;');
+            }
 
-                // Append full sync event to avoid pushing this as mutations
-                await dbService.run('DELETE FROM sync_queue');
-            });
+            const fkIssues = await dbService.getAll<{ table: string; rowid: number; parent: string; fkid: number }>('PRAGMA foreign_key_check;');
+            if (fkIssues.length > 0) {
+                const first = fkIssues[0];
+                throw new Error(`Snapshot restore integrity check failed (foreign_key_check). First issue: table=${first.table} rowid=${first.rowid} parent=${first.parent} fkid=${first.fkid}`);
+            }
         } catch (error) {
             console.error('Failed to restore snapshot:', error);
             throw error;
@@ -680,7 +717,9 @@ export class SyncService {
         });
 
         if (!response.ok) {
-            throw new Error(`Snapshot push failed! status: ${response.status}`);
+            const bodyText = await response.text().catch(() => '');
+            const suffix = bodyText ? ` body=${bodyText}` : '';
+            throw new Error(`Snapshot push failed! status: ${response.status}${suffix}`);
         }
 
         await dbService.run('DELETE FROM sync_queue');

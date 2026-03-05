@@ -23,11 +23,16 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const body = await req.json();
-        const { operations } = body;
+        let body: unknown;
+        try {
+            body = await req.json();
+        } catch {
+            return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+        }
 
-        if (!operations || !Array.isArray(operations)) {
-            return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+        const operations = (body as any)?.operations;
+        if (!Array.isArray(operations)) {
+            return NextResponse.json({ error: 'Invalid payload: operations must be an array' }, { status: 400 });
         }
 
         // Apply LWW strategies mapping tables to schemas
@@ -45,18 +50,34 @@ export async function POST(req: NextRequest) {
 
         const results = [];
 
-        for (const op of operations) {
-            const tableSchema = tableMap[op.table];
+        for (const op of operations as any[]) {
+            const table = typeof op?.table === 'string' ? op.table : null;
+            const operation = typeof op?.operation === 'string' ? op.operation : null;
+            const recordId = typeof op?.recordId === 'string' ? op.recordId : null;
+            const timestamp = typeof op?.timestamp === 'number' ? op.timestamp : null;
+            const payload = op?.payload && typeof op.payload === 'object' ? op.payload : null;
+
+            if (!table || !operation || !recordId || timestamp === null) {
+                results.push({ id: op?.id ?? null, status: 'error', reason: 'Invalid operation shape' });
+                continue;
+            }
+
+            const tableSchema = tableMap[table];
             if (!tableSchema) {
-                results.push({ id: op.id, status: 'ignored_unsupported_table' });
+                results.push({ id: op?.id ?? null, status: 'ignored_unsupported_table' });
                 continue;
             }
 
             try {
                 if (op.operation === 'INSERT' || op.operation === 'UPDATE') {
-                    const camelPayload = toCamelCase(op.payload);
+                    if (!payload) {
+                        results.push({ id: op?.id ?? null, status: 'error', reason: 'Missing payload' });
+                        continue;
+                    }
+
+                    const camelPayload = toCamelCase(payload);
                     camelPayload.userId = userId as string;
-                    camelPayload.updatedAt = new Date(op.timestamp);
+                    camelPayload.updatedAt = new Date(timestamp);
 
                     // Insert or replace based on conflicting IDs
                     await db.insert(tableSchema)
@@ -71,8 +92,8 @@ export async function POST(req: NextRequest) {
                 } else if (op.operation === 'DELETE') {
                     // Soft delete for enterprise
                     await db.update(tableSchema)
-                        .set({ deletedAt: new Date(op.timestamp), updatedAt: new Date(op.timestamp) })
-                        .where(and(eq(tableSchema.id, op.recordId), eq(tableSchema.userId, userId as string)));
+                        .set({ deletedAt: new Date(timestamp), updatedAt: new Date(timestamp) })
+                        .where(and(eq(tableSchema.id, recordId), eq(tableSchema.userId, userId as string)));
                 }
 
                 results.push({ id: op.id, status: 'success' });
@@ -85,7 +106,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, processed: results.length, results });
 
     } catch (error: any) {
-        console.error('Fatal Sync Push Error:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Internal server error';
+        console.error('Fatal Sync Push Error:', message);
+        return NextResponse.json({ error: 'Internal server error', message }, { status: 500 });
     }
 }

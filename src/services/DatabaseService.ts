@@ -1,8 +1,13 @@
+import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
 import { Category, Exercise, ExerciseType, Workout, WorkoutSet } from '../types/db';
 import { uuidV4 } from '../utils/uuid';
 
 const DB_NAME = 'irontrain_v1.db';
+const SEED_DISABLED_KEY = 'irontrain_seed_disabled';
+const UNCATEGORIZED_ID = 'uncategorized';
+const UNCATEGORIZED_NAME = 'Sin categoría';
+const LEGACY_UNCATEGORIZED_ID = 'sys-cat-1';
 
 export class DatabaseService {
     private db: SQLite.SQLiteDatabase | null = null;
@@ -338,10 +343,28 @@ export class DatabaseService {
 
         // Migration 4: Ensure "Sin categoría" exists for safe reassignment
         try {
-            const systemCat = await this.getFirst<{ id: string }>("SELECT id FROM categories WHERE name = 'Sin categoría'");
+            const hasStable = await this.getFirst<{ id: string }>('SELECT id FROM categories WHERE id = ?', [UNCATEGORIZED_ID]);
+            const hasLegacy = await this.getFirst<{ id: string }>('SELECT id FROM categories WHERE id = ?', [LEGACY_UNCATEGORIZED_ID]);
+
+            if (hasLegacy?.id && !hasStable?.id) {
+                await this.executeRaw('PRAGMA foreign_keys = OFF;');
+                try {
+                    await this.withTransaction(async () => {
+                        await this.run('UPDATE categories SET id = ? WHERE id = ?', [UNCATEGORIZED_ID, LEGACY_UNCATEGORIZED_ID]);
+                        await this.run('UPDATE exercises SET category_id = ? WHERE category_id = ?', [UNCATEGORIZED_ID, LEGACY_UNCATEGORIZED_ID]);
+                    });
+                } finally {
+                    await this.executeRaw('PRAGMA foreign_keys = ON;');
+                }
+            }
+
+            const systemCat = await this.getFirst<{ id: string }>('SELECT id FROM categories WHERE id = ?', [UNCATEGORIZED_ID]);
             if (!systemCat) {
                 console.log('Running Migration Check: Re-creating default category.');
-                await this.run("INSERT INTO categories (id, name, is_system, sort_order, color) VALUES ('sys-cat-1', 'Sin categoría', 1, 999, '#64748b')");
+                await this.run(
+                    'INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, 999, ?)',
+                    [UNCATEGORIZED_ID, UNCATEGORIZED_NAME, '#64748b']
+                );
             }
         } catch (e) {
             console.warn('Migration check failed (create system cat):', e);
@@ -401,6 +424,60 @@ export class DatabaseService {
             }
         } catch (e) {
             console.warn('Migration check failed (plate_inventory pk/unit):', e);
+        }
+
+        // Migration 11: Repair plate_inventory if a legacy migration removed required columns (id/available)
+        try {
+            const info = await this.getAll<{ name: string }>("PRAGMA table_info('plate_inventory')");
+            const columns = info.map(c => c.name);
+
+            const needsRepair = !columns.includes('id') || !columns.includes('available') || !columns.includes('updated_at');
+            if (needsRepair) {
+                await this.withTransaction(async () => {
+                    await this.executeRaw(`
+                        CREATE TABLE IF NOT EXISTS plate_inventory_new (
+                            id TEXT PRIMARY KEY NOT NULL,
+                            weight REAL NOT NULL,
+                            count INTEGER NOT NULL,
+                            available INTEGER NOT NULL,
+                            type TEXT DEFAULT 'standard',
+                            unit TEXT NOT NULL,
+                            color TEXT,
+                            updated_at INTEGER DEFAULT 0
+                        );
+                    `);
+
+                    const hasUnit = columns.includes('unit');
+                    const hasType = columns.includes('type');
+                    const hasColor = columns.includes('color');
+                    const hasCount = columns.includes('count');
+
+                    const selectUnit = hasUnit ? "COALESCE(unit, 'kg')" : "'kg'";
+                    const selectType = hasType ? "COALESCE(type, 'standard')" : "'standard'";
+                    const selectColor = hasColor ? 'color' : 'NULL';
+                    const selectCount = hasCount ? 'COALESCE(count, 0)' : '0';
+
+                    await this.executeRaw(`
+                        INSERT OR REPLACE INTO plate_inventory_new (id, weight, count, available, type, unit, color, updated_at)
+                        SELECT
+                            lower(hex(randomblob(16))) as id,
+                            weight,
+                            ${selectCount} as count,
+                            1 as available,
+                            ${selectType} as type,
+                            ${selectUnit} as unit,
+                            ${selectColor} as color,
+                            0 as updated_at
+                        FROM plate_inventory;
+                    `);
+
+                    await this.executeRaw('DROP TABLE plate_inventory;');
+                    await this.executeRaw('ALTER TABLE plate_inventory_new RENAME TO plate_inventory;');
+                    await this.executeRaw('CREATE UNIQUE INDEX IF NOT EXISTS idx_plate_inventory_unique ON plate_inventory(weight, type, unit);');
+                });
+            }
+        } catch (e) {
+            console.warn('Migration 11 failed (plate_inventory repair):', e);
         }
 
         // Migration 6: Add color column to plate_inventory
@@ -465,6 +542,10 @@ export class DatabaseService {
     }
 
     private async seedDatabase(): Promise<void> {
+        const seedDisabled = await SecureStore.getItemAsync(SEED_DISABLED_KEY);
+        if (seedDisabled === '1') {
+            return;
+        }
         const result = await this.getFirst<{ count: number }>('SELECT count(*) as count FROM categories');
         if (result && result.count > 0) {
             return; // Already seeded
@@ -762,20 +843,39 @@ export class DatabaseService {
     }
 
     public async factoryReset(): Promise<void> {
-        await this.withTransaction(async () => {
-            await this.run('DELETE FROM workout_sets');
-            await this.run('DELETE FROM workouts');
+        await this.executeRaw('PRAGMA foreign_keys = OFF;');
+        try {
+            await this.withTransaction(async () => {
+                await this.run('DELETE FROM workout_sets');
+                await this.run('DELETE FROM workouts');
 
-            await this.run('DELETE FROM measurements');
-            await this.run('DELETE FROM goals');
-            await this.run('DELETE FROM plate_inventory');
-            await this.run('DELETE FROM settings');
+                await this.run('DELETE FROM measurements');
+                await this.run('DELETE FROM goals');
+                await this.run('DELETE FROM body_metrics');
+                await this.run('DELETE FROM plate_inventory');
 
-            await this.run('DELETE FROM exercises');
-            await this.run('DELETE FROM categories');
-        });
+                await this.run('DELETE FROM routine_exercises');
+                await this.run('DELETE FROM routine_days');
+                await this.run('DELETE FROM routines');
 
-        await this.seedDatabase();
+                await this.run('DELETE FROM exercises');
+                await this.run('DELETE FROM categories');
+                await this.run("INSERT INTO categories (id, name, is_system, sort_order, color) VALUES ('sys-cat-1', 'Sin categoría', 1, 999, '#64748b')");
+
+                await this.run('DELETE FROM sync_queue');
+                await this.run('DELETE FROM settings');
+            });
+        } finally {
+            await this.executeRaw('PRAGMA foreign_keys = ON;');
+        }
+
+        const fkIssues = await this.getAll<{ table: string; rowid: number; parent: string; fkid: number }>('PRAGMA foreign_key_check;');
+        if (fkIssues.length > 0) {
+            const first = fkIssues[0];
+            throw new Error(`Factory reset integrity check failed (foreign_key_check). First issue: table=${first.table} rowid=${first.rowid} parent=${first.parent} fkid=${first.fkid}`);
+        }
+
+        await SecureStore.setItemAsync(SEED_DISABLED_KEY, '1');
     }
 
     // --- GHOST VALUES / HISTORY ---

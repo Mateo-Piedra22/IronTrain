@@ -241,13 +241,14 @@ export default function SettingsScreen() {
     const handleResetDB = () => {
         confirm.destructive(
             'Restablecer de fábrica',
-            'Se borrarán TODOS tus datos. Esta acción no se puede deshacer.',
+            'Se borrarán TODOS tus datos locales. Esta acción no se puede deshacer. Luego se restaurará el catálogo base (categorías/ejercicios) y se cerrará la sesión para evitar que la nube repueble los datos automáticamente.',
             async () => {
                 try {
                     await dbService.factoryReset();
                     await configService.reset();
+                    await useAuthStore.getState().logout();
                     await loadSettings();
-                    notify.success('Reinicio de fábrica', 'Los datos fueron limpiados. La app quedó como nueva.');
+                    notify.success('Reinicio de fábrica', 'Los datos locales fueron limpiados. Iniciá sesión para volver a sincronizar con Neon.');
                 } catch (e: any) { notify.error('Fallo de formateo', e?.message || 'No se pudo completar el restablecimiento.'); }
             },
             'BORRAR TODO'
