@@ -105,6 +105,53 @@ export const goals = pgTable('goals', {
     ...commonFields,
 });
 
+export const bodyMetrics = pgTable('body_metrics', {
+    id: text('id').primaryKey(),
+    date: integer('date').notNull(),
+    weight: real('weight'),
+    bodyFat: real('body_fat'),
+    notes: text('notes'),
+    ...commonFields,
+});
+
+export const plateInventory = pgTable('plate_inventory', {
+    id: text('id').primaryKey(),
+    weight: real('weight').notNull(),
+    count: integer('count').notNull(),
+    available: integer('available').notNull(),
+    type: text('type').default('standard'),
+    unit: text('unit').notNull(),
+    color: text('color'),
+    userId: text('user_id').notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const settings = pgTable('settings', {
+    key: text('key').primaryKey(),
+    value: text('value').notNull(),
+    description: text('description'),
+    userId: text('user_id').notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const wipeAudit = pgTable('wipe_audit', {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    requestedAt: timestamp('requested_at').defaultNow().notNull(),
+    ipHash: text('ip_hash').notNull(),
+    userAgent: text('user_agent'),
+    status: text('status').notNull(),
+    errorMessage: text('error_message'),
+});
+
+export const syncRateLimits = pgTable('sync_rate_limits', {
+    key: text('key').primaryKey(),
+    userId: text('user_id').notNull(),
+    action: text('action').notNull(),
+    windowStartAt: timestamp('window_start_at').defaultNow().notNull(),
+    count: integer('count').default(0).notNull(),
+});
+
 // --- IRON SOCIAL ---
 export const userProfiles = pgTable('user_profiles', {
     id: text('id').primaryKey(), // The user's ID

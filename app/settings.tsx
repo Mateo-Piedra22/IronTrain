@@ -164,9 +164,27 @@ export default function SettingsScreen() {
                         ? 'Este dispositivo parece vacío.'
                         : 'No hay datos detectados en ninguna parte.';
 
+            const formatCounts = (counts?: Record<string, { active: number; deleted: number; total: number }>) => {
+                if (!counts) return '';
+                const order = [
+                    'categories', 'exercises',
+                    'routines', 'routine_days', 'routine_exercises',
+                    'workouts', 'workout_sets',
+                    'measurements', 'goals',
+                    'body_metrics', 'plate_inventory', 'settings'
+                ];
+                const lines: string[] = [];
+                for (const k of order) {
+                    const v = counts[k];
+                    if (!v) continue;
+                    lines.push(`${k}: activos ${v.active} | borrados ${v.deleted} | total ${v.total}`);
+                }
+                return lines.length > 0 ? `\n\nDetalle (activos/borrados/total):\n${lines.join('\n')}` : '';
+            };
+
             confirm.custom({
                 title: 'Resolución de Conflictos',
-                message: `${contextLine}\n\nCelular: ${local.recordCount} registros.\nNube Neon: ${remote.recordCount} registros.\n\nCola de Sync en el celular (pendiente de subir):\nPendientes: ${queue.pending}\nFallidos: ${queue.failed}\nProcesando: ${queue.processing}\nTotal: ${queue.totalOutstanding}\n\n¿Qué querés hacer?`,
+                message: `${contextLine}\n\nCelular (activos): ${local.recordCount} registros.\nNube Neon (activos): ${remote.recordCount} registros.${formatCounts(local.counts)}${formatCounts(remote.counts)}\n\nCola de Sync en el celular (pendiente de subir):\nPendientes: ${queue.pending}\nFallidos: ${queue.failed}\nProcesando: ${queue.processing}\nTotal: ${queue.totalOutstanding}\n\n¿Qué querés hacer?`,
                 variant: 'warning',
                 buttons: [
                     {
@@ -214,6 +232,39 @@ export default function SettingsScreen() {
                             } catch (e: any) {
                                 notify.error('Error', e?.message || 'No se pudo subir el snapshot.');
                             }
+                        }
+                    }
+                    ,
+                    {
+                        label: 'Vaciar Nube + Celular',
+                        variant: 'outline',
+                        onPress: async () => {
+                            confirm.hide();
+                            confirm.destructive(
+                                'Vaciar TODO',
+                                'Esto borrará definitivamente TODOS tus datos en Neon y en este celular (incluye historial, rutinas, mediciones). Esta acción no se puede deshacer.',
+                                async () => {
+                                    confirm.destructive(
+                                        'Confirmación final',
+                                        'Confirmá nuevamente para proceder con el borrado total.',
+                                        async () => {
+                                            try {
+                                                notify.info('Borrando...', 'Vaciando Neon y el celular.');
+                                                await syncService.wipeAllUserData();
+                                                await dbService.factoryReset();
+                                                await configService.reset();
+                                                await useAuthStore.getState().logout();
+                                                await loadSettings();
+                                                notify.success('Éxito', 'Datos vaciados. Iniciá sesión para comenzar de cero.');
+                                            } catch (e: any) {
+                                                notify.error('Error', e?.message || 'No se pudo completar el borrado total.');
+                                            }
+                                        },
+                                        'BORRAR TODO'
+                                    );
+                                },
+                                'CONTINUAR'
+                            );
                         }
                     }
                 ]

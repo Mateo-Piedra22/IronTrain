@@ -93,6 +93,9 @@ export async function GET(req: NextRequest) {
         snapshot.routine_exercises = await db.select().from(schema.routineExercises).where(eq(schema.routineExercises.userId, userId));
         snapshot.measurements = await db.select().from(schema.measurements).where(eq(schema.measurements.userId, userId));
         snapshot.goals = await db.select().from(schema.goals).where(eq(schema.goals.userId, userId));
+        snapshot.body_metrics = await db.select().from(schema.bodyMetrics).where(eq(schema.bodyMetrics.userId, userId));
+        snapshot.plate_inventory = await db.select().from(schema.plateInventory).where(eq(schema.plateInventory.userId, userId));
+        snapshot.settings = await db.select().from(schema.settings).where(eq(schema.settings.userId, userId));
 
         return NextResponse.json({ success: true, snapshot });
     } catch (e) {
@@ -122,6 +125,9 @@ export async function POST(req: NextRequest) {
         type WorkoutSetInsert = typeof schema.workoutSets.$inferInsert;
         type MeasurementInsert = typeof schema.measurements.$inferInsert;
         type GoalInsert = typeof schema.goals.$inferInsert;
+        type BodyMetricInsert = typeof schema.bodyMetrics.$inferInsert;
+        type PlateInventoryInsert = typeof schema.plateInventory.$inferInsert;
+        type SettingsInsert = typeof schema.settings.$inferInsert;
 
         const categories = normalizeSnapshotArray<CategoryInsert>(snapshot.categories, userId, ['id', 'name', 'userId']);
         const exercises = normalizeSnapshotArray<ExerciseInsert>(snapshot.exercises, userId, ['id', 'name', 'userId', 'categoryId', 'type']);
@@ -132,35 +138,40 @@ export async function POST(req: NextRequest) {
         const workoutSets = normalizeSnapshotArray<WorkoutSetInsert>(snapshot.workout_sets, userId, ['id', 'userId', 'workoutId', 'exerciseId']);
         const measurements = normalizeSnapshotArray<MeasurementInsert>(snapshot.measurements, userId, ['id', 'userId', 'date', 'type', 'value', 'unit']);
         const goals = normalizeSnapshotArray<GoalInsert>(snapshot.goals, userId, ['id', 'userId', 'type', 'title', 'targetValue']);
+        const bodyMetrics = normalizeSnapshotArray<BodyMetricInsert>(snapshot.body_metrics, userId, ['id', 'userId', 'date']);
+        const plateInventory = normalizeSnapshotArray<PlateInventoryInsert>(snapshot.plate_inventory, userId, ['id', 'userId', 'weight', 'count', 'available', 'unit']);
+        const settingsRows = normalizeSnapshotArray<SettingsInsert>(snapshot.settings, userId, ['key', 'userId', 'value']);
 
-        // Wipe all user data transactionally
-        await db.transaction(async (tx) => {
-            // Delete in reverse dependency order
-            await tx.delete(schema.workoutSets).where(eq(schema.workoutSets.userId, userId));
-            await tx.delete(schema.workouts).where(eq(schema.workouts.userId, userId));
-            await tx.delete(schema.routineExercises).where(eq(schema.routineExercises.userId, userId));
-            await tx.delete(schema.routineDays).where(eq(schema.routineDays.userId, userId));
-            await tx.delete(schema.routines).where(eq(schema.routines.userId, userId));
-            await tx.delete(schema.exercises).where(eq(schema.exercises.userId, userId));
-            await tx.delete(schema.categories).where(eq(schema.categories.userId, userId));
-            await tx.delete(schema.measurements).where(eq(schema.measurements.userId, userId));
-            await tx.delete(schema.goals).where(eq(schema.goals.userId, userId));
+        await db.delete(schema.workoutSets).where(eq(schema.workoutSets.userId, userId));
+        await db.delete(schema.workouts).where(eq(schema.workouts.userId, userId));
+        await db.delete(schema.routineExercises).where(eq(schema.routineExercises.userId, userId));
+        await db.delete(schema.routineDays).where(eq(schema.routineDays.userId, userId));
+        await db.delete(schema.routines).where(eq(schema.routines.userId, userId));
+        await db.delete(schema.exercises).where(eq(schema.exercises.userId, userId));
+        await db.delete(schema.categories).where(eq(schema.categories.userId, userId));
+        await db.delete(schema.measurements).where(eq(schema.measurements.userId, userId));
+        await db.delete(schema.goals).where(eq(schema.goals.userId, userId));
+        await db.delete(schema.bodyMetrics).where(eq(schema.bodyMetrics.userId, userId));
+        await db.delete(schema.plateInventory).where(eq(schema.plateInventory.userId, userId));
+        await db.delete(schema.settings).where(eq(schema.settings.userId, userId));
 
-            // Insert new data
-            if (categories.length) await tx.insert(schema.categories).values(categories).onConflictDoNothing();
-            if (exercises.length) await tx.insert(schema.exercises).values(exercises).onConflictDoNothing();
-            if (routines.length) await tx.insert(schema.routines).values(routines).onConflictDoNothing();
-            if (routineDays.length) await tx.insert(schema.routineDays).values(routineDays).onConflictDoNothing();
-            if (routineExercises.length) await tx.insert(schema.routineExercises).values(routineExercises).onConflictDoNothing();
-            if (workouts.length) await tx.insert(schema.workouts).values(workouts).onConflictDoNothing();
-            if (workoutSets.length) await tx.insert(schema.workoutSets).values(workoutSets).onConflictDoNothing();
-            if (measurements.length) await tx.insert(schema.measurements).values(measurements).onConflictDoNothing();
-            if (goals.length) await tx.insert(schema.goals).values(goals).onConflictDoNothing();
-        });
+        if (categories.length) await db.insert(schema.categories).values(categories).onConflictDoNothing();
+        if (exercises.length) await db.insert(schema.exercises).values(exercises).onConflictDoNothing();
+        if (routines.length) await db.insert(schema.routines).values(routines).onConflictDoNothing();
+        if (routineDays.length) await db.insert(schema.routineDays).values(routineDays).onConflictDoNothing();
+        if (routineExercises.length) await db.insert(schema.routineExercises).values(routineExercises).onConflictDoNothing();
+        if (workouts.length) await db.insert(schema.workouts).values(workouts).onConflictDoNothing();
+        if (workoutSets.length) await db.insert(schema.workoutSets).values(workoutSets).onConflictDoNothing();
+        if (measurements.length) await db.insert(schema.measurements).values(measurements).onConflictDoNothing();
+        if (goals.length) await db.insert(schema.goals).values(goals).onConflictDoNothing();
+        if (bodyMetrics.length) await db.insert(schema.bodyMetrics).values(bodyMetrics).onConflictDoNothing();
+        if (plateInventory.length) await db.insert(schema.plateInventory).values(plateInventory).onConflictDoNothing();
+        if (settingsRows.length) await db.insert(schema.settings).values(settingsRows).onConflictDoNothing();
 
         return NextResponse.json({ success: true });
     } catch (e) {
-        console.error('Snapshot POST error:', e);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        const message = e instanceof Error ? e.message : 'Internal Server Error';
+        console.error('Snapshot POST error:', message);
+        return NextResponse.json({ error: 'Internal Server Error', message }, { status: 500 });
     }
 }

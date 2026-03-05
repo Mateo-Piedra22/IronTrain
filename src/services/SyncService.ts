@@ -59,6 +59,7 @@ interface SyncPayload {
 export interface SyncStatus {
     hasData: boolean;
     recordCount: number;
+    counts?: Record<string, { active: number; deleted: number; total: number }>;
 }
 
 export interface SyncQueueStatus {
@@ -477,7 +478,7 @@ export class SyncService {
         const tables = [
             'exercises', 'categories', 'workouts', 'workout_sets',
             'routines', 'routine_days', 'routine_exercises',
-            'measurements', 'goals', 'plate_inventory', 'settings'
+            'measurements', 'goals', 'plate_inventory', 'settings', 'body_metrics'
         ];
 
         const snapshot: Record<string, any[]> = {};
@@ -654,13 +655,39 @@ export class SyncService {
     }
 
     public async checkLocalStatus(): Promise<SyncStatus> {
-        let count = 0;
-        const tables = ['workouts', 'routines', 'exercises'];
+        const tables: Array<{ key: string; table: string; supportsDelete: boolean }> = [
+            { key: 'categories', table: 'categories', supportsDelete: true },
+            { key: 'exercises', table: 'exercises', supportsDelete: true },
+            { key: 'workouts', table: 'workouts', supportsDelete: true },
+            { key: 'workout_sets', table: 'workout_sets', supportsDelete: true },
+            { key: 'routines', table: 'routines', supportsDelete: true },
+            { key: 'routine_days', table: 'routine_days', supportsDelete: true },
+            { key: 'routine_exercises', table: 'routine_exercises', supportsDelete: true },
+            { key: 'measurements', table: 'measurements', supportsDelete: true },
+            { key: 'goals', table: 'goals', supportsDelete: true },
+            { key: 'body_metrics', table: 'body_metrics', supportsDelete: true },
+            { key: 'plate_inventory', table: 'plate_inventory', supportsDelete: false },
+            { key: 'settings', table: 'settings', supportsDelete: false },
+        ];
+
+        const counts: Record<string, { active: number; deleted: number; total: number }> = {};
         for (const t of tables) {
-            const res = await dbService.getFirst<{ count: number }>(`SELECT COUNT(*) as count FROM ${t}`);
-            count += res?.count || 0;
+            const activeSql = t.supportsDelete
+                ? `SELECT COUNT(*) as count FROM ${t.table} WHERE deleted_at IS NULL`
+                : `SELECT COUNT(*) as count FROM ${t.table}`;
+            const deletedSql = t.supportsDelete
+                ? `SELECT COUNT(*) as count FROM ${t.table} WHERE deleted_at IS NOT NULL`
+                : null;
+
+            const activeRes = await dbService.getFirst<{ count: number }>(activeSql);
+            const deletedRes = deletedSql ? await dbService.getFirst<{ count: number }>(deletedSql) : ({ count: 0 } as any);
+            const active = activeRes?.count || 0;
+            const deleted = deletedRes?.count || 0;
+            counts[t.key] = { active, deleted, total: active + deleted };
         }
-        return { hasData: count > 0, recordCount: count };
+
+        const recordCount = Object.values(counts).reduce((acc, v) => acc + v.active, 0);
+        return { hasData: recordCount > 0, recordCount, counts };
     }
 
     public async checkQueueStatus(): Promise<SyncQueueStatus> {
@@ -699,7 +726,7 @@ export class SyncService {
         const tables = [
             'exercises', 'categories', 'workouts', 'workout_sets',
             'routines', 'routine_days', 'routine_exercises',
-            'measurements', 'goals'
+            'measurements', 'goals', 'plate_inventory', 'settings', 'body_metrics'
         ];
 
         const snapshot: Record<string, any[]> = {};
@@ -724,6 +751,25 @@ export class SyncService {
 
         await dbService.run('DELETE FROM sync_queue');
         await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', Date.now().toString()]);
+    }
+
+    public async wipeAllUserData(): Promise<void> {
+        const token = useAuthStore.getState().token;
+        if (!token) throw new Error('Usuario no autenticado');
+
+        const response = await this.requestWithRetry(`${API_BASE_URL}/wipe`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+        });
+
+        if (!response.ok) {
+            const bodyText = await response.text().catch(() => '');
+            const suffix = bodyText ? ` body=${bodyText}` : '';
+            throw new Error(`Wipe failed! status: ${response.status}${suffix}`);
+        }
     }
 
     public async pullCloudSnapshot(): Promise<void> {

@@ -46,6 +46,27 @@ export async function POST(req: NextRequest) {
             'routine_exercises': schema.routineExercises,
             'measurements': schema.measurements,
             'goals': schema.goals,
+            'body_metrics': schema.bodyMetrics,
+            'plate_inventory': schema.plateInventory,
+            'settings': schema.settings,
+        };
+
+        const supportsSoftDelete = new Set<string>([
+            'categories',
+            'exercises',
+            'workouts',
+            'workout_sets',
+            'routines',
+            'routine_days',
+            'routine_exercises',
+            'measurements',
+            'goals',
+            'body_metrics',
+        ]);
+
+        const conflictTargetForTable = (table: string, tableSchema: any) => {
+            if (table === 'settings') return tableSchema.key;
+            return tableSchema.id;
         };
 
         const results = [];
@@ -83,17 +104,22 @@ export async function POST(req: NextRequest) {
                     await db.insert(tableSchema)
                         .values(camelPayload)
                         .onConflictDoUpdate({
-                            target: tableSchema.id,
+                            target: conflictTargetForTable(table, tableSchema),
                             set: camelPayload,
                             // Last Write Wins Reconciliation
                             where: sql`${tableSchema.updatedAt} < ${camelPayload.updatedAt.toISOString()}`
                         });
 
                 } else if (op.operation === 'DELETE') {
-                    // Soft delete for enterprise
-                    await db.update(tableSchema)
-                        .set({ deletedAt: new Date(timestamp), updatedAt: new Date(timestamp) })
-                        .where(and(eq(tableSchema.id, recordId), eq(tableSchema.userId, userId as string)));
+                    if (supportsSoftDelete.has(table)) {
+                        await db.update(tableSchema)
+                            .set({ deletedAt: new Date(timestamp), updatedAt: new Date(timestamp) })
+                            .where(and(eq(tableSchema.id, recordId), eq(tableSchema.userId, userId as string)));
+                    } else {
+                        const pkCol = table === 'settings' ? tableSchema.key : tableSchema.id;
+                        await db.delete(tableSchema)
+                            .where(and(eq(pkCol, recordId), eq(tableSchema.userId, userId as string)));
+                    }
                 }
 
                 results.push({ id: op.id, status: 'success' });

@@ -24,6 +24,31 @@ describe('SyncService', () => {
     global.fetch = jest.fn();
   });
 
+  it('computes local status with per-table active/deleted counts and aggregates only active', async () => {
+    // For each table, checkLocalStatus issues 2 queries when supportsDelete=true, else 1.
+    // We return 1 active and 2 deleted for all soft-delete tables, and 5 for non-soft-delete tables.
+    const getFirst = dbService.getFirst as jest.Mock;
+
+    getFirst.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM plate_inventory')) return { count: 5 };
+      if (sql.includes('FROM settings')) return { count: 5 };
+      if (sql.includes('deleted_at IS NULL')) return { count: 1 };
+      if (sql.includes('deleted_at IS NOT NULL')) return { count: 2 };
+      return { count: 0 };
+    });
+
+    const res = await syncService.checkLocalStatus();
+
+    expect(res.counts).toBeDefined();
+    expect(res.counts?.categories).toEqual({ active: 1, deleted: 2, total: 3 });
+    expect(res.counts?.plate_inventory).toEqual({ active: 5, deleted: 0, total: 5 });
+    expect(res.counts?.settings).toEqual({ active: 5, deleted: 0, total: 5 });
+
+    // active total: 10 soft-delete tables * 1 + 2 non-soft-delete tables * 5 = 20
+    expect(res.recordCount).toBe(20);
+    expect(res.hasData).toBe(true);
+  });
+
   it('computes queue status counts from sync_queue', async () => {
     (dbService.getFirst as jest.Mock)
       .mockResolvedValueOnce({ count: 2 }) // pending

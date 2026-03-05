@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
@@ -11,23 +11,52 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Check if user has data in neon
-        const [workoutsInfo, routinesInfo, exercisesInfo] = await Promise.all([
-            db.select({ count: sql<number>`count(*)` }).from(schema.workouts).where(eq(schema.workouts.userId, userId)),
-            db.select({ count: sql<number>`count(*)` }).from(schema.routines).where(eq(schema.routines.userId, userId)),
-            db.select({ count: sql<number>`count(*)` }).from(schema.exercises).where(eq(schema.exercises.userId, userId)),
-        ]);
+        const tables = [
+            { key: 'categories', table: schema.categories, supportsDelete: true },
+            { key: 'exercises', table: schema.exercises, supportsDelete: true },
+            { key: 'workouts', table: schema.workouts, supportsDelete: true },
+            { key: 'workout_sets', table: schema.workoutSets, supportsDelete: true },
+            { key: 'routines', table: schema.routines, supportsDelete: true },
+            { key: 'routine_days', table: schema.routineDays, supportsDelete: true },
+            { key: 'routine_exercises', table: schema.routineExercises, supportsDelete: true },
+            { key: 'measurements', table: schema.measurements, supportsDelete: true },
+            { key: 'goals', table: schema.goals, supportsDelete: true },
+            { key: 'body_metrics', table: schema.bodyMetrics, supportsDelete: true },
+            { key: 'plate_inventory', table: schema.plateInventory, supportsDelete: false },
+            { key: 'settings', table: schema.settings, supportsDelete: false },
+        ] as const;
 
-        const totalRecords = (workoutsInfo[0]?.count || 0) + (routinesInfo[0]?.count || 0) + (exercisesInfo[0]?.count || 0);
+        const countsEntries = await Promise.all(
+            tables.map(async (t) => {
+                const [active] = await db
+                    .select({ count: sql<number>`count(*)` })
+                    .from(t.table)
+                    .where(
+                        t.supportsDelete
+                            ? and(eq((t.table as any).userId, userId), isNull((t.table as any).deletedAt))
+                            : eq((t.table as any).userId, userId)
+                    );
+
+                const [deleted] = t.supportsDelete
+                    ? await db
+                        .select({ count: sql<number>`count(*)` })
+                        .from(t.table)
+                        .where(and(eq((t.table as any).userId, userId), sql`${(t.table as any).deletedAt} is not null`))
+                    : [{ count: 0 }];
+
+                const activeCount = active?.count || 0;
+                const deletedCount = deleted?.count || 0;
+                return [t.key, { active: activeCount, deleted: deletedCount, total: activeCount + deletedCount }] as const;
+            })
+        );
+
+        const counts = Object.fromEntries(countsEntries);
+        const recordCount = Object.values(counts).reduce((acc: number, v: any) => acc + (v?.active || 0), 0);
 
         return NextResponse.json({
-            hasData: totalRecords > 0,
-            recordCount: totalRecords,
-            counts: {
-                workouts: workoutsInfo[0]?.count || 0,
-                routines: routinesInfo[0]?.count || 0,
-                exercises: exercisesInfo[0]?.count || 0,
-            }
+            hasData: recordCount > 0,
+            recordCount,
+            counts,
         });
 
     } catch (e) {

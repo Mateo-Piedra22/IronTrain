@@ -45,6 +45,9 @@ export async function GET(req: NextRequest) {
             'routine_exercises': schema.routineExercises,
             'measurements': schema.measurements,
             'goals': schema.goals,
+            'body_metrics': schema.bodyMetrics,
+            'plate_inventory': schema.plateInventory,
+            'settings': schema.settings,
         };
 
         const changes: Array<{ table: string; operation: string; payload: Record<string, unknown> }> = [];
