@@ -71,77 +71,115 @@ export default async function RoutineSharePage({ params }: RoutinePageProps) {
     const publicLink = `https://irontrain.motiona.xyz/share/routine/${id}`;
 
     return (
-        <div className="flex flex-col min-h-[calc(100vh-80px)] p-6 md:p-12 items-center justify-center bg-[#f8fafc]">
-            <div className="w-full max-w-2xl text-left">
-                <div className="border border-slate-200 bg-white p-8 rounded-3xl shadow-xl relative overflow-hidden text-left">
-                    <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-500 to-amber-500"></div>
+        <div className="min-h-screen py-12 md:py-20 px-6 font-mono text-[#1a1a2e]">
+            <div className="max-w-2xl mx-auto">
+                {/* Back Link */}
+                <Link href="/feed" className="inline-flex items-center gap-2 text-[10px] opacity-40 hover:opacity-100 mb-8 transition-opacity uppercase tracking-[0.2em]">
+                    ← Volver al Directorio
+                </Link>
 
-                    <div className="flex items-center gap-3 mb-6">
-                        <Sparkles className="w-8 h-8 text-orange-500" />
-                        <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase">{routine.name}</h1>
-                    </div>
+                <div className="border border-current p-6 md:p-10 relative bg-[#f5f1e8]">
+                    {/* Header Decorative Bar */}
+                    <div className="absolute top-0 left-0 w-full h-1.5 bg-current"></div>
 
-                    {routine.description && (
-                        <p className="text-slate-500 mb-8 border-l-4 border-orange-500/20 pl-4 py-1 italic font-medium">
-                            {routine.description}
-                        </p>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4 mb-8">
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                            <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Días</div>
-                            <div className="text-xl font-black text-slate-900">{Object.keys(groupedDays).length}</div>
+                    <div className="flex flex-col gap-6">
+                        {/* Title Section */}
+                        <div>
+                            <div className="text-[10px] opacity-40 tracking-[0.3em] mb-2 uppercase italic flex items-center gap-2">
+                                <Sparkles className="w-3 h-3" />
+                                PLAN DE ENTRENAMIENTO
+                            </div>
+                            <h1 className="text-3xl md:text-5xl font-bold tracking-tighter uppercase break-words leading-[0.9]">
+                                {routine.name}
+                            </h1>
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                            <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Autor</div>
-                            <div className="text-sm font-black text-slate-900 truncate">@{routine.username || 'user'}</div>
-                        </div>
-                    </div>
 
-                    <div className="space-y-6 mb-10">
-                        <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">━━ Estructura del Plan</h3>
-                        <div className="space-y-4">
-                            {Object.values(groupedDays).map((day, idx) => (
-                                <div key={idx} className="border border-slate-100 rounded-2xl p-4 bg-slate-50/30 text-left">
-                                    <div className="font-black text-slate-800 mb-2 flex items-center gap-2">
-                                        <div className="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] flex items-center justify-center">{idx + 1}</div>
-                                        {day.name}
+                        {/* Description */}
+                        {routine.description && (
+                            <div className="border-l-2 border-current pl-4 py-2 opacity-70">
+                                <p className="text-sm italic leading-relaxed">
+                                    {routine.description}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-2 border-y border-current/10 py-6 my-2 gap-8">
+                            <div>
+                                <div className="text-[10px] opacity-40 uppercase tracking-widest mb-1">Volumen</div>
+                                <div className="text-2xl font-bold">{Object.keys(groupedDays).length} DÍAS</div>
+                            </div>
+                            <div>
+                                <div className="text-[10px] opacity-40 uppercase tracking-widest mb-1">Creado por</div>
+                                <div className="text-sm font-bold truncate">@{routine.username || 'user'}</div>
+                            </div>
+                        </div>
+
+                        {/* Structure Section */}
+                        <div className="space-y-8">
+                            <h3 className="text-[10px] opacity-40 uppercase tracking-[0.3em]">━━ DESGLOSE DE SESIONES</h3>
+
+                            <div className="space-y-8">
+                                {Object.values(groupedDays).map((day, idx) => (
+                                    <div key={idx} className="relative pl-8">
+                                        <div className="absolute left-0 top-0 text-[10px] font-bold opacity-30">
+                                            {String(idx + 1).padStart(2, '0')}
+                                        </div>
+                                        <h4 className="font-bold text-lg uppercase tracking-tight mb-3">
+                                            {day.name}
+                                        </h4>
+                                        <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-current/5 pt-3">
+                                            {day.exercises.length > 0 ? day.exercises.map((ex, i) => (
+                                                <div key={i} className="text-[11px] opacity-60 flex items-center gap-2 uppercase font-bold">
+                                                    <span className="w-1 h-1 bg-current opacity-30 rounded-full" />
+                                                    {ex}
+                                                </div>
+                                            )) : (
+                                                <span className="text-[10px] opacity-30 italic">Sin ejercicios definidos</span>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {day.exercises.length > 0 ? day.exercises.map((ex, i) => (
-                                            <span key={i} className="text-[10px] bg-white border border-slate-200 px-2 py-1 rounded-lg font-bold text-slate-500">
-                                                {ex}
-                                            </span>
-                                        )) : <span className="text-[10px] text-slate-400 italic">Sin ejercicios definidos</span>}
-                                    </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="flex flex-col gap-3">
-                        <a
-                            href={deepLink}
-                            className="w-full px-6 py-5 bg-slate-900 text-white rounded-2xl hover:bg-black transition-all flex items-center justify-center gap-3 group text-sm font-black tracking-wider shadow-lg shadow-slate-900/20"
-                        >
-                            <Download className="w-5 h-5 group-hover:-translate-y-1 transition-transform" />
-                            DESCARGAR EN MI APP
-                        </a>
-                        <button
-                            type="button"
-                            className="w-full px-6 py-4 border border-slate-200 bg-white rounded-2xl hover:border-slate-400 transition-all flex items-center justify-center gap-2 text-[10px] font-black tracking-[0.2em] uppercase text-slate-500"
-                            data-copy={publicLink}
-                        >
-                            <Copy className="w-4 h-4" />
-                            Copiar Link Público
-                        </button>
+                        {/* Footer / Actions */}
+                        <div className="mt-12 pt-8 border-t border-current space-y-4">
+                            <a
+                                href={deepLink}
+                                className="w-full bg-[#1a1a2e] text-[#f5f1e8] py-5 px-6 flex items-center justify-center gap-4 hover:opacity-90 transition-opacity font-bold uppercase tracking-[0.15em] text-sm"
+                            >
+                                <Download className="w-5 h-5" />
+                                DESCARGAR EN MI APP
+                            </a>
 
-                        <p className="text-[10px] text-center text-slate-400 mt-6 px-4 leading-relaxed font-bold uppercase tracking-tighter">
-                            ¿No tienes IronTrain? <Link href="/downloads" className="text-orange-500 underline">Consíguelo gratis aquí</Link>
-                        </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <button
+                                    type="button"
+                                    className="border border-current/20 py-4 px-6 flex items-center justify-center gap-3 hover:bg-current/5 transition-all text-[11px] font-bold uppercase tracking-wider"
+                                    data-copy={publicLink}
+                                >
+                                    <Copy className="w-4 h-4 opacity-40" />
+                                    Copiar Enlace
+                                </button>
+                                <Link
+                                    href="/downloads"
+                                    className="border border-current/20 py-4 px-6 flex items-center justify-center gap-3 hover:bg-current/5 transition-all text-[11px] font-bold uppercase tracking-wider"
+                                >
+                                    Obtener IronTrain
+                                </Link>
+                            </div>
+
+                            <div className="text-[9px] opacity-30 text-center pt-6 uppercase tracking-widest leading-relaxed">
+                                FECHA DE EMISIÓN: {new Date(routine.updatedAt).toLocaleDateString()}
+                                <br />
+                                VERIFICADO POR SISTEMA IRONTRAIN P2P
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+
             <script
                 dangerouslySetInnerHTML={{
                     __html: `
@@ -152,9 +190,9 @@ export default async function RoutineSharePage({ params }: RoutinePageProps) {
                                     const link = btn.getAttribute('data-copy');
                                     if (!link) return;
                                     await navigator.clipboard.writeText(link);
-                                    const previous = btn.innerHTML;
-                                    btn.innerHTML = 'COPIADO';
-                                    setTimeout(() => { btn.innerHTML = previous; }, 1200);
+                                    const previousLabel = btn.innerHTML;
+                                    btn.innerText = 'COPIADO ✓';
+                                    setTimeout(() => { btn.innerHTML = previousLabel; }, 1500);
                                 } catch {}
                             });
                         });

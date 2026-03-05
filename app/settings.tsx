@@ -10,7 +10,7 @@ import { Colors } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
-import { BarChart3, Bell, Calculator, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, CloudLightning, Database, Disc, Download, LogOut, Megaphone, MessageSquare, RefreshCw, Ruler, Shield, Smartphone, Timer, Trash2, User, Vibrate, Volume2, Zap } from 'lucide-react-native';
+import { AlertTriangle, BarChart3, Bell, Calculator, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, CloudLightning, Database, Disc, Download, LogOut, Megaphone, MessageSquare, RefreshCw, Ruler, Shield, Smartphone, Timer, Trash2, User, Vibrate, Volume2, Zap } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { syncService } from '../src/services/SyncService';
@@ -249,39 +249,6 @@ export default function SettingsScreen() {
                             }
                         }
                     }
-                    ,
-                    {
-                        label: 'Vaciar Nube + Celular',
-                        variant: 'outline',
-                        onPress: async () => {
-                            confirm.hide();
-                            confirm.destructive(
-                                'Vaciar TODO',
-                                'Esto borrará definitivamente TODOS tus datos en Neon y en este celular (incluye historial, rutinas, mediciones). Esta acción no se puede deshacer.',
-                                async () => {
-                                    confirm.destructive(
-                                        'Confirmación final',
-                                        'Confirmá nuevamente para proceder con el borrado total.',
-                                        async () => {
-                                            try {
-                                                notify.info('Borrando...', 'Vaciando Neon y el celular.');
-                                                await syncService.wipeAllUserData();
-                                                await dbService.factoryReset();
-                                                await configService.reset();
-                                                await useAuthStore.getState().logout();
-                                                await loadSettings();
-                                                notify.success('Éxito', 'Datos vaciados. Iniciá sesión para comenzar de cero.');
-                                            } catch (e: any) {
-                                                notify.error('Error', e?.message || 'No se pudo completar el borrado total.');
-                                            }
-                                        },
-                                        'BORRAR TODO'
-                                    );
-                                },
-                                'CONTINUAR'
-                            );
-                        }
-                    }
                 ]
             });
         } catch (error: any) {
@@ -318,6 +285,39 @@ export default function SettingsScreen() {
                 } catch (e: any) { notify.error('Fallo de formateo', e?.message || 'No se pudo completar el restablecimiento.'); }
             },
             'BORRAR TODO'
+        );
+    };
+
+    const handleFullAccountWipe = () => {
+        if (!auth.token) {
+            notify.error('No autenticado', 'Debes estar logueado para vaciar la nube. Si solo quieres borrar los datos de este celular, usa "Restablecer de fábrica".');
+            return;
+        }
+
+        confirm.destructive(
+            'Vaciar Cuenta Completa',
+            '⚠️ **ESTO ES DEFINITIVO** ⚠️\n\nEste proceso borrará TODOS tus datos tanto en este dispositivo como en la Nube Neon.\n\nSe eliminarán historial, rutinas, mediciones, fuerza y personalizaciones. No se puede revertir.',
+            async () => {
+                confirm.destructive(
+                    'Confirmación final',
+                    'Para confirmar, presioná el botón. Se borrará la nube y el celular simultáneamente y se cerrará tu sesión.',
+                    async () => {
+                        try {
+                            notify.info('Borrando...', 'Limpiando datos de cuenta en todas partes.');
+                            await syncService.wipeAllUserData();
+                            await dbService.factoryReset();
+                            await configService.reset();
+                            await auth.logout();
+                            await loadSettings();
+                            notify.success('Éxito', 'Cuenta vaciada. Ya podés empezar de cero.');
+                        } catch (e: any) {
+                            notify.error('Error de borrado', e?.message || 'No se pudo completar el wipe total.');
+                        }
+                    },
+                    'VACIAR TODO'
+                );
+            },
+            'CONTINUAR'
         );
     };
 
@@ -735,10 +735,24 @@ export default function SettingsScreen() {
                 {/* Danger Zone */}
                 <SectionHeader icon={Shield} title="Zona de riesgo" />
                 <View style={[s.card, { borderColor: '#ef444430', marginBottom: 24 }]}>
-                    <TouchableOpacity onPress={handleResetDB} style={s.settingRow}>
+                    <TouchableOpacity onPress={handleResetDB} style={[s.settingRow, s.settingRowBorder]}>
                         <View style={s.settingLeft}>
                             <View style={[s.settingIconCircle, { backgroundColor: '#ef444415' }]}><Trash2 size={16} color="#ef4444" /></View>
-                            <Text style={[s.settingLabel, { color: '#ef4444' }]}>Restablecer de fábrica</Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[s.settingLabel, { color: '#ef4444' }]}>Restablecer de fábrica</Text>
+                                <Text style={s.settingSubtitle}>Borra todos los datos locales.</Text>
+                            </View>
+                        </View>
+                        <ChevronRight size={16} color="#ef4444" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={handleFullAccountWipe} style={s.settingRow}>
+                        <View style={s.settingLeft}>
+                            <View style={[s.settingIconCircle, { backgroundColor: '#ef444420' }]}><AlertTriangle size={16} color="#ef4444" /></View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[s.settingLabel, { color: '#ef4444' }]}>Vaciar cuenta (Local + Nube)</Text>
+                                <Text style={s.settingSubtitle}>Borrado total e irreversible en todas partes.</Text>
+                            </View>
                         </View>
                         <ChevronRight size={16} color="#ef4444" />
                     </TouchableOpacity>
