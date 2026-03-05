@@ -2,13 +2,13 @@ import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { routineService } from '@/src/services/RoutineService';
 import { SocialFriend, SocialInboxItem, SocialLeaderboardEntry, SocialProfile, SocialSearchUser, SocialService } from '@/src/services/SocialService';
 import { useAuthStore } from '@/src/store/authStore';
+import { confirm } from '@/src/store/confirmStore';
 import { Colors } from '@/src/theme';
 import * as Clipboard from 'expo-clipboard';
-import { Copy, Globe, UserCheck } from 'lucide-react-native';
+import { Copy, Dumbbell, Flame, Globe, Info, Scale, Trophy, UserCheck } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Image,
     Linking,
     RefreshControl,
@@ -32,6 +32,10 @@ export default function SocialTab() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [activeTab, setActiveTab] = useState<SocialTabKey>('leaderboard');
+    const [rankingSegment, setRankingSegment] = useState<'weekly' | 'monthly' | 'lifetime'>('lifetime');
+    const [expandedFriendId, setExpandedFriendId] = useState<string | null>(null);
+    const [comparisons, setComparisons] = useState<Record<string, any[]>>({});
+    const [loadingCompare, setLoadingCompare] = useState(false);
 
     const authState = useAuthStore();
 
@@ -50,7 +54,7 @@ export default function SocialTab() {
             setInbox(inb);
             setLeaderboard(lb);
         } catch {
-            Alert.alert('Error', 'No se pudieron cargar los datos sociales.');
+            confirm.error('Error', 'No se pudieron cargar los datos sociales.');
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -64,7 +68,7 @@ export default function SocialTab() {
     const handleCopyId = async () => {
         if (profile?.id) {
             await Clipboard.setStringAsync(profile.id);
-            Alert.alert('Copiado', 'Tu ID ha sido copiado al portapapeles. Compartilo con un amigo.');
+            confirm.success('Copiado', 'Tu ID ha sido copiado al portapapeles. Compartilo con un amigo.');
         }
     };
 
@@ -78,7 +82,7 @@ export default function SocialTab() {
             setActiveTab('search');
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : 'Error desconocido';
-            Alert.alert('Error', msg);
+            confirm.error('Error', msg);
         } finally {
             setLoading(false);
         }
@@ -88,18 +92,18 @@ export default function SocialTab() {
         try {
             await Linking.openURL('https://irontrain.motiona.xyz/feed');
         } catch {
-            Alert.alert('Error', 'No se pudo abrir la página de rutinas públicas.');
+            confirm.error('Error', 'No se pudo abrir la página de rutinas públicas.');
         }
     };
 
     const handleSendRequest = async (friendId: string) => {
         try {
             await SocialService.sendFriendRequest(friendId);
-            Alert.alert('Solicitud enviada', 'La solicitud fue enviada correctamente.');
+            confirm.success('Solicitud enviada', 'La solicitud fue enviada correctamente.');
             loadData();
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : 'Error desconocido';
-            Alert.alert('Error', msg);
+            confirm.error('Error', msg);
         }
     };
 
@@ -109,7 +113,7 @@ export default function SocialTab() {
             loadData();
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : 'Error desconocido';
-            Alert.alert('Error', msg);
+            confirm.error('Error', msg);
         }
     };
 
@@ -120,13 +124,70 @@ export default function SocialTab() {
                     ? JSON.parse(payload)
                     : payload;
                 await routineService.importSharedRoutine(parsedPayload);
-                Alert.alert('Rutina importada', 'La rutina ha sido añadida a tu biblioteca local.');
+                confirm.success('Rutina importada', 'La rutina ha sido añadida a tu biblioteca local.');
             }
             await SocialService.respondInbox(inboxId, action);
             loadData();
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : 'Error desconocido';
-            Alert.alert('Error', msg);
+            confirm.error('Error', msg);
+        }
+    };
+
+    const handleToggleKudo = async (feedId: string) => {
+        // Optimistic UI update
+        const prevInbox = [...inbox];
+        setInbox(prev => prev.map(item => {
+            if (item.id === feedId) {
+                return {
+                    ...item,
+                    hasKudoed: !item.hasKudoed,
+                    kudosCount: (item.kudosCount || 0) + (item.hasKudoed ? -1 : 1)
+                };
+            }
+            return item;
+        }));
+
+        try {
+            await SocialService.toggleKudo(feedId);
+        } catch (e) {
+            // Revert on error
+            setInbox(prevInbox);
+        }
+    };
+
+    const handleShowScoreInfo = () => {
+        confirm.info(
+            'Sistema IronScore',
+            `Tu puntaje mide tu constancia y aporte a la comunidad:\n\n` +
+            `• Cada entrenamiento: +10 pts\n` +
+            `• Rutina creada: +5 pts\n` +
+            `• Compartir rutinas: +20 pts\n\n` +
+            `**Multiplicador por Racha:**\n` +
+            `• 3 días seguidos: x1.1\n` +
+            `• 5 días seguidos: x1.25\n` +
+            `• 10+ días seguidos: x1.50\n\n` +
+            `¡Entrena sin fallar para empujar tu score al máximo!`
+        );
+    };
+
+    const handleExpandFriend = async (friendId: string) => {
+        if (friendId === profile?.id) return;
+        if (expandedFriendId === friendId) {
+            setExpandedFriendId(null);
+            return;
+        }
+        setExpandedFriendId(friendId);
+        if (!comparisons[friendId]) {
+            setLoadingCompare(true);
+            try {
+                const data = await SocialService.compareFriend(friendId);
+                setComparisons(prev => ({ ...prev, [friendId]: data }));
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoadingCompare(false);
+            }
         }
     };
 
@@ -202,7 +263,7 @@ export default function SocialTab() {
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.tabBtn, activeTab === 'inbox' && styles.tabBtnActive]} onPress={() => setActiveTab('inbox')}>
                             <Text style={[styles.tabText, activeTab === 'inbox' && styles.tabTextActive]}>
-                                Inbox{pendingInboxCount > 0 ? ` (${pendingInboxCount})` : ''}
+                                Feed{pendingInboxCount > 0 ? ` (${pendingInboxCount})` : ''}
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.tabBtn, activeTab === 'search' && styles.tabBtnActive]} onPress={() => setActiveTab('search')}>
@@ -214,22 +275,92 @@ export default function SocialTab() {
                 <View style={styles.tabContent}>
                     {activeTab === 'leaderboard' && (
                         <View>
+                            <View style={styles.rankingHeader}>
+                                <View style={styles.rankingSegmentRow}>
+                                    {(['weekly', 'monthly', 'lifetime'] as const).map((seg) => (
+                                        <TouchableOpacity
+                                            key={seg}
+                                            style={[styles.segmentBtn, rankingSegment === seg && styles.segmentBtnActive]}
+                                            onPress={() => setRankingSegment(seg)}
+                                        >
+                                            <Text style={[styles.segmentText, rankingSegment === seg && styles.segmentTextActive]}>
+                                                {seg === 'weekly' ? 'Semanal' : seg === 'monthly' ? 'Mensual' : 'Histórico'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                                <TouchableOpacity onPress={handleShowScoreInfo} style={styles.infoBtn}>
+                                    <Info size={20} color={Colors.iron[400]} />
+                                </TouchableOpacity>
+                            </View>
+
                             {leaderboard.length === 0 ? (
                                 <Text style={styles.emptyText}>Sin datos de ranking aún.</Text>
                             ) : (
-                                leaderboard.map((user, i) => (
-                                    <View key={user.id} style={[styles.friendRow, user.id === profile?.id && styles.highlightRow]}>
-                                        <View style={styles.rankRow}>
-                                            <Text style={[styles.rankNumber, { color: i === 0 ? '#ffd700' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : Colors.iron[500] }]}>
-                                                {i + 1}
-                                            </Text>
-                                            <View>
-                                                <Text style={styles.friendName}>{user.id === profile?.id ? 'Tú' : user.displayName}</Text>
-                                                <Text style={styles.friendStatus}>IronScore {user.score}</Text>
-                                            </View>
+                                [...leaderboard].sort((a, b) => b.scores[rankingSegment] - a.scores[rankingSegment]).map((user, i) => {
+                                    const isExpanded = expandedFriendId === user.id;
+                                    const comparisonData = comparisons[user.id] || [];
+
+                                    return (
+                                        <View key={user.id}>
+                                            <TouchableOpacity
+                                                style={[styles.friendRow, user.id === profile?.id && styles.highlightRow]}
+                                                onPress={() => handleExpandFriend(user.id)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <View style={styles.rankRow}>
+                                                    <Text style={[styles.rankNumber, { color: i === 0 ? '#ffd700' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : Colors.iron[500] }]}>
+                                                        {i + 1}
+                                                    </Text>
+                                                    <View>
+                                                        <Text style={styles.friendName}>{user.id === profile?.id ? 'Tú' : user.displayName}</Text>
+                                                        <Text style={styles.friendStatus}>IronScore {user.scores[rankingSegment]}</Text>
+                                                    </View>
+                                                </View>
+                                                {user.stats?.currentStreak >= 3 && (
+                                                    <View style={styles.streakBadge}>
+                                                        <Flame size={12} color="#ef4444" fill="#ef4444" style={{ marginRight: 4 }} />
+                                                        <Text style={styles.streakText}>{user.stats.currentStreak}</Text>
+                                                    </View>
+                                                )}
+                                            </TouchableOpacity>
+
+                                            {isExpanded && (
+                                                <View style={styles.expandedComparisonBox}>
+                                                    <View style={styles.compareHeader}>
+                                                        <Scale size={18} color={Colors.iron[400]} />
+                                                        <Text style={styles.compareTitle}>Comparación de Fuerza (1RM)</Text>
+                                                    </View>
+                                                    {loadingCompare ? (
+                                                        <ActivityIndicator size="small" color={Colors.primary.DEFAULT} style={{ marginVertical: 10 }} />
+                                                    ) : comparisonData.length === 0 ? (
+                                                        <Text style={styles.compareEmptyText}>No hay ejercicios comunes acá.</Text>
+                                                    ) : (
+                                                        comparisonData.map((comp: any, cidx: number) => {
+                                                            const userWon = comp.user1RM > comp.friend1RM;
+                                                            const friendWon = comp.friend1RM > comp.user1RM;
+                                                            return (
+                                                                <View key={cidx} style={styles.compareRow}>
+                                                                    <Text style={styles.compareExerciseName}>{comp.exerciseName}</Text>
+                                                                    <View style={styles.compareBars}>
+                                                                        <View style={{ flex: 1, alignItems: 'center' }}>
+                                                                            <Text style={[styles.compareValue, userWon && styles.compareValueHighlight]}>{comp.user1RM}kg</Text>
+                                                                            <Text style={styles.compareLabel}>Tú</Text>
+                                                                        </View>
+                                                                        <View style={{ flex: 1, alignItems: 'center' }}>
+                                                                            <Text style={[styles.compareValue, friendWon && styles.compareValueHighlight]}>{comp.friend1RM}kg</Text>
+                                                                            <Text style={styles.compareLabel}>{user.displayName}</Text>
+                                                                        </View>
+                                                                    </View>
+                                                                </View>
+                                                            );
+                                                        })
+                                                    )}
+                                                </View>
+                                            )}
                                         </View>
-                                    </View>
-                                ))
+                                    );
+                                })
                             )}
                         </View>
                     )}
@@ -267,30 +398,91 @@ export default function SocialTab() {
                     )}
 
                     {activeTab === 'inbox' && (
-                        <View>
+                        <View style={{ gap: 16 }}>
                             {inbox.length === 0 ? (
-                                <Text style={styles.emptyText}>Tu bandeja de entrada está vacía.</Text>
+                                <Text style={styles.emptyText}>Tu Feed de la comunidad está vacío.</Text>
                             ) : (
-                                inbox.map((item) => (
-                                    <View key={item.id} style={styles.friendRow}>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.friendName}>{item.senderName} te envió una Rutina</Text>
-                                            <Text style={styles.friendStatus}>{new Date(item.createdAt).toLocaleDateString()}</Text>
-                                        </View>
-                                        {item.status === 'pending' ? (
-                                            <View style={styles.actionsBox}>
-                                                <TouchableOpacity style={styles.btnSmallAccept} onPress={() => handleInboxResponse(item.id, 'accept', item.payload)}>
-                                                    <Text style={styles.btnSmallText}>Importar</Text>
-                                                </TouchableOpacity>
-                                                <TouchableOpacity style={styles.btnSmallReject} onPress={() => handleInboxResponse(item.id, 'reject')}>
-                                                    <Text style={styles.btnSmallTextReject}>Rechazar</Text>
-                                                </TouchableOpacity>
+                                inbox.map((item) => {
+                                    if (item.feedType === 'direct_share' || !item.feedType) {
+                                        return (
+                                            <View key={item.id} style={styles.premiumCard}>
+                                                <View style={styles.premiumHeader}>
+                                                    <View style={styles.premiumIconBox}>
+                                                        <Dumbbell size={24} color={Colors.white} />
+                                                    </View>
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={styles.premiumTitle}>Invitación a Entrenar</Text>
+                                                        <Text style={styles.premiumSender}>de @{item.senderUsername || item.senderName}</Text>
+                                                    </View>
+                                                    <Text style={styles.activityDate}>
+                                                        {new Date(item.createdAt).toLocaleDateString()}
+                                                    </Text>
+                                                </View>
+
+                                                <View style={styles.premiumBody}>
+                                                    <Text style={styles.premiumDescription}>
+                                                        @{item.senderUsername || item.senderName} diseñó una rutina para vos. Sumala a tu biblioteca.
+                                                    </Text>
+                                                </View>
+
+                                                {item.status === 'pending' ? (
+                                                    <View style={styles.premiumActions}>
+                                                        <TouchableOpacity style={styles.premiumBtnPrimary} onPress={() => handleInboxResponse(item.id, 'accept', item.payload)}>
+                                                            <Text style={styles.premiumBtnTextPrimary}>Descargar & Importar</Text>
+                                                        </TouchableOpacity>
+                                                        <TouchableOpacity style={styles.premiumBtnSecondary} onPress={() => handleInboxResponse(item.id, 'reject')}>
+                                                            <Text style={styles.premiumBtnTextSecondary}>Ignorar</Text>
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                ) : (
+                                                    <View style={styles.premiumResolved}>
+                                                        <Text style={styles.premiumStatusText}>
+                                                            {item.status === 'accepted' ? '✓ Rutina Importada' : '✗ Rutina Rechazada'}
+                                                        </Text>
+                                                    </View>
+                                                )}
                                             </View>
-                                        ) : (
-                                            <Text style={styles.friendStatus}>{item.status === 'accepted' ? 'Importada' : 'Rechazada'}</Text>
-                                        )}
-                                    </View>
-                                ))
+                                        );
+                                    }
+
+                                    if (item.feedType === 'activity_log') {
+                                        let metaDataLog = {};
+                                        try { metaDataLog = JSON.parse(typeof item.metadata === 'string' ? item.metadata : '{}'); } catch (e) { }
+                                        const isPr = item.actionType === 'pr_broken';
+
+                                        return (
+                                            <View key={item.id} style={styles.activityRow}>
+                                                <View style={styles.activityHeader}>
+                                                    <View style={[styles.activityIconBox, isPr ? { backgroundColor: '#ffd70030' } : {}]}>
+                                                        {isPr ? <Trophy size={18} color="#ffd700" /> : <Dumbbell size={18} color={Colors.iron[400]} />}
+                                                    </View>
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={styles.activityUser}>@{item.senderUsername || item.senderName}</Text>
+                                                        <Text style={styles.activityDesc}>
+                                                            {isPr ? 'Rompió un Récord Personal' : 'Completó un Entrenamiento'}
+                                                        </Text>
+                                                    </View>
+                                                    <Text style={styles.activityDate}>
+                                                        {new Date(item.createdAt).toLocaleDateString()}
+                                                    </Text>
+                                                </View>
+
+                                                <View style={styles.activityFooter}>
+                                                    <TouchableOpacity
+                                                        style={[styles.kudoBtn, item.hasKudoed && styles.kudoBtnActive]}
+                                                        onPress={() => handleToggleKudo(item.id)}
+                                                    >
+                                                        <Flame size={18} color={item.hasKudoed ? '#f97316' : Colors.iron[400]} fill={item.hasKudoed ? '#f97316' : "transparent"} />
+                                                        <Text style={[styles.kudoText, item.hasKudoed && styles.kudoTextActive]}>
+                                                            {item.kudosCount || 0} Kudos
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                </View>
+                                            </View>
+                                        );
+                                    }
+                                    return null;
+                                })
                             )}
                         </View>
                     )}
@@ -535,10 +727,130 @@ const styles = StyleSheet.create({
         borderColor: Colors.primary.DEFAULT,
         borderWidth: 2,
     },
+    expandedComparisonBox: {
+        backgroundColor: Colors.iron[900],
+        marginHorizontal: 16,
+        marginBottom: 8,
+        padding: 16,
+        borderBottomLeftRadius: 16,
+        borderBottomRightRadius: 16,
+        borderTopWidth: 1,
+        borderColor: Colors.iron[800],
+        marginTop: -8, // tuck under the main row
+        zIndex: -1,
+    },
+    compareHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
+        paddingBottom: 8,
+        borderBottomWidth: 1,
+        borderColor: Colors.iron[800],
+    },
+    compareTitle: {
+        color: Colors.iron[300],
+        fontSize: 13,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
+    compareEmptyText: {
+        color: Colors.iron[500],
+        fontSize: 13,
+        fontStyle: 'italic',
+        textAlign: 'center',
+        marginTop: 8,
+    },
+    compareRow: {
+        marginBottom: 12,
+        backgroundColor: Colors.iron[950],
+        borderRadius: 8,
+        padding: 12,
+    },
+    compareExerciseName: {
+        color: Colors.white,
+        fontSize: 14,
+        fontWeight: 'bold',
+        textTransform: 'capitalize',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    compareBars: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    compareValue: {
+        fontSize: 18,
+        color: Colors.iron[400],
+        fontWeight: '900',
+    },
+    compareValueHighlight: {
+        color: Colors.primary.DEFAULT,
+    },
+    compareLabel: {
+        fontSize: 11,
+        color: Colors.iron[500],
+        fontWeight: 'bold',
+        marginTop: 2,
+    },
     rankRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
+    },
+    rankingHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    rankingSegmentRow: {
+        flexDirection: 'row',
+        backgroundColor: Colors.iron[900],
+        borderRadius: 10,
+        padding: 4,
+        flex: 1,
+        marginRight: 12,
+    },
+    segmentBtn: {
+        flex: 1,
+        paddingVertical: 8,
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    segmentBtnActive: {
+        backgroundColor: Colors.iron[700],
+    },
+    segmentText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: Colors.iron[500],
+        textTransform: 'uppercase',
+    },
+    segmentTextActive: {
+        color: Colors.white,
+    },
+    infoBtn: {
+        padding: 8,
+        backgroundColor: Colors.surface,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
+    },
+    streakBadge: {
+        backgroundColor: '#ef444420',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#ef444450',
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    streakText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#ef4444',
     },
     friendName: {
         color: Colors.iron[950],
@@ -607,5 +919,168 @@ const styles = StyleSheet.create({
     searchBtnText: {
         color: '#fff',
         fontWeight: 'bold',
+    },
+    // Premium Routine Card Styles
+    premiumCard: {
+        backgroundColor: Colors.surface,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
+        overflow: 'hidden',
+        elevation: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+    },
+    premiumHeader: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        padding: 16,
+        paddingBottom: 8,
+        gap: 12,
+    },
+    premiumIconBox: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: Colors.primary.DEFAULT,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    premiumTitle: {
+        fontSize: 18,
+        fontWeight: '900',
+        color: Colors.iron[950],
+        marginBottom: 2,
+    },
+    premiumSender: {
+        fontSize: 14,
+        color: Colors.primary.DEFAULT,
+        fontWeight: '700',
+    },
+    premiumBody: {
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+    },
+    premiumDescription: {
+        fontSize: 14,
+        color: Colors.iron[500],
+        lineHeight: 20,
+    },
+    premiumActions: {
+        flexDirection: 'row',
+        padding: 16,
+        gap: 8,
+        borderTopWidth: 1,
+        borderColor: Colors.iron[700],
+        backgroundColor: Colors.iron[900],
+    },
+    premiumBtnPrimary: {
+        flex: 1,
+        backgroundColor: Colors.primary.DEFAULT,
+        paddingVertical: 12,
+        alignItems: 'center',
+        borderRadius: 12,
+    },
+    premiumBtnTextPrimary: {
+        color: Colors.white,
+        fontWeight: '900',
+        fontSize: 13,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    premiumBtnSecondary: {
+        backgroundColor: Colors.iron[800],
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: Colors.iron[600],
+    },
+    premiumBtnTextSecondary: {
+        color: Colors.iron[400],
+        fontWeight: '800',
+        fontSize: 13,
+        textTransform: 'uppercase',
+    },
+    premiumResolved: {
+        padding: 16,
+        alignItems: 'center',
+        borderTopWidth: 1,
+        borderColor: Colors.iron[700],
+        backgroundColor: Colors.iron[900],
+    },
+    premiumStatusText: {
+        color: Colors.iron[500],
+        fontWeight: '800',
+        fontStyle: 'italic',
+    },
+    // Activity Log Styles
+    activityRow: {
+        backgroundColor: Colors.surface,
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
+    },
+    activityHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 12,
+    },
+    activityIconBox: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: Colors.iron[800],
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    activityUser: {
+        fontSize: 15,
+        fontWeight: '900',
+        color: Colors.iron[950],
+    },
+    activityDesc: {
+        fontSize: 13,
+        color: Colors.iron[500],
+    },
+    activityDate: {
+        fontSize: 11,
+        color: Colors.iron[600],
+        textTransform: 'uppercase',
+        fontWeight: '600',
+    },
+    activityFooter: {
+        flexDirection: 'row',
+        borderTopWidth: 1,
+        borderColor: Colors.iron[800],
+        paddingTop: 12,
+        marginTop: 4,
+    },
+    kudoBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        borderRadius: 20,
+        backgroundColor: Colors.iron[800],
+    },
+    kudoBtnActive: {
+        backgroundColor: '#f9731615',
+        borderColor: '#f9731640',
+        borderWidth: 1,
+    },
+    kudoText: {
+        color: Colors.iron[400],
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    kudoTextActive: {
+        color: '#f97316',
     },
 });

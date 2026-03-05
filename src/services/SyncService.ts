@@ -1,3 +1,4 @@
+import NetInfo from '@react-native-community/netinfo';
 import { format } from 'date-fns';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useAuthStore } from '../store/authStore';
@@ -53,16 +54,23 @@ export class SyncService {
      */
     public async syncBidirectional(): Promise<void> {
         if (this.isSyncing) return;
-
-        const token = useAuthStore.getState().token;
-        if (!token) throw new Error('Usuario no autenticado para sincronizar');
-
         this.isSyncing = true;
+
         try {
+            const token = useAuthStore.getState().token;
+            if (!token) return; // Silent if no network or auth
+
+            const netState = await NetInfo.fetch();
+            if (!netState.isConnected || !netState.isInternetReachable) return;
+            const db = dbService.getDatabase();
+
+            // Reintentar los fallidos si es manual
+            await db.runAsync(`UPDATE sync_queue SET status = 'pending', retry_count = 0 WHERE status = 'failed'`);
+
             await this.pushLocalChanges(token);
             await this.pullRemoteChanges(token);
         } catch (error) {
-            console.error('Error during bidirectional sync:', error);
+            console.error('Bidirectional sync failed', error);
             throw error;
         } finally {
             this.isSyncing = false;
@@ -148,11 +156,36 @@ export class SyncService {
 
                 const result = await response.json();
 
-                await db.runAsync(`UPDATE sync_queue SET status = 'synced', synced_at = ? WHERE id IN (${validOperations.map(() => '?').join(',')})`, [Date.now(), ...validOperations.map(op => op.id)]);
+                // Track IDs of successfully synced versus failed operations
+                const successIds: number[] = [];
+                const failedIds: number[] = [];
+
+                if (result.results && Array.isArray(result.results)) {
+                    for (const res of result.results) {
+                        if (res.status === 'error') {
+                            failedIds.push(res.id);
+                        } else {
+                            successIds.push(res.id);
+                        }
+                    }
+                } else {
+                    // Si no hay detalles (backend no lo respeta), asumimos exitoso si devolvió 200
+                    successIds.push(...validOperations.map(op => op.id));
+                }
+
+                if (successIds.length > 0) {
+                    await db.runAsync(`UPDATE sync_queue SET status = 'synced', synced_at = ? WHERE id IN (${successIds.map(() => '?').join(',')})`, [Date.now(), ...successIds]);
+                }
+
+                if (failedIds.length > 0) {
+                    await db.runAsync(`UPDATE sync_queue SET status = 'failed', retry_count = retry_count + 1 WHERE id IN (${failedIds.map(() => '?').join(',')})`, failedIds);
+                }
+
+                hasMore = validOperations.length === MAX_BATCH_SIZE; // Continue if we processed a full batch
             } catch (error) {
                 console.error(`Sync push error:`, error);
-
                 await db.runAsync(`UPDATE sync_queue SET status = 'failed', retry_count = retry_count + 1 WHERE id IN (${ids.map(() => '?').join(',')})`, ids);
+                throw error; // Throw to abort sync chain if push fails fully
             }
         }
     }
@@ -224,7 +257,7 @@ export class SyncService {
 
         } catch (error) {
             console.error('PULL sync failed:', error);
-            // Non critical, just retry next time
+            throw error; // Throw so syncBidirectional fails loudly
         }
     }
 

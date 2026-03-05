@@ -2,7 +2,7 @@ import { ToastMessage, useNotificationStore } from '@/src/store/notificationStor
 import { Colors } from '@/src/theme';
 import { AlertTriangle, CheckCircle, Info, X, XCircle } from 'lucide-react-native';
 import React from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown, LinearTransition, SlideOutUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -60,25 +60,23 @@ export const ToastContainer = () => {
     const hasToasts = toasts.length > 0;
 
     return (
-        <Modal
-            visible={hasToasts}
-            transparent
-            animationType="none"
-            statusBarTranslucent
-            hardwareAccelerated
-            onRequestClose={() => { /* prevent back button from closing toast layer */ }}
+        <View
+            pointerEvents="box-none"
+            style={[
+                styles.container,
+                {
+                    paddingTop: Math.max(insets.top + 10, 50),
+                    zIndex: 9999, // Ensure it's above the Stack
+                    display: hasToasts ? 'flex' : 'none'
+                }
+            ]}
         >
-            <View
-                pointerEvents="box-none"
-                style={[styles.container, { paddingTop: Math.max(insets.top + 10, 50) }]}
-            >
-                <View pointerEvents="box-none" style={styles.inner}>
-                    {toasts.map(toast => (
-                        <ToastItem key={toast.id} toast={toast} onDismiss={removeToast} />
-                    ))}
-                </View>
+            <View pointerEvents="box-none" style={styles.inner}>
+                {toasts.map(toast => (
+                    <ToastItem key={toast.id} toast={toast} onDismiss={removeToast} />
+                ))}
             </View>
-        </Modal>
+        </View>
     );
 };
 

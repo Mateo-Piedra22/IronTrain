@@ -8,7 +8,7 @@ import { confirm } from '@/src/store/confirmStore';
 import { Colors } from '@/src/theme';
 import { Routine } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
-import { Calendar, ChevronRight, Dumbbell, Edit3, GripVertical, Plus, Send, Share2, Trash2, X } from 'lucide-react-native';
+import { Calendar, ChevronRight, Dumbbell, Edit3, GripVertical, Plus, Send, Share2, Trash2, User, Users, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
@@ -307,24 +307,32 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
 
                                 {/* Action buttons row */}
                                 <View style={st.btnRow}>
-                                    <TouchableOpacity style={[st.smallBtn, { backgroundColor: Colors.primary.DEFAULT, borderColor: Colors.primary.DEFAULT }]} onPress={handleShareRoutine}>
-                                        <Share2 size={14} color="white" />
-                                        <Text style={[st.smallBtnText, { color: 'white' }]}>Compartir</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={st.smallBtn} onPress={handleOpenFriendPicker}>
-                                        <Send size={14} color={Colors.primary.DEFAULT} />
-                                        <Text style={st.smallBtnText}>Enviar a amigo</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={st.smallBtn} onPress={() => {
-                                        setEditRoutineName(routine?.name || ''); setEditRoutineDesc(routine?.description || ''); setEditRoutinePublic(routine?.is_public === 1); setEditRoutineVisible(true);
-                                    }}>
-                                        <Edit3 size={14} color={Colors.primary.DEFAULT} />
-                                        <Text style={st.smallBtnText}>Editar</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={[st.smallBtn, { borderColor: '#ef444430' }]} onPress={handleDeleteRoutine}>
-                                        <Trash2 size={14} color="#ef4444" />
-                                        <Text style={[st.smallBtnText, { color: '#ef4444' }]}>Borrar</Text>
-                                    </TouchableOpacity>
+                                    <View style={{ flex: 1 }}>
+                                        <TouchableOpacity style={[st.smallBtn, { backgroundColor: Colors.primary.DEFAULT, borderColor: Colors.primary.DEFAULT }]} onPress={handleShareRoutine}>
+                                            <Share2 size={12} color="white" />
+                                            <Text style={[st.smallBtnText, { color: 'white' }]}>Link</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <TouchableOpacity style={st.smallBtn} onPress={handleOpenFriendPicker}>
+                                            <Send size={12} color={Colors.primary.DEFAULT} />
+                                            <Text style={st.smallBtnText}>Amigo</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <TouchableOpacity style={st.smallBtn} onPress={() => {
+                                            setEditRoutineName(routine?.name || ''); setEditRoutineDesc(routine?.description || ''); setEditRoutinePublic(routine?.is_public === 1); setEditRoutineVisible(true);
+                                        }}>
+                                            <Edit3 size={12} color={Colors.primary.DEFAULT} />
+                                            <Text style={st.smallBtnText}>Edit</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <TouchableOpacity style={[st.smallBtn, { borderColor: '#ef444430' }]} onPress={handleDeleteRoutine}>
+                                            <Trash2 size={12} color="#ef4444" />
+                                            <Text style={[st.smallBtnText, { color: '#ef4444' }]}>Del</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
 
                                 {/* Section label */}
@@ -478,21 +486,50 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                     <X size={18} color="#fff" />
                                 </TouchableOpacity>
                             </View>
-                            <View style={{ flex: 1, padding: 16 }}>
+                            <View style={{ flex: 1, padding: 16, backgroundColor: Colors.iron[100] }}>
                                 {friends.length === 0 ? (
-                                    <Text style={{ color: Colors.iron[400], textAlign: 'center', marginTop: 20 }}>No tienes amigos agregados.</Text>
+                                    <View style={st.centered}>
+                                        <Users size={40} color={Colors.iron[300]} strokeWidth={1} />
+                                        <Text style={{ color: Colors.iron[400], textAlign: 'center', marginTop: 12, fontWeight: '600' }}>No tienes amigos agregados.</Text>
+                                    </View>
                                 ) : (
                                     <FlatList
                                         data={friends}
                                         keyExtractor={(item) => item.friendId}
                                         renderItem={({ item }) => (
                                             <TouchableOpacity
-                                                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.iron[800], padding: 16, borderRadius: 8, marginBottom: 8 }}
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    backgroundColor: Colors.surface,
+                                                    padding: 16,
+                                                    borderRadius: 16,
+                                                    marginBottom: 10,
+                                                    borderWidth: 1,
+                                                    borderColor: Colors.iron[300],
+                                                    elevation: 2,
+                                                    shadowColor: '#000',
+                                                    shadowOffset: { width: 0, height: 2 },
+                                                    shadowOpacity: 0.05,
+                                                    shadowRadius: 4
+                                                }}
                                                 onPress={() => handleSendToFriend(item.friendId)}
                                                 disabled={sendingRoutine}
                                             >
-                                                <Text style={{ color: '#fff', fontWeight: 'bold' }}>{item.displayName}</Text>
-                                                {sendingRoutine ? <ActivityIndicator color={Colors.primary.DEFAULT} /> : <Send size={16} color={Colors.primary.DEFAULT} />}
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary.DEFAULT + '15', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.primary.DEFAULT + '30' }}>
+                                                        <User size={18} color={Colors.primary.DEFAULT} />
+                                                    </View>
+                                                    <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 16 }}>{item.displayName}</Text>
+                                                </View>
+                                                {sendingRoutine ? (
+                                                    <ActivityIndicator size="small" color={Colors.primary.DEFAULT} />
+                                                ) : (
+                                                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.iron[100], alignItems: 'center', justifyContent: 'center' }}>
+                                                        <Send size={14} color={Colors.primary.DEFAULT} />
+                                                    </View>
+                                                )}
                                             </TouchableOpacity>
                                         )}
                                     />
@@ -574,15 +611,16 @@ const st = StyleSheet.create({
     smallBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 10,
+        justifyContent: 'center',
+        gap: 4,
+        paddingHorizontal: 6,
+        paddingVertical: 10,
+        borderRadius: 12,
         borderWidth: 1,
         borderColor: Colors.iron[300],
         backgroundColor: Colors.surface,
     },
-    smallBtnText: { fontSize: 13, fontWeight: '700', color: Colors.primary.DEFAULT },
+    smallBtnText: { fontSize: 11, fontWeight: '800', color: Colors.primary.DEFAULT, textTransform: 'uppercase' },
 
     // Day block (Container that visually differentiates a Day with its inner exercises)
     dayBlockOuter: {
@@ -633,7 +671,7 @@ const st = StyleSheet.create({
         borderBottomColor: Colors.iron[100],
     },
     dayInnerExNum: { color: Colors.primary.DEFAULT, fontWeight: '800', fontSize: 13, width: 20 },
-    dayInnerExText: { flex: 1, color: Colors.iron[700], fontSize: 14, fontWeight: '600' },
+    dayInnerExText: { flex: 1, color: Colors.iron[950], fontSize: 14, fontWeight: '900' },
     addInnerBtn: {
         flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 12, marginTop: 4
     },

@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { ChevronRight, Clock, Download, Globe, User } from 'lucide-react';
 import { unstable_noStore as noStore } from 'next/cache';
 import Link from 'next/link';
@@ -11,24 +11,26 @@ export const revalidate = 0;
 export default async function RoutineFeedPage() {
     noStore(); // Ensure no aggressive caching for social feed
 
-    // Fetch public routines
+    // Fetch public routines with user profile usernames
     const publicRoutines = await db.select({
         id: schema.routines.id,
         name: schema.routines.name,
         description: schema.routines.description,
         userId: schema.routines.userId,
+        username: schema.userProfiles.username,
         updatedAt: schema.routines.updatedAt,
     })
         .from(schema.routines)
+        .leftJoin(schema.userProfiles, eq(schema.routines.userId, schema.userProfiles.id))
         .where(
             and(
                 eq(schema.routines.isPublic, 1),
                 isNull(schema.routines.deletedAt)
             )
         )
-        .orderBy(schema.routines.updatedAt); // Maybe DESC but we can use JS to reverse or use desc(schema.routines.updatedAt) if imported
+        .orderBy(desc(schema.routines.updatedAt));
 
-    publicRoutines.reverse(); // simple reverse for latest first
+
 
     return (
         <section className="min-h-screen py-20 lg:py-32 bg-[#f5f1e8] text-[#1a1a2e] selection:bg-[#1a1a2e] selection:text-[#f5f1e8]">
@@ -79,7 +81,7 @@ export default async function RoutineFeedPage() {
                                         <div className="flex flex-wrap items-center gap-4 pt-4 text-[11px] opacity-50 uppercase tracking-widest font-bold">
                                             <div className="flex items-center gap-1.5">
                                                 <User className="w-3.5 h-3.5" />
-                                                <span className="truncate max-w-[120px]">{routine.userId}</span>
+                                                <span className="truncate max-w-[120px]">@{routine.username || 'user'}</span>
                                             </div>
                                             <div className="flex items-center gap-1.5">
                                                 <Clock className="w-3.5 h-3.5" />

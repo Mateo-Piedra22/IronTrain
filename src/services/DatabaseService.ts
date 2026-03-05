@@ -7,28 +7,38 @@ const DB_NAME = 'irontrain_v1.db';
 export class DatabaseService {
     private db: SQLite.SQLiteDatabase | null = null;
     private isInitialized = false;
+    private initPromise: Promise<void> | null = null;
 
     public async init(): Promise<void> {
         if (this.isInitialized) return;
-
-        try {
-            this.db = await SQLite.openDatabaseAsync(DB_NAME);
-
-            // Enable foreign keys
-            await this.db.execAsync('PRAGMA foreign_keys = ON;');
-
-            // Create Schema
-            await this.createTables();
-
-            // Seed if empty
-            await this.seedDatabase();
-
-            this.isInitialized = true;
-
-        } catch (error) {
-            console.error('❌ Database initialization failed:', error);
-            throw error;
+        if (this.initPromise) {
+            await this.initPromise;
+            return;
         }
+
+        this.initPromise = (async () => {
+            try {
+                this.db = await SQLite.openDatabaseAsync(DB_NAME);
+
+                // Enable foreign keys
+                await this.db.execAsync('PRAGMA foreign_keys = ON;');
+
+                // Create Schema
+                await this.createTables();
+
+                // Seed if empty
+                await this.seedDatabase();
+
+                this.isInitialized = true;
+
+                this.initPromise = null;
+            } catch (error) {
+                console.error('[Error] Database initialization failed:', error);
+                this.initPromise = null;
+                throw error;
+            }
+        })();
+        await this.initPromise;
     }
 
     private async createTables(): Promise<void> {
@@ -40,18 +50,22 @@ export class DatabaseService {
         name TEXT NOT NULL,
         is_system INTEGER DEFAULT 0,
         sort_order INTEGER DEFAULT 0,
-        color TEXT
+        color TEXT,
+        updated_at INTEGER DEFAULT 0,
+        deleted_at INTEGER
       );
 
       CREATE TABLE IF NOT EXISTS exercises (
         id TEXT PRIMARY KEY NOT NULL,
         category_id TEXT NOT NULL,
         name TEXT NOT NULL,
-        type TEXT NOT NULL, -- 'weight_reps', 'distance_time', 'weight_only', 'reps_only'
+        type TEXT NOT NULL,
         default_increment REAL DEFAULT 2.5,
         notes TEXT,
         is_system INTEGER DEFAULT 0,
-        origin_id TEXT, -- For Social P2P
+        origin_id TEXT,
+        updated_at INTEGER DEFAULT 0,
+        deleted_at INTEGER,
         FOREIGN KEY (category_id) REFERENCES categories (id)
       );
 
@@ -62,15 +76,18 @@ export class DatabaseService {
         end_time INTEGER,
         name TEXT,
         notes TEXT,
-        status TEXT NOT NULL, -- 'in_progress', 'completed'
-        is_template INTEGER DEFAULT 0
+        status TEXT NOT NULL,
+        is_template INTEGER DEFAULT 0,
+        duration INTEGER DEFAULT 0,
+        updated_at INTEGER DEFAULT 0,
+        deleted_at INTEGER
       );
 
       CREATE TABLE IF NOT EXISTS workout_sets (
         id TEXT PRIMARY KEY NOT NULL,
         workout_id TEXT NOT NULL,
         exercise_id TEXT NOT NULL,
-        type TEXT NOT NULL, -- 'normal', 'warmup', 'failure', 'drop', 'pr'
+        type TEXT NOT NULL,
         weight REAL,
         reps INTEGER,
         distance REAL,
@@ -79,7 +96,9 @@ export class DatabaseService {
         order_index INTEGER NOT NULL,
         completed INTEGER DEFAULT 0,
         notes TEXT,
-        superset_id TEXT, -- NEW: For grouping exercises
+        superset_id TEXT,
+        updated_at INTEGER DEFAULT 0,
+        deleted_at INTEGER,
         FOREIGN KEY (workout_id) REFERENCES workouts (id) ON DELETE CASCADE,
         FOREIGN KEY (exercise_id) REFERENCES exercises (id)
       );
@@ -87,41 +106,52 @@ export class DatabaseService {
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY NOT NULL,
         value TEXT NOT NULL,
-        description TEXT
+        description TEXT,
+        updated_at INTEGER DEFAULT 0
       );
 
-      -- NEW: Body Tracker
+      CREATE TABLE IF NOT EXISTS goals (
+        id TEXT PRIMARY KEY NOT NULL,
+        title TEXT NOT NULL,
+        target_value REAL NOT NULL,
+        current_value REAL DEFAULT 0,
+        deadline INTEGER,
+        type TEXT NOT NULL,
+        reference_id TEXT,
+        completed INTEGER DEFAULT 0,
+        coop_user_id TEXT,
+        updated_at INTEGER DEFAULT 0,
+        deleted_at INTEGER
+      );
+
       CREATE TABLE IF NOT EXISTS measurements (
         id TEXT PRIMARY KEY NOT NULL,
         date INTEGER NOT NULL,
-        type TEXT NOT NULL, -- 'weight', 'body_fat', 'neck', 'shoulders', 'chest', 'bicep', 'forearm', 'waist', 'hips', 'thigh', 'calf'
+        type TEXT NOT NULL,
         value REAL NOT NULL,
-        unit TEXT NOT NULL, -- 'kg', 'lbs', 'cm', 'in', '%'
-        notes TEXT
+        unit TEXT NOT NULL,
+        notes TEXT,
+        updated_at INTEGER DEFAULT 0,
+        deleted_at INTEGER
       );
 
-      -- NEW: Plate Calculator Inventory
       CREATE TABLE IF NOT EXISTS plate_inventory (
         weight REAL NOT NULL,
         count INTEGER DEFAULT 0,
-        type TEXT DEFAULT 'standard', -- 'standard', 'bumper', 'calibrated'
+        type TEXT DEFAULT 'standard',
         unit TEXT DEFAULT 'kg',
         color TEXT,
+        updated_at INTEGER DEFAULT 0,
         PRIMARY KEY (weight, type, unit)
       );
 
-      -- Indexes for performance
-      CREATE INDEX IF NOT EXISTS idx_exercises_category ON exercises(category_id);
-      CREATE INDEX IF NOT EXISTS idx_sets_exercise ON workout_sets(exercise_id);
-      CREATE INDEX IF NOT EXISTS idx_sets_workout ON workout_sets(workout_id);
-      CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
-
-      -- NEW: Routines
       CREATE TABLE IF NOT EXISTS routines (
         id TEXT PRIMARY KEY NOT NULL,
         name TEXT NOT NULL,
         description TEXT,
-        is_public INTEGER DEFAULT 0
+        is_public INTEGER DEFAULT 0,
+        updated_at INTEGER DEFAULT 0,
+        deleted_at INTEGER
       );
 
       CREATE TABLE IF NOT EXISTS routine_days (
@@ -129,6 +159,8 @@ export class DatabaseService {
         routine_id TEXT NOT NULL,
         name TEXT NOT NULL,
         order_index INTEGER NOT NULL,
+        updated_at INTEGER DEFAULT 0,
+        deleted_at INTEGER,
         FOREIGN KEY (routine_id) REFERENCES routines (id) ON DELETE CASCADE
       );
 
@@ -138,24 +170,30 @@ export class DatabaseService {
         exercise_id TEXT NOT NULL,
         order_index INTEGER NOT NULL,
         notes TEXT,
+        updated_at INTEGER DEFAULT 0,
+        deleted_at INTEGER,
         FOREIGN KEY (routine_day_id) REFERENCES routine_days (id) ON DELETE CASCADE,
         FOREIGN KEY (exercise_id) REFERENCES exercises (id)
       );
 
-      CREATE INDEX IF NOT EXISTS idx_routine_days_routine ON routine_days(routine_id);
-      CREATE INDEX IF NOT EXISTS idx_routine_exercises_day ON routine_exercises(routine_day_id);
-
-      -- NEW: Sync Queue (Offline-First Architecture)
       CREATE TABLE IF NOT EXISTS sync_queue (
         id TEXT PRIMARY KEY NOT NULL,
         table_name TEXT NOT NULL,
         record_id TEXT NOT NULL,
-        operation TEXT NOT NULL, -- 'INSERT', 'UPDATE', 'DELETE'
-        payload TEXT, -- JSON payload of the mutation
+        operation TEXT NOT NULL,
+        payload TEXT,
         created_at INTEGER NOT NULL,
-        status TEXT DEFAULT 'pending', -- 'pending', 'syncing', 'error'
+        synced_at INTEGER,
+        status TEXT DEFAULT 'pending',
         retry_count INTEGER DEFAULT 0
       );
+
+      CREATE INDEX IF NOT EXISTS idx_exercises_category ON exercises(category_id);
+      CREATE INDEX IF NOT EXISTS idx_sets_exercise ON workout_sets(exercise_id);
+      CREATE INDEX IF NOT EXISTS idx_sets_workout ON workout_sets(workout_id);
+      CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
+      CREATE INDEX IF NOT EXISTS idx_routine_days_routine ON routine_days(routine_id);
+      CREATE INDEX IF NOT EXISTS idx_routine_exercises_day ON routine_exercises(routine_day_id);
     `;
 
         await this.db.execAsync(schema);
@@ -218,6 +256,32 @@ export class DatabaseService {
             }
         } catch (e) {
             console.log('Migration check failed (superset_id):', e);
+        }
+
+        // Migration to fix goals table schema
+        try {
+            const result = await this.db?.getFirstAsync<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('goals') WHERE name='title'");
+            if (result && result.count === 0) {
+                console.log('Running Migration: Fixing goals table schema');
+                await this.db?.execAsync('DROP TABLE IF EXISTS goals');
+                await this.db?.execAsync(`
+                    CREATE TABLE IF NOT EXISTS goals (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        title TEXT NOT NULL,
+                        target_value REAL NOT NULL,
+                        current_value REAL DEFAULT 0,
+                        deadline INTEGER,
+                        type TEXT NOT NULL,
+                        reference_id TEXT,
+                        completed INTEGER DEFAULT 0,
+                        coop_user_id TEXT,
+                        updated_at INTEGER DEFAULT 0,
+                        deleted_at INTEGER
+                    );
+                `);
+            }
+        } catch (e) {
+            console.error('Migration check failed (goals schema):', e);
         }
 
         // Migration 2: Add rpe to workout_sets if it doesn't exist (Legacy DB support)
@@ -341,22 +405,42 @@ export class DatabaseService {
             console.log('Migration check failed (workouts duration):', e);
         }
 
-        // Migration 8: Create sync_queue table if it doesn't exist
+        // Migration 9: Add updated_at and deleted_at to all syncable tables for cloud sync
+        const syncableTables = [
+            'categories', 'exercises', 'workouts', 'workout_sets',
+            'routines', 'routine_days', 'routine_exercises',
+            'measurements', 'goals', 'plate_inventory', 'settings'
+        ];
+
+        for (const table of syncableTables) {
+            try {
+                const info = await this.db?.getAllAsync<{ name: string }>(`PRAGMA table_info('${table}')`);
+                const columns = (info ?? []).map(c => c.name);
+
+                if (!columns.includes('updated_at')) {
+                    console.log(`Migration 9: Adding updated_at to ${table}`);
+                    await this.db?.execAsync(`ALTER TABLE ${table} ADD COLUMN updated_at INTEGER DEFAULT 0`);
+                }
+
+                if (!columns.includes('deleted_at') && !['settings', 'plate_inventory', 'goals'].includes(table)) {
+                    console.log(`Migration 9: Adding deleted_at to ${table}`);
+                    await this.db?.execAsync(`ALTER TABLE ${table} ADD COLUMN deleted_at INTEGER`);
+                }
+            } catch (e) {
+                console.log(`Migration 9 failed for ${table}:`, e);
+            }
+        }
+
+        // Migration 10: Ensure synced_at exists in sync_queue
         try {
-            await this.db?.execAsync(`
-                CREATE TABLE IF NOT EXISTS sync_queue (
-                    id TEXT PRIMARY KEY NOT NULL,
-                    table_name TEXT NOT NULL,
-                    record_id TEXT NOT NULL,
-                    operation TEXT NOT NULL,
-                    payload TEXT,
-                    created_at INTEGER NOT NULL,
-                    status TEXT DEFAULT 'pending',
-                    retry_count INTEGER DEFAULT 0
-                )
-            `);
+            const info = await this.db?.getAllAsync<{ name: string }>("PRAGMA table_info('sync_queue')");
+            const columns = (info ?? []).map(c => c.name);
+            if (!columns.includes('synced_at')) {
+                console.log('Migration 10: Adding synced_at to sync_queue');
+                await this.db?.execAsync('ALTER TABLE sync_queue ADD COLUMN synced_at INTEGER');
+            }
         } catch (e) {
-            console.log('Migration check failed (sync_queue):', e);
+            console.log('Migration 10 failed:', e);
         }
     }
 

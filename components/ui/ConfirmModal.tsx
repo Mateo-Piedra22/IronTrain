@@ -44,6 +44,8 @@ export function ConfirmModal({ visible, onClose, title, message, variant = 'info
         { label: 'Entendido', onPress: onClose, variant: 'solid' },
     ];
 
+    const isStacked = resolvedButtons.length > 2;
+
     return (
         <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
             <Pressable style={st.overlay} onPress={onClose}>
@@ -60,11 +62,11 @@ export function ConfirmModal({ visible, onClose, title, message, variant = 'info
                     {message ? <Text style={st.message}>{message}</Text> : null}
 
                     {/* Buttons */}
-                    <View style={st.buttonRow}>
+                    <View style={[st.buttonRow, isStacked && st.buttonRowStacked]}>
                         {resolvedButtons.map((btn, i) => {
                             if (btn.destructive) {
                                 return (
-                                    <View key={i} style={{ flex: 1 }}>
+                                    <View key={i} style={isStacked ? st.buttonFullWidth : { flex: 1 }}>
                                         <Pressable
                                             onPress={btn.onPress}
                                             style={st.destructiveBtn}
@@ -76,7 +78,7 @@ export function ConfirmModal({ visible, onClose, title, message, variant = 'info
                                 );
                             }
                             return (
-                                <View key={i} style={{ flex: 1 }}>
+                                <View key={i} style={isStacked ? st.buttonFullWidth : { flex: 1 }}>
                                     <IronButton
                                         label={btn.label}
                                         variant={btn.variant ?? 'solid'}
@@ -145,6 +147,13 @@ const st = StyleSheet.create({
     buttonRow: {
         flexDirection: 'row',
         gap: 12,
+    },
+    buttonRowStacked: {
+        flexDirection: 'column',
+        gap: 12,
+    },
+    buttonFullWidth: {
+        width: '100%',
     },
     destructiveBtn: {
         backgroundColor: '#ef444412',

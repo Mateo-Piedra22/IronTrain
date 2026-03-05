@@ -12,7 +12,7 @@ import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
 import { BarChart3, Bell, Calculator, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, CloudLightning, Database, Disc, Download, LogOut, Megaphone, MessageSquare, RefreshCw, Ruler, Shield, Smartphone, Timer, Trash2, User, Vibrate, Volume2, Zap } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { syncService } from '../src/services/SyncService';
 import { useAuthStore } from '../src/store/authStore';
 import { confirm } from '../src/store/confirmStore';
@@ -129,43 +129,54 @@ export default function SettingsScreen() {
             const remote = await syncService.checkRemoteStatus();
 
             if (local.hasData && remote.hasData) {
-                Alert.alert(
-                    'Resolución de Conflictos P2P',
-                    `Tenes datos completos en ambas partes:\nCelular: ${local.recordCount} registros.\nNube Neon: ${remote.recordCount} registros.\n¿Qué base de datos querés utilizar como fuente de verdad?`,
-                    [
+                confirm.custom({
+                    title: 'Resolución de Conflictos',
+                    message: `Tenes datos completos en ambas partes:\nCelular: ${local.recordCount} registros.\nNube Neon: ${remote.recordCount} registros.\n¿Qué base de datos querés utilizar como fuente de verdad?`,
+                    variant: 'warning',
+                    buttons: [
                         {
-                            text: 'Celular (Sobrescribir Nube)',
-                            onPress: async () => {
-                                try {
-                                    notify.info('Cargando...', 'Subiendo Snapshot a la Nube...');
-                                    await syncService.pushLocalSnapshot();
-                                    notify.success('Éxito', 'Nube actualizada con los datos de tu celular.');
-                                } catch (e) { notify.error('Error'); }
-                            },
+                            label: 'Cancelar',
+                            variant: 'ghost',
+                            onPress: confirm.hide
                         },
                         {
-                            text: 'Nube (Sobrescribir Celular)',
+                            label: 'Sincronizar (Mezclar)',
+                            variant: 'outline',
                             onPress: async () => {
-                                try {
-                                    notify.info('Cargando...', 'Descargando Snapshot de la Nube...');
-                                    await syncService.pullCloudSnapshot();
-                                    notify.success('Éxito', 'Celular actualizado con los datos de la nube.');
-                                } catch (e) { notify.error('Error'); }
-                            },
-                        },
-                        {
-                            text: 'Sincronizar (Mezclar ambos)',
-                            onPress: async () => {
+                                confirm.hide();
                                 try {
                                     notify.info('Sincronizando...', 'Fusionando datos local-nube sin perder métricas.');
                                     await syncService.syncBidirectional();
                                     notify.success('Éxito', 'Sincronización híbrida completa.');
                                 } catch (e) { notify.error('Error'); }
-                            },
+                            }
                         },
-                        { text: 'Cancelar', style: 'cancel' }
+                        {
+                            label: 'Nube -> Celular',
+                            variant: 'outline',
+                            onPress: async () => {
+                                confirm.hide();
+                                try {
+                                    notify.info('Cargando...', 'Descargando Snapshot de la Nube...');
+                                    await syncService.pullCloudSnapshot();
+                                    notify.success('Éxito', 'Celular actualizado con los datos de la nube.');
+                                } catch (e) { notify.error('Error'); }
+                            }
+                        },
+                        {
+                            label: 'Celular -> Nube',
+                            variant: 'solid',
+                            onPress: async () => {
+                                confirm.hide();
+                                try {
+                                    notify.info('Cargando...', 'Subiendo Snapshot a la Nube...');
+                                    await syncService.pushLocalSnapshot();
+                                    notify.success('Éxito', 'Nube actualizada con los datos de tu celular.');
+                                } catch (e) { notify.error('Error'); }
+                            }
+                        }
                     ]
-                );
+                });
             } else if (local.hasData && !remote.hasData) {
                 notify.info('Subiendo (Zero-Trust)...', 'La nube está vacía, forzando subida de datos locales...');
                 await syncService.pushLocalSnapshot();
@@ -344,10 +355,10 @@ export default function SettingsScreen() {
                                         notify.success('Sesión cerrada', 'Te has desconectado correctamente.');
                                     }, 'Cerrar Sesión');
                                 }}
-                                style={{ backgroundColor: Colors.iron[200], paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                                style={{ backgroundColor: '#ef444415', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}
                             >
-                                <LogOut size={16} color={Colors.iron[700]} />
-                                <Text style={{ color: Colors.iron[800], fontWeight: '700', fontSize: 14 }}>Salir</Text>
+                                <LogOut size={16} color="#ef4444" />
+                                <Text style={{ color: '#ef4444', fontWeight: '800', fontSize: 14 }}>Salir</Text>
                             </TouchableOpacity>
                         </View>
                     ) : (

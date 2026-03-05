@@ -13,7 +13,7 @@ const toSnakeCase = (camelObj: Record<string, unknown>): Record<string, unknown>
             continue;
         }
         const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-        snakeObj[snakeKey] = value;
+        snakeObj[snakeKey] = typeof value === 'boolean' ? (value ? 1 : 0) : value;
     }
     // Remove internal fields that should not leak to offline clients
     delete snakeObj.user_id;

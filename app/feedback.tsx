@@ -1,10 +1,11 @@
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { MetricsAndFeedbackService } from '@/src/services/MetricsAndFeedbackService';
+import { confirm } from '@/src/store/confirmStore';
 import { Colors } from '@/src/theme';
 import { Stack, router } from 'expo-router';
 import { Check, ChevronLeft, Lightbulb, MessageSquareQuote, ShieldAlert } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const FEEDBACK_TYPES = [
     { id: 'bug', label: 'Reportar Bug', icon: ShieldAlert, color: '#ef4444' },
@@ -20,12 +21,12 @@ export default function FeedbackScreen() {
 
     const handleSubmit = async () => {
         if (!message.trim()) {
-            Alert.alert('Error', 'Por favor, describe tu problema o sugerencia.');
+            confirm.error('Error', 'Por favor, describe tu problema o sugerencia.');
             return;
         }
 
         if (message.trim().length < 10) {
-            Alert.alert('Error', 'El mensaje debe tener al menos 10 caracteres para que podamos entenderte mejor.');
+            confirm.error('Error', 'El mensaje debe tener al menos 10 caracteres para que podamos entenderte mejor.');
             return;
         }
 
@@ -34,7 +35,7 @@ export default function FeedbackScreen() {
             await MetricsAndFeedbackService.submitFeedback(type as any, message.trim());
             setSuccess(true);
         } catch (e: any) {
-            Alert.alert('Error de red', e.message || 'No se pudo enviar el feedback. Intenta de nuevo más tarde.');
+            confirm.error('Error de red', e.message || 'No se pudo enviar el feedback. Intenta de nuevo más tarde.');
         } finally {
             setLoading(false);
         }

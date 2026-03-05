@@ -22,21 +22,37 @@ export interface SocialFriend {
 
 export interface SocialInboxItem {
     id: string;
+    feedType?: 'direct_share' | 'activity_log'; // A.2
     senderId: string;
     senderName: string;
-    type: 'routine';
-    payload: unknown;
-    status: 'pending' | 'accepted' | 'rejected';
+    senderUsername?: string | null;
+    type?: 'routine';
+    payload?: unknown;
+    status?: 'pending' | 'accepted' | 'rejected';
+    actionType?: string; // 'workout_completed', 'pr_broken'
+    metadata?: string | null;
+    kudosCount?: number;
+    hasKudoed?: boolean;
     createdAt: string | number | Date;
 }
 
 export interface SocialLeaderboardEntry {
     id: string;
     displayName: string;
-    score: number;
-    workouts: number;
-    routines: number;
-    shares: number;
+    scores: {
+        lifetime: number;
+        monthly: number;
+        weekly: number;
+    };
+    stats: {
+        workoutsLifetime: number;
+        workoutsMonthly: number;
+        workoutsWeekly: number;
+        routines: number;
+        shares: number;
+        currentStreak: number;
+        highestStreak: number;
+    };
 }
 
 export interface SocialSearchUser {
@@ -165,6 +181,18 @@ export class SocialService {
         return data.success;
     }
 
+    static async toggleKudo(feedId: string): Promise<'added' | 'removed'> {
+        const headers = await this.getHeaders();
+        const res = await fetch(`${API_URL}/api/social/feed/kudos`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ feedId }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to toggle kudo');
+        return data.action;
+    }
+
     // -- ANALYTICS --
 
     static async getAnalytics(): Promise<SocialLeaderboardEntry[]> {
@@ -173,5 +201,13 @@ export class SocialService {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to fetch analytics');
         return data.leaderboard;
+    }
+
+    static async compareFriend(friendId: string): Promise<any[]> {
+        const headers = await this.getHeaders();
+        const res = await fetch(`${API_URL}/api/social/compare?friendId=${friendId}`, { headers });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to compare');
+        return data.comparison;
     }
 }

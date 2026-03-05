@@ -23,6 +23,9 @@ export async function GET(req: NextRequest) {
                 displayName: 'Atleta',
                 isPublic: 1,
                 shareStats: 0,
+                currentStreak: 0,
+                highestStreak: 0,
+                lastActiveDate: null,
                 updatedAt: new Date(),
             };
         }

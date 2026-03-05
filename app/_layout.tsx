@@ -157,8 +157,10 @@ export default function RootLayout() {
 
   // Initialize Update Service
   useEffect(() => {
-    updateService.init();
-  }, []);
+    if (dbInitialized) {
+      updateService.init();
+    }
+  }, [dbInitialized]);
 
   // Monitor Update Status (Blocking & Notifications)
   const updateStatus = useUpdateStore((state) => state.status);

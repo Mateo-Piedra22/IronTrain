@@ -112,6 +112,9 @@ export const userProfiles = pgTable('user_profiles', {
     displayName: text('display_name'),
     isPublic: integer('is_public').default(1),
     shareStats: integer('share_stats').default(0),
+    currentStreak: integer('current_streak').default(0), // A.3: Streak tracking
+    highestStreak: integer('highest_streak').default(0),
+    lastActiveDate: integer('last_active_date'), // Unix timestamp
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
@@ -133,6 +136,22 @@ export const sharesInbox = pgTable('shares_inbox', {
     status: text('status').notNull().default('pending'), // 'pending', 'accepted', 'rejected'
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
+});
+
+export const activityFeed = pgTable('activity_feed', {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    actionType: text('action_type').notNull(), // 'workout_completed', 'pr_broken', 'routine_shared'
+    referenceId: text('reference_id'), // ID of the workout, routine, etc.
+    metadata: text('metadata'), // JSON string with specific info (e.g. weight, exercise name)
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const kudos = pgTable('kudos', {
+    id: text('id').primaryKey(),
+    feedId: text('feed_id').notNull(),
+    giverId: text('giver_id').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 // --- ADMIN & METRICS ---
