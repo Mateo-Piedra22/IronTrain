@@ -88,7 +88,14 @@ export default function LibraryScreen() {
                     <BookOpen size={16} color={Colors.primary.DEFAULT} />
                 </View>
                 <View style={{ flex: 1 }}>
-                    <Text style={s.cardName} numberOfLines={1}>{item.name}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={s.cardName} numberOfLines={1}>{item.name}</Text>
+                        {item.is_moderated === 1 && (
+                            <View style={{ backgroundColor: '#f59e0b20', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, borderWidth: 1, borderColor: '#f59e0b40' }}>
+                                <Text style={{ color: '#b45309', fontSize: 8, fontWeight: '900' }}>OCULTA</Text>
+                            </View>
+                        )}
+                    </View>
                     {item.description ? (
                         <Text style={s.cardMeta} numberOfLines={1}>{item.description}</Text>
                     ) : (

@@ -98,7 +98,17 @@ export async function POST(req: NextRequest) {
 
                     const camelPayload = toCamelCase(payload);
                     camelPayload.userId = userId as string;
-                    camelPayload.updatedAt = new Date(timestamp);
+
+                    // Security: Explicitly remove moderation fields from client-supplied payload
+                    // These fields can only be set via the Admin Panel
+                    if (table === 'routines') {
+                        delete (camelPayload as any).isModerated;
+                        delete (camelPayload as any).moderationMessage;
+                    }
+
+                    // Prevent 1970 (Unix 0) timestamps from being saved
+                    const validTimestamp = (typeof timestamp === 'number' && timestamp > 0) ? timestamp : Date.now();
+                    camelPayload.updatedAt = new Date(validTimestamp);
 
                     // Insert or replace based on conflicting IDs
                     await db.insert(tableSchema)

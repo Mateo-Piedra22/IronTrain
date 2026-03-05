@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { ChevronRight, Clock, Download, Globe, User } from 'lucide-react';
 import { unstable_noStore as noStore } from 'next/cache';
 import Link from 'next/link';
@@ -25,7 +25,8 @@ export default async function RoutineFeedPage() {
         .where(
             and(
                 eq(schema.routines.isPublic, 1),
-                isNull(schema.routines.deletedAt)
+                isNull(schema.routines.deletedAt),
+                sql`${schema.routines.isModerated} = 0 OR ${schema.routines.isModerated} IS NULL`
             )
         )
         .orderBy(desc(schema.routines.updatedAt));
@@ -85,7 +86,10 @@ export default async function RoutineFeedPage() {
                                             </div>
                                             <div className="flex items-center gap-1.5">
                                                 <Clock className="w-3.5 h-3.5" />
-                                                <span>{new Date(routine.updatedAt).toLocaleDateString()}</span>
+                                                <span>{routine.updatedAt && new Date(routine.updatedAt).getTime() > 0
+                                                    ? new Date(routine.updatedAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                                                    : new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>

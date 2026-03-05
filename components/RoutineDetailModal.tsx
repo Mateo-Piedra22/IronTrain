@@ -298,8 +298,14 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                     ) : viewMode === 'routine' ? (
                         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
                             <View style={st.contentArea}>
-                                {/* Routine info card */}
-                                {routine?.description ? (
+                                {routine?.is_moderated === 1 ? (
+                                    <View style={[st.infoCard, { borderLeftColor: '#f59e0b', backgroundColor: '#fef3c730' }]}>
+                                        <Text style={{ color: '#b45309', fontWeight: '900', fontSize: 12, marginBottom: 4 }}>⚠️ ESTADO: OCULTA</Text>
+                                        <Text style={[st.infoCardText, { color: '#92400e' }]}>
+                                            {routine.moderation_message || 'Esta rutina ha sido ocultada del directorio público por un administrador.'}
+                                        </Text>
+                                    </View>
+                                ) : routine?.description ? (
                                     <View style={st.infoCard}>
                                         <Text style={st.infoCardText}>{routine.description}</Text>
                                     </View>

@@ -9,10 +9,11 @@ const toCamelCaseKey = (key: string): string => key.replace(/_([a-z])/g, (_, ch:
 const toDateFromAny = (value: unknown): Date | undefined => {
     if (value === null || value === undefined) return undefined;
     if (value instanceof Date) return value;
-    if (typeof value === 'number' && Number.isFinite(value)) return new Date(value);
+    // Prevent Unix 0 (1970) from being treated as a valid timestamp
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) return new Date(value);
     if (typeof value === 'string') {
         const ms = Date.parse(value);
-        if (!Number.isNaN(ms)) return new Date(ms);
+        if (!Number.isNaN(ms) && ms > 0) return new Date(ms);
     }
     return undefined;
 };
@@ -36,6 +37,9 @@ const normalizeSnapshotRecord = (raw: unknown, userId: string): Record<string, u
             out.deletedAt = d ?? null;
             continue;
         }
+
+        if (k === 'is_moderated' || k === 'isModerated') continue;
+        if (k === 'moderation_message' || k === 'moderationMessage') continue;
 
         const nextKey = k.includes('_') ? toCamelCaseKey(k) : k;
         out[nextKey] = v;

@@ -98,6 +98,8 @@ export interface Routine {
     name: string;
     description?: string;
     is_public?: number; // 1 | 0
+    is_moderated?: number; // 1 | 0
+    moderation_message?: string;
 }
 
 export interface RoutineDay {

@@ -62,6 +62,8 @@ export const routines = pgTable('routines', {
     name: text('name').notNull(),
     description: text('description'),
     isPublic: integer('is_public').default(0), // Funciones Sociales
+    isModerated: integer('is_moderated').default(0), // Moderación de administración
+    moderationMessage: text('moderation_message'), // Mensaje para el usuario si se modera
     ...commonFields,
 });
 

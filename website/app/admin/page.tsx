@@ -57,16 +57,29 @@ async function handleRoutineAction(formData: FormData) {
 
     const id = formData.get('id') as string;
     const action = formData.get('action') as string;
-    const currentStatus = formData.get('currentStatus') === '1';
+    const currentModerated = formData.get('currentModerated') === '1';
+    const message = formData.get('message') as string;
 
-    if (action === 'toggle-public') {
-        const newStatus = currentStatus ? 0 : 1;
+    if (action === 'toggle-moderation') {
+        const newStatus = currentModerated ? 0 : 1;
         await db.update(schema.routines)
-            .set({ isPublic: newStatus, updatedAt: new Date() })
+            .set({
+                isModerated: newStatus,
+                moderationMessage: newStatus === 1 ? (message || 'Contenido ocultado por incumplir las normas de la comunidad.') : null,
+                // If we moderate (hide), we also ensure isPublic is 0 for consistency
+                ...(newStatus === 1 ? { isPublic: 0 } : {}),
+                updatedAt: new Date()
+            })
             .where(eq(schema.routines.id, id));
     } else if (action === 'purge') {
         await db.update(schema.routines)
-            .set({ deletedAt: new Date(), isPublic: 0 })
+            .set({
+                deletedAt: new Date(),
+                isPublic: 0,
+                isModerated: 1,
+                moderationMessage: 'Esta rutina ha sido eliminada permanentemente por un administrador.',
+                updatedAt: new Date()
+            })
             .where(eq(schema.routines.id, id));
     }
     revalidatePath('/admin');
@@ -87,6 +100,8 @@ export default async function AdminPanel() {
             name: schema.routines.name,
             description: schema.routines.description,
             isPublic: schema.routines.isPublic,
+            isModerated: schema.routines.isModerated,
+            moderationMessage: schema.routines.moderationMessage,
             updatedAt: schema.routines.updatedAt,
             userId: schema.routines.userId,
             username: schema.userProfiles.username,
@@ -273,28 +288,46 @@ export default async function AdminPanel() {
                                             )}
                                         </td>
                                         <td className="p-4 text-right">
-                                            <form action={handleRoutineAction} className="inline-flex gap-2">
+                                            <form action={handleRoutineAction} className="inline-flex flex-col gap-2 items-end">
                                                 <input type="hidden" name="id" value={r.id} />
-                                                <input type="hidden" name="currentStatus" value={r.isPublic ? '1' : '0'} />
-                                                <button
-                                                    type="submit"
-                                                    name="action"
-                                                    value="toggle-public"
-                                                    className={`h-8 px-3 border border-[#1a1a2e] font-black uppercase text-[9px] transition-all flex items-center gap-2 ${r.isPublic ? 'bg-amber-400 hover:bg-[#1a1a2e] hover:text-[#f5f1e8]' : 'bg-[#f5f1e8] hover:bg-[#1a1a2e] hover:text-[#f5f1e8]'}`}
-                                                    title={r.isPublic ? "Ocultar en feed" : "Publicar en feed"}
-                                                >
-                                                    {r.isPublic ? <EyeOff className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                                                    {r.isPublic ? 'OCULTAR' : 'MOSTRAR'}
-                                                </button>
-                                                <button
-                                                    type="submit"
-                                                    name="action"
-                                                    value="purge"
-                                                    className="h-8 px-3 bg-red-500 text-white font-black uppercase text-[9px] hover:bg-red-600 transition-all flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-                                                    title="Eliminar permanentemente"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" /> PURGA
-                                                </button>
+                                                <input type="hidden" name="currentModerated" value={r.isModerated ? '1' : '0'} />
+
+                                                {!r.isModerated && (
+                                                    <input
+                                                        type="text"
+                                                        name="message"
+                                                        placeholder="Motivo (opcional)..."
+                                                        className="bg-[#1a1a2e]/5 border border-[#1a1a2e]/20 px-2 py-1 text-[9px] w-32 focus:outline-none focus:border-[#1a1a2e]"
+                                                    />
+                                                )}
+
+                                                {r.moderationMessage && (
+                                                    <div className="text-[8px] text-amber-600 font-bold max-w-[120px] leading-tight mb-1 italic">
+                                                        "{r.moderationMessage}"
+                                                    </div>
+                                                )}
+
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        type="submit"
+                                                        name="action"
+                                                        value="toggle-moderation"
+                                                        className={`h-8 px-3 border border-[#1a1a2e] font-black uppercase text-[9px] transition-all flex items-center gap-2 ${r.isModerated ? 'bg-amber-400 hover:bg-[#1a1a2e] hover:text-[#f5f1e8]' : 'bg-[#f5f1e8] hover:bg-[#1a1a2e] hover:text-[#f5f1e8]'}`}
+                                                        title={r.isModerated ? "Mostrar en feed" : "Ocultar en feed"}
+                                                    >
+                                                        {r.isModerated ? <CheckCircle className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                                                        {r.isModerated ? 'HABILITAR' : 'OCULTAR'}
+                                                    </button>
+                                                    <button
+                                                        type="submit"
+                                                        name="action"
+                                                        value="purge"
+                                                        className="h-8 px-3 bg-red-500 text-white font-black uppercase text-[9px] hover:bg-red-600 transition-all flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                                                        title="Eliminar permanentemente"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" /> PURGA
+                                                    </button>
+                                                </div>
                                             </form>
                                         </td>
                                     </tr>
@@ -328,8 +361,8 @@ export default async function AdminPanel() {
                                     <tr key={f.id} className="hover:bg-white transition-colors">
                                         <td className="p-4">
                                             <div className={`inline-block px-1.5 py-0.5 font-black text-[9px] uppercase tracking-tighter ${f.type === 'bug' ? 'bg-red-100 text-red-600' :
-                                                    f.type === 'feature_request' ? 'bg-orange-100 text-orange-600' :
-                                                        'bg-blue-100 text-blue-600'
+                                                f.type === 'feature_request' ? 'bg-orange-100 text-orange-600' :
+                                                    'bg-blue-100 text-blue-600'
                                                 }`}>
                                                 {f.type}
                                             </div>

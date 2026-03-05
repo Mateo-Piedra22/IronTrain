@@ -297,8 +297,7 @@ export default function RootLayout() {
               name="share/routine/[id]"
               options={{
                 presentation: 'modal',
-                title: 'Descargar Rutina',
-                headerBackTitle: 'Cancelar'
+                headerShown: false,
               }}
             />
           </Stack>

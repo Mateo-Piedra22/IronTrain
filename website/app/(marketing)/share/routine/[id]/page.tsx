@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, or } from 'drizzle-orm';
 import { Copy, Download, Sparkles } from 'lucide-react';
 import { Metadata } from 'next';
 import Link from 'next/link';
@@ -12,7 +12,13 @@ interface RoutinePageProps {
 
 export async function generateMetadata({ params }: RoutinePageProps): Promise<Metadata> {
     const { id } = await params;
-    const routineRecords = await db.select().from(schema.routines).where(and(eq(schema.routines.id, id), isNull(schema.routines.deletedAt)));
+    const routineRecords = await db.select().from(schema.routines).where(
+        and(
+            eq(schema.routines.id, id),
+            isNull(schema.routines.deletedAt),
+            or(isNull(schema.routines.isModerated), eq(schema.routines.isModerated, 0))
+        )
+    );
     const routine = routineRecords[0];
 
     if (!routine) return { title: 'Rutina No Encontrada' };
@@ -36,7 +42,13 @@ export default async function RoutineSharePage({ params }: RoutinePageProps) {
     })
         .from(schema.routines)
         .leftJoin(schema.userProfiles, eq(schema.routines.userId, schema.userProfiles.id))
-        .where(and(eq(schema.routines.id, id), isNull(schema.routines.deletedAt)));
+        .where(
+            and(
+                eq(schema.routines.id, id),
+                isNull(schema.routines.deletedAt),
+                or(isNull(schema.routines.isModerated), eq(schema.routines.isModerated, 0))
+            )
+        );
 
     const routine = routineRecords[0];
 
@@ -171,7 +183,9 @@ export default async function RoutineSharePage({ params }: RoutinePageProps) {
                             </div>
 
                             <div className="text-[9px] opacity-30 text-center pt-6 uppercase tracking-widest leading-relaxed">
-                                FECHA DE EMISIÓN: {new Date(routine.updatedAt).toLocaleDateString()}
+                                FECHA DE EMISIÓN: {routine.updatedAt && new Date(routine.updatedAt).getTime() > 0
+                                    ? new Date(routine.updatedAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                                    : new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                                 <br />
                                 VERIFICADO POR SISTEMA IRONTRAIN P2P
                             </div>

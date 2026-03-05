@@ -206,6 +206,8 @@ export class DatabaseService {
         name TEXT NOT NULL,
         description TEXT,
         is_public INTEGER DEFAULT 0,
+        is_moderated INTEGER DEFAULT 0,
+        moderation_message TEXT,
         updated_at INTEGER DEFAULT 0,
         deleted_at INTEGER
       );
@@ -538,6 +540,19 @@ export class DatabaseService {
             }
         } catch (e) {
             console.warn('Migration 10 failed:', e);
+        }
+
+        // Migration 11: Add moderation columns to routines
+        try {
+            const info = await this.getAll<{ name: string }>("PRAGMA table_info('routines')");
+            const columns = info.map(c => c.name);
+            if (!columns.includes('is_moderated')) {
+                console.log('Migration 11: Adding moderation columns to routines');
+                await this.executeRaw('ALTER TABLE routines ADD COLUMN is_moderated INTEGER DEFAULT 0');
+                await this.executeRaw('ALTER TABLE routines ADD COLUMN moderation_message TEXT');
+            }
+        } catch (e) {
+            console.warn('Migration 11 failed:', e);
         }
     }
 
