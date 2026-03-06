@@ -1,3 +1,4 @@
+import { Config } from '@/src/constants/Config';
 import { configService } from '@/src/services/ConfigService';
 import { systemNotificationService } from '@/src/services/SystemNotificationService';
 import { useUpdateStore } from '@/src/store/updateStore';
@@ -108,7 +109,7 @@ class UpdateServiceManager {
     }
 
     private async performCheck() {
-        const feedUrl = (Constants.expoConfig?.extra as any)?.updateFeedUrl;
+        const feedUrl = Config.UPDATE_FEED_URL;
         if (!feedUrl) {
             console.warn('UpdateService: No updateFeedUrl configured.');
             useUpdateStore.getState().setStatus('idle'); // Or 'disabled'

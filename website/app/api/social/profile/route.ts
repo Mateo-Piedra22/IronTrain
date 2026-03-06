@@ -1,34 +1,26 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
+import { validateUsername } from '../../../../src/lib/moderation';
 
 export async function GET(req: NextRequest) {
     try {
         const userId = await verifyAuth(req);
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const profiles = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, userId));
+        let profiles = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, userId));
 
-        let profile = profiles[0];
-        if (!profile) {
+        if (profiles.length === 0) {
             await db.insert(schema.userProfiles).values({
                 id: userId,
                 displayName: 'Atleta',
             });
-            profile = {
-                id: userId,
-                username: null,
-                displayName: 'Atleta',
-                isPublic: 1,
-                shareStats: 0,
-                currentStreak: 0,
-                highestStreak: 0,
-                lastActiveDate: null,
-                updatedAt: new Date(),
-            };
+            profiles = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, userId));
         }
+
+        const profile = profiles[0];
 
         return NextResponse.json({ success: true, profile });
     } catch (e: unknown) {
@@ -44,15 +36,28 @@ export async function PUT(req: NextRequest) {
 
         const body = await req.json();
 
-        if (body.displayName !== undefined && typeof body.displayName !== 'string') {
-            return NextResponse.json({ error: 'displayName must be a string' }, { status: 400 });
-        }
-        if (body.username !== undefined && typeof body.username !== 'string') {
-            return NextResponse.json({ error: 'username must be a string' }, { status: 400 });
-        }
+        // Removed original type checks for displayName and username as they are now handled by validation/sanitization.
 
         const sanitizedDisplayName = body.displayName?.trim().slice(0, 64) || undefined;
-        const sanitizedUsername = body.username?.trim().slice(0, 32).toLowerCase() || undefined;
+        let sanitizedUsername = body.username?.trim().slice(0, 32).toLowerCase() || undefined;
+
+        // Strict Uniqueness & Content Check for Usernames
+        if (sanitizedUsername) {
+            const validation = validateUsername(sanitizedUsername);
+            if (!validation.valid) {
+                return NextResponse.json({ error: validation.error }, { status: 400 });
+            }
+
+            // Check uniqueness - is this username taken by someone else?
+            const existing = await db.select({ id: schema.userProfiles.id })
+                .from(schema.userProfiles)
+                .where(and(eq(schema.userProfiles.username, sanitizedUsername), ne(schema.userProfiles.id, userId)))
+                .limit(1);
+
+            if (existing.length > 0) {
+                return NextResponse.json({ error: 'Username already taken' }, { status: 409 });
+            }
+        }
 
         const profiles = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, userId));
         if (profiles.length === 0) {

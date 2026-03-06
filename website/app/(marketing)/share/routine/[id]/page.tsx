@@ -1,4 +1,4 @@
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 import { Copy, Download, Sparkles } from 'lucide-react';
 import { Metadata } from 'next';
 import Link from 'next/link';
@@ -58,7 +58,8 @@ export default async function RoutineSharePage({ params }: RoutinePageProps) {
         dayId: schema.routineDays.id,
         dayName: schema.routineDays.name,
         dayOrder: schema.routineDays.orderIndex,
-        exerciseId: schema.routineExercises.id,
+        exerciseLinkId: schema.routineExercises.id,
+        exerciseId: schema.exercises.id,
         exerciseName: schema.exercises.name,
         exerciseOrder: schema.routineExercises.orderIndex
     })
@@ -68,14 +69,40 @@ export default async function RoutineSharePage({ params }: RoutinePageProps) {
         .where(and(eq(schema.routineDays.routineId, id), isNull(schema.routineDays.deletedAt)))
         .orderBy(schema.routineDays.orderIndex, schema.routineExercises.orderIndex);
 
+    const exerciseIds = Array.from(new Set(daysWithExercises.map(row => row.exerciseId).filter(Boolean)));
+
+    // Fetch Badges for those exercises
+    let badgesForExercises: any[] = [];
+    if (exerciseIds.length > 0) {
+        badgesForExercises = await db.select({
+            exerciseId: schema.exerciseBadges.exerciseId,
+            id: schema.badges.id,
+            name: schema.badges.name,
+            color: schema.badges.color,
+        })
+            .from(schema.exerciseBadges)
+            .innerJoin(schema.badges, eq(schema.exerciseBadges.badgeId, schema.badges.id))
+            .where(
+                and(
+                    inArray(schema.exerciseBadges.exerciseId, exerciseIds as string[]),
+                    isNull(schema.exerciseBadges.deletedAt)
+                )
+            );
+    }
+
     // Grouping
-    const groupedDays: Record<string, { name: string, exercises: string[] }> = {};
+    const groupedDays: Record<string, { name: string, exercises: { name: string, id: string, badges: any[] }[] }> = {};
     daysWithExercises.forEach(row => {
         if (!groupedDays[row.dayId]) {
             groupedDays[row.dayId] = { name: row.dayName, exercises: [] };
         }
-        if (row.exerciseName) {
-            groupedDays[row.dayId].exercises.push(row.exerciseName);
+        if (row.exerciseName && row.exerciseId) {
+            const exBadges = badgesForExercises.filter(b => b.exerciseId === row.exerciseId);
+            groupedDays[row.dayId].exercises.push({
+                id: row.exerciseId,
+                name: row.exerciseName,
+                badges: exBadges
+            });
         }
     });
 
@@ -140,11 +167,32 @@ export default async function RoutineSharePage({ params }: RoutinePageProps) {
                                         <h4 className="font-bold text-lg uppercase tracking-tight mb-3">
                                             {day.name}
                                         </h4>
-                                        <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-current/5 pt-3">
+                                        <div className="flex flex-col gap-3 border-t border-current/5 pt-3">
                                             {day.exercises.length > 0 ? day.exercises.map((ex, i) => (
-                                                <div key={i} className="text-[11px] opacity-60 flex items-center gap-2 uppercase font-bold">
-                                                    <span className="w-1 h-1 bg-current opacity-30 rounded-full" />
-                                                    {ex}
+                                                <div key={i} className="relative">
+                                                    <div className="text-[11px] opacity-60 flex flex-wrap items-center gap-2 uppercase font-bold">
+                                                        <span className="w-1 h-1 bg-current opacity-30 rounded-full" />
+                                                        {ex.name}
+
+                                                        {/* Badges UI for Web */}
+                                                        {ex.badges.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1 ml-2">
+                                                                {ex.badges.map((badge, bIdx) => (
+                                                                    <span
+                                                                        key={bIdx}
+                                                                        className="text-[8px] px-1.5 py-0.5 rounded-full border border-current font-black"
+                                                                        style={{
+                                                                            backgroundColor: `${badge.color}15`,
+                                                                            color: badge.color,
+                                                                            borderColor: `${badge.color}40`
+                                                                        }}
+                                                                    >
+                                                                        {badge.name}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )) : (
                                                 <span className="text-[10px] opacity-30 italic">Sin ejercicios definidos</span>

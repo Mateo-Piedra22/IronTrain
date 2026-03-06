@@ -5,6 +5,8 @@ node_modules/
 
 # trae
 .trae
+.claude/
+.trae/
 
 # Expo
 .expo/
@@ -39,6 +41,12 @@ yarn-error.*
 .env.*
 .env*.local
 
+# Firebase / Push credentials
+app-irontrain-firebase-adminsdk-*.json
+firebase-adminsdk-*.json
+google-services.json
+GoogleService-Info.plist
+
 # agent
 .agent/
 .agents/
@@ -50,3 +58,5 @@ yarn-error.*
 /ios
 /android
 jest_out.txt
+tmp/
+website/tmp/

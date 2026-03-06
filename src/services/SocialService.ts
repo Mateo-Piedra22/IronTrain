@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
+import { Config } from '../constants/Config';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://irontrain.motiona.xyz';
+const API_URL = Config.API_URL;
 
 export interface SocialProfile {
     id: string;
@@ -61,6 +62,16 @@ export interface SocialSearchUser {
     username: string | null;
 }
 
+export interface SocialComparisonEntry {
+    exerciseName: string;
+    user1RM: number;
+    friend1RM: number;
+    unit: 'kg' | 'lbs';
+    user1RMKg: number;
+    friend1RMKg: number;
+    diff: number;
+}
+
 export class SocialService {
     static async getToken(): Promise<string | null> {
         return await SecureStore.getItemAsync('irontrain_auth_token');
@@ -96,6 +107,11 @@ export class SocialService {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to update profile');
+
+        // Emit event for real-time UI updates
+        const { dataEventService } = await import('./DataEventService');
+        dataEventService.emit('SOCIAL_UPDATED');
+
         return data.success;
     }
 
@@ -132,6 +148,11 @@ export class SocialService {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to send request');
+
+        // Emit event for real-time UI updates
+        const { dataEventService } = await import('./DataEventService');
+        dataEventService.emit('SOCIAL_UPDATED');
+
         return data.success;
     }
 
@@ -144,6 +165,11 @@ export class SocialService {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to respond');
+
+        // Emit event for real-time UI updates
+        const { dataEventService } = await import('./DataEventService');
+        dataEventService.emit('SOCIAL_UPDATED');
+
         return data.success;
     }
 
@@ -166,6 +192,10 @@ export class SocialService {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to send');
+        try {
+            const { dataEventService } = await import('./DataEventService');
+            dataEventService.emit('SOCIAL_UPDATED');
+        } catch { }
         return data.success;
     }
 
@@ -178,19 +208,34 @@ export class SocialService {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to respond');
+
+        // Emit event for real-time UI updates
+        const { dataEventService } = await import('./DataEventService');
+        dataEventService.emit('SOCIAL_UPDATED');
+
         return data.success;
     }
 
-    static async toggleKudo(feedId: string): Promise<'added' | 'removed'> {
-        const headers = await this.getHeaders();
-        const res = await fetch(`${API_URL}/api/social/feed/kudos`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ feedId }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to toggle kudo');
-        return data.action;
+    static async toggleKudo(feedId: string): Promise<'added' | 'removed' | 'error'> {
+        if (!feedId || feedId.trim().length === 0) return 'error';
+
+        try {
+            const headers = await this.getHeaders();
+            const res = await fetch(`${API_URL}/api/social/feed/kudos`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ feedId: feedId.trim() }),
+            });
+            const data = await res.json();
+            if (!res.ok) return 'error';
+            try {
+                const { dataEventService } = await import('./DataEventService');
+                dataEventService.emit('SOCIAL_UPDATED');
+            } catch { }
+            return data.action === 'removed' ? 'removed' : 'added';
+        } catch (e) {
+            return 'error';
+        }
     }
 
     // -- ANALYTICS --
@@ -203,9 +248,9 @@ export class SocialService {
         return data.leaderboard;
     }
 
-    static async compareFriend(friendId: string): Promise<any[]> {
+    static async compareFriend(friendId: string): Promise<SocialComparisonEntry[]> {
         const headers = await this.getHeaders();
-        const res = await fetch(`${API_URL}/api/social/compare?friendId=${friendId}`, { headers });
+        const res = await fetch(`${API_URL}/api/social/compare?friendId=${encodeURIComponent(friendId)}`, { headers });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to compare');
         return data.comparison;

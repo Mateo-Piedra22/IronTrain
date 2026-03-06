@@ -15,6 +15,8 @@ const FEEDBACK_TYPES = [
 
 export default function FeedbackScreen() {
     const [type, setType] = useState<typeof FEEDBACK_TYPES[number]['id']>('feature_request');
+    const [subject, setSubject] = useState('');
+    const [contactEmail, setContactEmail] = useState('');
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -32,7 +34,11 @@ export default function FeedbackScreen() {
 
         try {
             setLoading(true);
-            await MetricsAndFeedbackService.submitFeedback(type as any, message.trim());
+            await MetricsAndFeedbackService.submitFeedback(type as any, message.trim(), {
+                subject: subject.trim() || undefined,
+                contactEmail: contactEmail.trim() || undefined,
+                context: 'app_feedback_screen',
+            });
             setSuccess(true);
         } catch (e: any) {
             confirm.error('Error de red', e.message || 'No se pudo enviar el feedback. Intenta de nuevo más tarde.');
@@ -81,6 +87,13 @@ export default function FeedbackScreen() {
                         Tus datos de dispositivo y versión se adjuntarán automáticamente para que podamos replicar errores.
                     </Text>
 
+                    <View style={s.contextRow}>
+                        <Text style={s.contextPill}>Adjunta: versión</Text>
+                        <Text style={s.contextPill}>OS</Text>
+                        <Text style={s.contextPill}>modelo</Text>
+                        <Text style={s.contextPill}>usuario</Text>
+                    </View>
+
                     <Text style={s.sectionTitle}>¿Qué nos quieres contar?</Text>
                     <View style={s.typeGrid}>
                         {FEEDBACK_TYPES.map((t) => {
@@ -100,6 +113,33 @@ export default function FeedbackScreen() {
                         })}
                     </View>
 
+                    <Text style={s.sectionTitle}>Asunto (opcional)</Text>
+                    <View style={s.singleInputWrapper}>
+                        <TextInput
+                            style={s.singleInput}
+                            placeholder="Ej: Fallo al compartir rutina en Social"
+                            placeholderTextColor={Colors.iron[400]}
+                            value={subject}
+                            onChangeText={setSubject}
+                            maxLength={140}
+                        />
+                    </View>
+
+                    <Text style={s.sectionTitle}>Email de contacto (opcional)</Text>
+                    <View style={s.singleInputWrapper}>
+                        <TextInput
+                            style={s.singleInput}
+                            placeholder="tu@email.com"
+                            placeholderTextColor={Colors.iron[400]}
+                            value={contactEmail}
+                            onChangeText={setContactEmail}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            keyboardType="email-address"
+                            maxLength={128}
+                        />
+                    </View>
+
                     <Text style={s.sectionTitle}>Tus comentarios</Text>
                     <View style={s.inputWrapper}>
                         <TextInput
@@ -112,8 +152,10 @@ export default function FeedbackScreen() {
                             value={message}
                             onChangeText={setMessage}
                             autoCorrect
+                            maxLength={4000}
                         />
                     </View>
+                    <Text style={s.inputHint}>{message.trim().length}/4000 caracteres</Text>
 
                     <TouchableOpacity
                         style={[s.submitBtn, (!message.trim() || loading) && s.submitBtnDisabled]}
@@ -169,7 +211,24 @@ const s = StyleSheet.create({
         fontSize: 14,
         color: Colors.iron[600],
         lineHeight: 22,
-        marginBottom: 32,
+        marginBottom: 16,
+    },
+    contextRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 28,
+    },
+    contextPill: {
+        borderWidth: 1,
+        borderColor: Colors.iron[300],
+        backgroundColor: Colors.white,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
+        color: Colors.iron[500],
+        fontSize: 11,
+        fontWeight: '700',
     },
     sectionTitle: {
         fontSize: 12,
@@ -215,14 +274,34 @@ const s = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.iron[200],
         borderRadius: 16,
-        marginBottom: 32,
+        marginBottom: 8,
         padding: 4,
+    },
+    singleInputWrapper: {
+        backgroundColor: Colors.white,
+        borderWidth: 1,
+        borderColor: Colors.iron[200],
+        borderRadius: 14,
+        marginBottom: 20,
+    },
+    singleInput: {
+        height: 50,
+        paddingHorizontal: 14,
+        fontSize: 14,
+        color: Colors.iron[950],
     },
     input: {
         height: 160,
         padding: 16,
         fontSize: 16,
         color: Colors.iron[950],
+    },
+    inputHint: {
+        fontSize: 11,
+        color: Colors.iron[500],
+        marginBottom: 20,
+        textAlign: 'right',
+        fontWeight: '700',
     },
     submitBtn: {
         backgroundColor: Colors.primary.DEFAULT,

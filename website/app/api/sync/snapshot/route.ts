@@ -100,6 +100,10 @@ export async function GET(req: NextRequest) {
         snapshot.body_metrics = await db.select().from(schema.bodyMetrics).where(eq(schema.bodyMetrics.userId, userId));
         snapshot.plate_inventory = await db.select().from(schema.plateInventory).where(eq(schema.plateInventory.userId, userId));
         snapshot.settings = await db.select().from(schema.settings).where(eq(schema.settings.userId, userId));
+        snapshot.badges = await db.select().from(schema.badges).where(eq(schema.badges.userId, userId));
+        snapshot.exercise_badges = await db.select().from(schema.exerciseBadges).where(eq(schema.exerciseBadges.userId, userId));
+        snapshot.changelog_reactions = await db.select().from(schema.changelogReactions).where(eq(schema.changelogReactions.userId, userId));
+        snapshot.kudos = await db.select().from(schema.kudos).where(eq(schema.kudos.giverId, userId));
 
         return NextResponse.json({ success: true, snapshot });
     } catch (e) {
@@ -132,6 +136,10 @@ export async function POST(req: NextRequest) {
         type BodyMetricInsert = typeof schema.bodyMetrics.$inferInsert;
         type PlateInventoryInsert = typeof schema.plateInventory.$inferInsert;
         type SettingsInsert = typeof schema.settings.$inferInsert;
+        type BadgeInsert = typeof schema.badges.$inferInsert;
+        type ExerciseBadgeInsert = typeof schema.exerciseBadges.$inferInsert;
+        type ChangelogReactionInsert = typeof schema.changelogReactions.$inferInsert;
+        type KudosInsert = typeof schema.kudos.$inferInsert;
 
         const categories = normalizeSnapshotArray<CategoryInsert>(snapshot.categories, userId, ['id', 'name', 'userId']);
         const exercises = normalizeSnapshotArray<ExerciseInsert>(snapshot.exercises, userId, ['id', 'name', 'userId', 'categoryId', 'type']);
@@ -145,32 +153,48 @@ export async function POST(req: NextRequest) {
         const bodyMetrics = normalizeSnapshotArray<BodyMetricInsert>(snapshot.body_metrics, userId, ['id', 'userId', 'date']);
         const plateInventory = normalizeSnapshotArray<PlateInventoryInsert>(snapshot.plate_inventory, userId, ['id', 'userId', 'weight', 'count', 'available', 'unit']);
         const settingsRows = normalizeSnapshotArray<SettingsInsert>(snapshot.settings, userId, ['key', 'userId', 'value']);
+        const badges = normalizeSnapshotArray<BadgeInsert>(snapshot.badges, userId, ['id', 'userId', 'name', 'color']);
+        const exerciseBadges = normalizeSnapshotArray<ExerciseBadgeInsert>(snapshot.exercise_badges, userId, ['id', 'userId', 'exerciseId', 'badgeId']);
+        const changelogReactions = normalizeSnapshotArray<ChangelogReactionInsert>(snapshot.changelog_reactions, userId, ['id', 'userId', 'changelogId']);
+        const kudos = normalizeSnapshotArray<KudosInsert>(snapshot.kudos, userId, ['id', 'giverId', 'feedId']);
 
-        await db.delete(schema.workoutSets).where(eq(schema.workoutSets.userId, userId));
-        await db.delete(schema.workouts).where(eq(schema.workouts.userId, userId));
-        await db.delete(schema.routineExercises).where(eq(schema.routineExercises.userId, userId));
-        await db.delete(schema.routineDays).where(eq(schema.routineDays.userId, userId));
-        await db.delete(schema.routines).where(eq(schema.routines.userId, userId));
-        await db.delete(schema.exercises).where(eq(schema.exercises.userId, userId));
-        await db.delete(schema.categories).where(eq(schema.categories.userId, userId));
-        await db.delete(schema.measurements).where(eq(schema.measurements.userId, userId));
-        await db.delete(schema.goals).where(eq(schema.goals.userId, userId));
-        await db.delete(schema.bodyMetrics).where(eq(schema.bodyMetrics.userId, userId));
-        await db.delete(schema.plateInventory).where(eq(schema.plateInventory.userId, userId));
-        await db.delete(schema.settings).where(eq(schema.settings.userId, userId));
+        await db.transaction(async (trx) => {
+            // Delete existing data for the user
+            await trx.delete(schema.workoutSets).where(eq(schema.workoutSets.userId, userId));
+            await trx.delete(schema.workouts).where(eq(schema.workouts.userId, userId));
+            await trx.delete(schema.routineExercises).where(eq(schema.routineExercises.userId, userId));
+            await trx.delete(schema.routineDays).where(eq(schema.routineDays.userId, userId));
+            await trx.delete(schema.routines).where(eq(schema.routines.userId, userId));
+            await trx.delete(schema.exercises).where(eq(schema.exercises.userId, userId));
+            await trx.delete(schema.categories).where(eq(schema.categories.userId, userId));
+            await trx.delete(schema.settings).where(eq(schema.settings.userId, userId));
+            await trx.delete(schema.goals).where(eq(schema.goals.userId, userId));
+            await trx.delete(schema.measurements).where(eq(schema.measurements.userId, userId));
+            await trx.delete(schema.bodyMetrics).where(eq(schema.bodyMetrics.userId, userId));
+            await trx.delete(schema.plateInventory).where(eq(schema.plateInventory.userId, userId));
+            await trx.delete(schema.badges).where(eq(schema.badges.userId, userId));
+            await trx.delete(schema.exerciseBadges).where(eq(schema.exerciseBadges.userId, userId));
+            await trx.delete(schema.changelogReactions).where(eq(schema.changelogReactions.userId, userId));
+            await trx.delete(schema.kudos).where(eq(schema.kudos.giverId, userId));
 
-        if (categories.length) await db.insert(schema.categories).values(categories).onConflictDoNothing();
-        if (exercises.length) await db.insert(schema.exercises).values(exercises).onConflictDoNothing();
-        if (routines.length) await db.insert(schema.routines).values(routines).onConflictDoNothing();
-        if (routineDays.length) await db.insert(schema.routineDays).values(routineDays).onConflictDoNothing();
-        if (routineExercises.length) await db.insert(schema.routineExercises).values(routineExercises).onConflictDoNothing();
-        if (workouts.length) await db.insert(schema.workouts).values(workouts).onConflictDoNothing();
-        if (workoutSets.length) await db.insert(schema.workoutSets).values(workoutSets).onConflictDoNothing();
-        if (measurements.length) await db.insert(schema.measurements).values(measurements).onConflictDoNothing();
-        if (goals.length) await db.insert(schema.goals).values(goals).onConflictDoNothing();
-        if (bodyMetrics.length) await db.insert(schema.bodyMetrics).values(bodyMetrics).onConflictDoNothing();
-        if (plateInventory.length) await db.insert(schema.plateInventory).values(plateInventory).onConflictDoNothing();
-        if (settingsRows.length) await db.insert(schema.settings).values(settingsRows).onConflictDoNothing();
+            // Insert new data
+            if (categories.length) await trx.insert(schema.categories).values(categories).onConflictDoNothing();
+            if (exercises.length) await trx.insert(schema.exercises).values(exercises).onConflictDoNothing();
+            if (routines.length) await trx.insert(schema.routines).values(routines).onConflictDoNothing();
+            if (routineDays.length) await trx.insert(schema.routineDays).values(routineDays).onConflictDoNothing();
+            if (routineExercises.length) await trx.insert(schema.routineExercises).values(routineExercises).onConflictDoNothing();
+            if (workouts.length) await trx.insert(schema.workouts).values(workouts).onConflictDoNothing();
+            if (workoutSets.length) await trx.insert(schema.workoutSets).values(workoutSets).onConflictDoNothing();
+            if (measurements.length) await trx.insert(schema.measurements).values(measurements).onConflictDoNothing();
+            if (goals.length) await trx.insert(schema.goals).values(goals).onConflictDoNothing();
+            if (bodyMetrics.length) await trx.insert(schema.bodyMetrics).values(bodyMetrics).onConflictDoNothing();
+            if (plateInventory.length) await trx.insert(schema.plateInventory).values(plateInventory).onConflictDoNothing();
+            if (settingsRows.length) await trx.insert(schema.settings).values(settingsRows).onConflictDoNothing();
+            if (badges.length) await trx.insert(schema.badges).values(badges).onConflictDoNothing();
+            if (exerciseBadges.length) await trx.insert(schema.exerciseBadges).values(exerciseBadges).onConflictDoNothing();
+            if (changelogReactions.length) await trx.insert(schema.changelogReactions).values(changelogReactions).onConflictDoNothing();
+            if (kudos.length) await trx.insert(schema.kudos).values(kudos).onConflictDoNothing();
+        });
 
         return NextResponse.json({ success: true });
     } catch (e) {

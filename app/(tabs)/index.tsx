@@ -7,20 +7,23 @@ import { LoadRoutineModal } from '@/components/LoadRoutineModal';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { WorkoutLog } from '@/components/WorkoutLog';
 import { WorkoutStatusBar } from '@/components/WorkoutStatusBar';
+import { useDataReload } from '@/src/hooks/useDataReload';
 import { ChangelogService } from '@/src/services/ChangelogService';
 import { configService } from '@/src/services/ConfigService';
 import { RoutineDayWithExercises } from '@/src/services/RoutineService';
 import { useTimerStore } from '@/src/store/timerStore';
 import { Colors } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { addDays, subDays } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
 import { Info, Plus, Timer, X } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useContext, useState } from 'react';
+import { ActivityIndicator, Image, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { workoutService } from '../../src/services/WorkoutService';
 import { ExerciseType, Workout, WorkoutSet } from '../../src/types/db';
 
@@ -42,6 +45,10 @@ export default function DailyLogScreen() {
   const [historyExerciseType, setHistoryExerciseType] = useState<ExerciseType>('weight_reps');
   const [hasNewChangelog, setHasNewChangelog] = useState(false);
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
+
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
+  const bottomOffset = (tabBarHeight ? tabBarHeight : insets.bottom) + 12;
 
   const loadData = async () => {
     setLoading(true);
@@ -81,16 +88,20 @@ export default function DailyLogScreen() {
     useCallback(() => {
       loadData();
 
-      // Check changelog unread badge
-      const latestVersion = ChangelogService.getLatestRelease()?.version;
-      const lastViewed = configService.get('lastViewedChangelogVersion');
-      if (latestVersion && latestVersion !== lastViewed) {
-        setHasNewChangelog(true);
-      } else {
-        setHasNewChangelog(false);
-      }
+      const checkChangelogBadge = async () => {
+        const latestRelease = await ChangelogService.getLatestRelease();
+        const latestVersion = latestRelease?.version;
+        const lastViewed = configService.get('lastViewedChangelogVersion');
+        setHasNewChangelog(!!latestVersion && latestVersion !== lastViewed);
+      };
+
+      checkChangelogBadge();
     }, [selectedDate]) // Re-fetch on focus just in case
   );
+
+  useDataReload(() => {
+    loadData();
+  });
 
   const [isPickerVisible, setIsPickerVisible] = useState(false);
 
@@ -275,59 +286,75 @@ export default function DailyLogScreen() {
               />
             }
             headerRight={
-              <Link href="/changelog" asChild>
-                <TouchableOpacity className="relative p-1 active:opacity-50">
-                  <Info size={24} color={Colors.iron[950]} />
-                  {hasNewChangelog && (
-                    <View className="absolute top-0 -right-1 w-3 h-3 rounded-full bg-red-500 border-2 border-iron-900" />
-                  )}
-                </TouchableOpacity>
-              </Link>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Link href="/changelog" asChild>
+                  <Pressable
+                    style={({ pressed }) => ({
+                      opacity: pressed ? 0.7 : 1,
+                      width: 36, height: 36, borderRadius: 18,
+                      backgroundColor: Colors.iron[800],
+                      alignItems: 'center', justifyContent: 'center',
+                      borderWidth: 1, borderColor: Colors.iron[700],
+                    })}
+                  >
+                    <Info size={20} color={markedDates['changelog'] ? Colors.primary.DEFAULT : Colors.iron[400]} />
+                    {hasNewChangelog && (
+                      <View style={{ position: 'absolute', top: -1, right: -1, width: 10, height: 10, borderRadius: 5, backgroundColor: '#ef4444', borderWidth: 2, borderColor: Colors.iron[900] }} />
+                    )}
+                  </Pressable>
+                </Link>
+              </View>
             }
           />
         </View>
       </GestureDetector>
 
       {/* Workout Status Bar — Tri-state: idle → active → completed */}
-      {workout && (
-        <WorkoutStatusBar
-          workout={workout}
-          sets={sets}
-          onStatusChange={refreshWorkoutOnly}
-        />
-      )}
-
-      {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
-        </View>
-      ) : (
-        <>
-          <WorkoutLog
+      {
+        workout && (
+          <WorkoutStatusBar
+            workout={workout}
             sets={sets}
-            onExercisePress={(exId, exName) => {
-              router.push({
-                pathname: '/exercise/[id]' as any,
-                params: { id: exId, workoutId: workout?.id, exerciseId: exId, exerciseName: exName }
-              });
-            }}
-            workoutId={workout?.id || ''}
-            onRefresh={loadData}
-            onCopyPress={() => setCopyModalVisible(true)}
-            onLoadRoutinePress={() => setLoadRoutineModalVisible(true)}
+            onStatusChange={refreshWorkoutOnly}
           />
-        </>
-      )}
+        )
+      }
+
+      {
+        loading ? (
+          <View className="flex-1 items-center justify-center">
+            <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
+          </View>
+        ) : (
+          <>
+            <WorkoutLog
+              sets={sets}
+              onExercisePress={(exId, exName) => {
+                router.push({
+                  pathname: '/exercise/[id]' as any,
+                  params: { id: exId, workoutId: workout?.id, exerciseId: exId, exerciseName: exName }
+                });
+              }}
+              workoutId={workout?.id || ''}
+              onRefresh={loadData}
+              onCopyPress={() => setCopyModalVisible(true)}
+              onLoadRoutinePress={() => setLoadRoutineModalVisible(true)}
+            />
+          </>
+        )
+      }
 
       {/* ... FAB ... */}
-      {!loading && (
-        <TouchableOpacity
-          onPress={handleAddButton}
-          style={{ position: 'absolute', bottom: 24, right: 24, zIndex: 20, width: 56, height: 56, backgroundColor: Colors.primary.DEFAULT, borderRadius: 28, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
-        >
-          <Plus color="white" size={28} />
-        </TouchableOpacity>
-      )}
+      {
+        !loading && (
+          <TouchableOpacity
+            onPress={handleAddButton}
+            style={{ position: 'absolute', bottom: bottomOffset, right: 24, zIndex: 20, width: 56, height: 56, backgroundColor: Colors.primary.DEFAULT, borderRadius: 28, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
+          >
+            <Plus color="white" size={28} />
+          </TouchableOpacity>
+        )
+      }
 
       {/* ... Pickers ... */}
       <Modal visible={isPickerVisible} transparent animationType="fade" onRequestClose={() => setIsPickerVisible(false)}>
@@ -389,15 +416,17 @@ export default function DailyLogScreen() {
       />
 
       {/* Timer FAB (Left Side) */}
-      {!loading && (
-        <TouchableOpacity
-          onPress={() => setTimerVisible(true)}
-          style={{ position: 'absolute', bottom: 24, left: 24, zIndex: 20, width: 48, height: 48, backgroundColor: Colors.iron[800], borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[700], elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6 }}
-        >
-          <Timer color="#94a3b8" size={22} />
-        </TouchableOpacity>
-      )}
-    </SafeAreaWrapper>
+      {
+        !loading && (
+          <TouchableOpacity
+            onPress={() => setTimerVisible(true)}
+            style={{ position: 'absolute', bottom: bottomOffset, left: 24, zIndex: 20, width: 48, height: 48, backgroundColor: Colors.iron[800], borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[700], elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6 }}
+          >
+            <Timer color="#94a3b8" size={22} />
+          </TouchableOpacity>
+        )
+      }
+    </SafeAreaWrapper >
 
   );
 }

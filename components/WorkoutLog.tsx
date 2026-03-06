@@ -15,8 +15,9 @@ import { WorkoutSet } from '../src/types/db';
 import { ExerciseSummary } from './ExerciseSummary';
 
 interface WorkoutLogProps {
-    sets: (WorkoutSet & { exercise_name: string; category_color: string; exercise_type: ExerciseType })[];
+    sets: (WorkoutSet & { exercise_name: string; category_color: string; exercise_type: ExerciseType; badges?: any[] })[];
     onExercisePress: (exerciseId: string, exerciseName: string) => void;
+
     onRefresh: () => void;
     workoutId: string;
     onCopyPress?: () => void;
@@ -28,8 +29,10 @@ interface GroupedExercise {
     exercise_name: string;
     category_color: string;
     exercise_type: ExerciseType;
+    badges: any[];
     sets: WorkoutSet[];
 }
+
 
 export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopyPress, onLoadRoutinePress }: WorkoutLogProps) {
     const [localGroups, setLocalGroups] = useState<GroupedExercise[]>([]);
@@ -39,7 +42,15 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
         const orderedGroups: GroupedExercise[] = [];
         sets.forEach((set) => {
             if (!groups[set.exercise_id]) {
-                const group: GroupedExercise = { exercise_id: set.exercise_id, exercise_name: set.exercise_name, category_color: set.category_color, exercise_type: set.exercise_type, sets: [] };
+                const group: GroupedExercise = {
+                    exercise_id: set.exercise_id,
+                    exercise_name: set.exercise_name,
+                    category_color: set.category_color,
+                    exercise_type: set.exercise_type,
+                    badges: (set as any).badges || [],
+                    sets: []
+                };
+
                 groups[set.exercise_id] = group;
                 orderedGroups.push(group);
             }
@@ -183,10 +194,12 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
                             exerciseName={group.exercise_name}
                             exerciseType={group.exercise_type}
                             sets={group.sets}
+                            badges={group.badges}
                             categoryColor={group.category_color}
                             onPress={() => onExercisePress(group.exercise_id, group.exercise_name)}
                             disabled={isActive}
                         />
+
                     </Swipeable>
                 </View>
             </ScaleDecorator>

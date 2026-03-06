@@ -88,6 +88,33 @@ export async function GET(
                 );
         }
 
+        // 5. Fetch Exercise Badges
+        let exBadges: typeof schema.exerciseBadges.$inferSelect[] = [];
+        if (exerciseIds.length > 0) {
+            exBadges = await db.select()
+                .from(schema.exerciseBadges)
+                .where(
+                    and(
+                        inArray(schema.exerciseBadges.exerciseId, exerciseIds),
+                        isNull(schema.exerciseBadges.deletedAt)
+                    )
+                );
+        }
+
+        // 6. Fetch Badges metadata
+        const badgeIds = [...new Set(exBadges.map(eb => eb.badgeId))];
+        let badgesMetadata: typeof schema.badges.$inferSelect[] = [];
+        if (badgeIds.length > 0) {
+            badgesMetadata = await db.select()
+                .from(schema.badges)
+                .where(
+                    and(
+                        inArray(schema.badges.id, badgeIds),
+                        isNull(schema.badges.deletedAt)
+                    )
+                );
+        }
+
         // Return fully packaged JSON payload for Mobile P2P consumption
         const payload = {
             routine: toSnakeCase(routine as unknown as Record<string, unknown>),
@@ -95,6 +122,8 @@ export async function GET(
             routine_exercises: routineExercises.map(re => toSnakeCase(re as unknown as Record<string, unknown>)),
             exercises: exercises.map(ex => toSnakeCase(ex as unknown as Record<string, unknown>)),
             categories: categories.map(cat => toSnakeCase(cat as unknown as Record<string, unknown>)),
+            badges: badgesMetadata.map(b => toSnakeCase(b as unknown as Record<string, unknown>)),
+            exercise_badges: exBadges.map(eb => toSnakeCase(eb as unknown as Record<string, unknown>)),
         };
 
         return NextResponse.json({ success: true, data: payload });

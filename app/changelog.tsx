@@ -26,25 +26,73 @@ const renderFormattedText = (text: string, style: any, boldStyle: any) => {
     );
 };
 
+const KudosButton = ({ version }: { version: string }) => {
+    const [count, setCount] = useState<number | null>(null);
+    const [isReacting, setIsReacting] = useState(false);
+
+    useEffect(() => {
+        ChangelogService.getReactionCount(version).then(setCount);
+    }, [version]);
+
+    const handlePress = async () => {
+        if (isReacting) return;
+        setIsReacting(true);
+        const result = await ChangelogService.toggleReaction(version);
+        if (result !== 'error') {
+            const newCount = await ChangelogService.getReactionCount(version);
+            setCount(newCount);
+        }
+        setIsReacting(false);
+    };
+
+    if (count === null) return null;
+
+    return (
+        <TouchableOpacity
+            onPress={handlePress}
+            disabled={isReacting}
+            style={[ss.kudosBtn, isReacting && { opacity: 0.7 }]}
+        >
+            <View style={ss.kudosContent}>
+                <Text style={ss.kudosCount}>{count}</Text>
+                <Text style={ss.kudosText}>🔥 Kudos</Text>
+            </View>
+        </TouchableOpacity>
+    );
+};
+
 export default function ChangelogModalScreen() {
     const router = useRouter();
     const appVersion = ChangelogService.getAppVersion();
-    const [releases, setReleases] = useState<ChangelogRelease[]>(() => ChangelogService.getReleases());
-    const [unreleased, setUnreleased] = useState<ChangelogRelease[]>(() => {
-        const all = ChangelogService.getReleases({ includeUnreleased: true });
-        return all.filter((r) => r.unreleased === true || r.date === null || String(r.date ?? '').trim().toLowerCase() === 'unreleased');
-    });
+    const [releases, setReleases] = useState<ChangelogRelease[]>([]);
+    const [unreleased, setUnreleased] = useState<ChangelogRelease[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const loadData = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            await ChangelogService.sync();
+            const rels = await ChangelogService.getReleases();
+            setReleases(rels);
+
+            const all = await ChangelogService.getReleases({ includeUnreleased: true });
+            setUnreleased(all.filter((r) => r.unreleased === true || r.date === null || String(r.date ?? '').trim().toLowerCase() === 'unreleased'));
+
+            const latest = rels[0];
+            if (latest?.version) {
+                configService.set('lastViewedChangelogVersion', latest.version);
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
 
     useFocusEffect(
         useCallback(() => {
-            ChangelogService.reload();
-            setReleases(ChangelogService.getReleases());
-            const all = ChangelogService.getReleases({ includeUnreleased: true });
-            setUnreleased(all.filter((r) => r.unreleased === true || r.date === null || String(r.date ?? '').trim().toLowerCase() === 'unreleased'));
-            const latest = ChangelogService.getLatestRelease();
-            if (latest?.version) { configService.set('lastViewedChangelogVersion', latest.version); }
-        }, [])
+            loadData();
+        }, [loadData])
     );
+
 
     const initialExpanded = useMemo(() => {
         const match = releases.find((r) => isSameVersion(r.version, appVersion));
@@ -98,6 +146,10 @@ export default function ChangelogModalScreen() {
                                 </View>
                             ))}
                         </View>
+
+                        <View style={ss.releaseFooter}>
+                            <KudosButton version={r.version} />
+                        </View>
                     </View>
                 )}
             </View>
@@ -118,7 +170,11 @@ export default function ChangelogModalScreen() {
                     </View>
                 </View>
 
-                {releases.length > 0 ? (
+                {isLoading ? (
+                    <View style={ss.emptyCard}>
+                        <Text style={ss.emptyTitle}>Sincronizando...</Text>
+                    </View>
+                ) : releases.length > 0 ? (
                     <View>
                         {releases.map(renderRelease)}
 
@@ -139,9 +195,10 @@ export default function ChangelogModalScreen() {
                 ) : (
                     <View style={ss.emptyCard}>
                         <Text style={ss.emptyTitle}>No hay changelog disponible</Text>
-                        <Text style={ss.emptySub}>Verifica que `src/changelog.generated.json` exista y esté actualizado.</Text>
+                        <Text style={ss.emptySub}>Verifica tu conexión o intenta más tarde.</Text>
                     </View>
                 )}
+
             </ScrollView>
         </SafeAreaWrapper>
     );
@@ -169,4 +226,9 @@ const ss = StyleSheet.create({
     emptyCard: { backgroundColor: Colors.surface, padding: 24, borderRadius: 20, borderWidth: 1, borderColor: Colors.iron[300] },
     emptyTitle: { color: Colors.iron[950], fontWeight: '800', fontSize: 15 },
     emptySub: { color: Colors.iron[500], fontSize: 13, marginTop: 6, lineHeight: 20 },
+    releaseFooter: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.iron[200], alignItems: 'flex-end' },
+    kudosBtn: { backgroundColor: Colors.iron[100], paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: Colors.iron[300] },
+    kudosContent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    kudosCount: { color: Colors.iron[950], fontWeight: '900', fontSize: 14 },
+    kudosText: { color: Colors.iron[600], fontWeight: '700', fontSize: 12 },
 });

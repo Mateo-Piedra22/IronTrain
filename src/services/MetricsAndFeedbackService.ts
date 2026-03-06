@@ -2,8 +2,9 @@ import * as Application from 'expo-application';
 import * as Device from 'expo-device';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { Config } from '../constants/Config';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://irontrain.motiona.xyz';
+const API_URL = Config.API_URL;
 const INSTALL_TRACKED_KEY = 'irontrain_install_tracked';
 
 export class MetricsAndFeedbackService {
@@ -50,7 +51,11 @@ export class MetricsAndFeedbackService {
         }
     }
 
-    static async submitFeedback(type: 'bug' | 'feature_request' | 'review' | 'other', message: string): Promise<boolean> {
+    static async submitFeedback(
+        type: 'bug' | 'feature_request' | 'review' | 'other',
+        message: string,
+        extras?: { subject?: string; contactEmail?: string; context?: string }
+    ): Promise<boolean> {
         try {
             const token = await this.getToken();
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -58,8 +63,13 @@ export class MetricsAndFeedbackService {
 
             const metadata = {
                 appVersion: Application.nativeApplicationVersion || '1.0.0',
+                appBuild: Application.nativeBuildVersion || '0',
                 platform: Platform.OS,
                 osVersion: Device.osVersion,
+                deviceModel: Device.modelName || null,
+                context: extras?.context || 'feedback_screen',
+                subject: extras?.subject || null,
+                contactEmail: extras?.contactEmail || null,
             };
 
             const res = await fetch(`${API_URL}/api/feedback`, {

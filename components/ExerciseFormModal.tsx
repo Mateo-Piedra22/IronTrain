@@ -1,9 +1,14 @@
 import { Colors } from '@/src/theme';
+import { Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { badgeService } from '../src/services/BadgeService';
 import { CategoryService } from '../src/services/CategoryService';
 import { ExerciseService } from '../src/services/ExerciseService';
-import { Category, Exercise, ExerciseType } from '../src/types/db';
+import { Badge, Category, Exercise, ExerciseType } from '../src/types/db';
+import { BadgeSelectorModal } from './BadgeSelectorModal';
+import { BadgePill } from './ui/BadgePill';
+
 
 interface ExerciseFormModalProps {
     visible: boolean;
@@ -18,20 +23,41 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
     const [type, setType] = useState<ExerciseType>('weight_reps');
     const [categories, setCategories] = useState<Category[]>([]);
 
+    // Badges State
+    const [allBadges, setAllBadges] = useState<Badge[]>([]);
+    const [selectedBadgeIds, setSelectedBadgeIds] = useState<string[]>([]);
+    const [showBadgeSelector, setShowBadgeSelector] = useState(false);
+
+
     useEffect(() => {
         if (visible) {
-            loadCategories();
-            if (initialData) {
-                setName(initialData.name);
-                setCategoryId(initialData.category_id);
-                setType(initialData.type);
-            } else {
-                setName('');
-                setCategoryId('');
-                setType('weight_reps');
-            }
+            loadInitialData();
         }
     }, [visible, initialData]);
+
+    const loadInitialData = async () => {
+        loadCategories();
+
+        // Load all badges for mapping
+        const sBadges = await badgeService.getAllBadges();
+        setAllBadges(sBadges);
+
+        if (initialData) {
+            setName(initialData.name);
+            setCategoryId(initialData.category_id);
+            setType(initialData.type);
+
+            // Load current exercise badges
+            const exerciseBadges = await badgeService.getBadgesByExerciseId(initialData.id);
+            setSelectedBadgeIds(exerciseBadges.map(b => b.id));
+        } else {
+            setName('');
+            setCategoryId('');
+            setType('weight_reps');
+            setSelectedBadgeIds([]);
+        }
+    };
+
 
     const loadCategories = async () => {
         const cats = await CategoryService.getAll();
@@ -44,14 +70,21 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
     const handleSave = async () => {
         if (!name.trim() || !categoryId) return;
         try {
+            let exerciseId = '';
             if (initialData) {
+                exerciseId = initialData.id;
                 await ExerciseService.update(initialData.id, { name, category_id: categoryId, type });
             } else {
-                await ExerciseService.create({ name, category_id: categoryId, type });
+                exerciseId = await ExerciseService.create({ name, category_id: categoryId, type });
             }
+
+            // Update Badges
+            await badgeService.updateExerciseBadges(exerciseId, selectedBadgeIds);
+
             onSave();
             onClose();
         } catch (e) {
+
             /* handled by caller */
         }
     };
@@ -116,8 +149,55 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
                         })}
                     </View>
 
-                    {/* Type */}
+                    {/* Badges Selection */}
+                    <Text style={{ color: Colors.iron[500], fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Badges / Etiquetas</Text>
+                    <View style={{ marginBottom: 20 }}>
+                        <TouchableOpacity
+                            onPress={() => setShowBadgeSelector(true)}
+                            style={{
+                                flexDirection: 'row',
+                                flexWrap: 'wrap',
+                                gap: 6,
+                                minHeight: 48,
+                                backgroundColor: Colors.iron[200],
+                                borderRadius: 12,
+                                padding: 10,
+                                borderWidth: 1,
+                                borderColor: Colors.iron[300],
+                                alignItems: 'center'
+                            }}
+                        >
+                            {selectedBadgeIds.length === 0 ? (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', opacity: 0.5 }}>
+                                    <Plus size={14} color={Colors.iron[400]} />
+                                    <Text style={{ fontSize: 13, color: Colors.iron[400], marginLeft: 4, fontWeight: '600' }}>Añadir badges...</Text>
+                                </View>
+                            ) : (
+                                <>
+                                    {selectedBadgeIds.map(id => {
+                                        const badge = allBadges.find(b => b.id === id);
+                                        if (!badge) return null;
+                                        return (
+                                            <BadgePill
+                                                key={badge.id}
+                                                name={badge.name}
+                                                color={badge.color}
+                                                icon={badge.icon || undefined}
+                                                size="sm"
+                                            />
+                                        );
+                                    })}
+                                    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.iron[300], justifyContent: 'center', alignItems: 'center', marginLeft: 4 }}>
+                                        <Plus size={12} color={Colors.iron[600]} />
+                                    </View>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Type/Registro Selection */}
                     <Text style={{ color: Colors.iron[500], fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Registro</Text>
+
                     <View style={{ gap: 8, marginBottom: 24 }}>
                         {EXERCISE_TYPES.map(t => {
                             const isActive = type === t.id;
@@ -154,8 +234,17 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
                         </View>
                     </View>
                 </View>
+
+                {/* Badge Picker Sub-Modal */}
+                <BadgeSelectorModal
+                    visible={showBadgeSelector}
+                    onClose={() => setShowBadgeSelector(false)}
+                    onSave={(ids) => setSelectedBadgeIds(ids)}
+                    initialSelectedIds={selectedBadgeIds}
+                />
             </KeyboardAvoidingView>
         </Modal>
+
     );
 }
 

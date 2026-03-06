@@ -1,5 +1,6 @@
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useDataReload } from '@/src/hooks/useDataReload';
 import { backupService } from '@/src/services/BackupService';
 import { ChangelogService } from '@/src/services/ChangelogService';
 import { AppConfig, configService, NotificationPreferences } from '@/src/services/ConfigService';
@@ -13,6 +14,7 @@ import { Stack, useRouter } from 'expo-router';
 import { AlertTriangle, BarChart3, Bell, Calculator, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, CloudLightning, Database, Disc, Download, LogOut, Megaphone, MessageSquare, RefreshCw, Ruler, Shield, Smartphone, Timer, Trash2, User, Vibrate, Volume2, Zap } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { notificationPermissionsService } from '../src/services/NotificationPermissionsService';
 import { syncService } from '../src/services/SyncService';
 import { useAuthStore } from '../src/store/authStore';
 import { confirm } from '../src/store/confirmStore';
@@ -22,11 +24,7 @@ export default function SettingsScreen() {
     const router = useRouter();
     const colorScheme = useColorScheme();
     const installedVersion = ChangelogService.getAppVersion();
-    const installedRelease = ChangelogService.getInstalledRelease();
-    const candidateDate = installedRelease?.date ?? ChangelogService.getLatestRelease()?.date ?? null;
-    const footerDate = typeof candidateDate === 'string' && candidateDate.trim().toLowerCase() === 'unreleased'
-        ? null
-        : candidateDate;
+    const [footerDate, setFooterDate] = useState<string | null>(null);
     const [units, setUnits] = useState('kg');
     const [defaultTimer, setDefaultTimer] = useState(90);
     const [autoRestOnComplete, setAutoRestOnComplete] = useState(true);
@@ -59,7 +57,24 @@ export default function SettingsScreen() {
 
     const updateInfo = { installedVersion: installedVersionStr, latestVersion, date: releaseDate, error: updateError, downloadUrl, notesUrl, lastChecked };
 
+    useDataReload(() => {
+        loadSettings();
+    }, ['SETTINGS_UPDATED']);
+
     useEffect(() => { loadSettings(); }, []);
+
+    useEffect(() => {
+        const resolveFooterDate = async () => {
+            const installedRelease = await ChangelogService.getInstalledRelease();
+            const latestRelease = await ChangelogService.getLatestRelease();
+            const candidateDate = installedRelease?.date ?? latestRelease?.date ?? null;
+            const normalizedDate = typeof candidateDate === 'string' && candidateDate.trim().toLowerCase() === 'unreleased'
+                ? null
+                : candidateDate;
+            setFooterDate(typeof normalizedDate === 'string' ? normalizedDate : null);
+        };
+        resolveFooterDate();
+    }, []);
 
     const loadSettings = async () => {
         await configService.init();
@@ -78,11 +93,8 @@ export default function SettingsScreen() {
         setRoundLbs(configService.get('calculatorsRoundingLbs'));
         setRmFormula(configService.get('calculatorsDefault1RMFormula'));
 
-        const rawDays = await configService.get('training_days' as keyof AppConfig); // Fallback until typed
-        if (rawDays) {
-            try { setTrainingDays(typeof rawDays === 'string' ? JSON.parse(rawDays) : rawDays); }
-            catch (e) { /* ignore */ }
-        }
+        const rawDays = await configService.get('training_days');
+        setTrainingDays(Array.isArray(rawDays) ? rawDays : [1, 2, 3, 4, 5, 6]);
     };
 
     const checkUpdates = async () => { await updateService.checkForUpdate(); };
@@ -103,6 +115,12 @@ export default function SettingsScreen() {
         if (key === 'calculatorsRoundingKg') setRoundKg(value as any);
         if (key === 'calculatorsRoundingLbs') setRoundLbs(value as any);
         if (key === 'calculatorsDefault1RMFormula') setRmFormula(value as any);
+        if (key === 'training_days') {
+            const newDays = value as number[];
+            setTrainingDays(newDays);
+            const { useSettingsStore } = await import('../src/store/useSettingsStore');
+            await useSettingsStore.getState().setTrainingDays(newDays);
+        }
     };
 
     const handleBackup = async () => {
@@ -215,6 +233,10 @@ export default function SettingsScreen() {
                             try {
                                 notify.info('Sincronizando...', 'Fusionando datos local-nube sin perder métricas.');
                                 await syncService.syncBidirectional({ forcePull: true });
+                                await configService.reload();
+                                await loadSettings();
+                                const { useSettingsStore } = await import('../src/store/useSettingsStore');
+                                await useSettingsStore.getState().loadSettings();
                                 notify.success('Éxito', 'Sincronización híbrida completa.');
                             } catch (e: any) {
                                 notify.error('Error', e?.message || 'No se pudo sincronizar.');
@@ -229,6 +251,10 @@ export default function SettingsScreen() {
                             try {
                                 notify.info('Cargando...', 'Descargando Snapshot de la Nube...');
                                 await syncService.pullCloudSnapshot();
+                                await configService.reload();
+                                await loadSettings();
+                                const { useSettingsStore } = await import('../src/store/useSettingsStore');
+                                await useSettingsStore.getState().loadSettings();
                                 notify.success('Éxito', 'Celular actualizado con los datos de la nube.');
                             } catch (e: any) {
                                 notify.error('Error', e?.message || 'No se pudo descargar el snapshot.');
@@ -519,13 +545,9 @@ export default function SettingsScreen() {
                                 return (
                                     <TouchableOpacity
                                         key={day.id}
-                                        onPress={async () => {
+                                        onPress={() => {
                                             const newDays = isSelected ? trainingDays.filter(d => d !== day.id) : [...trainingDays, day.id].sort();
-                                            setTrainingDays(newDays);
-                                            await configService.set('training_days' as keyof AppConfig, JSON.stringify(newDays) as any);
-                                            import('../src/store/useSettingsStore').then(({ useSettingsStore }) => {
-                                                useSettingsStore.getState().setTrainingDays(newDays);
-                                            });
+                                            saveSetting('training_days', newDays);
                                         }}
                                         style={[s.dayChip, isSelected && s.dayChipActive]}
                                         activeOpacity={0.7}
@@ -579,6 +601,7 @@ export default function SettingsScreen() {
                         onToggle={(v) => {
                             updateNotifPref('system', 'enabled', v);
                             saveSetting('systemNotificationsEnabled', v);
+                            if (v) notificationPermissionsService.requestPermission();
                         }}
                         expanded={expandedNotifGroup === 'system'}
                         onExpand={() => setExpandedNotifGroup(expandedNotifGroup === 'system' ? null : 'system')}
@@ -595,7 +618,8 @@ export default function SettingsScreen() {
                             <NotifSubToggle label="Interval timer" enabled={notifPrefs.system.intervalTimer} onToggle={(v) => updateNotifPref('system', 'intervalTimer', v)} />
                             <NotifSubToggle label="Actualización disponible" enabled={notifPrefs.system.updateAvailable} onToggle={(v) => updateNotifPref('system', 'updateAvailable', v)} />
                             <NotifSubToggle label="App actualizada" enabled={notifPrefs.system.appUpdated} onToggle={(v) => updateNotifPref('system', 'appUpdated', v)} />
-                            <NotifSubToggle label="Recordatorio de racha" enabled={notifPrefs.system.streakReminder} onToggle={(v) => updateNotifPref('system', 'streakReminder', v)} last />
+                            <NotifSubToggle label="Recordatorio de racha" enabled={notifPrefs.system.streakReminder} onToggle={(v) => updateNotifPref('system', 'streakReminder', v)} />
+
                         </View>
                     )}
 

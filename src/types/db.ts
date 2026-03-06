@@ -27,6 +27,8 @@ export interface Workout {
     date: number; // Unix Timestamp
     start_time: number; // Unix Timestamp
     end_time?: number; // Unix Timestamp
+    finish_lat?: number;
+    finish_lon?: number;
     notes?: string;
     status: WorkoutStatus;
     duration?: number; // Elapsed seconds, persisted for timer state
@@ -115,4 +117,23 @@ export interface RoutineExercise {
     exercise_id: string;
     order_index: number;
     notes?: string;
+}
+
+export interface Badge {
+    id: string; // UUID
+    name: string;
+    color: string; // Hex color
+    icon?: string; // Lucide icon name
+    group_name?: 'equipamiento' | 'variacion' | 'posicion' | 'otro';
+    is_system: number; // 1 | 0
+    updated_at: number;
+    deleted_at?: number;
+}
+
+export interface ExerciseBadge {
+    id: string; // UUID
+    exercise_id: string;
+    badge_id: string;
+    updated_at: number;
+    deleted_at?: number;
 }

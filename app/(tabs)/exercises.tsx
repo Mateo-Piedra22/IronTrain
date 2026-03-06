@@ -3,6 +3,7 @@ import { CreateRoutineModal } from '@/components/CreateRoutineModal';
 import { ExerciseList } from '@/components/ExerciseList';
 import { RoutineDetailModal } from '@/components/RoutineDetailModal';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
+import { useDataReload } from '@/src/hooks/useDataReload';
 import { routineService } from '@/src/services/RoutineService';
 import { confirm } from '@/src/store/confirmStore';
 import { Colors } from '@/src/theme';
@@ -52,6 +53,12 @@ export default function LibraryScreen() {
             loadRoutines();
         }
     }, [mode, loadRoutines]));
+
+    useDataReload(() => {
+        if (mode === 'routines') {
+            loadRoutines();
+        }
+    });
 
     const handleDeleteRoutine = (routine: Routine) => {
         confirm.destructive(

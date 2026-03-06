@@ -3,11 +3,13 @@ import { ExerciseFormModal } from '@/components/ExerciseFormModal';
 import { IronButton } from '@/components/IronButton';
 import { IronCard } from '@/components/IronCard';
 import { SET_TYPE_CONFIG, SetRow } from '@/components/SetRow';
+import { BadgePill } from '@/components/ui/BadgePill';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { WarmupCalculatorModal } from '@/components/WarmupCalculatorModal';
 import { CalculatorService } from '@/src/services/CalculatorService';
 import { configService } from '@/src/services/ConfigService';
 import { dbService } from '@/src/services/DatabaseService';
+import { ExerciseService } from '@/src/services/ExerciseService';
 import { UnitService } from '@/src/services/UnitService';
 import { workoutService } from '@/src/services/WorkoutService';
 import { useTimerStore } from '@/src/store/timerStore';
@@ -19,7 +21,8 @@ import * as Haptics from 'expo-haptics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Info, Pencil, Timer, Trophy, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Dimensions, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 import { BarChart, LineChart } from 'react-native-gifted-charts';
 
 type Tab = 'track' | 'history' | 'analysis';
@@ -53,7 +56,7 @@ export default function ExerciseDetailScreen() {
 
     // Config Modal
     const [isConfigVisible, setIsConfigVisible] = useState(false);
-    const [currentExercise, setCurrentExercise] = useState<Exercise | null>(null);
+    const [currentExercise, setCurrentExercise] = useState<(Exercise & { badges?: any[] }) | null>(null);
 
     const screenWidth = Dimensions.get('window').width;
 
@@ -133,7 +136,7 @@ export default function ExerciseDetailScreen() {
             const hist = await workoutService.getExerciseHistory(exerciseId, 60, historyRangeDays);
             setHistory(hist);
             // Also load exercise details if needed
-            const exerciseDetails = await workoutService.getExercise(exerciseId);
+            const exerciseDetails = await ExerciseService.getById(exerciseId);
             setNotes(exerciseDetails?.notes || null);
             setCurrentExercise(exerciseDetails || null);
         } catch (e) {
@@ -1519,6 +1522,19 @@ export default function ExerciseDetailScreen() {
             </View>
 
             <ScrollView style={{ flex: 1, padding: 16 }} contentContainerStyle={{ paddingBottom: 100 }}>
+                {currentExercise?.badges && currentExercise.badges.length > 0 && (
+                    <View style={{ marginBottom: 16 }}>
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={{ gap: 8 }}
+                        >
+                            {currentExercise.badges.map((b, i) => (
+                                <BadgePill key={i} name={b.name} color={b.color} icon={b.icon} size="sm" />
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
                 {loading ? (
                     <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                         <Text style={{ color: Colors.iron[500], fontWeight: '700' }}>Cargando…</Text>

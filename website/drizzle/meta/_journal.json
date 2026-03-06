@@ -8,6 +8,20 @@
       "when": 1772631390628,
       "tag": "0000_silent_elektra",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772803572607,
+      "tag": "0001_real_quentin_quire",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772826500000,
+      "tag": "0002_social_scoring_overhaul",
+      "breakpoints": true
     }
   ]
 }

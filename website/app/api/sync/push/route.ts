@@ -1,8 +1,9 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
+import { applyWorkoutScoring } from '../../../../src/lib/social-scoring';
 
 // Convert snake_case from SQLite payload to camelCase for Drizzle
 const toCamelCase = (snakeObj: any) => {
@@ -23,19 +24,18 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        let body: unknown;
+        let body: any;
         try {
             body = await req.json();
         } catch {
             return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
         }
 
-        const operations = (body as any)?.operations;
+        const operations = body?.operations;
         if (!Array.isArray(operations)) {
             return NextResponse.json({ error: 'Invalid payload: operations must be an array' }, { status: 400 });
         }
 
-        // Apply LWW strategies mapping tables to schemas
         const tableMap: Record<string, any> = {
             'categories': schema.categories,
             'exercises': schema.exercises,
@@ -49,97 +49,122 @@ export async function POST(req: NextRequest) {
             'body_metrics': schema.bodyMetrics,
             'plate_inventory': schema.plateInventory,
             'settings': schema.settings,
+            'badges': schema.badges,
+            'exercise_badges': schema.exerciseBadges,
+            'user_profiles': schema.userProfiles,
+            'changelog_reactions': schema.changelogReactions,
+            'kudos': schema.kudos,
+            'activity_feed': schema.activityFeed,
         };
 
-        const supportsSoftDelete = new Set<string>([
-            'categories',
-            'exercises',
-            'workouts',
-            'workout_sets',
-            'routines',
-            'routine_days',
-            'routine_exercises',
-            'measurements',
-            'goals',
-            'body_metrics',
-        ]);
+        const processedIds: string[] = [];
+        const results: any[] = [];
 
-        const conflictTargetForTable = (table: string, tableSchema: any) => {
-            if (table === 'settings') return tableSchema.key;
-            return tableSchema.id;
-        };
+        await db.transaction(async (trx) => {
+            for (const op of operations) {
+                const { table: tableName, operation, payload: rawPayload, id: opId } = op;
+                const tableSchema = tableMap[tableName];
 
-        const results = [];
-
-        for (const op of operations as any[]) {
-            const table = typeof op?.table === 'string' ? op.table : null;
-            const operation = typeof op?.operation === 'string' ? op.operation : null;
-            const recordId = typeof op?.recordId === 'string' ? op.recordId : null;
-            const timestamp = typeof op?.timestamp === 'number' ? op.timestamp : null;
-            const payload = op?.payload && typeof op.payload === 'object' ? op.payload : null;
-
-            if (!table || !operation || !recordId || timestamp === null) {
-                results.push({ id: op?.id ?? null, status: 'error', reason: 'Invalid operation shape' });
-                continue;
-            }
-
-            const tableSchema = tableMap[table];
-            if (!tableSchema) {
-                results.push({ id: op?.id ?? null, status: 'ignored_unsupported_table' });
-                continue;
-            }
-
-            try {
-                if (op.operation === 'INSERT' || op.operation === 'UPDATE') {
-                    if (!payload) {
-                        results.push({ id: op?.id ?? null, status: 'error', reason: 'Missing payload' });
-                        continue;
-                    }
-
-                    const camelPayload = toCamelCase(payload);
-                    camelPayload.userId = userId as string;
-
-                    // Security: Explicitly remove moderation fields from client-supplied payload
-                    // These fields can only be set via the Admin Panel
-                    if (table === 'routines') {
-                        delete (camelPayload as any).isModerated;
-                        delete (camelPayload as any).moderationMessage;
-                    }
-
-                    // Prevent 1970 (Unix 0) timestamps from being saved
-                    const validTimestamp = (typeof timestamp === 'number' && timestamp > 0) ? timestamp : Date.now();
-                    camelPayload.updatedAt = new Date(validTimestamp);
-
-                    // Insert or replace based on conflicting IDs
-                    await db.insert(tableSchema)
-                        .values(camelPayload)
-                        .onConflictDoUpdate({
-                            target: conflictTargetForTable(table, tableSchema),
-                            set: camelPayload,
-                            // Last Write Wins Reconciliation
-                            where: sql`${tableSchema.updatedAt} < ${camelPayload.updatedAt.toISOString()}`
-                        });
-
-                } else if (op.operation === 'DELETE') {
-                    if (supportsSoftDelete.has(table)) {
-                        await db.update(tableSchema)
-                            .set({ deletedAt: new Date(timestamp), updatedAt: new Date(timestamp) })
-                            .where(and(eq(tableSchema.id, recordId), eq(tableSchema.userId, userId as string)));
-                    } else {
-                        const pkCol = table === 'settings' ? tableSchema.key : tableSchema.id;
-                        await db.delete(tableSchema)
-                            .where(and(eq(pkCol, recordId), eq(tableSchema.userId, userId as string)));
-                    }
+                if (!tableSchema) {
+                    results.push({ id: opId, status: 'ignored_unsupported_table' });
+                    continue;
                 }
 
-                results.push({ id: op.id, status: 'success' });
-            } catch (err: any) {
-                console.error(`Mutation error on ops ID ${op.id} [${op.table}]:`, err.message);
-                results.push({ id: op.id, status: 'error', reason: err.message });
-            }
-        }
+                const payload = toCamelCase(rawPayload);
 
-        return NextResponse.json({ success: true, processed: results.length, results });
+                // Strip sensitive fields
+                delete (payload as any).isModerated;
+                delete (payload as any).moderationMessage;
+
+                try {
+                    // Normalize updatedAt
+                    const updatedAt = payload.updatedAt ? new Date(payload.updatedAt) : new Date();
+                    const shouldEvaluateWorkoutScore = tableName === 'workouts' && operation !== 'DELETE' && payload.status === 'completed' && typeof (payload.id || payload.key) === 'string';
+
+                    const pkCol = tableName === 'settings' ? tableSchema.key : tableSchema.id;
+                    const recordId = payload.id || payload.key;
+
+                    let existingRecord;
+                    if (recordId) {
+                        const queryKey = tableName.replace(/_([a-z])/g, (g: string) => g[1].toUpperCase());
+                        existingRecord = await (trx.query as any)[queryKey].findFirst({ where: eq(pkCol, recordId) });
+                    }
+
+                    if (existingRecord) {
+                        const existingUpdatedAtValue = (existingRecord as any)?.updatedAt;
+                        const existingUpdatedAtMs = existingUpdatedAtValue instanceof Date ? existingUpdatedAtValue.getTime() : Number(existingUpdatedAtValue);
+                        const incomingUpdatedAtMs = updatedAt.getTime();
+                        const hasComparableTimestamps = Number.isFinite(existingUpdatedAtMs) && Number.isFinite(incomingUpdatedAtMs);
+                        if (hasComparableTimestamps && incomingUpdatedAtMs < existingUpdatedAtMs) {
+                            results.push({ id: opId, status: 'ignored_stale' });
+                            continue;
+                        }
+
+                        // UPDATE or DELETE existing record
+                        if (operation === 'DELETE') {
+                            await trx.update(tableSchema).set({ deletedAt: new Date(), updatedAt }).where(eq(pkCol, recordId));
+
+                            // Update counts
+                            if (tableName === 'kudos' && !existingRecord.deletedAt) {
+                                await trx.update(schema.activityFeed).set({ kudoCount: sql`${schema.activityFeed.kudoCount} - 1`, updatedAt: new Date() }).where(eq(schema.activityFeed.id, existingRecord.feedId));
+                            } else if (tableName === 'changelog_reactions' && !existingRecord.deletedAt) {
+                                await trx.update(schema.changelogs).set({ reactionCount: sql`${schema.changelogs.reactionCount} - 1`, updatedAt: new Date() }).where(eq(schema.changelogs.id, existingRecord.changelogId));
+                            }
+                        } else {
+                            await trx.update(tableSchema).set({ ...payload, updatedAt, deletedAt: null }).where(eq(pkCol, recordId));
+
+                            // If it was deleted and now it's not (undelete)
+                            if (existingRecord.deletedAt && !payload.deletedAt) {
+                                if (tableName === 'kudos') {
+                                    await trx.update(schema.activityFeed).set({ kudoCount: sql`${schema.activityFeed.kudoCount} + 1`, updatedAt: new Date() }).where(eq(schema.activityFeed.id, existingRecord.feedId));
+                                } else if (tableName === 'changelog_reactions') {
+                                    await trx.update(schema.changelogs).set({ reactionCount: sql`${schema.changelogs.reactionCount} + 1`, updatedAt: new Date() }).where(eq(schema.changelogs.id, existingRecord.changelogId));
+                                }
+                            }
+                        }
+                    } else {
+                        // INSERT
+                        if (operation !== 'DELETE') {
+                            // Ensure the record being inserted belongs to the user
+                            if (tableName === 'user_profiles') payload.id = userId;
+                            else if (tableName === 'kudos') payload.giverId = userId;
+                            else if (tableName === 'changelog_reactions') payload.userId = userId;
+                            else if (tableName === 'settings') payload.userId = userId;
+                            else if (tableName !== 'changelogs') payload.userId = userId;
+
+                            await trx.insert(tableSchema).values({ ...payload, updatedAt });
+
+                            // Update counts
+                            if (tableName === 'kudos') {
+                                await trx.update(schema.activityFeed).set({ kudoCount: sql`${schema.activityFeed.kudoCount} + 1`, updatedAt: new Date() }).where(eq(schema.activityFeed.id, payload.feedId));
+                            } else if (tableName === 'changelog_reactions') {
+                                await trx.update(schema.changelogs).set({ reactionCount: sql`${schema.changelogs.reactionCount} + 1`, updatedAt: new Date() }).where(eq(schema.changelogs.id, payload.changelogId));
+                            }
+                        }
+                    }
+
+                    const statusTransitionedToCompleted =
+                        tableName === 'workouts' &&
+                        operation !== 'DELETE' &&
+                        payload.status === 'completed' &&
+                        (
+                            !existingRecord ||
+                            (existingRecord as any)?.status !== 'completed'
+                        );
+
+                    if (shouldEvaluateWorkoutScore && statusTransitionedToCompleted) {
+                        await applyWorkoutScoring(trx, userId, payload.id || payload.key);
+                    }
+                    processedIds.push(opId);
+                    results.push({ id: opId, status: 'success' });
+                } catch (err: any) {
+                    console.error(`[Push] Error processing ${tableName}:${opId}:`, err);
+                    results.push({ id: opId, status: 'error', reason: err.message });
+                }
+            }
+        });
+
+        return NextResponse.json({ success: true, processed: processedIds.length, results });
 
     } catch (error: any) {
         const message = error instanceof Error ? error.message : 'Internal server error';

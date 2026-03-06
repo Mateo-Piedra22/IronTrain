@@ -33,8 +33,10 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
     const [warmupBar, setWarmupBar] = useState(String(unit === 'kg' ? configService.get('plateCalculatorDefaultBarWeightKg') : configService.get('plateCalculatorDefaultBarWeightLbs')));
     const [bw, setBw] = useState('');
     const [total, setTotal] = useState('');
+    const [isFemale, setIsFemale] = useState(false);
 
     const percentages = [0.95, 0.90, 0.875, 0.85, 0.825, 0.80, 0.75, 0.70, 0.65, 0.60, 0.50];
+
     const estFromSet = CalculatorService.estimate1RM(formula, parseFloat(setWeight) || 0, parseFloat(setReps) || 0);
     const oneRm = Math.max(parseFloat(oneRmManual) || 0, estFromSet || 0);
     const table = CalculatorService.percentTable(oneRm, percentages, rounding);
@@ -43,8 +45,9 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
     const totalValue = parseFloat(total) || 0;
     const bwKg = unit === 'kg' ? bwValue : UnitService.lbsToKg(bwValue);
     const totalKg = unit === 'kg' ? totalValue : UnitService.lbsToKg(totalValue);
-    const wilks = statsService.calculateWilks(bwKg, totalKg);
-    const dots = statsService.calculateDOTS(bwKg, totalKg);
+    const wilks = statsService.calculateWilks(bwKg, totalKg, isFemale);
+    const dots = statsService.calculateDOTS(bwKg, totalKg, isFemale);
+
 
     const warmup = CalculatorService.warmupSuggestions({ workingWeight: parseFloat(warmupWorking) || 0, barWeight: parseFloat(warmupBar) || 0, rounding });
 
@@ -116,24 +119,50 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
 
                                     {/* Result */}
                                     <View style={s.resultBox}>
-                                        <Text style={s.resultLabel}>1RM USADO</Text>
+                                        <Text style={s.resultLabel}>TU 1RM ACTUAL</Text>
                                         <Text style={s.resultValue}>{Math.round(oneRm)}</Text>
                                         <Text style={s.resultUnit}>{unit}</Text>
                                     </View>
                                 </View>
 
-                                <Text style={s.sectionTitle}>Porcentajes</Text>
+                                <Text style={s.sectionTitle}>Perfil de Intensidades</Text>
                                 <View style={s.tableCard}>
                                     <View style={s.tableHeader}>
-                                        <Text style={s.tableHeaderText}>%</Text>
-                                        <Text style={[s.tableHeaderText, { textAlign: 'right' }]}>PESO</Text>
+                                        <Text style={[s.tableHeaderText, { flex: 1.2 }]}>INTENSIDAD</Text>
+                                        <Text style={[s.tableHeaderText, { flex: 1, textAlign: 'center' }]}>REPS</Text>
+                                        <Text style={[s.tableHeaderText, { flex: 1.5, textAlign: 'right' }]}>PESO ({unit})</Text>
                                     </View>
-                                    {table.map((row, idx) => (
-                                        <View key={row.pct} style={[s.tableRow, idx < table.length - 1 && s.tableRowBorder]}>
-                                            <Text style={s.tablePct}>{Math.round(row.pct * 100)}%</Text>
-                                            <Text style={s.tableWeight}>{row.weight} {unit}</Text>
-                                        </View>
-                                    ))}
+                                    {[
+                                        { pct: 1.00, reps: '1', zone: 'MÁXIMA', color: '#ef4444' },
+                                        { pct: 0.95, reps: '2', zone: 'MÁXIMA', color: '#ef4444' },
+                                        { pct: 0.90, reps: '4', zone: 'FUERZA', color: '#3b82f6' },
+                                        { pct: 0.85, reps: '6', zone: 'FUERZA', color: '#3b82f6' },
+                                        { pct: 0.80, reps: '8', zone: 'HIPERTROFIA', color: '#10b981' },
+                                        { pct: 0.75, reps: '10', zone: 'HIPERTROFIA', color: '#10b981' },
+                                        { pct: 0.70, reps: '12', zone: 'RESISTENCIA', color: '#8b5cf6' },
+                                        { pct: 0.65, reps: '16', zone: 'RESISTENCIA', color: '#8b5cf6' },
+                                        { pct: 0.60, reps: '20', zone: 'TÉCNICA', color: '#6b7280' },
+                                        { pct: 0.50, reps: '30+', zone: 'TÉCNICA', color: '#6b7280' },
+                                    ].map((row, idx, arr) => {
+                                        const weight = CalculatorService.roundToIncrement(oneRm * row.pct, rounding);
+                                        return (
+                                            <View key={row.pct} style={[s.tableRow, idx < arr.length - 1 && s.tableRowBorder]}>
+                                                <View style={{ flex: 1.2, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                                    <View style={{ width: 4, height: 24, backgroundColor: row.color, borderRadius: 2 }} />
+                                                    <View>
+                                                        <Text style={s.tablePct}>{Math.round(row.pct * 100)}%</Text>
+                                                        <Text style={[s.tableZone, { color: row.color }]}>{row.zone}</Text>
+                                                    </View>
+                                                </View>
+                                                <View style={{ flex: 1, alignItems: 'center' }}>
+                                                    <View style={s.repsBadge}>
+                                                        <Text style={s.repsText}>{row.reps}</Text>
+                                                    </View>
+                                                </View>
+                                                <Text style={[s.tableWeight, { flex: 1.5, textAlign: 'right' }]}>{weight}</Text>
+                                            </View>
+                                        );
+                                    })}
                                 </View>
                             </View>
                         ) : activeTab === 'warmup' ? (
@@ -152,7 +181,7 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
                                         <View key={`${ws.weight}-${idx}`} style={[s.tableRow, idx < warmup.length - 1 && s.tableRowBorder]}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#eab308' }} />
-                                                <Text style={s.tableWeight}>{ws.weight} {unit}</Text>
+                                                <Text style={s.tableWeightText}>{ws.weight} {unit}</Text>
                                             </View>
                                             <Text style={s.tablePct}>{ws.reps} reps</Text>
                                         </View>
@@ -166,6 +195,26 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
                         ) : (
                             <View>
                                 <Text style={s.sectionTitle}>Power Scores</Text>
+                                <View style={{ marginBottom: 20 }}>
+                                    <Text style={s.inputLabel}>Género</Text>
+                                    <View style={s.chipRow}>
+                                        <TouchableOpacity
+                                            onPress={() => setIsFemale(false)}
+                                            style={[s.chip, !isFemale && s.chipActive]}
+                                            accessibilityRole="button"
+                                        >
+                                            <Text style={[s.chipText, !isFemale && s.chipTextActive]}>Masculino</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            onPress={() => setIsFemale(true)}
+                                            style={[s.chip, isFemale && s.chipActive]}
+                                            accessibilityRole="button"
+                                        >
+                                            <Text style={[s.chipText, isFemale && s.chipTextActive]}>Femenino</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
                                 <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
                                     <View style={{ flex: 1 }}>
                                         <Text style={s.inputLabel}>Peso corporal ({unit})</Text>
@@ -176,6 +225,7 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
                                         <IronInput value={total} onChangeText={setTotal} keyboardType="numeric" placeholder={unit === 'kg' ? '500' : '1100'} />
                                     </View>
                                 </View>
+
 
                                 <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
                                     <View style={s.scoreCard}>
@@ -207,11 +257,11 @@ const s = StyleSheet.create({
     closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary.DEFAULT, justifyContent: 'center', alignItems: 'center' },
     tabTrack: { flexDirection: 'row', backgroundColor: Colors.surface, padding: 4, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[700], marginBottom: 20 },
     tab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-    tabActive: { backgroundColor: Colors.primary.DEFAULT, shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2 },
+    tabActive: { backgroundColor: Colors.primary.DEFAULT },
     tabText: { fontWeight: '800', fontSize: 13, color: Colors.iron[500] },
     tabTextActive: { color: '#fff' },
     sectionTitle: { fontSize: 17, fontWeight: '900', color: Colors.iron[950], marginBottom: 12, letterSpacing: -0.3 },
-    card: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], padding: 20, marginBottom: 20, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 },
+    card: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], padding: 20, marginBottom: 20 },
     cardLabel: { fontSize: 10, fontWeight: '800', color: Colors.iron[500], textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
     chipRow: { flexDirection: 'row', gap: 8 },
     chip: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: Colors.iron[300], backgroundColor: Colors.iron[200], alignItems: 'center' },
@@ -222,16 +272,19 @@ const s = StyleSheet.create({
     resultLabel: { fontSize: 10, fontWeight: '800', color: Colors.iron[500], textTransform: 'uppercase', letterSpacing: 1 },
     resultValue: { fontSize: 40, fontWeight: '900', color: Colors.iron[950], letterSpacing: -1, marginTop: 4 },
     resultUnit: { fontSize: 12, fontWeight: '700', color: Colors.iron[400], textTransform: 'uppercase' },
-    tableCard: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], overflow: 'hidden', marginBottom: 24, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 },
+    tableCard: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], overflow: 'hidden', marginBottom: 24 },
     tableHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: Colors.iron[200], borderBottomWidth: 1, borderBottomColor: Colors.iron[300] },
-    tableHeaderText: { fontSize: 10, fontWeight: '800', color: Colors.iron[500], textTransform: 'uppercase', letterSpacing: 1, flex: 1 },
+    tableHeaderText: { fontSize: 10, fontWeight: '800', color: Colors.iron[500], textTransform: 'uppercase', letterSpacing: 1 },
     tableRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
     tableRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.iron[200] },
-    tablePct: { fontSize: 14, fontWeight: '700', color: Colors.iron[500] },
-    tableWeight: { fontSize: 16, fontWeight: '900', color: Colors.iron[950] },
+    tablePct: { fontSize: 16, fontWeight: '900', color: Colors.iron[950] },
+    tableZone: { fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.3, marginTop: 1 },
+    repsBadge: { backgroundColor: Colors.iron[200], paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: Colors.iron[300] },
+    repsText: { fontSize: 13, fontWeight: '900', color: Colors.iron[950] },
+    tableWeight: { fontSize: 18, fontWeight: '900', color: Colors.primary.DEFAULT, letterSpacing: -0.5 },
+    tableWeightText: { fontSize: 18, fontWeight: '900', color: Colors.iron[950] },
     inputLabel: { fontSize: 12, fontWeight: '700', color: Colors.iron[500], marginBottom: 6 },
     hintText: { fontSize: 11, color: Colors.iron[400], marginTop: 12, fontStyle: 'italic' },
-    emptyCard: { padding: 24, backgroundColor: Colors.iron[200], borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300] },
     emptyText: { color: Colors.iron[500], textAlign: 'center', fontSize: 13 },
     scoreCard: { flex: 1, backgroundColor: Colors.iron[200], padding: 20, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[300], alignItems: 'center' },
     scoreLabel: { fontSize: 10, fontWeight: '800', color: Colors.primary.DEFAULT, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },

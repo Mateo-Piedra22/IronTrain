@@ -1,4 +1,4 @@
-import { and, eq, gt } from 'drizzle-orm';
+import { and, eq, gt, inArray } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
@@ -48,21 +48,57 @@ export async function GET(req: NextRequest) {
             'body_metrics': schema.bodyMetrics,
             'plate_inventory': schema.plateInventory,
             'settings': schema.settings,
+            'badges': schema.badges,
+            'exercise_badges': schema.exerciseBadges,
+            'user_profiles': schema.userProfiles,
+            'changelogs': schema.changelogs,
+            'changelog_reactions': schema.changelogReactions,
+            'kudos': schema.kudos,
+            'activity_feed': schema.activityFeed,
         };
+
+        // Get friend IDs for the activity feed pull
+        const friendsA = await db.select({ id: schema.friendships.friendId }).from(schema.friendships).where(and(eq(schema.friendships.userId, userId), eq(schema.friendships.status, 'accepted')));
+        const friendsB = await db.select({ id: schema.friendships.userId }).from(schema.friendships).where(and(eq(schema.friendships.friendId, userId), eq(schema.friendships.status, 'accepted')));
+        const friendIds = [...new Set([...friendsA.map(f => f.id), ...friendsB.map(f => f.id)])];
+        const allRelevantUserIdsForFeed = [userId, ...friendIds];
 
         const changes: Array<{ table: string; operation: string; payload: Record<string, unknown> }> = [];
 
-        // Fix: Use WHERE clause to filter by userId AND timestamp in the DB query
-        // instead of fetching all records and filtering in JS (N+1 elimination)
         for (const [tableName, tableSchema] of Object.entries(tableMap)) {
-            const records = await db.select()
-                .from(tableSchema)
-                .where(
-                    and(
-                        eq(tableSchema.userId, userId),
-                        gt(tableSchema.updatedAt, timestampMarker)
-                    )
-                );
+            const query = db.select().from(tableSchema);
+
+            let whereClause;
+            if (tableName === 'user_profiles') {
+                whereClause = eq(tableSchema.id, userId);
+            } else if (tableName === 'changelogs') {
+                whereClause = eq(tableSchema.isUnreleased, 0);
+            } else if (tableName === 'changelog_reactions') {
+                whereClause = eq(tableSchema.userId, userId);
+            } else if (tableName === 'kudos') {
+                // Pull kudos where I am the giver OR kudos on MY feed items
+                whereClause = eq(tableSchema.giverId, userId);
+                // Note: For full social sync, we might need a more complex OR here, 
+                // but let's stick to items owned/created by user for now to keep it simple and secure.
+            } else if (tableName === 'activity_feed') {
+                // Pull feed items for self and friends
+                if (allRelevantUserIdsForFeed.length > 0) {
+                    whereClause = inArray(tableSchema.userId, allRelevantUserIdsForFeed);
+                } else {
+                    // If no relevant users (e.g., no friends and userId is not in the list for some reason),
+                    // default to just the current user to avoid an empty IN clause error.
+                    whereClause = eq(tableSchema.userId, userId);
+                }
+            } else {
+                whereClause = eq(tableSchema.userId, userId);
+            }
+
+            const records = await query.where(
+                and(
+                    whereClause,
+                    gt(tableSchema.updatedAt, timestampMarker)
+                )
+            );
 
             for (const record of records) {
                 if (record.deletedAt && new Date(record.deletedAt) > timestampMarker) {

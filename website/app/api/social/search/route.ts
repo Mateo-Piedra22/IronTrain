@@ -1,4 +1,4 @@
-import { eq, or } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
@@ -25,9 +25,12 @@ export async function GET(req: NextRequest) {
             displayName: schema.userProfiles.displayName,
             username: schema.userProfiles.username,
         }).from(schema.userProfiles).where(
-            or(
-                eq(schema.userProfiles.id, query),
-                eq(schema.userProfiles.username, query.toLowerCase())
+            and(
+                eq(schema.userProfiles.isPublic, 1),
+                or(
+                    eq(schema.userProfiles.id, query),
+                    eq(schema.userProfiles.username, query.toLowerCase())
+                )
             )
         ).limit(10);
 

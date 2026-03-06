@@ -8,8 +8,30 @@ export class ExerciseService {
         return await dbService.getAll<Exercise>('SELECT * FROM exercises ORDER BY name ASC');
     }
 
-    static async getByCategory(categoryId: string): Promise<Exercise[]> {
-        return await dbService.getAll<Exercise>('SELECT * FROM exercises WHERE category_id = ? ORDER BY name ASC', [categoryId]);
+    static async getByCategory(categoryId: string): Promise<(Exercise & { badges?: any[] })[]> {
+        const sql = `
+            SELECT e.*, 
+            (SELECT GROUP_CONCAT(b.name || '|' || b.color || '|' || COALESCE(b.icon, '')) 
+             FROM badges b 
+             JOIN exercise_badges eb ON b.id = eb.badge_id 
+             WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL) as badges_csv
+            FROM exercises e 
+            WHERE e.category_id = ? 
+            ORDER BY e.name ASC
+        `;
+        const results = await dbService.getAll<any>(sql, [categoryId]);
+
+        return results.map(row => {
+            const badges = row.badges_csv ? row.badges_csv.split(',').map((s: string) => {
+                const [name, color, icon] = s.split('|');
+                return { name, color, icon: icon || undefined };
+            }) : [];
+
+            return {
+                ...row,
+                badges
+            };
+        });
     }
 
     static async create(data: Omit<Exercise, 'id' | 'is_system'>): Promise<string> {
@@ -19,6 +41,11 @@ export class ExerciseService {
             [id, data.category_id, data.name, data.type, data.notes ?? null]
         );
         await dbService.queueSyncMutation('exercises', id, 'INSERT', { id, category_id: data.category_id, name: data.name, type: data.type, notes: data.notes ?? null, is_system: 0 });
+
+        // Emit for real-time UI updates
+        const { dataEventService } = await import('./DataEventService');
+        dataEventService.emit('DATA_UPDATED');
+
         return id;
     }
 
@@ -90,6 +117,10 @@ export class ExerciseService {
                 }
             });
             await dbService.queueSyncMutation('exercises', id, 'UPDATE', data);
+
+            // Emit for real-time UI updates
+            const { dataEventService } = await import('./DataEventService');
+            dataEventService.emit('DATA_UPDATED');
         } catch (e) {
             throw e;
         }
@@ -111,11 +142,19 @@ export class ExerciseService {
         }
         await dbService.run('DELETE FROM exercises WHERE id = ?', [id]);
         await dbService.queueSyncMutation('exercises', id, 'DELETE');
+
+        // Emit for real-time UI updates
+        const { dataEventService } = await import('./DataEventService');
+        dataEventService.emit('DATA_UPDATED');
     }
 
-    static async search(query: string, categoryId?: string): Promise<(Exercise & { category_name: string; category_color: string })[]> {
+    static async search(query: string, categoryId?: string): Promise<(Exercise & { category_name: string; category_color: string; badges: any[] })[]> {
         let sql = `
-            SELECT e.*, c.name as category_name, c.color as category_color
+            SELECT e.*, c.name as category_name, c.color as category_color,
+            (SELECT GROUP_CONCAT(b.name || '|' || b.color || '|' || COALESCE(b.icon, '')) 
+             FROM badges b 
+             JOIN exercise_badges eb ON b.id = eb.badge_id 
+             WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL) as badges_csv
             FROM exercises e
             LEFT JOIN categories c ON e.category_id = c.id
             WHERE 1=1
@@ -134,7 +173,46 @@ export class ExerciseService {
 
         sql += ` ORDER BY e.name ASC`;
 
-        return await dbService.getAll(sql, params);
+        const results = await dbService.getAll<any>(sql, params);
+
+        return results.map(row => {
+            const badges = row.badges_csv ? row.badges_csv.split(',').map((s: string) => {
+                const [name, color, icon] = s.split('|');
+                return { name, color, icon: icon || undefined };
+            }) : [];
+
+            return {
+                ...row,
+                badges
+            };
+        });
+    }
+
+    static async getById(id: string): Promise<(Exercise & { category_name: string; category_color: string; badges: any[] }) | null> {
+        const sql = `
+            SELECT e.*, c.name as category_name, c.color as category_color,
+            (SELECT GROUP_CONCAT(b.name || '|' || b.color || '|' || COALESCE(b.icon, '')) 
+             FROM badges b 
+             JOIN exercise_badges eb ON b.id = eb.badge_id 
+             WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL) as badges_csv
+            FROM exercises e
+            LEFT JOIN categories c ON e.category_id = c.id
+            WHERE e.id = ?
+        `;
+        const row = await dbService.getFirst<any>(sql, [id]);
+        if (!row) return null;
+
+        const badges = row.badges_csv ? row.badges_csv.split(',').map((s: string) => {
+            const [name, color, icon] = s.split('|');
+            return { name, color, icon: icon || undefined };
+        }) : [];
+
+        return {
+            ...row,
+            badges
+        };
     }
 }
+
+
 

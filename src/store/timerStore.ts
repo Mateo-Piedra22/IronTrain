@@ -65,7 +65,6 @@ export const useTimerStore = create<TimerState>((set, get) => ({
         const now = Date.now();
         const left = Math.max(0, Math.ceil((endAtMs - now) / 1000));
         if (left <= 0) {
-            systemNotificationService.cancelRestTimerNotification();
             const prefs = configService.get('notificationPreferences');
             if (prefs.sounds.restTimer) {
                 feedbackService.restTimerExpired();

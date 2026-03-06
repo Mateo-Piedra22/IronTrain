@@ -5,6 +5,7 @@ import { AnalysisTrends } from '@/components/analysis/AnalysisTrends';
 import { CalculatorsModal } from '@/components/CalculatorsModal';
 import { IronCard } from '@/components/IronCard';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
+import { useDataReload } from '@/src/hooks/useDataReload';
 import { AnalysisService, CardioSummary, CategoryVolumeRow, ExerciseVolumeRow, OneRMProgressRow, OneRepMax, RepsOnlySummary, VolumeSeriesPoint, WeightOnlySummary, WorkoutComparison, WorkoutStreak, WorkoutSummary } from '@/src/services/AnalysisService';
 import { configService } from '@/src/services/ConfigService';
 import { UnitService } from '@/src/services/UnitService';
@@ -183,6 +184,11 @@ export default function AnalysisScreen() {
         }, [loadStats, loadRangeStats, rangeDays, bucket])
     );
 
+    useDataReload(async () => {
+        loadStats();
+        loadRangeStats(rangeDays, bucket);
+    });
+
     return (
         <SafeAreaWrapper className="flex-1 bg-iron-900" edges={['top', 'left', 'right']}>
             {/* Unified Header */}
@@ -193,24 +199,17 @@ export default function AnalysisScreen() {
                 zIndex: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 4
             }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
-                    <Text style={{
-                        color: Colors.iron[950],
-                        fontWeight: '900',
-                        fontSize: 20,
-                        letterSpacing: -0.5
-                    }}>
-                        Análisis
-                    </Text>
+                    <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 20, letterSpacing: -0.5 }}>Análisis</Text>
                 </View>
-
                 <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                    <Image
-                        source={require('../../assets/images/icon.png')}
-                        style={{ width: 100, height: 100, resizeMode: 'contain' }}
-                    />
+                    <View style={{ width: 100, height: 100, alignItems: 'center', justifyContent: 'center' }}>
+                        <Image
+                            source={require('../../assets/images/icon.png')}
+                            style={{ width: 100, height: 100, resizeMode: 'contain' }}
+                        />
+                    </View>
                 </View>
-
-                <View style={{ zIndex: 10, width: 24 }} />
+                <View style={{ zIndex: 10, width: 40 }} />
             </View>
 
             <View className="flex-1 px-4 mt-2">
@@ -289,6 +288,7 @@ export default function AnalysisScreen() {
                                 {tab === 'records' && (
                                     <AnalysisRecords
                                         oneRepMaxes={rangeData.oneRepMaxes}
+                                        top1RMProgress={rangeData.top1RMProgress}
                                         rangeDays={rangeDays}
                                     />
                                 )}
@@ -305,6 +305,6 @@ export default function AnalysisScreen() {
                 </View>
             </View>
             <CalculatorsModal visible={calcVisible} onClose={() => setCalcVisible(false)} initialTab={calcTab} />
-        </SafeAreaWrapper>
+        </SafeAreaWrapper >
     );
 }

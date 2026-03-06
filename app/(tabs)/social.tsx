@@ -1,19 +1,24 @@
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
+import { useDataReload } from '@/src/hooks/useDataReload';
 import { routineService } from '@/src/services/RoutineService';
-import { SocialFriend, SocialInboxItem, SocialLeaderboardEntry, SocialProfile, SocialSearchUser, SocialService } from '@/src/services/SocialService';
+import { SocialComparisonEntry, SocialFriend, SocialInboxItem, SocialLeaderboardEntry, SocialProfile, SocialSearchUser, SocialService } from '@/src/services/SocialService';
 import { useAuthStore } from '@/src/store/authStore';
 import { confirm } from '@/src/store/confirmStore';
 import { Colors } from '@/src/theme';
 import * as Clipboard from 'expo-clipboard';
-import { CheckCircle, Copy, Dumbbell, Flame, Globe, Info, Scale, Trophy, UserCheck, XCircle } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { CheckCircle, Copy, Dumbbell, Flame, Globe, Info, Lock as LockIcon, Scale, Settings, Shield as ShieldIcon, Trophy, UserCheck, UserMinus as UserMinusIcon, XCircle, X as XIcon } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Image,
     Linking,
+    Modal,
+    Pressable,
     RefreshControl,
     ScrollView,
     StyleSheet,
+    Switch,
     Text,
     TextInput,
     TouchableOpacity,
@@ -32,10 +37,18 @@ export default function SocialTab() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [activeTab, setActiveTab] = useState<SocialTabKey>('leaderboard');
+    const router = useRouter();
     const [rankingSegment, setRankingSegment] = useState<'weekly' | 'monthly' | 'lifetime'>('lifetime');
     const [expandedFriendId, setExpandedFriendId] = useState<string | null>(null);
-    const [comparisons, setComparisons] = useState<Record<string, any[]>>({});
+    const [comparisons, setComparisons] = useState<Record<string, SocialComparisonEntry[]>>({});
     const [loadingCompare, setLoadingCompare] = useState(false);
+    const [activeFriend, setActiveFriend] = useState<SocialFriend | null>(null);
+    const [friendActionLoading, setFriendActionLoading] = useState(false);
+    const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
+    const [profileFormDisplayName, setProfileFormDisplayName] = useState('');
+    const [profileFormUsername, setProfileFormUsername] = useState('');
+    const [profileFormPublic, setProfileFormPublic] = useState(true);
+    const [profileSaving, setProfileSaving] = useState(false);
 
     const authState = useAuthStore();
 
@@ -60,6 +73,10 @@ export default function SocialTab() {
             setRefreshing(false);
         }
     }, [authState.token]);
+
+    useDataReload(() => {
+        loadData();
+    }, ['DATA_UPDATED', 'SOCIAL_UPDATED']);
 
     useEffect(() => {
         loadData();
@@ -117,6 +134,47 @@ export default function SocialTab() {
         }
     };
 
+    const openProfileModal = () => {
+        if (!profile) return;
+        setProfileFormDisplayName((profile.displayName || '').trim());
+        setProfileFormUsername((profile.username || '').trim());
+        setProfileFormPublic(profile.isPublic !== 0);
+        setIsProfileModalVisible(true);
+    };
+
+    const handleSaveProfile = async () => {
+        const normalizedDisplayName = profileFormDisplayName.trim();
+        const normalizedUsername = profileFormUsername.trim().toLowerCase();
+
+        if (!normalizedDisplayName) {
+            confirm.error('Error', 'El nombre visible es obligatorio.');
+            return;
+        }
+
+        setProfileSaving(true);
+        try {
+            await SocialService.updateProfile(
+                normalizedDisplayName,
+                normalizedUsername.length > 0 ? normalizedUsername : undefined,
+                profileFormPublic ? 1 : 0
+            );
+            setProfile((prev) => prev ? ({
+                ...prev,
+                displayName: normalizedDisplayName,
+                username: normalizedUsername.length > 0 ? normalizedUsername : null,
+                isPublic: profileFormPublic ? 1 : 0,
+            }) : prev);
+            setIsProfileModalVisible(false);
+            confirm.success('Perfil actualizado', 'Tu perfil social se actualizó correctamente.');
+            await loadData();
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : 'Error desconocido';
+            confirm.error('Error', msg);
+        } finally {
+            setProfileSaving(false);
+        }
+    };
+
     const handleInboxResponse = async (inboxId: string, action: 'accept' | 'reject', payload?: unknown) => {
         try {
             if (action === 'accept' && payload) {
@@ -149,9 +207,19 @@ export default function SocialTab() {
         }));
 
         try {
-            await SocialService.toggleKudo(feedId);
-        } catch (e) {
-            // Revert on error
+            const action = await SocialService.toggleKudo(feedId);
+            if (action === 'error') {
+                setInbox(prevInbox);
+            } else {
+                setInbox(prev => prev.map(item => {
+                    if (item.id !== feedId) return item;
+                    const count = Math.max(0, item.kudosCount || 0);
+                    const hasKudoed = action === 'added';
+                    const nextCount = action === 'added' ? Math.max(1, count) : Math.max(0, count - 1);
+                    return { ...item, hasKudoed, kudosCount: nextCount };
+                }));
+            }
+        } catch {
             setInbox(prevInbox);
         }
     };
@@ -159,15 +227,18 @@ export default function SocialTab() {
     const handleShowScoreInfo = () => {
         confirm.info(
             'Sistema IronScore',
-            `Tu puntaje mide tu constancia y aporte a la comunidad:\n\n` +
-            `- Cada entrenamiento: +10 pts\n` +
-            `- Rutina creada: +5 pts\n` +
-            `- Compartir rutinas: +20 pts\n\n` +
-            `Multiplicador por Racha:\n` +
-            `- 3 días seguidos: x1.1\n` +
-            `- 5 días seguidos: x1.25\n` +
-            `- 10+ días seguidos: x1.50\n\n` +
-            `¡Entrena sin fallar para empujar tu score al máximo!`
+            `Tu puntaje es acumulativo, no se reinicia ni se pierde:\n\n` +
+            `- Completar entrenamiento: +20 pts\n` +
+            `- Día extra sobre tu meta semanal: +10 pts (máx. 2/semana)\n` +
+            `- Romper PR (normal): +10 pts\n` +
+            `- Romper PR Big 3: +25 pts\n` +
+            `- Voluntad de Hierro (clima adverso): +15 pts\n\n` +
+            `Multiplicador por racha semanal:\n` +
+            `- Semanas 1-2: x1.00\n` +
+            `- Semanas 3-4: x1.10\n` +
+            `- Semanas 5-9: x1.25\n` +
+            `- Semana 10+: x1.50\n\n` +
+            `Los eventos globales activos pueden aumentar este multiplicador.`
         );
     };
 
@@ -183,11 +254,36 @@ export default function SocialTab() {
             try {
                 const data = await SocialService.compareFriend(friendId);
                 setComparisons(prev => ({ ...prev, [friendId]: data }));
-            } catch (e) {
-                console.error(e);
+            } catch {
+                confirm.error('Error', 'No se pudo cargar la comparación de fuerza.');
             } finally {
                 setLoadingCompare(false);
             }
+        }
+    };
+
+    const handleOpenFriendModal = (friend: SocialFriend) => {
+        setActiveFriend(friend);
+    };
+
+    const closeFriendModal = () => {
+        if (!friendActionLoading) {
+            setActiveFriend(null);
+        }
+    };
+
+    const handleFriendAction = async (action: 'accept' | 'reject' | 'remove' | 'block') => {
+        if (!activeFriend) return;
+        setFriendActionLoading(true);
+        try {
+            await SocialService.respondFriendRequest(activeFriend.id, action);
+            setActiveFriend(null);
+            await loadData();
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : 'Error desconocido';
+            confirm.error('Error', msg);
+        } finally {
+            setFriendActionLoading(false);
         }
     };
 
@@ -228,6 +324,9 @@ export default function SocialTab() {
                     />
                 </View>
                 <View style={styles.headerActions}>
+                    <TouchableOpacity style={styles.headerIconBtn} onPress={() => router.push('/settings' as any)}>
+                        <Settings size={20} color={Colors.primary.DEFAULT} />
+                    </TouchableOpacity>
                     <TouchableOpacity style={styles.publicBtn} onPress={handleOpenPublicRoutines}>
                         <Globe size={16} color={Colors.white} />
                     </TouchableOpacity>
@@ -246,6 +345,16 @@ export default function SocialTab() {
                             <Text style={styles.profileUsername}>@{profile.username}</Text>
                         )}
                         <Text style={styles.profileStats}>Rutinas compartidas: {profile.shareStats || 0}</Text>
+                        <View style={styles.profileMetaRow}>
+                            <View style={styles.profileVisibilityBadge}>
+                                {profile.isPublic === 0 ? <LockIcon size={14} color={Colors.iron[500]} /> : <Globe size={14} color={Colors.primary.DEFAULT} />}
+                                <Text style={styles.profileVisibilityText}>{profile.isPublic === 0 ? 'Perfil Privado' : 'Perfil Público'}</Text>
+                            </View>
+                            <TouchableOpacity style={styles.profileEditBtn} onPress={openProfileModal}>
+                                <ShieldIcon size={14} color={Colors.white} />
+                                <Text style={styles.profileEditBtnText}>Editar Perfil</Text>
+                            </TouchableOpacity>
+                        </View>
                         <TouchableOpacity style={styles.idBox} onPress={handleCopyId}>
                             <Text style={styles.idText} numberOfLines={1} ellipsizeMode="middle">ID: {profile.id}</Text>
                             <Copy size={16} color={Colors.iron[500]} />
@@ -336,7 +445,7 @@ export default function SocialTab() {
                                                     ) : comparisonData.length === 0 ? (
                                                         <Text style={styles.compareEmptyText}>No hay ejercicios comunes acá.</Text>
                                                     ) : (
-                                                        comparisonData.map((comp: any, cidx: number) => {
+                                                        comparisonData.map((comp, cidx) => {
                                                             const userWon = comp.user1RM > comp.friend1RM;
                                                             const friendWon = comp.friend1RM > comp.user1RM;
                                                             const diff = Math.abs(comp.user1RM - comp.friend1RM);
@@ -347,20 +456,20 @@ export default function SocialTab() {
                                                                         <Text style={styles.compareExerciseName}>{comp.exerciseName}</Text>
                                                                         {diff > 0 && (
                                                                             <Text style={[styles.compareDiff, { color: userWon ? '#16a34a' : '#ef4444' }]}>
-                                                                                {userWon ? '+' : '-'}{diff.toFixed(1)}kg
+                                                                                {userWon ? '+' : '-'}{diff.toFixed(1)}{comp.unit}
                                                                             </Text>
                                                                         )}
                                                                     </View>
                                                                     <View style={styles.compareBars}>
                                                                         <View style={[styles.compareBarContainer, { flex: 1 }]}>
                                                                             <View style={[styles.compareValueRow, userWon && styles.compareValueHighlightBox]}>
-                                                                                <Text style={[styles.compareValue, userWon && styles.compareValueHighlight]}>{comp.user1RM}kg</Text>
+                                                                                <Text style={[styles.compareValue, userWon && styles.compareValueHighlight]}>{comp.user1RM}{comp.unit}</Text>
                                                                             </View>
                                                                             <Text style={styles.compareLabel}>Tú</Text>
                                                                         </View>
                                                                         <View style={[styles.compareBarContainer, { flex: 1 }]}>
                                                                             <View style={[styles.compareValueRow, friendWon && styles.compareValueHighlightBox]}>
-                                                                                <Text style={[styles.compareValue, friendWon && styles.compareValueHighlight]}>{comp.friend1RM}kg</Text>
+                                                                                <Text style={[styles.compareValue, friendWon && styles.compareValueHighlight]}>{comp.friend1RM}{comp.unit}</Text>
                                                                             </View>
                                                                             <Text style={styles.compareLabel}>{user.displayName}</Text>
                                                                         </View>
@@ -384,7 +493,7 @@ export default function SocialTab() {
                                 <Text style={styles.emptyText}>No tienes amigos aún. Busca a alguien por su ID.</Text>
                             ) : (
                                 friends.map((f) => (
-                                    <View key={f.id} style={styles.friendRow}>
+                                    <TouchableOpacity key={f.id} style={styles.friendRow} onPress={() => handleOpenFriendModal(f)} activeOpacity={0.8}>
                                         <View>
                                             <Text style={styles.friendName}>{f.displayName}</Text>
                                             <Text style={styles.friendStatus}>
@@ -404,7 +513,7 @@ export default function SocialTab() {
                                         {f.status === 'accepted' && (
                                             <UserCheck size={20} color={Colors.primary.DEFAULT} />
                                         )}
-                                    </View>
+                                    </TouchableOpacity>
                                 ))
                             )}
                         </View>
@@ -467,20 +576,20 @@ export default function SocialTab() {
                                     }
 
                                     if (item.feedType === 'activity_log') {
-                                        let metaDataLog = {};
-                                        try { metaDataLog = JSON.parse(typeof item.metadata === 'string' ? item.metadata : '{}'); } catch (e) { }
                                         const isPr = item.actionType === 'pr_broken';
+                                        const isRoutineShared = item.actionType === 'routine_shared';
+                                        const isOwnActivity = profile?.id && item.senderId === profile.id;
 
                                         return (
                                             <View key={item.id} style={styles.activityRow}>
                                                 <View style={styles.activityHeader}>
                                                     <View style={[styles.activityIconBox, isPr ? { backgroundColor: '#ffd70030' } : {}]}>
-                                                        {isPr ? <Trophy size={18} color="#ffd700" /> : <Dumbbell size={18} color={Colors.iron[400]} />}
+                                                        {isPr ? <Trophy size={18} color="#ffd700" /> : isRoutineShared ? <Globe size={18} color={Colors.primary.DEFAULT} /> : <Dumbbell size={18} color={Colors.iron[400]} />}
                                                     </View>
                                                     <View style={{ flex: 1 }}>
                                                         <Text style={styles.activityUser}>@{item.senderUsername || item.senderName}</Text>
                                                         <Text style={styles.activityDesc}>
-                                                            {isPr ? 'Rompió un Récord Personal' : 'Completó un Entrenamiento'}
+                                                            {isPr ? 'Rompió un Récord Personal' : isRoutineShared ? 'Compartió una rutina' : 'Completó un Entrenamiento'}
                                                         </Text>
                                                     </View>
                                                     <Text style={styles.activityDate}>
@@ -490,14 +599,16 @@ export default function SocialTab() {
 
                                                 <View style={styles.activityFooter}>
                                                     <TouchableOpacity
-                                                        style={[styles.kudoBtn, item.hasKudoed && styles.kudoBtnActive]}
-                                                        onPress={() => handleToggleKudo(item.id)}
+                                                        style={[styles.kudoBtn, item.hasKudoed && styles.kudoBtnActive, isOwnActivity && styles.kudoBtnDisabled]}
+                                                        onPress={() => !isOwnActivity && handleToggleKudo(item.id)}
+                                                        disabled={!!isOwnActivity}
                                                     >
                                                         <Flame size={18} color={item.hasKudoed ? '#f97316' : Colors.iron[400]} fill={item.hasKudoed ? '#f97316' : "transparent"} />
                                                         <Text style={[styles.kudoText, item.hasKudoed && styles.kudoTextActive]}>
                                                             {item.kudosCount || 0} Kudos
                                                         </Text>
                                                     </TouchableOpacity>
+                                                    {isOwnActivity ? <Text style={styles.ownActivityHint}>Tu actividad</Text> : null}
                                                 </View>
                                             </View>
                                         );
@@ -544,6 +655,120 @@ export default function SocialTab() {
                     )}
                 </View>
             </ScrollView>
+
+            <Modal visible={isProfileModalVisible} transparent animationType="fade" onRequestClose={() => setIsProfileModalVisible(false)}>
+                <Pressable style={styles.modalOverlay} onPress={() => setIsProfileModalVisible(false)}>
+                    <Pressable style={styles.modalCard} onPress={() => { }}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Perfil Social</Text>
+                            <TouchableOpacity onPress={() => setIsProfileModalVisible(false)} style={styles.modalCloseBtn}>
+                                <XIcon size={18} color={Colors.iron[500]} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.modalBody}>
+                            <Text style={styles.modalLabel}>Nombre visible</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={profileFormDisplayName}
+                                onChangeText={setProfileFormDisplayName}
+                                maxLength={64}
+                                placeholder="Tu nombre visible"
+                                placeholderTextColor={Colors.iron[500]}
+                            />
+
+                            <Text style={styles.modalLabel}>Username</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={profileFormUsername}
+                                onChangeText={setProfileFormUsername}
+                                maxLength={32}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                placeholder="sin espacios"
+                                placeholderTextColor={Colors.iron[500]}
+                            />
+
+                            <View style={styles.privacyRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.modalLabel}>Visibilidad del perfil</Text>
+                                    <Text style={styles.privacyHint}>
+                                        {profileFormPublic ? 'Público: apareces en búsqueda social.' : 'Privado: no apareces en búsqueda social.'}
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={profileFormPublic}
+                                    onValueChange={setProfileFormPublic}
+                                    trackColor={{ false: Colors.iron[700], true: Colors.primary.DEFAULT + '66' }}
+                                    thumbColor={profileFormPublic ? Colors.primary.DEFAULT : Colors.iron[500]}
+                                />
+                            </View>
+                        </View>
+
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setIsProfileModalVisible(false)}>
+                                <Text style={styles.modalCancelText}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.modalPrimaryBtn} onPress={handleSaveProfile} disabled={profileSaving}>
+                                {profileSaving ? <ActivityIndicator size="small" color={Colors.white} /> : <Text style={styles.modalPrimaryText}>Guardar</Text>}
+                            </TouchableOpacity>
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
+            <Modal visible={!!activeFriend} transparent animationType="fade" onRequestClose={closeFriendModal}>
+                <Pressable style={styles.modalOverlay} onPress={closeFriendModal}>
+                    <Pressable style={styles.modalCard} onPress={() => { }}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>{activeFriend?.displayName || 'Amigo'}</Text>
+                            <TouchableOpacity onPress={closeFriendModal} style={styles.modalCloseBtn}>
+                                <XIcon size={18} color={Colors.iron[500]} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.modalBody}>
+                            {activeFriend?.username && (
+                                <Text style={styles.friendModalUsername}>@{activeFriend.username}</Text>
+                            )}
+                            <Text style={styles.friendModalStatus}>
+                                {activeFriend?.status === 'pending'
+                                    ? activeFriend.isSender
+                                        ? 'Solicitud enviada'
+                                        : 'Solicitud recibida'
+                                    : activeFriend?.status === 'blocked'
+                                        ? 'Bloqueado'
+                                        : 'Amistad aceptada'}
+                            </Text>
+                        </View>
+
+                        <View style={styles.modalActionsStack}>
+                            {activeFriend?.status === 'pending' && !activeFriend?.isSender && (
+                                <View style={styles.dualActionRow}>
+                                    <TouchableOpacity style={styles.modalPrimaryBtn} disabled={friendActionLoading} onPress={() => handleFriendAction('accept')}>
+                                        <Text style={styles.modalPrimaryText}>Aceptar</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.modalDangerBtn} disabled={friendActionLoading} onPress={() => handleFriendAction('reject')}>
+                                        <Text style={styles.modalDangerText}>Rechazar</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
+                            {activeFriend?.status === 'accepted' && (
+                                <View style={styles.dualActionRow}>
+                                    <TouchableOpacity style={styles.modalSecondaryBtn} disabled={friendActionLoading} onPress={() => handleFriendAction('remove')}>
+                                        <UserMinusIcon size={14} color={Colors.iron[500]} />
+                                        <Text style={styles.modalSecondaryText}>Eliminar amigo</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.modalDangerBtn} disabled={friendActionLoading} onPress={() => handleFriendAction('block')}>
+                                        <Text style={styles.modalDangerText}>Bloquear</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
         </SafeAreaWrapper>
     );
 }
@@ -644,6 +869,16 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         borderRadius: 12,
     },
+    headerIconBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: Colors.iron[800],
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
+    },
     scrollContent: {
         paddingHorizontal: 20,
         paddingBottom: 40,
@@ -672,7 +907,47 @@ const styles = StyleSheet.create({
     profileStats: {
         fontSize: 14,
         color: Colors.iron[500],
-        marginBottom: 16,
+        marginBottom: 12,
+    },
+    profileMetaRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+        gap: 8,
+    },
+    profileVisibilityBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        backgroundColor: Colors.iron[950],
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
+    },
+    profileVisibilityText: {
+        fontSize: 11,
+        color: Colors.iron[500],
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+    profileEditBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        backgroundColor: Colors.primary.DEFAULT,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+    },
+    profileEditBtnText: {
+        color: Colors.white,
+        fontSize: 11,
+        fontWeight: '900',
+        textTransform: 'uppercase',
     },
     idBox: {
         flexDirection: 'row',
@@ -1120,6 +1395,9 @@ const styles = StyleSheet.create({
         borderColor: '#f9731640',
         borderWidth: 1,
     },
+    kudoBtnDisabled: {
+        opacity: 0.45,
+    },
     kudoText: {
         color: Colors.iron[400],
         fontSize: 13,
@@ -1127,5 +1405,176 @@ const styles = StyleSheet.create({
     },
     kudoTextActive: {
         color: '#f97316',
+    },
+    ownActivityHint: {
+        marginLeft: 10,
+        color: Colors.iron[500],
+        fontSize: 11,
+        fontWeight: '700',
+        alignSelf: 'center',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 20,
+    },
+    modalCard: {
+        width: '100%',
+        maxWidth: 430,
+        backgroundColor: Colors.surface,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
+        overflow: 'hidden',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        borderColor: Colors.iron[700],
+    },
+    modalTitle: {
+        color: Colors.iron[950],
+        fontSize: 18,
+        fontWeight: '900',
+    },
+    modalCloseBtn: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.iron[900],
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
+    },
+    modalBody: {
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        gap: 10,
+    },
+    modalLabel: {
+        color: Colors.iron[500],
+        fontSize: 12,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+    modalInput: {
+        backgroundColor: Colors.iron[950],
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        color: Colors.iron[400],
+        fontWeight: '700',
+    },
+    privacyRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 2,
+        gap: 12,
+    },
+    privacyHint: {
+        color: Colors.iron[500],
+        fontSize: 12,
+    },
+    modalActions: {
+        flexDirection: 'row',
+        gap: 10,
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+        paddingTop: 4,
+    },
+    modalActionsStack: {
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+        paddingTop: 4,
+        gap: 8,
+    },
+    modalCancelBtn: {
+        flex: 1,
+        backgroundColor: Colors.iron[800],
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+    },
+    modalCancelText: {
+        color: Colors.iron[400],
+        fontSize: 13,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+    modalPrimaryBtn: {
+        flex: 1,
+        backgroundColor: Colors.primary.DEFAULT,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+    },
+    modalPrimaryText: {
+        color: Colors.white,
+        fontSize: 13,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+    },
+    friendModalUsername: {
+        fontSize: 16,
+        fontWeight: '900',
+        color: Colors.primary.DEFAULT,
+    },
+    friendModalStatus: {
+        color: Colors.iron[500],
+        fontSize: 13,
+        textTransform: 'uppercase',
+        fontWeight: '800',
+    },
+    dualActionRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    modalSecondaryBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: Colors.iron[800],
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
+        borderRadius: 12,
+        paddingVertical: 12,
+    },
+    modalSecondaryText: {
+        color: Colors.iron[400],
+        fontSize: 12,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+    modalDangerBtn: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#7f1d1d',
+        borderWidth: 1,
+        borderColor: '#991b1b',
+        borderRadius: 12,
+        paddingVertical: 12,
+    },
+    modalDangerText: {
+        color: '#fecaca',
+        fontSize: 12,
+        fontWeight: '900',
+        textTransform: 'uppercase',
     },
 });

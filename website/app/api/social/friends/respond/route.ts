@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../../src/db';
 import * as schema from '../../../../../src/db/schema';
 import { verifyAuth } from '../../../../../src/lib/auth';
+import { formatActorName, getUserBrief, notifyUserById } from '../../../../../src/lib/social-notifications';
 
 type FriendAction = 'accept' | 'reject' | 'block' | 'remove';
 const VALID_ACTIONS: FriendAction[] = ['accept', 'reject', 'block', 'remove'];
@@ -40,6 +41,20 @@ export async function POST(req: NextRequest) {
             await db.update(schema.friendships)
                 .set({ status: 'accepted', updatedAt: now })
                 .where(eq(schema.friendships.id, requestId));
+
+            const receiverId = userId;
+            const requesterId = isUserA ? rel.friendId : rel.userId;
+            const actor = await getUserBrief(receiverId);
+            await notifyUserById(
+                requesterId,
+                'Solicitud aceptada',
+                `${formatActorName(actor)} aceptó tu solicitud de amistad.`,
+                {
+                    type: 'social_friend_accept',
+                    actionUrl: 'irontrain://social',
+                    friendId: receiverId,
+                }
+            );
 
         } else if (action === 'reject') {
             // Only the receiver can reject a pending request

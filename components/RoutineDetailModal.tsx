@@ -12,6 +12,7 @@ import { Calendar, ChevronRight, Dumbbell, Edit3, GripVertical, Plus, Send, Shar
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import { BadgePill } from './ui/BadgePill';
 
 interface RoutineDetailModalProps {
     visible: boolean;
@@ -238,7 +239,21 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                         item.exercises.map((ex, idx) => (
                             <View key={ex.id} style={st.dayInnerExRow}>
                                 <Text style={st.dayInnerExNum}>{idx + 1}.</Text>
-                                <Text style={st.dayInnerExText} numberOfLines={1}>{ex.exercise_name}</Text>
+                                <View style={{ flex: 1, overflow: 'hidden' }}>
+                                    <Text style={st.dayInnerExText} numberOfLines={1}>{ex.exercise_name}</Text>
+                                    {ex.badges && ex.badges.length > 0 && (
+                                        <View style={{ flexDirection: 'row', gap: 4, marginTop: 2 }}>
+                                            {ex.badges.slice(0, 2).map((b, bIdx) => (
+                                                <BadgePill key={`${ex.id}-p-${bIdx}`} name={b.name} color={b.color} icon={b.icon} size="xs" />
+                                            ))}
+                                            {ex.badges.length > 2 && (
+                                                <View style={{ backgroundColor: Colors.iron[200], paddingHorizontal: 4, borderRadius: 4, justifyContent: 'center' }}>
+                                                    <Text style={{ fontSize: 8, fontWeight: '800', color: Colors.iron[500] }}>+{ex.badges.length - 2}</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    )}
+                                </View>
                             </View>
                         ))
                     )}
@@ -260,9 +275,24 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                 <View style={st.exIconBox}>
                     <Dumbbell color={Colors.primary.DEFAULT} size={16} />
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, overflow: 'hidden' }}>
                     <Text style={st.exCardTitle} numberOfLines={1}>{item.exercise_name}</Text>
-                    {item.category_name ? <Text style={st.exCardMeta}>{item.category_name.toUpperCase()}</Text> : null}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                        {item.category_name ? <Text style={st.exCardMeta}>{item.category_name.toUpperCase()}</Text> : null}
+
+                        {item.badges && item.badges.length > 0 && (
+                            <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+                                {item.badges.slice(0, 3).map((b, bIdx) => (
+                                    <BadgePill key={`${item.id}-b-${bIdx}`} name={b.name} color={b.color} icon={b.icon} size="xs" />
+                                ))}
+                                {item.badges.length > 3 && (
+                                    <View style={{ backgroundColor: Colors.iron[200], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                        <Text style={{ fontSize: 9, fontWeight: '800', color: Colors.iron[500] }}>+{item.badges.length - 3}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        )}
+                    </View>
                 </View>
                 <TouchableOpacity onPress={() => handleDeleteExercise(item.id, item.exercise_name)}
                     style={{ padding: 8, backgroundColor: '#ef444412', borderRadius: 10, borderWidth: 1, borderColor: '#ef444425' }}>

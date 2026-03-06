@@ -1,4 +1,5 @@
 import { IronButton } from '@/components/IronButton';
+import { BadgePill } from '@/components/ui/BadgePill';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { routineService } from '@/src/services/RoutineService';
 import { Colors } from '@/src/theme';
@@ -89,20 +90,22 @@ export default function ShareRoutineScreen() {
         );
     }
 
-    const { routine, routine_days, routine_exercises, exercises } = payload;
+    const { routine, routine_days, routine_exercises, exercises, badges, exercise_badges } = payload;
 
     return (
         <SafeAreaWrapper style={styles.screen} edges={['top', 'bottom']}>
-            {/* Custom Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                    <ChevronLeft size={24} color={Colors.iron[950]} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Vista Previa</Text>
-                <View style={styles.headerActionSpace} />
-            </View>
-
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                {/* Custom Floating Header Style (Matching Changelog) */}
+                <View style={styles.headerRow}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                        <ChevronLeft size={20} color={Colors.iron[950]} />
+                    </TouchableOpacity>
+                    <View>
+                        <Text style={styles.pageTitle}>Vista Previa</Text>
+                        <Text style={styles.pageSub}>IMPORTAR RUTINA</Text>
+                    </View>
+                </View>
+
                 {/* Hero Info Section */}
                 <View style={styles.heroSection}>
                     <View style={styles.titleRow}>
@@ -111,7 +114,7 @@ export default function ShareRoutineScreen() {
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.title}>{routine.name}</Text>
-                            <Text style={styles.subtitle}>Rutina compartida vía IronTrain</Text>
+                            <Text style={styles.subtitle}>IronTrain Share</Text>
                         </View>
                     </View>
 
@@ -137,10 +140,10 @@ export default function ShareRoutineScreen() {
                 </View>
 
                 {/* Days Section */}
-                <Text style={styles.sectionLabel}>Estructura de entrenamiento</Text>
+                <Text style={styles.sectionLabel}>Plan de Entrenamiento</Text>
 
                 <View style={styles.dayList}>
-                    {routine_days.map((day: any) => {
+                    {routine_days.sort((a: any, b: any) => a.order_index - b.order_index).map((day: any) => {
                         const dayExercises = routine_exercises.filter((re: any) => re.routine_day_id === day.id);
                         return (
                             <View key={day.id} style={styles.dayBlock}>
@@ -148,27 +151,48 @@ export default function ShareRoutineScreen() {
                                     <View style={styles.dayIconBox}>
                                         <Calendar color={Colors.primary.DEFAULT} size={18} />
                                     </View>
-                                    <Text style={styles.dayTitle}>{day.name}</Text>
-                                    <View style={styles.dayBadge}>
-                                        <Text style={styles.dayBadgeText}>{dayExercises.length} EJ.</Text>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.dayTitle}>{day.name}</Text>
+                                        <Text style={styles.daySubLabel}>{dayExercises.length} EJERCICIOS</Text>
                                     </View>
                                 </View>
                                 <View style={styles.dayInnerContent}>
                                     {dayExercises.length === 0 ? (
                                         <Text style={styles.emptyText}>Sin ejercicios definidos</Text>
                                     ) : (
-                                        dayExercises.slice(0, 4).map((re: any, idx: number) => {
+                                        dayExercises.sort((a: any, b: any) => a.order_index - b.order_index).map((re: any, idx: number) => {
                                             const ex = exercises.find((e: any) => e.id === re.exercise_id);
+                                            // Get relevant badges for this exercise
+                                            const relBadges = (exercise_badges || [])
+                                                .filter((eb: any) => eb.exercise_id === ex?.id)
+                                                .map((eb: any) => badges?.find((b: any) => b.id === eb.badge_id))
+                                                .filter(Boolean);
+
                                             return (
-                                                <View key={re.id} style={styles.exMiniRow}>
-                                                    <Text style={styles.exNumber}>{idx + 1}.</Text>
-                                                    <Text style={styles.exName} numberOfLines={1}>{ex?.name || 'Ejercicio'}</Text>
+                                                <View key={re.id} style={styles.exCard}>
+                                                    <View style={styles.exInfo}>
+                                                        <Text style={styles.exNumber}>{idx + 1}</Text>
+                                                        <View style={{ flex: 1 }}>
+                                                            <Text style={styles.exName} numberOfLines={1}>{ex?.name || 'Ejercicio'}</Text>
+                                                            {relBadges.length > 0 && (
+                                                                <View style={styles.badgeRow}>
+                                                                    {relBadges.map((b: any) => (
+                                                                        <BadgePill key={b.id} name={b.name} color={b.color} icon={b.icon} size="sm" variant="minimal" />
+                                                                    ))}
+                                                                </View>
+                                                            )}
+                                                        </View>
+                                                    </View>
+                                                    {re.notes && (
+                                                        <View style={styles.exNotesHeader}>
+                                                            <Text style={styles.exNotesText} numberOfLines={1}>
+                                                                {re.notes}
+                                                            </Text>
+                                                        </View>
+                                                    )}
                                                 </View>
                                             );
                                         })
-                                    )}
-                                    {dayExercises.length > 4 && (
-                                        <Text style={styles.moreText}>+ {dayExercises.length - 4} ejercicios más...</Text>
                                     )}
                                 </View>
                             </View>
@@ -179,22 +203,22 @@ export default function ShareRoutineScreen() {
                 {/* Import Section */}
                 <View style={styles.actionSection}>
                     <View style={styles.helperCard}>
-                        <Info size={14} color={Colors.iron[400]} />
+                        <Info size={14} color={Colors.primary.DEFAULT} />
                         <Text style={styles.helperText}>
-                            Los ejercicios se sincronizarán con tu biblioteca local automáticamente.
+                            La rutina y sus ejercicios personalizados se importarán a tu biblioteca local.
                         </Text>
                     </View>
 
                     <IronButton
-                        label={importing ? "Importando..." : "Importar en mi librería"}
+                        label={importing ? "Importando..." : "Confirmar Importación"}
                         onPress={handleImport}
                         disabled={importing}
                         loading={importing}
-                        style={{ marginTop: 8 }}
+                        style={{ height: 60 }}
                     />
 
                     <TouchableOpacity onPress={() => router.back()} style={styles.cancelBtn}>
-                        <Text style={styles.cancelBtnText}>Volver atrás</Text>
+                        <Text style={styles.cancelBtnText}>Volver a la app</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
@@ -205,51 +229,62 @@ export default function ShareRoutineScreen() {
 const styles = StyleSheet.create({
     screen: {
         flex: 1,
-        backgroundColor: Colors.iron[100],
+        backgroundColor: Colors.iron[900],
     },
     centered: {
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         padding: 32,
     },
     content: {
         padding: 20,
-        paddingBottom: 40,
+        paddingBottom: 60,
     },
     loadingText: {
         marginTop: 16,
         color: Colors.iron[500],
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '700',
+        letterSpacing: 0.2,
     },
-    // Custom Header
-    header: {
+    // Floating Header Style
+    headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 8,
-        height: 64,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.iron[200],
-        backgroundColor: Colors.surface,
+        gap: 16,
+        marginBottom: 24,
+        paddingHorizontal: 4,
     },
     backBtn: {
-        width: 44,
-        height: 44,
-        justifyContent: 'center',
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: Colors.surface,
         alignItems: 'center',
-        borderRadius: 22,
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: Colors.iron[300],
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
     },
-    headerTitle: {
-        fontSize: 16,
-        fontWeight: '900',
+    pageTitle: {
         color: Colors.iron[950],
-        textTransform: 'uppercase',
-        letterSpacing: 1,
+        fontWeight: '900',
+        fontSize: 24,
+        letterSpacing: -1,
     },
-    headerActionSpace: {
-        width: 44,
+    pageSub: {
+        color: Colors.primary.DEFAULT,
+        fontSize: 10,
+        fontWeight: '900',
+        marginTop: 2,
+        letterSpacing: 1.2,
     },
+
     errorIconBox: {
         width: 80,
         height: 80,
@@ -279,11 +314,11 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.surface,
         borderRadius: 14,
         borderWidth: 1,
-        borderColor: Colors.border,
+        borderColor: Colors.iron[300],
     },
     errorBtnText: {
         color: Colors.iron[950],
-        fontWeight: '800',
+        fontWeight: '900',
         textTransform: 'uppercase',
         fontSize: 13,
         letterSpacing: 0.8,
@@ -389,8 +424,8 @@ const styles = StyleSheet.create({
         marginBottom: 32,
     },
     dayBlock: {
-        backgroundColor: Colors.white,
-        borderRadius: 18,
+        backgroundColor: Colors.surface,
+        borderRadius: 20,
         borderWidth: 1,
         borderColor: Colors.iron[300],
         overflow: 'hidden',
@@ -399,67 +434,88 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         padding: 14,
-        backgroundColor: Colors.iron[50],
+        backgroundColor: Colors.iron[100],
         borderBottomWidth: 1,
-        borderBottomColor: Colors.iron[200],
+        borderBottomColor: Colors.iron[300],
         gap: 12,
     },
     dayIconBox: {
-        width: 34,
-        height: 34,
-        borderRadius: 10,
-        backgroundColor: Colors.primary.DEFAULT + '15',
+        width: 36,
+        height: 36,
+        borderRadius: 12,
+        backgroundColor: Colors.primary.DEFAULT + '10',
         justifyContent: 'center',
         alignItems: 'center',
     },
     dayTitle: {
-        flex: 1,
         fontSize: 16,
         fontWeight: '900',
         color: Colors.iron[950],
     },
-    dayBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        backgroundColor: Colors.iron[200],
-        borderRadius: 8,
-    },
-    dayBadgeText: {
-        fontSize: 10,
-        fontWeight: '900',
-        color: Colors.iron[500],
+    daySubLabel: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: Colors.iron[400],
+        letterSpacing: 0.5,
+        marginTop: -1,
     },
     dayInnerContent: {
-        padding: 16,
+        padding: 12,
+        gap: 10,
     },
-    exMiniRow: {
+    exCard: {
+        backgroundColor: Colors.surface,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: Colors.iron[200],
+        padding: 12,
+    },
+    exInfo: {
         flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        paddingVertical: 6,
+        alignItems: 'flex-start',
+        gap: 12,
     },
     exNumber: {
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: '900',
         color: Colors.primary.DEFAULT,
-        width: 18,
+        backgroundColor: Colors.primary.DEFAULT + '15',
+        width: 20,
+        height: 20,
+        borderRadius: 6,
+        textAlign: 'center',
+        lineHeight: 20,
+        overflow: 'hidden',
     },
     exName: {
         fontSize: 14,
-        fontWeight: '800',
+        fontWeight: '900',
         color: Colors.iron[950],
-        flex: 1,
+        marginBottom: 4,
     },
-    moreText: {
+    badgeRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 4,
+        marginTop: 2,
+    },
+    exNotesHeader: {
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: Colors.iron[100],
+    },
+    exNotesText: {
         fontSize: 12,
         color: Colors.iron[400],
         fontStyle: 'italic',
-        marginTop: 8,
     },
     emptyText: {
         fontSize: 13,
         color: Colors.iron[400],
         fontStyle: 'italic',
+        textAlign: 'center',
+        paddingVertical: 10,
     },
 
     // Actions
@@ -471,16 +527,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 10,
         backgroundColor: Colors.iron[200],
-        padding: 12,
-        borderRadius: 12,
+        padding: 14,
+        borderRadius: 14,
         marginBottom: 8,
     },
     helperText: {
         flex: 1,
-        fontSize: 11,
-        color: Colors.iron[500],
-        fontWeight: '600',
-        lineHeight: 16,
+        fontSize: 12,
+        color: Colors.iron[600],
+        fontWeight: '700',
+        lineHeight: 18,
     },
     cancelBtn: {
         alignItems: 'center',
@@ -488,7 +544,7 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     cancelBtnText: {
-        color: Colors.iron[400],
+        color: Colors.iron[500],
         fontWeight: '800',
         fontSize: 13,
         textTransform: 'uppercase',

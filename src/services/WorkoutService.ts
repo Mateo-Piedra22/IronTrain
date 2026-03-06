@@ -1,11 +1,14 @@
 import { endOfDay, format, getUnixTime, startOfDay } from 'date-fns';
+import { useAuthStore } from '../store/authStore';
 import { ExerciseType, SetType, Workout, WorkoutSet } from '../types/db';
 import { uuidV4 } from '../utils/uuid';
+import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
 
 type CopyMode = 'replace' | 'append';
 type CopyNameMode = 'if_empty' | 'always' | 'never';
 type CopyContentMode = 'full' | 'structure' | 'exercises_only';
+type FinishLocation = { lat: number; lon: number } | null;
 
 class WorkoutService {
     private calendarEventsCache: { ts: number; data: Record<string, { status: string; colors: string[] }> } | null = null;
@@ -14,6 +17,26 @@ class WorkoutService {
     private invalidateCaches() {
         this.calendarEventsCache = null;
         this.exerciseHistoryCache.clear();
+    }
+
+    private async captureFinishLocation(): Promise<FinishLocation> {
+        try {
+            const expoLocation = require('expo-location');
+            if (!expoLocation?.requestForegroundPermissionsAsync || !expoLocation?.getCurrentPositionAsync) {
+                return null;
+            }
+            const permission = await expoLocation.requestForegroundPermissionsAsync();
+            if (permission?.status !== 'granted') return null;
+            const position = await expoLocation.getCurrentPositionAsync({
+                accuracy: expoLocation.Accuracy?.Balanced ?? 3,
+            });
+            const lat = Number(position?.coords?.latitude);
+            const lon = Number(position?.coords?.longitude);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            return { lat, lon };
+        } catch {
+            return null;
+        }
     }
 
     /**
@@ -510,12 +533,31 @@ class WorkoutService {
         if (workout?.status === 'completed') return; // Idempotent
 
         const now = Date.now();
+        const location = await this.captureFinishLocation();
 
-        await dbService.run(
-            'UPDATE workouts SET status = ?, end_time = ?, updated_at = ? WHERE id = ?',
-            ['completed', now, now, id]
-        );
-        await dbService.queueSyncMutation('workouts', id, 'UPDATE', { status: 'completed', end_time: now, updated_at: now });
+        if (location) {
+            await dbService.run(
+                'UPDATE workouts SET status = ?, end_time = ?, finish_lat = ?, finish_lon = ?, updated_at = ? WHERE id = ?',
+                ['completed', now, location.lat, location.lon, now, id]
+            );
+            await dbService.queueSyncMutation('workouts', id, 'UPDATE', {
+                status: 'completed',
+                end_time: now,
+                finish_lat: location.lat,
+                finish_lon: location.lon,
+                updated_at: now,
+            });
+        } else {
+            await dbService.run(
+                'UPDATE workouts SET status = ?, end_time = ?, updated_at = ? WHERE id = ?',
+                ['completed', now, now, id]
+            );
+            await dbService.queueSyncMutation('workouts', id, 'UPDATE', { status: 'completed', end_time: now, updated_at: now });
+        }
+        await this.createSocialFeedEventsForFinishedWorkout(id, now);
+
+        dataEventService.emit('DATA_UPDATED');
+
         this.invalidateCaches();
     }
 
@@ -526,6 +568,9 @@ class WorkoutService {
             ['in_progress', now, id]
         );
         await dbService.queueSyncMutation('workouts', id, 'UPDATE', { status: 'in_progress', updated_at: now });
+
+        dataEventService.emit('DATA_UPDATED');
+
         this.invalidateCaches();
     }
 
@@ -571,6 +616,133 @@ class WorkoutService {
         for (const s of updatedSets) {
             await dbService.queueSyncMutation('workout_sets', s.id, 'UPDATE', { superset_id: null });
         }
+    }
+
+    private async createSocialFeedEventsForFinishedWorkout(workoutId: string, timestamp: number): Promise<void> {
+        const userId = useAuthStore.getState().user?.id;
+        if (!userId) return;
+
+        await this.upsertActivityFeedRecord({
+            id: `activity-workout-${workoutId}`,
+            userId,
+            actionType: 'workout_completed',
+            referenceId: workoutId,
+            metadata: JSON.stringify({ workoutId }),
+            createdAt: timestamp,
+            updatedAt: timestamp,
+        });
+
+        const workoutSets = await dbService.getAll<{ exercise_id: string; exercise_name: string; weight: number; reps: number; type: string | null }>(
+            `SELECT
+                s.exercise_id as exercise_id,
+                e.name as exercise_name,
+                s.weight as weight,
+                s.reps as reps,
+                s.type as type
+             FROM workout_sets s
+             JOIN exercises e ON e.id = s.exercise_id
+             WHERE s.workout_id = ?
+               AND s.completed = 1
+               AND s.weight > 0
+               AND s.reps > 0
+               AND (s.type IS NULL OR s.type != 'warmup')
+               AND s.deleted_at IS NULL`,
+            [workoutId]
+        );
+
+        const bestByExercise = new Map<string, { exerciseName: string; oneRm: number }>();
+        for (const set of workoutSets) {
+            const oneRm = set.weight * (1 + set.reps / 30);
+            const previous = bestByExercise.get(set.exercise_id);
+            if (!previous || oneRm > previous.oneRm) {
+                bestByExercise.set(set.exercise_id, {
+                    exerciseName: set.exercise_name,
+                    oneRm,
+                });
+            }
+        }
+
+        for (const [exerciseId, current] of bestByExercise.entries()) {
+            const previousMax = await dbService.getFirst<{ max_1rm: number | null }>(
+                `SELECT MAX(s.weight * (1.0 + (s.reps / 30.0))) as max_1rm
+                 FROM workout_sets s
+                 JOIN workouts w ON w.id = s.workout_id
+                 WHERE s.exercise_id = ?
+                   AND s.workout_id != ?
+                   AND s.completed = 1
+                   AND s.weight > 0
+                   AND s.reps > 0
+                   AND (s.type IS NULL OR s.type != 'warmup')
+                   AND s.deleted_at IS NULL
+                   AND w.deleted_at IS NULL`,
+                [exerciseId, workoutId]
+            );
+
+            const oldOneRm = Number(previousMax?.max_1rm || 0);
+            if (current.oneRm <= oldOneRm) {
+                continue;
+            }
+
+            const roundedOneRm = Math.round(current.oneRm);
+            await this.upsertActivityFeedRecord({
+                id: `activity-pr-${workoutId}-${exerciseId}`,
+                userId,
+                actionType: 'pr_broken',
+                referenceId: exerciseId,
+                metadata: JSON.stringify({
+                    workoutId,
+                    exerciseId,
+                    exerciseName: current.exerciseName,
+                    oneRm: roundedOneRm,
+                    previousOneRm: Math.round(oldOneRm),
+                }),
+                createdAt: timestamp,
+                updatedAt: timestamp,
+            });
+        }
+    }
+
+    private async upsertActivityFeedRecord(payload: {
+        id: string;
+        userId: string;
+        actionType: string;
+        referenceId: string;
+        metadata: string;
+        createdAt: number;
+        updatedAt: number;
+    }): Promise<void> {
+        const existing = await dbService.getFirst<{ id: string }>(
+            'SELECT id FROM activity_feed WHERE id = ?',
+            [payload.id]
+        );
+
+        if (existing?.id) {
+            await dbService.run(
+                'UPDATE activity_feed SET metadata = ?, updated_at = ?, deleted_at = NULL WHERE id = ?',
+                [payload.metadata, payload.updatedAt, payload.id]
+            );
+            await dbService.queueSyncMutation('activity_feed', payload.id, 'UPDATE', {
+                metadata: payload.metadata,
+                updated_at: payload.updatedAt,
+                deleted_at: null,
+            });
+            return;
+        }
+
+        await dbService.run(
+            'INSERT INTO activity_feed (id, user_id, action_type, reference_id, metadata, created_at, updated_at, kudo_count) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
+            [payload.id, payload.userId, payload.actionType, payload.referenceId, payload.metadata, payload.createdAt, payload.updatedAt]
+        );
+        await dbService.queueSyncMutation('activity_feed', payload.id, 'INSERT', {
+            id: payload.id,
+            user_id: payload.userId,
+            action_type: payload.actionType,
+            reference_id: payload.referenceId,
+            metadata: payload.metadata,
+            created_at: payload.createdAt,
+            updated_at: payload.updatedAt,
+            kudo_count: 0,
+        });
     }
 
     private generateId(): string {
@@ -691,6 +863,9 @@ class WorkoutService {
                 await dbService.run('DELETE FROM workout_sets WHERE workout_id = ?', [id]);
                 await dbService.run('DELETE FROM workouts WHERE id = ?', [id]);
             });
+
+            dataEventService.emit('DATA_UPDATED');
+
             this.invalidateCaches();
         } catch (e) {
             throw e;

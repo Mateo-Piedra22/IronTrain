@@ -17,7 +17,9 @@ export async function GET(req: NextRequest) {
                     eq(schema.sharesInbox.receiverId, userId),
                     isNull(schema.sharesInbox.deletedAt)
                 )
-            );
+            )
+            .orderBy(desc(schema.sharesInbox.updatedAt))
+            .limit(50);
 
         // 2. Fetch accepted friends to get their activity
         const friends = await db.select().from(schema.friendships).where(
@@ -37,7 +39,12 @@ export async function GET(req: NextRequest) {
 
         if (feedUsers.length > 0) {
             activityRecords = await db.select().from(schema.activityFeed)
-                .where(inArray(schema.activityFeed.userId, feedUsers))
+                .where(
+                    and(
+                        inArray(schema.activityFeed.userId, feedUsers),
+                        isNull(schema.activityFeed.deletedAt)
+                    )
+                )
                 .orderBy(desc(schema.activityFeed.createdAt))
                 .limit(50); // Get latest 50 activities overall
 
@@ -49,7 +56,10 @@ export async function GET(req: NextRequest) {
                     count: sql<number>`count(${schema.kudos.id})`.mapWith(Number),
                 })
                     .from(schema.kudos)
-                    .where(inArray(schema.kudos.feedId, activityIds))
+                    .where(and(
+                        inArray(schema.kudos.feedId, activityIds),
+                        isNull(schema.kudos.deletedAt)
+                    ))
                     .groupBy(schema.kudos.feedId);
 
                 // Determine if THIS user gave kudos
@@ -57,7 +67,8 @@ export async function GET(req: NextRequest) {
                     .from(schema.kudos)
                     .where(and(
                         inArray(schema.kudos.feedId, activityIds),
-                        eq(schema.kudos.giverId, userId)
+                        eq(schema.kudos.giverId, userId),
+                        isNull(schema.kudos.deletedAt)
                     ));
             }
         }

@@ -35,9 +35,17 @@
   - Migraciones idempotentes.
   - Normalizar parámetros (undefined→null).
 
+### IronSocial (Sync & Community)
+- Ubicación: `src/services/SyncService.ts`, `src/services/SocialService.ts`, `website/app/api/`.
+- Responsabilidad: Sincronización bidireccional, reconciliación LWW, perfiles de usuario y feed de actividad.
+- Reglas:
+  - Zero-Trust: Toda validación social se realiza en el servidor.
+  - Offline-First: Las mutaciones sociales se encolan localmente (`queueSyncMutation`).
+
 ## Convenciones clave
 - Unidades: kg como base interna para sets y body weight; UI convierte a kg/lbs para entrada/salida.
 - Timers: cálculo por timestamp (endAtMs / delta real) para evitar drift en background.
+- Zero-Trust Configuration: Centralización de configuración en `src/constants/Config.ts` con inyección de variables de entorno estricta.
 - Estado de workout:
   - `in_progress`: editable, timer activo.
   - `completed`: read-only (sin agregar/editar sets), con opción explícita de reabrir.

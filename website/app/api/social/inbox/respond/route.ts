@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../../src/db';
 import * as schema from '../../../../../src/db/schema';
 import { verifyAuth } from '../../../../../src/lib/auth';
+import { formatActorName, getUserBrief, notifyUserById } from '../../../../../src/lib/social-notifications';
 
 export async function POST(req: NextRequest) {
     try {
@@ -43,6 +44,21 @@ export async function POST(req: NextRequest) {
                 .set({ status: 'rejected', deletedAt: now, updatedAt: now })
                 .where(eq(schema.sharesInbox.id, inboxId));
         }
+
+        const actor = await getUserBrief(userId);
+        await notifyUserById(
+            item.senderId,
+            action === 'accept' ? 'Compartido aceptado' : 'Compartido rechazado',
+            action === 'accept'
+                ? `${formatActorName(actor)} aceptó la rutina que compartiste.`
+                : `${formatActorName(actor)} rechazó la rutina que compartiste.`,
+            {
+                type: action === 'accept' ? 'social_share_accept' : 'social_share_reject',
+                actionUrl: 'irontrain://social',
+                inboxId,
+                fromUserId: userId,
+            }
+        );
 
         return NextResponse.json({ success: true, message: 'Action executed' });
     } catch (e: unknown) {

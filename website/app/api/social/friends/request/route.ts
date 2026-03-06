@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../../src/db';
 import * as schema from '../../../../../src/db/schema';
 import { verifyAuth } from '../../../../../src/lib/auth';
+import { formatActorName, getUserBrief, notifyUserById } from '../../../../../src/lib/social-notifications';
 
 export async function POST(req: NextRequest) {
     try {
@@ -64,6 +65,19 @@ export async function POST(req: NextRequest) {
             friendId: friendId,
             status: 'pending',
         });
+
+        const actor = await getUserBrief(userId);
+        await notifyUserById(
+            friendId,
+            'Nueva solicitud de amistad',
+            `${formatActorName(actor)} quiere agregarte en IronSocial.`,
+            {
+                type: 'social_friend_request',
+                actionUrl: 'irontrain://social',
+                requestId: newId,
+                fromUserId: userId,
+            }
+        );
 
         return NextResponse.json({ success: true, message: 'Request sent' });
     } catch (e: unknown) {

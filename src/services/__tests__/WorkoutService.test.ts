@@ -1,11 +1,13 @@
 import { dbService } from '../DatabaseService';
 import { workoutService } from '../WorkoutService';
+import { useAuthStore } from '../../store/authStore';
 
 // Mock dependencies
 jest.mock('../DatabaseService', () => ({
   dbService: {
     run: jest.fn(),
     getAll: jest.fn(),
+    getFirst: jest.fn(),
     withTransaction: jest.fn(async (cb: () => Promise<void>) => { await cb(); }),
     queueSyncMutation: jest.fn(),
     getWorkoutById: jest.fn(),
@@ -21,9 +23,17 @@ jest.mock('../DatabaseService', () => ({
   },
 }));
 
+jest.mock('../../store/authStore', () => ({
+  useAuthStore: {
+    getState: jest.fn(() => ({ user: null })),
+  },
+}));
+
 describe('WorkoutService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (dbService.getAll as jest.Mock).mockResolvedValue([]);
+    (dbService.getFirst as jest.Mock).mockResolvedValue(null);
     (workoutService as any).calendarEventsCache = null;
     if ((workoutService as any).exerciseHistoryCache?.clear) {
       (workoutService as any).exerciseHistoryCache.clear();
@@ -211,6 +221,31 @@ describe('WorkoutService', () => {
       await workoutService.finishWorkout('w1');
 
       expect(dbService.run).not.toHaveBeenCalled();
+    });
+
+    it('should create workout activity event when authenticated', async () => {
+      (useAuthStore.getState as jest.Mock).mockReturnValue({ user: { id: 'u1' } });
+      (dbService.getWorkoutById as jest.Mock).mockResolvedValue({ id: 'w1', status: 'in_progress' });
+      (dbService.getAll as jest.Mock).mockResolvedValue([]);
+      (dbService.getFirst as jest.Mock).mockResolvedValue(null);
+
+      await workoutService.finishWorkout('w1');
+
+      expect(dbService.run).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO activity_feed'),
+        expect.arrayContaining(['activity-workout-w1', 'u1', 'workout_completed', 'w1'])
+      );
+      expect(dbService.queueSyncMutation).toHaveBeenCalledWith(
+        'activity_feed',
+        'activity-workout-w1',
+        'INSERT',
+        expect.objectContaining({
+          id: 'activity-workout-w1',
+          user_id: 'u1',
+          action_type: 'workout_completed',
+          reference_id: 'w1',
+        })
+      );
     });
   });
 

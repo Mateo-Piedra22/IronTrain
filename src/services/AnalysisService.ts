@@ -7,6 +7,7 @@ export interface OneRepMax {
     reps: number;
     estimated1RM: number;
     date: number;
+    badges: { name: string; color: string; icon?: string }[];
 }
 
 export interface VolumeData {
@@ -73,9 +74,9 @@ export interface ExercisePR {
 }
 
 export interface PowerliftingPRs {
-    squat: ExercisePR | null;
-    bench: ExercisePR | null;
-    deadlift: ExercisePR | null;
+    squat: (ExercisePR & { badges: { name: string; color: string; icon?: string }[] }) | null;
+    bench: (ExercisePR & { badges: { name: string; color: string; icon?: string }[] }) | null;
+    deadlift: (ExercisePR & { badges: { name: string; color: string; icon?: string }[] }) | null;
     totalKg: number;
     squatName: string | null;
     benchName: string | null;
@@ -105,6 +106,7 @@ export interface ExerciseVolumeRow {
     categoryColor: string | null;
     volume: number;
     setCount: number;
+    badges: { name: string; color: string; icon?: string }[];
 }
 
 export interface OneRMProgressRow {
@@ -114,6 +116,7 @@ export interface OneRMProgressRow {
     end1RM: number;
     delta: number;
     deltaPct: number | null;
+    badges: { name: string; color: string; icon?: string }[];
 }
 
 export class AnalysisService {
@@ -123,7 +126,16 @@ export class AnalysisService {
             const cutoff = days ? Date.now() - (days * 86400 * 1000) : null;
 
             const results = await dbService.getAll<any>(`
-            SELECT s.exercise_id as exerciseId, e.name as exerciseName, s.weight, s.reps, w.date
+            SELECT 
+                s.exercise_id as exerciseId, 
+                e.name as exerciseName, 
+                s.weight, 
+                s.reps, 
+                w.date,
+                (SELECT GROUP_CONCAT(b.name || '|' || b.color || '|' || COALESCE(b.icon, '')) 
+                 FROM badges b 
+                 JOIN exercise_badges eb ON b.id = eb.badge_id 
+                 WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL) as badges_csv
             FROM workout_sets s
             JOIN exercises e ON s.exercise_id = e.id
             JOIN workouts w ON s.workout_id = w.id
@@ -133,22 +145,29 @@ export class AnalysisService {
         `, cutoff ? [cutoff] : []);
 
             // Process in JS to find max 1RM per exercise
-            const maxes: Record<string, OneRepMax> = {};
+            const maxes: Record<string, OneRepMax & { badges: any[] }> = {};
 
             results.forEach(raw => {
                 const r: any = raw;
-                const eIdStr = String(r.exercise_id || r.exerciseId || r.exerciseid || r.id);
                 const eNameStr = String(r.exerciseName || r.exercisename || r.name);
                 // Epley: weight * (1 + reps/30)
                 const epley = Math.round(r.weight * (1 + r.reps / 30));
+
+                // If we don't have this exercise or this set provides a higher 1RM
                 if (!maxes[eNameStr] || epley > maxes[eNameStr].estimated1RM) {
+                    const badges = r.badges_csv ? r.badges_csv.split(',').map((s: string) => {
+                        const [name, color, icon] = s.split('|');
+                        return { name, color, icon: icon || undefined };
+                    }) : [];
+
                     maxes[eNameStr] = {
-                        exerciseId: eIdStr,
+                        exerciseId: String(r.exerciseId || r.exercise_id),
                         exerciseName: eNameStr,
                         weight: r.weight,
                         reps: r.reps,
                         estimated1RM: epley,
-                        date: r.date
+                        date: r.date,
+                        badges
                     };
                 }
             });
@@ -569,7 +588,11 @@ export class AnalysisService {
                     c.name as categoryName,
                     c.color as categoryColor,
                     COALESCE(SUM(CASE WHEN s.weight > 0 AND s.reps > 0 THEN (s.weight * s.reps) ELSE 0 END), 0) as volume,
-                    COALESCE(COUNT(CASE WHEN s.weight > 0 AND s.reps > 0 THEN 1 END), 0) as total_sets
+                    COALESCE(COUNT(CASE WHEN s.weight > 0 AND s.reps > 0 THEN 1 END), 0) as total_sets,
+                    (SELECT GROUP_CONCAT(b.name || '|' || b.color || '|' || COALESCE(b.icon, '')) 
+                     FROM badges b 
+                     JOIN exercise_badges eb ON b.id = eb.badge_id 
+                     WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL) as badges_csv
                 FROM workout_sets s
                 JOIN workouts w ON s.workout_id = w.id
                 JOIN exercises e ON s.exercise_id = e.id
@@ -586,11 +609,19 @@ export class AnalysisService {
             [cutoffMs, limit]
         );
 
-        return rows.map((r) => ({
-            ...r,
-            volume: Math.round((r as any).volume ?? 0),
-            setCount: (r as any).total_sets ?? 0,
-        }));
+        return rows.map((r: any) => {
+            const badges = r.badges_csv ? r.badges_csv.split(',').map((s: string) => {
+                const [name, color, icon] = s.split('|');
+                return { name, color, icon: icon || undefined };
+            }) : [];
+
+            return {
+                ...r,
+                volume: Math.round(r.volume ?? 0),
+                setCount: r.total_sets ?? 0,
+                badges
+            };
+        });
     }
 
     static async getTop1RMProgress(days: number, limit: number = 6): Promise<OneRMProgressRow[]> {
@@ -605,7 +636,11 @@ export class AnalysisService {
                     e.name as exerciseName,
                     s.weight as weight,
                     s.reps as reps,
-                    w.date as date
+                    w.date as date,
+                    (SELECT GROUP_CONCAT(b.name || '|' || b.color || '|' || COALESCE(b.icon, '')) 
+                     FROM badges b 
+                     JOIN exercise_badges eb ON b.id = eb.badge_id 
+                     WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL) as badges_csv
                 FROM workout_sets s
                 JOIN workouts w ON s.workout_id = w.id
                 JOIN exercises e ON s.exercise_id = e.id
@@ -619,12 +654,16 @@ export class AnalysisService {
             [cutoffMs]
         );
 
-        const map = new Map<string, { exerciseId: string; exerciseName: string; start: number; end: number }>();
-        for (const r of rows) {
+        const map = new Map<string, { exerciseId: string; exerciseName: string; start: number; end: number; badges: any[] }>();
+        for (const r of rows as any[]) {
             const epley = Math.round(r.weight * (1 + r.reps / 30));
             if (!Number.isFinite(epley) || epley <= 0) continue;
             if (!map.has(r.exerciseId)) {
-                map.set(r.exerciseId, { exerciseId: r.exerciseId, exerciseName: r.exerciseName, start: 0, end: 0 });
+                const badges = r.badges_csv ? r.badges_csv.split(',').map((s: string) => {
+                    const [name, color, icon] = s.split('|');
+                    return { name, color, icon: icon || undefined };
+                }) : [];
+                map.set(r.exerciseId, { exerciseId: r.exerciseId, exerciseName: r.exerciseName, start: 0, end: 0, badges });
             }
             const cur = map.get(r.exerciseId)!;
             if (r.date <= midMs) {
@@ -646,7 +685,8 @@ export class AnalysisService {
                 start1RM: v.start,
                 end1RM: v.end,
                 delta,
-                deltaPct
+                deltaPct,
+                badges: v.badges
             });
         });
 
@@ -700,12 +740,17 @@ export class AnalysisService {
         return { current: currentRun, best };
     }
 
-    static async getExercisePR(exerciseId: string): Promise<ExercisePR | null> {
-        const row = await dbService.getFirst<{ weight: number; reps: number; date: number }>(
+    static async getExercisePR(exerciseId: string): Promise<(ExercisePR & { badges: { name: string; color: string; icon?: string }[] }) | null> {
+        const row = await dbService.getFirst<{ weight: number; reps: number; date: number; badges_csv: string | null }>(
             `
-                SELECT s.weight as weight, s.reps as reps, w.date as date
+                SELECT s.weight as weight, s.reps as reps, w.date as date,
+                       (SELECT GROUP_CONCAT(b.name || '|' || b.color || '|' || COALESCE(b.icon, '')) 
+                        FROM badges b 
+                        JOIN exercise_badges eb ON b.id = eb.badge_id 
+                        WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL) as badges_csv
                 FROM workout_sets s
                 JOIN workouts w ON s.workout_id = w.id
+                JOIN exercises e ON s.exercise_id = e.id
                 WHERE s.exercise_id = ?
                 AND s.completed = 1
                 AND s.type != 'warmup'
@@ -717,10 +762,17 @@ export class AnalysisService {
         );
 
         if (!row || row.weight == null) return null;
+
+        const badges = row.badges_csv ? row.badges_csv.split(',').map((s: string) => {
+            const [name, color, icon] = s.split('|');
+            return { name, color, icon: icon || undefined };
+        }) : [];
+
         return {
             weight: row.weight ?? 0,
             reps: row.reps ?? 0,
-            date: row.date ?? 0
+            date: row.date ?? 0,
+            badges
         };
     }
 

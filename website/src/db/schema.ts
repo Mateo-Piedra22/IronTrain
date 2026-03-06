@@ -15,6 +15,23 @@ export const categories = pgTable('categories', {
     ...commonFields,
 });
 
+export const badges = pgTable('badges', {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    color: text('color').notNull(),
+    icon: text('icon'),
+    groupName: text('group_name'),
+    isSystem: integer('is_system').default(0),
+    ...commonFields,
+});
+
+export const exerciseBadges = pgTable('exercise_badges', {
+    id: text('id').primaryKey(),
+    exerciseId: text('exercise_id').notNull(),
+    badgeId: text('badge_id').notNull(),
+    ...commonFields,
+});
+
 export const exercises = pgTable('exercises', {
     id: text('id').primaryKey(),
     categoryId: text('category_id').notNull(),
@@ -32,6 +49,8 @@ export const workouts = pgTable('workouts', {
     date: integer('date').notNull(),
     startTime: integer('start_time').notNull(),
     endTime: integer('end_time'),
+    finishLat: real('finish_lat'),
+    finishLon: real('finish_lon'),
     name: text('name').notNull(),
     notes: text('notes'),
     status: text('status'),
@@ -157,13 +176,19 @@ export const syncRateLimits = pgTable('sync_rate_limits', {
 // --- IRON SOCIAL ---
 export const userProfiles = pgTable('user_profiles', {
     id: text('id').primaryKey(), // The user's ID
-    username: text('username'), // Optional searchable tag
+    username: text('username').unique(), // Optional searchable tag
     displayName: text('display_name'),
     isPublic: integer('is_public').default(1),
     shareStats: integer('share_stats').default(0),
     currentStreak: integer('current_streak').default(0), // A.3: Streak tracking
     highestStreak: integer('highest_streak').default(0),
+    scoreLifetime: integer('score_lifetime').default(0).notNull(),
+    streakWeeks: integer('streak_weeks').default(0).notNull(),
+    streakMultiplier: real('streak_multiplier').default(1).notNull(),
+    streakWeekEvaluatedAt: text('streak_week_evaluated_at'),
     lastActiveDate: integer('last_active_date'), // Unix timestamp
+    pushToken: text('push_token'), // For FCM
+    createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
@@ -194,6 +219,9 @@ export const activityFeed = pgTable('activity_feed', {
     referenceId: text('reference_id'), // ID of the workout, routine, etc.
     metadata: text('metadata'), // JSON string with specific info (e.g. weight, exercise name)
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+    kudoCount: integer('kudo_count').default(0).notNull(),
 });
 
 export const kudos = pgTable('kudos', {
@@ -201,6 +229,8 @@ export const kudos = pgTable('kudos', {
     feedId: text('feed_id').notNull(),
     giverId: text('giver_id').notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
 });
 
 // --- ADMIN & METRICS ---
@@ -222,3 +252,112 @@ export const feedback = pgTable('feedback', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+// --- CHANGELOG SYSTEM ---
+export const changelogs = pgTable('changelogs', {
+    id: text('id').primaryKey(), // Usually UUID
+    version: text('version').notNull().unique(), // e.g. '1.2.0'
+    date: timestamp('date').defaultNow().notNull(),
+    items: text('items').notNull(), // JSON string: string[]
+    isUnreleased: integer('is_unreleased').default(0),
+    metadata: text('metadata'), // JSON string: icon, bannerImage, etc.
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    reactionCount: integer('reaction_count').default(0).notNull(),
+});
+
+// --- NOTIFICATION SYSTEM ---
+export const adminNotifications = pgTable('admin_notifications', {
+    id: text('id').primaryKey(),
+    title: text('title').notNull(),
+    message: text('message').notNull(),
+    type: text('type').notNull(), // 'toast', 'modal', 'system'
+    priority: text('priority').default('normal'), // 'low', 'normal', 'high', 'critical'
+    displayMode: text('display_mode').default('once'), // 'once', 'always', 'until_closed'
+    targetVersion: text('target_version'), // if null, all versions
+    targetPlatform: text('target_platform'), // 'android', 'ios', 'all'
+    targetSegment: text('target_segment'), // 'all', 'premium', 'new_users', etc.
+    isActive: integer('is_active').default(1),
+    scheduledAt: timestamp('scheduled_at').defaultNow().notNull(),
+    metadata: text('metadata'), // JSON string: icons, action buttons, styles
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    expiresAt: timestamp('expires_at'),
+});
+
+export const notificationLogs = pgTable('notification_logs', {
+    id: text('id').primaryKey(),
+    notificationId: text('notification_id').notNull(),
+    userId: text('user_id').notNull(),
+    action: text('action').notNull(), // 'seen', 'closed', 'clicked'
+    metadata: text('metadata'), // e.g. platform, app version when action was taken
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const changelogReactions = pgTable('changelog_reactions', {
+    id: text('id').primaryKey(),
+    changelogId: text('changelog_id').notNull(),
+    userId: text('user_id').notNull(),
+    type: text('type').notNull().default('kudos'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+});
+
+export const socialScoringConfig = pgTable('social_scoring_config', {
+    id: text('id').primaryKey(),
+    workoutCompletePoints: integer('workout_complete_points').default(20).notNull(),
+    extraDayPoints: integer('extra_day_points').default(10).notNull(),
+    extraDayWeeklyCap: integer('extra_day_weekly_cap').default(2).notNull(),
+    prNormalPoints: integer('pr_normal_points').default(10).notNull(),
+    prBig3Points: integer('pr_big3_points').default(25).notNull(),
+    adverseWeatherPoints: integer('adverse_weather_points').default(15).notNull(),
+    weekTier2Min: integer('week_tier2_min').default(3).notNull(),
+    weekTier3Min: integer('week_tier3_min').default(5).notNull(),
+    weekTier4Min: integer('week_tier4_min').default(10).notNull(),
+    tier2Multiplier: real('tier2_multiplier').default(1.1).notNull(),
+    tier3Multiplier: real('tier3_multiplier').default(1.25).notNull(),
+    tier4Multiplier: real('tier4_multiplier').default(1.5).notNull(),
+    coldThresholdC: real('cold_threshold_c').default(3).notNull(),
+    weatherBonusEnabled: integer('weather_bonus_enabled').default(1).notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    updatedBy: text('updated_by'),
+});
+
+export const globalEvents = pgTable('global_events', {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    multiplier: real('multiplier').default(1).notNull(),
+    startDate: timestamp('start_date').notNull(),
+    endDate: timestamp('end_date').notNull(),
+    isActive: integer('is_active').default(1).notNull(),
+    pushSent: integer('push_sent').default(0).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    createdBy: text('created_by'),
+});
+
+export const userExercisePrs = pgTable('user_exercise_prs', {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    exerciseId: text('exercise_id').notNull(),
+    exerciseName: text('exercise_name').notNull(),
+    best1RmKg: real('best_1rm_kg').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const scoreEvents = pgTable('score_events', {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    workoutId: text('workout_id'),
+    eventType: text('event_type').notNull(),
+    eventKey: text('event_key').notNull().unique(),
+    pointsBase: integer('points_base').notNull(),
+    streakMultiplier: real('streak_multiplier').default(1).notNull(),
+    globalMultiplier: real('global_multiplier').default(1).notNull(),
+    pointsAwarded: integer('points_awarded').notNull(),
+    metadata: text('metadata'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+

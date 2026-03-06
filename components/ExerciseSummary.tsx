@@ -6,12 +6,16 @@ import { formatTimeSecondsCompact } from '@/src/utils/time';
 import { ChevronRight, Trophy } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { BadgePill } from './ui/BadgePill';
+
 
 interface ExerciseSummaryProps {
     exerciseName: string;
     exerciseType: ExerciseType;
     sets: WorkoutSet[];
+    badges?: any[];
     categoryColor?: string;
+
     onPress: () => void;
     disabled?: boolean;
 }
@@ -29,7 +33,8 @@ function formatWeight(value: number, unit: 'kg' | 'lbs'): string {
     return `${v.toFixed(decimals)} ${u}`;
 }
 
-export function ExerciseSummary({ exerciseName, exerciseType, sets, categoryColor = Colors.primary.dark, onPress, disabled }: ExerciseSummaryProps) {
+export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [], categoryColor = Colors.primary.dark, onPress, disabled }: ExerciseSummaryProps) {
+
     const unit = configService.get('weightUnit');
     const displayWeight = (kgValue: number) => unit === 'kg' ? kgValue : UnitService.kgToLbs(kgValue);
     const totalSets = sets.length;
@@ -84,6 +89,28 @@ export function ExerciseSummary({ exerciseName, exerciseType, sets, categoryColo
 
             <View style={{ flex: 1 }}>
                 <Text style={ss.name} numberOfLines={1}>{exerciseName}</Text>
+
+                {badges.length > 0 && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                        <View style={{ flexDirection: 'row', gap: 4 }}>
+                            {badges.slice(0, 3).map((badge, idx) => (
+                                <BadgePill
+                                    key={idx}
+                                    name={badge.name}
+                                    color={badge.color}
+                                    icon={badge.icon}
+                                    size="xs"
+                                />
+                            ))}
+                        </View>
+                        {badges.length > 3 && (
+                            <View style={{ backgroundColor: Colors.iron[100], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                <Text style={{ fontSize: 10, fontWeight: '800', color: Colors.iron[500] }}>+{badges.length - 3}</Text>
+                            </View>
+                        )}
+                    </View>
+                )}
+
 
                 <View style={ss.statsRow}>
                     <Text style={ss.statText}>{doneSets}/{totalSets} series</Text>

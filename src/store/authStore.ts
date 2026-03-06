@@ -3,9 +3,10 @@ import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import { jwtDecode } from 'jwt-decode';
 import { create } from 'zustand';
+import { Config } from '../constants/Config';
 
 const TOKEN_KEY = 'irontrain_auth_token';
-const WEBSITE_URL = 'https://irontrain.motiona.xyz';
+const WEBSITE_URL = Config.API_URL;
 
 interface UserData {
     id: string;

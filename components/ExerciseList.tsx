@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { useDataReload } from '@/src/hooks/useDataReload';
 import { Colors } from '@/src/theme';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,13 +13,16 @@ import { ExerciseService } from '../src/services/ExerciseService';
 import { confirm } from '../src/store/confirmStore';
 import { Category, Exercise } from '../src/types/db';
 import { ExerciseFormModal } from './ExerciseFormModal';
+import { BadgePill } from './ui/BadgePill';
+
 
 interface ExerciseListProps {
     onSelect?: (exerciseId: string) => void;
     inModal?: boolean;
 }
 
-type ExerciseItem = Exercise & { category_name: string; category_color: string };
+type ExerciseItem = Exercise & { category_name: string; category_color: string; badges: any[] };
+
 type CategoryItem = Category | { id: string; name: string; color: string };
 
 export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
@@ -56,6 +60,10 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
         const timeout = setTimeout(loadData, 300);
         return () => clearTimeout(timeout);
     }, [loadData]);
+
+    useDataReload(() => {
+        loadData();
+    });
 
 
     const router = useRouter(); // Required
@@ -173,7 +181,7 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
                             accessibilityRole="button"
                             accessibilityLabel={`Abrir ejercicio ${item.name}`}
                         >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12, overflow: 'hidden' }}>
                                 <View style={{
                                     width: 40, height: 40, borderRadius: 12,
                                     backgroundColor: (item.category_color || Colors.iron[400]) + '20',
@@ -182,15 +190,42 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
                                 }}>
                                     <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: item.category_color || Colors.iron[400] }} />
                                 </View>
-                                <View style={{ flex: 1 }}>
+                                <View style={{ flex: 1, overflow: 'hidden' }}>
                                     <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 }} numberOfLines={1}>{item.name}</Text>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                                        <Text style={{ color: Colors.iron[500], fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>{item.category_name}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8, flex: 1, overflow: 'hidden' }}>
+                                        <Text
+                                            style={{ color: Colors.iron[500], fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0 }}
+                                            numberOfLines={1}
+                                        >
+                                            {item.category_name}
+                                        </Text>
+
+                                        {/* Badges Preview */}
+                                        {item.badges && item.badges.length > 0 && (
+                                            <View style={{ flexDirection: 'row', gap: 4, flexShrink: 1, alignItems: 'center' }}>
+                                                {item.badges.slice(0, 3).map((badge, idx) => (
+                                                    <View key={`${item.id}-badge-${idx}`} style={{ flexShrink: 1 }}>
+                                                        <BadgePill
+                                                            name={badge.name}
+                                                            color={badge.color}
+                                                            icon={badge.icon}
+                                                            size="xs"
+                                                        />
+                                                    </View>
+                                                ))}
+                                                {item.badges.length > 3 && (
+                                                    <View style={{ backgroundColor: Colors.iron[100], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, justifyContent: 'center', flexShrink: 0 }}>
+                                                        <Text style={{ fontSize: 9, fontWeight: '800', color: Colors.iron[500] }}>+{item.badges.length - 3}</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
                                     </View>
                                 </View>
+
                             </View>
                             {!onSelect && (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 8 }}>
                                     <TouchableOpacity
                                         onPress={() => handleEdit(item)}
                                         style={{ padding: 8, backgroundColor: Colors.iron[200], borderRadius: 10, borderWidth: 1, borderColor: Colors.iron[300] }}

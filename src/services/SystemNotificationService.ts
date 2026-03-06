@@ -1,4 +1,10 @@
-import notifee, { AndroidCategory, AndroidImportance, AndroidVisibility, TimestampTrigger, TriggerType } from '@notifee/react-native';
+import notifee, {
+    AndroidCategory,
+    AndroidImportance,
+    AndroidVisibility,
+    TimestampTrigger,
+    TriggerType
+} from '@notifee/react-native';
 import { configService, NotificationPreferences } from './ConfigService';
 import { notificationPermissionsService } from './NotificationPermissionsService';
 
@@ -8,8 +14,9 @@ const CHANNELS = {
     WORKOUT_EVENTS: 'workout-events',
     REMINDERS: 'reminders',
     REST_TIMER: 'rest-timer',
-    INTERVAL_TIMER: 'interval-timer',
+    INTERVAL_TIMER: 'itimer-channel',
     UPDATES: 'updates',
+    STREAK: 'streak-reminders',
 } as const;
 
 // ─── Notification IDs ────────────────────────────────────────────────────────
@@ -18,7 +25,7 @@ const NOTIFICATION_IDS = {
     INACTIVITY_REMINDER: 'inactivity-reminder',
     CONGRATULATION: 'workout-congratulation',
     REST_TIMER: 'rest-timer-system',
-    INTERVAL_TIMER: 'interval-timer-persistent',
+    INTERVAL_TIMER: 'itimer-id',
     UPDATE_AVAILABLE: 'update-available',
     APP_UPDATED: 'app-updated',
     STREAK_REMINDER: 'streak-daily-reminder',
@@ -55,9 +62,8 @@ class SystemNotificationServiceImpl {
                 id: CHANNELS.WORKOUT_ACTIVE,
                 name: 'Entrenamiento Activo',
                 description: 'Notificación persistente durante el entrenamiento',
-                importance: AndroidImportance.LOW,
+                importance: AndroidImportance.HIGH,
                 visibility: AndroidVisibility.PUBLIC,
-                sound: '',
             });
             await notifee.createChannel({
                 id: CHANNELS.WORKOUT_EVENTS,
@@ -82,12 +88,20 @@ class SystemNotificationServiceImpl {
             });
             await notifee.createChannel({
                 id: CHANNELS.INTERVAL_TIMER,
-                name: 'Interval Timer',
-                description: 'Progreso del entrenamiento por intervalos',
-                importance: AndroidImportance.LOW,
+                name: 'Modo Intervalos',
+                description: 'Progreso y alertas durante entrenamiento por intervalos',
+                importance: AndroidImportance.HIGH,
                 visibility: AndroidVisibility.PUBLIC,
-                sound: '',
+                sound: 'default', // Crucial for phase changes
             });
+
+            // iOS Categories
+            await notifee.setNotificationCategories([
+                { id: 'workout-persistent', actions: [] },
+                { id: 'rest-timer', actions: [] },
+                { id: 'interval-timer', actions: [] },
+                { id: 'streak-reminder', actions: [] },
+            ]);
             await notifee.createChannel({
                 id: CHANNELS.UPDATES,
                 name: 'Actualizaciones',
@@ -96,15 +110,15 @@ class SystemNotificationServiceImpl {
                 sound: 'default',
             });
             await notifee.createChannel({
-                id: CHANNELS.REMINDERS,
+                id: CHANNELS.STREAK,
                 name: 'Recordatorios de Racha',
                 description: 'Recordatorio diario para mantener tu racha',
                 importance: AndroidImportance.HIGH,
                 sound: 'default',
             });
             this.channelsCreated = true;
-        } catch {
-            // Channel creation failure is non-fatal
+        } catch (e) {
+            console.error('Failed to create notification channels:', e);
         }
     }
 
@@ -136,8 +150,8 @@ class SystemNotificationServiceImpl {
         completedSets: number;
         totalExercises: number;
         isPaused: boolean;
-    }): Promise<void> {
-        if (!(await this.canNotifyType('workoutPersistent'))) return;
+    }, force = false): Promise<void> {
+        if (!force && !(await this.canNotifyType('workoutPersistent'))) return;
         await this.ensureChannels();
 
         const { elapsedSeconds, completedSets, totalExercises, isPaused } = params;
@@ -151,19 +165,29 @@ class SystemNotificationServiceImpl {
                 body: `⏱ ${timeStr}  ·  ${completedSets} series  ·  ${totalExercises} ejercicios`,
                 android: {
                     channelId: CHANNELS.WORKOUT_ACTIVE,
-                    ongoing: true,
-                    autoCancel: false,
-                    smallIcon: 'ic_notification',
+                    asForegroundService: true,
+                    foregroundServiceTypes: [1], // DATA_SYNC = 1
                     category: AndroidCategory.PROGRESS,
                     pressAction: { id: 'default' },
                     timestamp: Date.now() - elapsedSeconds * 1000,
                     showTimestamp: true,
                     chronometerDirection: 'up',
                     showChronometer: !isPaused,
+                    onlyAlertOnce: true,
                 },
-                ios: { categoryId: 'workout-active' },
+                ios: {
+                    categoryId: 'workout-active',
+                    foregroundPresentationOptions: {
+                        badge: true,
+                        sound: false,
+                        banner: true,
+                        list: true,
+                    }
+                },
             });
-        } catch { /* non-critical */ }
+        } catch (e) {
+            console.error('Error showing persistent workout notification:', e);
+        }
     }
 
     async dismissPersistentWorkout(): Promise<void> {
@@ -174,8 +198,8 @@ class SystemNotificationServiceImpl {
     // 2. INACTIVITY REMINDER
     // ═══════════════════════════════════════════════════════════════════════════
 
-    async scheduleInactivityReminder(elapsedSeconds: number): Promise<void> {
-        if (!(await this.canNotifyType('inactivityReminder'))) return;
+    async scheduleInactivityReminder(elapsedSeconds: number, force = false): Promise<void> {
+        if (!force && !(await this.canNotifyType('inactivityReminder'))) return;
         await this.ensureChannels();
         await this.cancelInactivityReminder();
 
@@ -212,8 +236,8 @@ class SystemNotificationServiceImpl {
         durationSeconds: number;
         completedSets: number;
         totalExercises: number;
-    }): Promise<void> {
-        if (!(await this.canNotifyType('workoutComplete'))) return;
+    }, force = false): Promise<void> {
+        if (!force && !(await this.canNotifyType('workoutComplete'))) return;
         await this.ensureChannels();
 
         const { durationSeconds, completedSets, totalExercises } = params;
@@ -239,8 +263,8 @@ class SystemNotificationServiceImpl {
     // 4. REST TIMER NOTIFICATION
     // ═══════════════════════════════════════════════════════════════════════════
 
-    async scheduleRestTimerNotification(endAtMs: number): Promise<void> {
-        if (!(await this.canNotifyType('restTimer'))) return;
+    async scheduleRestTimerNotification(endAtMs: number, force = false): Promise<void> {
+        if (!force && !(await this.canNotifyType('restTimer'))) return;
         await this.ensureChannels();
 
         try {
@@ -274,31 +298,46 @@ class SystemNotificationServiceImpl {
         totalRounds: number;
         timeLeft: number;
         isPaused: boolean;
-    }): Promise<void> {
-        if (!(await this.canNotifyType('intervalTimer'))) return;
+    }, force = false): Promise<void> {
+        if (!force && !(await this.canNotifyType('intervalTimer'))) return;
         await this.ensureChannels();
-
         const { phase, currentRound, totalRounds, timeLeft, isPaused } = params;
-        const phaseLabel = phase === 'work' ? '🔴 TRABAJO' : phase === 'rest' ? '🟢 DESCANSO' : phase === 'prepare' ? '⏳ PREPARACIÓN' : '⏱ TIMER';
+        const phaseLabel = phase === 'work' ? '🔴 TRABAJO' : phase === 'rest' ? '🟢 DESCANSO' : (phase === 'prepare' ? '⏳ PREPARACIÓN' : '⏱ TIMER');
         const timeStr = this.formatDuration(timeLeft);
-        const statusSuffix = isPaused ? ' (Pausado)' : '';
+        const statusEmoji = isPaused ? '⏸️' : '💪';
 
         try {
             await notifee.displayNotification({
                 id: NOTIFICATION_IDS.INTERVAL_TIMER,
-                title: `${phaseLabel}${statusSuffix}`,
+                title: `${statusEmoji} ${phaseLabel}`,
                 body: `Ronda ${currentRound}/${totalRounds}  ·  ${timeStr} restante`,
                 android: {
                     channelId: CHANNELS.INTERVAL_TIMER,
-                    ongoing: true,
+                    asForegroundService: true,
+                    foregroundServiceTypes: [1], // DATA_SYNC
+                    category: AndroidCategory.PROGRESS, // Use PROGRESS category for better system handling
                     autoCancel: false,
-                    smallIcon: 'ic_notification',
+                    color: '#5c2e2e',
                     pressAction: { id: 'default' },
-                    showChronometer: !isPaused,
+                    onlyAlertOnce: true,
+                    // Remove chronometer if it's causing issues with rendering updating body
+                    showChronometer: false,
+                    // Set importance explicitly even if channel has it
+                    importance: AndroidImportance.HIGH,
                 },
-                ios: { categoryId: 'interval-timer' },
+                ios: {
+                    categoryId: 'interval-timer',
+                    foregroundPresentationOptions: {
+                        badge: true,
+                        sound: true,
+                        banner: true,
+                        list: true,
+                    }
+                },
             });
-        } catch { /* non-critical */ }
+        } catch (e) {
+            console.error('Error showing interval timer notification:', e);
+        }
     }
 
     async dismissIntervalTimerNotification(): Promise<void> {
@@ -312,8 +351,8 @@ class SystemNotificationServiceImpl {
     async showUpdateAvailable(params: {
         latestVersion: string;
         releaseDate?: string | null;
-    }): Promise<void> {
-        if (!(await this.canNotifyType('updateAvailable'))) return;
+    }, force = false): Promise<void> {
+        if (!force && !(await this.canNotifyType('updateAvailable'))) return;
         await this.ensureChannels();
 
         const { latestVersion, releaseDate } = params;
@@ -340,8 +379,8 @@ class SystemNotificationServiceImpl {
 
     async showAppUpdated(params: {
         newVersion: string;
-    }): Promise<void> {
-        if (!(await this.canNotifyType('appUpdated'))) return;
+    }, force = false): Promise<void> {
+        if (!force && !(await this.canNotifyType('appUpdated'))) return;
         await this.ensureChannels();
 
         try {
@@ -420,10 +459,9 @@ class SystemNotificationServiceImpl {
                     title,
                     body,
                     android: {
-                        channelId: CHANNELS.REMINDERS,
+                        channelId: CHANNELS.STREAK,
                         pressAction: { id: 'default' },
                         autoCancel: true,
-                        smallIcon: 'ic_notification',
                     },
                     ios: { sound: 'default' },
                 },
@@ -437,7 +475,56 @@ class SystemNotificationServiceImpl {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 9. CLEANUP
+    // 9. TESTING / DEBUG
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    async testOne(type: keyof typeof NOTIFICATION_IDS): Promise<void> {
+        await this.ensureChannels();
+        switch (type) {
+            case 'PERSISTENT_WORKOUT':
+                await this.showPersistentWorkout({ elapsedSeconds: 3661, completedSets: 12, totalExercises: 5, isPaused: false }, true);
+                break;
+            case 'INACTIVITY_REMINDER':
+                // For test, trigger in 5 seconds
+                const trigger: TimestampTrigger = { type: TriggerType.TIMESTAMP, timestamp: Date.now() + 5000 };
+                await notifee.createTriggerNotification({
+                    id: NOTIFICATION_IDS.INACTIVITY_REMINDER,
+                    title: '🧪 TEST: Inactividad',
+                    body: 'Este es un test de recordatorio por inactividad (5s).',
+                    android: { channelId: CHANNELS.REMINDERS, pressAction: { id: 'default' }, autoCancel: true },
+                }, trigger);
+                break;
+            case 'CONGRATULATION':
+                await this.showCongratulation({ durationSeconds: 3600, completedSets: 20, totalExercises: 8 }, true);
+                break;
+            case 'REST_TIMER':
+                await this.scheduleRestTimerNotification(Date.now() + 3000, true);
+                break;
+            case 'INTERVAL_TIMER':
+                await this.showIntervalTimerNotification({ phase: 'work', currentRound: 1, totalRounds: 8, timeLeft: 20, isPaused: false }, true);
+                break;
+            case 'UPDATE_AVAILABLE':
+                await this.showUpdateAvailable({ latestVersion: '3.0.0-BETA' }, true);
+                break;
+            case 'APP_UPDATED':
+                await this.showAppUpdated({ newVersion: '2.0.0' }, true);
+                break;
+            case 'STREAK_REMINDER':
+                await notifee.displayNotification({
+                    title: '🧪 TEST: Racha Diaria',
+                    body: '¡Así se vería tu recordatorio de racha!',
+                    android: {
+                        channelId: CHANNELS.STREAK,
+                        pressAction: { id: 'default' },
+                    },
+                    ios: { categoryId: 'streak-reminder' }
+                });
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 10. CLEANUP
     // ═══════════════════════════════════════════════════════════════════════════
 
     async cancelAll(): Promise<void> {

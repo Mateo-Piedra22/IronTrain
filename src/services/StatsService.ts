@@ -1,28 +1,30 @@
-import { DOTS_COEFFS, WILKS_COEFFS } from '../constants/Formulas';
+import { DOTS_FEMALE, DOTS_MALE, WILKS_FEMALE, WILKS_MALE } from '../constants/Formulas';
 import { dbService } from './DatabaseService';
 
 class StatsService {
     public calculateWilks(bodyWeightKg: number, liftedTotalKg: number, isFemale: boolean = false): number {
         if (bodyWeightKg <= 0) return 0;
 
-        if (isFemale) {
-            // Placeholder for female coefficients
-        }
-
-        const { a, b, c, d, e, f } = WILKS_COEFFS;
+        const { a, b, c, d, e, f } = isFemale ? WILKS_FEMALE : WILKS_MALE;
         const x = bodyWeightKg;
-        const coeff = 500 / (a + b * x + c * Math.pow(x, 2) + d * Math.pow(x, 3) + e * Math.pow(x, 4) + f * Math.pow(x, 5));
+        const poly = a + b * x + c * Math.pow(x, 2) + d * Math.pow(x, 3) + e * Math.pow(x, 4) + f * Math.pow(x, 5);
+        if (poly === 0) return 0;
+
+        const coeff = 500 / poly;
         return liftedTotalKg * coeff;
     }
 
     public calculateDOTS(bodyWeightKg: number, liftedTotalKg: number, isFemale: boolean = false): number {
         if (bodyWeightKg <= 0) return 0;
 
-        const { A, B, C, D, E } = DOTS_COEFFS;
+        const { A, B, C, D, E } = isFemale ? DOTS_FEMALE : DOTS_MALE;
         const w = bodyWeightKg;
         const denominator = A * Math.pow(w, 4) + B * Math.pow(w, 3) + C * Math.pow(w, 2) + D * w + E;
+        if (denominator === 0) return 0;
+
         return (liftedTotalKg * 500) / denominator;
     }
+
 
     /**
      * Calculate Volume Density (kg / minute) for a specific workout.

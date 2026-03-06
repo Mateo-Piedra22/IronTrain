@@ -98,6 +98,8 @@ export class DatabaseService {
         date INTEGER NOT NULL,
         start_time INTEGER NOT NULL,
         end_time INTEGER,
+        finish_lat REAL,
+        finish_lon REAL,
         name TEXT,
         notes TEXT,
         status TEXT NOT NULL,
@@ -153,6 +155,7 @@ export class DatabaseService {
         date INTEGER NOT NULL,
         type TEXT NOT NULL,
         value REAL NOT NULL,
+        unit TEXT NOT NULL,
         notes TEXT,
         updated_at INTEGER DEFAULT 0,
         deleted_at INTEGER
@@ -201,6 +204,30 @@ export class DatabaseService {
         FOREIGN KEY (exercise_id) REFERENCES exercises (id)
       );
 
+      CREATE TABLE IF NOT EXISTS badges (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        color TEXT NOT NULL,
+        icon TEXT,
+        group_name TEXT,
+        is_system INTEGER DEFAULT 0,
+        updated_at INTEGER DEFAULT 0,
+        deleted_at INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS exercise_badges (
+        id TEXT PRIMARY KEY NOT NULL,
+        exercise_id TEXT NOT NULL,
+        badge_id TEXT NOT NULL,
+        updated_at INTEGER DEFAULT 0,
+        deleted_at INTEGER,
+        FOREIGN KEY (exercise_id) REFERENCES exercises (id) ON DELETE CASCADE,
+        FOREIGN KEY (badge_id) REFERENCES badges (id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_eb_exercise ON exercise_badges(exercise_id);
+
+
       CREATE TABLE IF NOT EXISTS routines (
         id TEXT PRIMARY KEY NOT NULL,
         name TEXT NOT NULL,
@@ -230,6 +257,60 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
       CREATE INDEX IF NOT EXISTS idx_routine_days_routine ON routine_days(routine_id);
       CREATE INDEX IF NOT EXISTS idx_routine_exercises_day ON routine_exercises(routine_day_id);
+
+      CREATE TABLE IF NOT EXISTS user_profiles (
+        id TEXT PRIMARY KEY NOT NULL,
+        username TEXT,
+        display_name TEXT,
+        is_public INTEGER DEFAULT 1,
+        share_stats INTEGER DEFAULT 0,
+        current_streak INTEGER DEFAULT 0,
+        highest_streak INTEGER DEFAULT 0,
+        last_active_date INTEGER,
+        push_token TEXT,
+        updated_at INTEGER DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS changelog_reactions (
+        id TEXT PRIMARY KEY NOT NULL,
+        changelog_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS kudos (
+        id TEXT PRIMARY KEY NOT NULL,
+        feed_id TEXT NOT NULL,
+        giver_id TEXT NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS changelogs (
+        id TEXT PRIMARY KEY NOT NULL,
+        version TEXT NOT NULL,
+        date INTEGER NOT NULL,
+        items TEXT NOT NULL,
+        is_unreleased INTEGER DEFAULT 0,
+        metadata TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        reaction_count INTEGER DEFAULT 0 NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS activity_feed (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        action_type TEXT NOT NULL,
+        reference_id TEXT,
+        metadata TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER,
+        kudo_count INTEGER DEFAULT 0 NOT NULL
+      );
     `;
 
         await this.executeRaw(schema);
@@ -554,6 +635,76 @@ export class DatabaseService {
         } catch (e) {
             console.warn('Migration 11 failed:', e);
         }
+
+        // Migration 12: Add unit column to measurements if it doesn't exist
+        try {
+            const result = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('measurements') WHERE name='unit'");
+            if (result && result.count === 0) {
+                console.log('Running Migration 12: Adding unit to measurements');
+                await this.executeRaw("ALTER TABLE measurements ADD COLUMN unit TEXT DEFAULT 'cm'");
+                // Fix legacy weights/fat if any
+                await this.run("UPDATE measurements SET unit = 'kg' WHERE type = 'weight'");
+                await this.run("UPDATE measurements SET unit = '%' WHERE type = 'body_fat'");
+            }
+        } catch (e) {
+            console.warn('Migration 12 failed (measurements unit):', e);
+        }
+
+        // Migration 13: Create changelog_reactions and kudos tables
+        try {
+            await this.executeRaw(`
+                CREATE TABLE IF NOT EXISTS changelog_reactions (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    changelog_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    deleted_at INTEGER
+                );
+
+                CREATE TABLE IF NOT EXISTS kudos (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    feed_id TEXT NOT NULL,
+                    giver_id TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    deleted_at INTEGER
+                );
+
+                CREATE TABLE IF NOT EXISTS activity_feed (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    user_id TEXT NOT NULL,
+                    action_type TEXT NOT NULL,
+                    reference_id TEXT,
+                    metadata TEXT,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    deleted_at INTEGER,
+                    kudo_count INTEGER DEFAULT 0 NOT NULL
+                );
+            `);
+
+            const chRes = await this.getFirst<{ count: number }>(
+                "SELECT count(*) as count FROM pragma_table_info('changelogs') WHERE name='reaction_count'"
+            );
+            if (chRes && chRes.count === 0) {
+                await this.executeRaw("ALTER TABLE changelogs ADD COLUMN reaction_count INTEGER DEFAULT 0 NOT NULL");
+            }
+        } catch (e) {
+            console.error('Migration 13 failed (changelog_reactions/kudos/activity_feed):', e);
+        }
+
+        try {
+            const info = await this.getAll<{ name: string }>("PRAGMA table_info('workouts')");
+            const columns = info.map((c) => c.name);
+            if (!columns.includes('finish_lat')) {
+                await this.executeRaw('ALTER TABLE workouts ADD COLUMN finish_lat REAL');
+            }
+            if (!columns.includes('finish_lon')) {
+                await this.executeRaw('ALTER TABLE workouts ADD COLUMN finish_lon REAL');
+            }
+        } catch (e) {
+            console.warn('Migration 14 failed (workouts finish location):', e);
+        }
     }
 
     private async seedDatabase(): Promise<void> {
@@ -604,6 +755,54 @@ export class DatabaseService {
         } catch (error) {
             console.error('Seeding failed', error);
             throw error;
+        }
+
+        // Seeding Badges (System Default)
+        await this.seedBadges();
+    }
+
+
+    private async seedBadges(): Promise<void> {
+        try {
+            const countRes = await this.getFirst<{ count: number }>('SELECT count(*) as count FROM badges');
+            if (countRes && countRes.count > 0) return;
+
+            // Hardcoded Deterministic UUIDs for System Badges to ensure cross-device consistency
+            const systemBadges = [
+                // Equipment
+                { id: 'bad-eq-001', name: 'Barra', color: '#475569', icon: 'BarChart', group_name: 'equipamiento' },
+                { id: 'bad-eq-002', name: 'Mancuernas', color: '#64748b', icon: 'BicepsFlexed', group_name: 'equipamiento' },
+                { id: 'bad-eq-003', name: 'Barra Z', color: '#475569', icon: 'Activity', group_name: 'equipamiento' },
+                { id: 'bad-eq-004', name: 'Poleas', color: '#64748b', icon: 'Settings', group_name: 'equipamiento' },
+                { id: 'bad-eq-005', name: 'Máquina', color: '#475569', icon: 'Box', group_name: 'equipamiento' },
+                { id: 'bad-eq-006', name: 'Peso Corporal', color: '#64748b', icon: 'User', group_name: 'equipamiento' },
+                { id: 'bad-eq-007', name: 'Smith Machine', color: '#475569', icon: 'Lock', group_name: 'equipamiento' },
+
+                // Position
+                { id: 'bad-ps-001', name: 'Plano', color: '#f97316', icon: 'Minus', group_name: 'posicion' },
+                { id: 'bad-ps-002', name: 'Inclinado', color: '#fbbf24', icon: 'TrendingUp', group_name: 'posicion' },
+                { id: 'bad-ps-003', name: 'Declinado', color: '#d97706', icon: 'TrendingDown', group_name: 'posicion' },
+                { id: 'bad-ps-004', name: 'Sentado', color: '#f59e0b', icon: 'Armchair', group_name: 'posicion' },
+                { id: 'bad-ps-005', name: 'De Pie', color: '#fb923c', icon: 'Accessibility', group_name: 'posicion' },
+
+                // Variation
+                { id: 'bad-vr-001', name: 'Unilateral', color: '#3b82f6', icon: 'Hand', group_name: 'variacion' },
+                { id: 'bad-vr-002', name: 'Agarre Ancho', color: '#6366f1', icon: 'Maximize', group_name: 'variacion' },
+                { id: 'bad-vr-003', name: 'Agarre Estrecho', color: '#4f46e5', icon: 'Minimize', group_name: 'variacion' },
+            ];
+
+            await this.withTransaction(async () => {
+                const now = Date.now();
+                for (const badge of systemBadges) {
+                    await this.run(
+                        'INSERT INTO badges (id, name, color, icon, group_name, is_system, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?)',
+                        [badge.id, badge.name, badge.color, badge.icon, badge.group_name, now]
+                    );
+                }
+            });
+            console.log(`Seeded ${systemBadges.length} system badges.`);
+        } catch (e) {
+            console.warn('Failed to seed badges:', e);
         }
     }
 
@@ -785,17 +984,29 @@ export class DatabaseService {
 
     // --- SETS ---
 
-    public async getSetsForWorkout(workoutId: string): Promise<(WorkoutSet & { exercise_name: string; category_color: string; exercise_type: ExerciseType })[]> {
-        // Join with exercises to get names for the UI
-        return await this.getAll(
-            `SELECT ws.*, e.name as exercise_name, e.type as exercise_type, c.color as category_color 
-       FROM workout_sets ws
-       JOIN exercises e ON ws.exercise_id = e.id
-       LEFT JOIN categories c ON e.category_id = c.id
-       WHERE ws.workout_id = ? 
-       ORDER BY ws.order_index ASC`,
+    public async getSetsForWorkout(workoutId: string): Promise<(WorkoutSet & { exercise_name: string; category_color: string; exercise_type: ExerciseType; badges: any[] })[]> {
+        // Join with exercises to get names for the UI, and subquery for badges
+        const rows = await this.getAll<any>(
+            `SELECT ws.*, e.name as exercise_name, e.type as exercise_type, c.color as category_color,
+            (SELECT GROUP_CONCAT(b.name || '|' || b.color || '|' || COALESCE(b.icon, '')) 
+             FROM badges b 
+             JOIN exercise_badges eb ON b.id = eb.badge_id 
+             WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL) as badges_csv
+        FROM workout_sets ws
+        JOIN exercises e ON ws.exercise_id = e.id
+        LEFT JOIN categories c ON e.category_id = c.id
+        WHERE ws.workout_id = ? 
+        ORDER BY ws.order_index ASC`,
             [workoutId]
         );
+
+        return rows.map(row => {
+            const badges = row.badges_csv ? row.badges_csv.split(',').map((s: string) => {
+                const [name, color, icon] = s.split('|');
+                return { name, color, icon: icon || undefined };
+            }) : [];
+            return { ...row, badges };
+        });
     }
 
     public async addSet(set: Partial<WorkoutSet> & { workout_id: string; exercise_id: string; order_index: number; type: string }): Promise<string> {
@@ -876,6 +1087,9 @@ export class DatabaseService {
                 await this.run('DELETE FROM exercises');
                 await this.run('DELETE FROM categories');
                 await this.run("INSERT INTO categories (id, name, is_system, sort_order, color) VALUES ('sys-cat-1', 'Sin categoría', 1, 999, '#64748b')");
+
+                await this.run('DELETE FROM exercise_badges');
+                await this.run('DELETE FROM badges');
 
                 await this.run('DELETE FROM sync_queue');
                 await this.run('DELETE FROM settings');

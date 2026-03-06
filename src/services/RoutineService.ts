@@ -1,4 +1,4 @@
-import { Routine, RoutineDay, RoutineExercise } from '../types/db';
+import { Badge, Routine, RoutineDay, RoutineExercise } from '../types/db';
 import { uuidV4 } from '../utils/uuid';
 import { dbService } from './DatabaseService';
 
@@ -7,7 +7,7 @@ export interface RoutineWithDays extends Routine {
 }
 
 export interface RoutineDayWithExercises extends RoutineDay {
-    exercises: (RoutineExercise & { exercise_name: string; category_name?: string })[];
+    exercises: (RoutineExercise & { exercise_name: string; category_name?: string; badges: Badge[] })[];
 }
 
 type SharedRoutinePayload = {
@@ -16,6 +16,8 @@ type SharedRoutinePayload = {
     routine_exercises?: Record<string, unknown>[];
     exercises?: Record<string, unknown>[];
     categories?: Record<string, unknown>[];
+    badges?: Record<string, unknown>[];
+    exercise_badges?: Record<string, unknown>[];
 };
 
 type SharedExercise = {
@@ -27,6 +29,20 @@ type SharedExercise = {
     notes?: unknown;
     category_id?: unknown;
     category_name?: unknown;
+};
+
+type SharedBadge = {
+    id?: unknown;
+    name?: unknown;
+    color?: unknown;
+    group_name?: unknown;
+    icon?: unknown;
+    is_system?: unknown;
+};
+
+type SharedExerciseBadge = {
+    exercise_id?: unknown;
+    badge_id?: unknown;
 };
 
 type SharedRoutineDay = {
@@ -73,7 +89,7 @@ class RoutineService {
         const routineDaysWithEx: RoutineDayWithExercises[] = [];
 
         for (const day of days) {
-            const exercises = await dbService.getAll<RoutineExercise & { exercise_name: string; category_name: string }>(`
+            const dayExercises = await dbService.getAll<RoutineExercise & { exercise_name: string; category_name: string }>(`
                 SELECT re.*, e.name as exercise_name, c.name as category_name 
                 FROM routine_exercises re
                 JOIN exercises e ON re.exercise_id = e.id
@@ -82,9 +98,20 @@ class RoutineService {
                 ORDER BY re.order_index ASC
             `, [day.id]);
 
+            // Fetch badges for each exercise
+            const exercisesWithBadges = await Promise.all(dayExercises.map(async (ex) => {
+                const badges = await dbService.getAll<Badge>(`
+                    SELECT b.* 
+                    FROM badges b
+                    JOIN exercise_badges eb ON b.id = eb.badge_id
+                    WHERE eb.exercise_id = ? AND eb.deleted_at IS NULL AND b.deleted_at IS NULL
+                `, [ex.exercise_id]);
+                return { ...ex, badges };
+            }));
+
             routineDaysWithEx.push({
                 ...day,
-                exercises
+                exercises: exercisesWithBadges
             });
         }
 
@@ -98,12 +125,21 @@ class RoutineService {
         const id = uuidV4();
         await dbService.run('INSERT INTO routines (id, name, description, is_public) VALUES (?, ?, ?, ?)', [id, name, description || null, isPublic]);
         await dbService.queueSyncMutation('routines', id, 'INSERT', { id, name, description: description || null, is_public: isPublic });
+
+        // Emit for real-time UI updates
+        const { dataEventService } = await import('./DataEventService');
+        dataEventService.emit('DATA_UPDATED');
+
         return id;
     }
 
     public async updateRoutine(id: string, name: string, description?: string, isPublic: number = 0): Promise<void> {
         await dbService.run('UPDATE routines SET name = ?, description = ?, is_public = ? WHERE id = ?', [name, description || null, isPublic, id]);
         await dbService.queueSyncMutation('routines', id, 'UPDATE', { name, description: description || null, is_public: isPublic });
+
+        // Emit for real-time UI updates
+        const { dataEventService } = await import('./DataEventService');
+        dataEventService.emit('DATA_UPDATED');
     }
 
     public async deleteRoutine(id: string): Promise<void> {
@@ -111,6 +147,10 @@ class RoutineService {
         // For sync consistency, we should ideally fetch children and push deletes. But the server can also implement cascading delete.
         await dbService.run('DELETE FROM routines WHERE id = ?', [id]);
         await dbService.queueSyncMutation('routines', id, 'DELETE');
+
+        // Emit for real-time UI updates
+        const { dataEventService } = await import('./DataEventService');
+        dataEventService.emit('DATA_UPDATED');
     }
 
     // --- ROUTINE DAYS ---
@@ -118,7 +158,7 @@ class RoutineService {
         const day = await dbService.getFirst<RoutineDay>('SELECT * FROM routine_days WHERE id = ?', [dayId]);
         if (!day) return null;
 
-        const exercises = await dbService.getAll<RoutineExercise & { exercise_name: string; category_name: string }>(`
+        const dayExercises = await dbService.getAll<RoutineExercise & { exercise_name: string; category_name: string }>(`
             SELECT re.*, e.name as exercise_name, c.name as category_name 
             FROM routine_exercises re
             JOIN exercises e ON re.exercise_id = e.id
@@ -127,9 +167,20 @@ class RoutineService {
             ORDER BY re.order_index ASC
         `, [day.id]);
 
+        // Fetch badges for each exercise
+        const exercisesWithBadges = await Promise.all(dayExercises.map(async (ex) => {
+            const badges = await dbService.getAll<Badge>(`
+                SELECT b.* 
+                FROM badges b
+                JOIN exercise_badges eb ON b.id = eb.badge_id
+                WHERE eb.exercise_id = ? AND eb.deleted_at IS NULL AND b.deleted_at IS NULL
+            `, [ex.exercise_id]);
+            return { ...ex, badges };
+        }));
+
         return {
             ...day,
-            exercises
+            exercises: exercisesWithBadges
         };
     }
 
@@ -196,6 +247,9 @@ class RoutineService {
         const routineExercises = toArray<SharedRoutineExercise>(payload?.routine_exercises);
         const exercises = toArray<SharedExercise>(payload?.exercises);
         const categories = toArray<SharedCategory>(payload?.categories);
+        const badges = toArray<SharedBadge>(payload?.badges);
+        const exerciseBadges = toArray<SharedExerciseBadge>(payload?.exercise_badges);
+
         const routineName = getString(routine?.name) || 'Rutina importada';
         const routineDescription = getString(routine?.description);
 
@@ -282,6 +336,40 @@ class RoutineService {
                     return defaultCategoryId;
                 };
 
+                // Badge Map
+                const badgeMap = new Map<string, string>();
+                for (const badge of badges) {
+                    const remoteId = getString(badge.id);
+                    const name = getString(badge.name);
+                    if (!remoteId || !name) continue;
+
+                    // Check if badge exists by name
+                    const existing = await dbService.getFirst<{ id: string }>(
+                        'SELECT id FROM badges WHERE name COLLATE NOCASE = ? AND deleted_at IS NULL',
+                        [name]
+                    );
+
+                    if (existing?.id) {
+                        badgeMap.set(remoteId, existing.id);
+                    } else {
+                        const newId = uuidV4();
+                        const color = getString(badge.color) || '#3b82f6';
+                        const group = getString(badge.group_name) || 'otro';
+                        const icon = getString(badge.icon);
+                        const isSystem = getNumber(badge.is_system) ?? 0;
+                        const now = Date.now();
+
+                        await dbService.run(
+                            'INSERT INTO badges (id, name, color, group_name, icon, is_system, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                            [newId, name, color, group, icon, isSystem, now]
+                        );
+                        await dbService.queueSyncMutation('badges', newId, 'INSERT', {
+                            id: newId, name, color, group_name: group, icon, is_system: isSystem, updated_at: now
+                        });
+                        badgeMap.set(remoteId, newId);
+                    }
+                }
+
                 // 1. Resolve Exercises (De-duplication by origin_id or name matching)
                 const exerciseMap = new Map<string, string>(); // Maps old remote ID => new local ID
                 for (const ex of exercises) {
@@ -294,8 +382,9 @@ class RoutineService {
                         [originTarget, exerciseName]
                     );
 
+                    let localExId = '';
                     if (existing?.id) {
-                        exerciseMap.set(remoteExerciseId, existing.id);
+                        localExId = existing.id;
                     } else {
                         const categoryId = await resolveCategoryId(ex);
                         const newExId = uuidV4();
@@ -316,7 +405,33 @@ class RoutineService {
                             is_system: 0,
                             origin_id: originTarget
                         });
-                        exerciseMap.set(remoteExerciseId, newExId);
+                        localExId = newExId;
+                    }
+                    exerciseMap.set(remoteExerciseId, localExId);
+
+                    // Link exercise badges
+                    const relevantBadges = exerciseBadges.filter(eb => getString(eb.exercise_id) === remoteExerciseId);
+                    for (const eb of relevantBadges) {
+                        const remoteBadgeId = getString(eb.badge_id);
+                        const localBadgeId = remoteBadgeId ? badgeMap.get(remoteBadgeId) : null;
+                        if (localBadgeId) {
+                            // Link if not already existing
+                            const linkExists = await dbService.getFirst<{ id: string }>(
+                                'SELECT id FROM exercise_badges WHERE exercise_id = ? AND badge_id = ? AND deleted_at IS NULL',
+                                [localExId, localBadgeId]
+                            );
+                            if (!linkExists) {
+                                const linkId = uuidV4();
+                                const now = Date.now();
+                                await dbService.run(
+                                    'INSERT INTO exercise_badges (id, exercise_id, badge_id, updated_at) VALUES (?, ?, ?, ?)',
+                                    [linkId, localExId, localBadgeId, now]
+                                );
+                                await dbService.queueSyncMutation('exercise_badges', linkId, 'INSERT', {
+                                    id: linkId, exercise_id: localExId, badge_id: localBadgeId, updated_at: now
+                                });
+                            }
+                        }
                     }
                 }
 
@@ -365,6 +480,14 @@ class RoutineService {
                 }
             });
 
+            // Emit event for real-time UI updates across tabs (e.g. Social -> Library)
+            try {
+                const { dataEventService } = await import('./DataEventService');
+                dataEventService.emit('DATA_UPDATED');
+            } catch (e) {
+                console.error('Error emitting DATA_UPDATED after import:', e);
+            }
+
             return newRoutineId;
 
         } catch (e) {
@@ -380,6 +503,8 @@ class RoutineService {
         let routine_exercises: any[] = [];
         let exercises: any[] = [];
         let categories: any[] = [];
+        let badges: any[] = [];
+        let exercise_badges: any[] = [];
 
         if (routine_days.length > 0) {
             const dayIds = routine_days.map((d: any) => d.id);
@@ -396,6 +521,21 @@ class RoutineService {
                     `SELECT * FROM exercises WHERE id IN (${exPlaceholders})`,
                     exIds
                 );
+
+                // Export Badges
+                exercise_badges = await dbService.getAll(
+                    `SELECT * FROM exercise_badges WHERE exercise_id IN (${exPlaceholders}) AND deleted_at IS NULL`,
+                    exIds
+                );
+
+                if (exercise_badges.length > 0) {
+                    const badgeIds = Array.from(new Set(exercise_badges.map(eb => eb.badge_id)));
+                    const badgePlaceholders = badgeIds.map(() => '?').join(',');
+                    badges = await dbService.getAll(
+                        `SELECT * FROM badges WHERE id IN (${badgePlaceholders}) AND deleted_at IS NULL`,
+                        badgeIds
+                    );
+                }
             }
         }
 
@@ -410,7 +550,7 @@ class RoutineService {
             }
         }
 
-        return { routine, routine_days, routine_exercises, exercises, categories };
+        return { routine, routine_days, routine_exercises, exercises, categories, badges, exercise_badges };
     }
 }
 

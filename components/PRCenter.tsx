@@ -1,3 +1,4 @@
+import { BadgePill } from '@/components/ui/BadgePill';
 import { AnalysisService, PowerliftingPRs } from '@/src/services/AnalysisService';
 import { Colors } from '@/src/theme';
 import { AlertCircle, Crown, Info, Trophy } from 'lucide-react-native';
@@ -133,6 +134,11 @@ export function PRCenter() {
                                         {lift.name && (
                                             <Text style={styles.liftExName} numberOfLines={1}>{lift.name}</Text>
                                         )}
+                                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 2, marginTop: 2 }}>
+                                            {(data[lift.label.toLowerCase() as keyof typeof data] as any)?.badges?.map((b: any, i: number) => (
+                                                <BadgePill key={i} name={b.name} color={b.color} icon={b.icon} size="xs" />
+                                            ))}
+                                        </View>
                                     </View>
                                 </View>
                                 <View style={styles.liftBarTrack}>

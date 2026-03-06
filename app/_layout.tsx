@@ -1,4 +1,3 @@
-import { ChangelogService } from '@/src/services/ChangelogService';
 import { Colors } from '@/src/theme';
 import NetInfo from '@react-native-community/netinfo';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
@@ -13,6 +12,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GlobalNoticeHandler } from '../components/GlobalNoticeHandler';
 import '../components/TimerOverlay';
 import { TimerOverlay } from '../components/TimerOverlay';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
@@ -29,30 +29,17 @@ import { useConfirmStore } from '../src/store/confirmStore';
 import { useUpdateStore } from '../src/store/updateStore';
 import { notify } from '../src/utils/notify';
 
-/**
- * IronTrain Entry Point
- * 
- * Responsibilities:
- * 1. Initialize Global Database (Offline-first).
- * 2. Load Assets/Fonts.
- * 3. Configure Global Theme (IronTrain Industrial).
- * 4. Manage Splash Screen.
- */
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-// IronTrain Cream & Coffee Theme
-// Cream Background (#fff7f1), Coffee Primary (#5c2e2e), Dark Text (#321414)
 const IronTrainTheme = {
   ...DarkTheme,
   colors: {
     ...DarkTheme.colors,
-    primary: Colors.primary.DEFAULT, // Marrón Rojizo
-    background: Colors.iron[900], // Cream
-    card: Colors.iron[900], // Cream (Header)
-    text: Colors.iron[950], // Dark Coffee
-    border: Colors.iron[300], // Light Gray
+    primary: Colors.primary.DEFAULT,
+    background: Colors.iron[900],
+    card: Colors.iron[900],
+    text: Colors.iron[950],
+    border: Colors.iron[300],
     notification: Colors.primary.DEFAULT,
   },
 };
@@ -80,23 +67,22 @@ export default function RootLayout() {
   const updatePromptShown = useRef(false);
   const authToken = useAuthStore((s) => s.token);
   const lastSyncedTokenRef = useRef<string | null>(null);
-  const [fontsLoaded, fontError] = useFonts({
-    // Add custom fonts here if required (e.g., Inter/Roboto)
-  });
+  const [fontsLoaded, fontError] = useFonts({});
 
-  // Database and Auth Initialization Logic
   useEffect(() => {
     async function initInfo() {
       try {
+        const { notificationPermissionsService } = await import('../src/services/NotificationPermissionsService');
+        const { locationPermissionsService } = await import('../src/services/LocationPermissionsService');
         await useAuthStore.getState().initialize();
         await dbService.init();
         await configService.init();
         setDbInitialized(true);
-        // Track install analytics asynchronously
         MetricsAndFeedbackService.trackInstallIfNeeded();
+        await notificationPermissionsService.requestPermission(false);
+        await locationPermissionsService.requestWeatherBonusPermissionOnce();
       } catch (e) {
         console.error('CRITICAL: Initialization failed:', e);
-        // In production, we should log this to a crash reporting service (Sentry)
       }
     }
     initInfo();
@@ -109,56 +95,34 @@ export default function RootLayout() {
 
     const runInitialSync = async () => {
       try {
-        // We ensure last_pull_sync starts at 0 if it's the first time, 
-        // ensuring we pull EVERYTHING if needed.
         const res = await dbService.getFirst<{ value: string }>('SELECT value FROM settings WHERE key = ?', ['last_pull_sync']);
         if (!res) {
           await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', '0']);
         }
         await syncService.syncBidirectional();
+        await configService.reload();
+
+        // Register for push notifications
+        const { PushRegistrationService } = await import('../src/services/PushRegistrationService');
+        PushRegistrationService.registerForPushNotifications().catch(e => console.warn('Push registration failed:', e));
       } catch (e) {
         notify.error('Sync fallido', 'No se pudo sincronizar con Neon');
         console.error('Initial sync trigger failed:', e);
       }
     };
-
     runInitialSync();
   }, [dbInitialized, authToken]);
 
-  // What's new proactive banner
-  useEffect(() => {
-    if (dbInitialized) {
-      const currentVersion = ChangelogService.getAppVersion();
-      const lastAppVersion = configService.get('lastViewedChangelogVersion') || '0.0.0';
-      if (lastAppVersion !== '0.0.0' && currentVersion !== lastAppVersion) {
-        notify.banner(
-          `¡Actualizado a v${currentVersion}! Toca para ver qué hay de nuevo.`,
-          'success',
-          'Novedades',
-          () => router.push('/changelog'),
-          true
-        );
-      }
-    }
-  }, [dbInitialized, router]);
-
-  // Network Monitoring for Sync
   useEffect(() => {
     if (!dbInitialized) return;
-
     const unsubscribe = NetInfo.addEventListener(state => {
-      // If we go from offline to online, trigger bidirectional sync
       if (state.isConnected && state.isInternetReachable) {
-        syncService.syncBidirectional().catch(e => {
-          console.error('Background sync failed:', e);
-        });
+        syncService.syncBidirectional().catch(e => console.error('Background sync failed:', e));
       }
     });
-
     return () => unsubscribe();
   }, [dbInitialized]);
 
-  // Splash Screen Hiding Logic
   useEffect(() => {
     async function hideSplash() {
       if ((fontsLoaded || fontError) && dbInitialized) {
@@ -168,49 +132,37 @@ export default function RootLayout() {
     hideSplash();
   }, [fontsLoaded, fontError, dbInitialized]);
 
-  // Initialize Update Service
   useEffect(() => {
     if (dbInitialized) {
       updateService.init();
     }
   }, [dbInitialized]);
 
-  // Monitor Update Status (Blocking & Notifications)
   const updateStatus = useUpdateStore((state) => state.status);
   const installedVersion = useUpdateStore((state) => state.installedVersion);
   const latestVersion = useUpdateStore((state) => state.latestVersion);
   const downloadUrl = useUpdateStore((state) => state.downloadUrl);
   const notesUrl = useUpdateStore((state) => state.notesUrl);
 
-  const updateInfo = {
-    installedVersion,
-    latestVersion,
-    downloadUrl,
-    notesUrl,
-    downloadsPageUrl: downloadUrl // fallback
-  };
-
   useEffect(() => {
     if (updateStatus === 'update_available' && !updatePromptShown.current) {
       updatePromptShown.current = true;
       notify.banner(
-        `Nueva versión ${updateInfo.latestVersion} lista para descargar.`,
+        `Nueva versión ${latestVersion} lista para descargar.`,
         'info',
         'Actualizar',
         () => {
-          const url = updateInfo.downloadUrl ?? updateInfo.notesUrl;
+          const url = downloadUrl ?? notesUrl;
           if (url) Linking.openURL(url);
         }
       );
     }
-  }, [updateStatus, updateInfo]);
+  }, [updateStatus, latestVersion, downloadUrl, notesUrl]);
 
-  // Render Loading Fallback (shouldn't be visible due to Splash Screen, but safe guard)
   if ((!fontsLoaded && !fontError) || !dbInitialized) {
     return null;
   }
 
-  // FORCE UPDATE BLOCKING SCREEN
   if (updateStatus === 'deprecated') {
     return (
       <SafeAreaProvider>
@@ -225,13 +177,12 @@ export default function RootLayout() {
               Tu versión de IronTrain es demasiado antigua y ya no es compatible. Por favor, actualiza para continuar.
             </Text>
             <Text style={{ color: Colors.iron[400], fontSize: 11, marginTop: 16, fontVariant: ['tabular-nums'], fontWeight: '600' }}>
-              v{updateInfo.installedVersion} {'->'}  v{updateInfo.latestVersion}
+              v{installedVersion} {'->'}  v{latestVersion}
             </Text>
           </View>
-
           <TouchableOpacity
             onPress={() => {
-              const url = updateInfo.downloadUrl ?? updateInfo.notesUrl;
+              const url = downloadUrl ?? notesUrl;
               if (url) Linking.openURL(url);
             }}
             style={{ backgroundColor: Colors.primary.DEFAULT, width: '100%', paddingVertical: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
@@ -245,61 +196,28 @@ export default function RootLayout() {
   }
 
   return (
-
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider value={IronTrainTheme}>
           <StatusBar style="dark" backgroundColor={Colors.iron[900]} />
           <GlobalBanner />
+          <GlobalNoticeHandler />
           <TimerOverlay />
           <GlobalConfirmModal />
           <Stack
             screenOptions={{
-              headerStyle: {
-                backgroundColor: Colors.iron[900], // Cream
-              },
-              headerTintColor: Colors.primary.DEFAULT, // Primary
-              headerTitleStyle: {
-                fontWeight: 'bold',
-                color: Colors.iron[950] // Dark Coffee
-              },
-              contentStyle: {
-                backgroundColor: Colors.iron[900] // Cream Body
-              },
-              animation: 'slide_from_right' // Smooth native transition
+              headerStyle: { backgroundColor: Colors.iron[900] },
+              headerTintColor: Colors.primary.DEFAULT,
+              headerTitleStyle: { fontWeight: 'bold', color: Colors.iron[950] },
+              contentStyle: { backgroundColor: Colors.iron[900] },
+              animation: 'slide_from_right'
             }}
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="modal"
-              options={{
-                presentation: 'modal',
-                title: 'IronTrain'
-              }}
-            />
-            <Stack.Screen
-              name="changelog"
-              options={{
-                presentation: 'modal',
-                title: 'Novedades'
-              }}
-            />
-            {/* Dynamic workout screen */}
-            <Stack.Screen
-              name="workout/[id]"
-              options={{
-                title: 'Sesión',
-                headerBackTitle: 'Atrás'
-              }}
-            />
-            {/* Social Share Preview Modal */}
-            <Stack.Screen
-              name="share/routine/[id]"
-              options={{
-                presentation: 'modal',
-                headerShown: false,
-              }}
-            />
+            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'IronTrain' }} />
+            <Stack.Screen name="changelog" options={{ presentation: 'modal', title: 'Novedades' }} />
+            <Stack.Screen name="workout/[id]" options={{ title: 'Sesión', headerBackTitle: 'Atrás' }} />
+            <Stack.Screen name="share/routine/[id]" options={{ presentation: 'modal', headerShown: false }} />
           </Stack>
           <ToastContainer />
         </ThemeProvider>

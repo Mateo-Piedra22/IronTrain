@@ -54,6 +54,7 @@ export interface AppConfig {
     exerciseCardioMetricById: Record<string, 'distance' | 'time' | 'pace' | 'speed'>;
     exerciseCardioPrimaryPRById: Record<string, 'distance' | 'time' | 'pace' | 'speed'>;
     lastViewedChangelogVersion: string;
+    training_days: number[];
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -87,12 +88,18 @@ const DEFAULT_CONFIG: AppConfig = {
     exerciseCardioMetricById: {},
     exerciseCardioPrimaryPRById: {},
     lastViewedChangelogVersion: '0.0.0',
+    training_days: [1, 2, 3, 4, 5, 6], // default Mon-Sat
 };
 
 class ConfigService {
     private cache: AppConfig | null = null;
 
     public async init(): Promise<void> {
+        await this.loadConfig();
+    }
+
+    public async reload(): Promise<void> {
+        this.cache = null;
         await this.loadConfig();
     }
 
@@ -124,8 +131,17 @@ class ConfigService {
                         s.key === 'calculatorsRoundingKg' ||
                         s.key === 'calculatorsRoundingLbs'
                     ) loadedConfig[s.key] = parseFloat(s.value);
-                    else if (s.key === 'exerciseCardioMetricById') loadedConfig[s.key] = JSON.parse(s.value);
-                    else if (s.key === 'exerciseCardioPrimaryPRById') loadedConfig[s.key] = JSON.parse(s.value);
+                    else if (
+                        s.key === 'exerciseCardioMetricById' ||
+                        s.key === 'exerciseCardioPrimaryPRById' ||
+                        s.key === 'training_days'
+                    ) {
+                        try {
+                            loadedConfig[s.key] = JSON.parse(s.value);
+                        } catch {
+                            // If it's not valid JSON, it might be a raw value or null
+                        }
+                    }
                     else if (s.key === 'notificationPreferences') {
                         try {
                             const parsed = JSON.parse(s.value);
@@ -186,6 +202,11 @@ class ConfigService {
             }
             loadedConfig.exerciseCardioPrimaryPRById = cleanedPR;
 
+            // Ensure training_days is always an array
+            if (!Array.isArray(loadedConfig.training_days)) {
+                loadedConfig.training_days = [...DEFAULT_CONFIG.training_days];
+            }
+
             this.cache = loadedConfig;
             return loadedConfig;
         } catch (e) {
@@ -209,6 +230,14 @@ class ConfigService {
         else if (typeof value === 'object') dbValue = JSON.stringify(value);
 
         await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, dbValue]);
+
+        // Emit event for real-time UI updates
+        try {
+            const { dataEventService } = await import('./DataEventService');
+            dataEventService.emit('SETTINGS_UPDATED', { key, value });
+        } catch (e) {
+            // Emitter might not be ready or failed
+        }
     }
 
     public async reset(): Promise<void> {

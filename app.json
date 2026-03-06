@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "irontrain",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -15,16 +14,24 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.irontrain.app"
+      "bundleIdentifier": "com.irontrain.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "IronTrain usa tu ubicación aproximada al finalizar entrenamientos para detectar clima adverso y aplicar bonus opcionales de puntaje."
+      }
     },
     "android": {
       "package": "com.irontrain.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#fff7f1"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -41,7 +48,15 @@
           ]
         }
       ],
-      "expo-secure-store"
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#1a1a2e"
+        }
+      ],
+      "expo-secure-store",
+      "expo-location"
     ],
     "experiments": {
       "typedRoutes": true
@@ -49,6 +64,7 @@
     "extra": {
       "router": {},
       "updateFeedUrl": "https://irontrain.motiona.xyz/releases.json",
+      "backendUrl": "https://irontrain.motiona.xyz",
       "eas": {
         "projectId": "76d89df6-9ab1-4903-af08-64d0bc630646"
       }

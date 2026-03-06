@@ -1,117 +1,125 @@
-# Publicar una nueva versión (a prueba de tontos)
+# Publicar una Nueva Versión (Guía Definitiva)
 
-Esta guía asume que **ya probaste todo** y la build está lista.
+Esta guía documenta el proceso estricto para realizar el despliegue de una nueva versión de IronTrain. Se basa en una política de Zero-Trust y automatización para garantizar la integridad de los datos y la consistencia entre la App, la Web y el Backend.
 
 ## Objetivo
-Al finalizar, vas a tener:
-- APK publicado en GitHub Releases (descargable)
-- Web actualizada (Descargas + Changelog)
-- App avisando “Actualización disponible” y abriendo la descarga
+Al finalizar este proceso, se habrán cumplido los siguientes hitos:
+- APK publicado y firmado en GitHub Releases (descargable).
+- Website actualizado (Sección de Descargas y Changelog).
+- API de Sincronización preparada para la nueva versión.
+- Sistema de Actualización In-App notificando a los usuarios con el link de descarga directo.
 
 ---
 
-## Paso 0 — Requisitos (una sola vez)
-### En GitHub (Repo)
-- Configurá el secret `EXPO_TOKEN` (para que GitHub Actions pueda buildear con EAS).
-  - Crear token: Expo Dashboard → Settings → Access Tokens → Create token
-  - Guardar en GitHub: Repo → Settings → Secrets and variables → Actions → New repository secret → `EXPO_TOKEN`
+## Paso 0 - Requisitos Previos (Configuración Unica)
 
-### En Vercel (Website)
-- Root Directory: `website`
-- Variables env:
-  - `GITHUB_RELEASES_OWNER`
-  - `GITHUB_RELEASES_REPO`
-  - `GITHUB_RELEASES_TOKEN` (opcional)
-- Importante: en Vercel, dejá **Output Directory vacío** (Next.js no usa `public` como output).
+### Infraestructura de Build (GitHub Actions)
+- Configurar el Secret `EXPO_TOKEN` en el repositorio de GitHub para permitir que las Actions ejecuten builds con EAS.
+  - Generar token en: Expo Dashboard > Settings > Access Tokens.
+  - Guardar en: GitHub > Repo > Settings > Secrets and variables > Actions > `EXPO_TOKEN`.
 
----
-
-## Paso 1 — Elegí la versión
-Ejemplo: `1.2.0`
-
-Regla simple:
-- Si es algo grande: subí minor (1.1.0 → 1.2.0)
-- Si es fix: subí patch (1.1.0 → 1.1.1)
+### Infraestructura de Hosting (Vercel)
+- Directorio Raíz: `website`
+- Variables de Entorno Críticas:
+  - `DATABASE_URL`: Conexión string de Neon Database.
+  - `NEON_AUTH_COOKIE_SECRET`: Secreto para verificación de JWT de IronSocial.
+  - `NEXT_PUBLIC_NEON_AUTH_URL`: URL del proveedor de autenticación.
+  - `GITHUB_RELEASES_OWNER` / `REPO` / `TOKEN`: Para la sincronización de releases.
+  - `FIREBASE_PRIVATE_KEY` y asociados: Para el envío de notificaciones Push (FCM).
 
 ---
 
-## Paso 2 — Preparar versión (automático)
-En la raíz del repo:
-- `npm run release:prepare -- 1.2.0`
+## Paso 1 - Definición de Versión Semántica
 
-Esto actualiza:
-- `app.json` (versión de la app)
-- `package.json` (versión del paquete)
-- `docs/CHANGELOG.md` (crea/asegura `1.2.0 (Unreleased)`)
-- `src/changelog.generated.json` (JSON que usa la app)
-- `website/content/CHANGELOG.md` (copia para la web)
-- `website/content/DOWNLOADS.json` (copia para la web)
+IronTrain utiliza [Semantic Versioning](https://semver.org/).
+Ejemplo de flujo: `2.0.0` -> `2.0.1` (Parche) o `2.0.0` -> `2.1.0` (Nueva Funcionalidad).
 
 ---
 
-## Paso 3 — Completar el changelog (manual)
-Abrí `docs/CHANGELOG.md` y en la sección:
-- `## 1.2.0 (Unreleased)`
+## Paso 2 - Preparación de la Versión (Automatizado)
 
-Reemplazá el placeholder por bullets reales:
-- `- Nueva pantalla de X`
-- `- Fix de Y`
-- `- Mejora de Z`
+Ejecutar en la raíz del proyecto:
+`npm run release:prepare -- [VERSION]`
+Ejemplo: `npm run release:prepare -- 2.0.1`
 
-Guardá el archivo.
-
----
-
-## Paso 4 — Cerrar el release (automático)
-Cuando ya lo querés “publicar”:
-- `npm run release:finalize`
-
-Esto hace:
-- `Unreleased` → fecha (`YYYY-MM-DD`)
-- crea el siguiente `Unreleased` (ej. `1.2.1 (Unreleased)`)
-- regenera `src/changelog.generated.json`
-- sincroniza `website/content/*` (para que Vercel no ignore cambios solo en `docs/`)
+Este comando sincroniza automáticamente:
+- `app.json` (Version y Build Number).
+- `package.json` (Metadata del paquete).
+- `docs/CHANGELOG.md` (Fuente única de verdad del changelog).
+- `src/changelog.generated.json` (JSON estático de fallback para la App).
+- `website/content/CHANGELOG.md` (Copia para fallback web y builds).
 
 ---
 
-## Paso 5 — Commit + Push (normal)
-Comiteá y pusheá los cambios a tu rama principal.
+## Paso 3 - Redacción del Changelog (Manual)
 
-Archivos típicos que cambian:
-- `app.json`
-- `package.json`
-- `docs/CHANGELOG.md`
-- `src/changelog.generated.json`
-- `website/content/CHANGELOG.md`
-- `website/content/DOWNLOADS.json`
-
-Tip: si por algún motivo querés sincronizarlo manualmente:
-- `npm run website:sync-content`
+Edite el archivo `docs/CHANGELOG.md`. 
+En la sección `## [VERSION] (Unreleased)`, describa los cambios realizados siguiendo el formato técnico establecido:
+- Utilice bullets claros.
+- Resalte el componente afectado en negrita (ej: **Sync Engine**, **IronSocial**).
+- No utilice placeholders ni información genérica.
 
 ---
 
-## Paso 6 — Crear tag y pushearlo (esto dispara el build automático)
-Ejemplo:
-- `git tag v1.2.0`
-- `git push --tags`
+## Paso 4 - Cierre del Release (Automatizado)
 
-Cuando hacés push del tag:
-- GitHub Actions construye el APK (EAS)
-- crea el GitHub Release
-- sube el APK + sha256
+Una vez verificado el contenido del changelog:
+`npm run release:finalize`
+
+Este paso realiza:
+1. Conversión de `Unreleased` a la fecha actual (`YYYY-MM-DD`).
+2. Creación preventivo del siguiente bloque `Unreleased`.
+3. Regeneración de `src/changelog.generated.json`.
+4. Sincronización final de `website/content/` para asegurar que el despliegue en Vercel incluya la información actualizada.
+5. La tabla `changelogs` en Neon se alinea automáticamente cuando se consulta `GET /api/changelogs` (upsert idempotente desde `docs/CHANGELOG.md`).
+
+## Modelo Unificado de Changelog
+
+- Fuente canónica: `docs/CHANGELOG.md`.
+- App móvil: consume `GET /api/changelogs?includeUnreleased=1`, cachea localmente y usa `src/changelog.generated.json` como fallback offline.
+- Website/API: sincroniza `docs/CHANGELOG.md` hacia tabla `changelogs` antes de responder.
+- Reacciones: permanecen en DB (`changelog_reactions`) y se sincronizan por motor offline-first.
 
 ---
 
-## Paso 7 — Verificar (simple)
-### GitHub
-- Andá a “Releases” y confirmá que exista `v1.2.0` con el asset `.apk`.
+## Paso 5 - Commit y Despliegue de Código
 
-### Website
-- Abrí:
-  - `https://irontrain.motiona.xyz/downloads`
-  - `https://irontrain.motiona.xyz/releases.json`
+Realice el commit de los archivos modificados (app.json, package.json, changelogs, etc.) y haga push a la rama principal. 
+Vercel detectará el cambio y actualizará el sitio web automáticamente.
 
-### App
-- Abrí la app:
-  - si la versión instalada es menor, debería mostrar un alert “Actualización disponible”
-  - tocá “Descargar” y debería abrir la web.
+---
+
+## Paso 6 - Tagging y Build de Producción
+
+Para disparar la construcción del APK y la publicación del release:
+`git tag v[VERSION]`
+`git push --tags`
+
+Esto activa el flujo de GitHub Actions que:
+- Ejecuta `eas build` para Android/iOS.
+- Crea el Release en GitHub con el tag correspondiente.
+- Sube el binario (`.apk`) y el archivo de sumas de verificación (`sha256`).
+
+---
+
+## Paso 7 - Verificación Final (Checklist)
+
+### GitHub Releases
+- Confirmar que el Release `v[VERSION]` existe y contiene el archivo APK.
+
+### Website Check
+- Verificar que `https://irontrain.motiona.xyz/downloads` muestra la nueva versión.
+- Verificar que `https://irontrain.motiona.xyz/releases.json` devuelve el JSON correcto con la versión `latest`.
+- Forzar sincronización de changelog a DB (solo admin autenticado):
+  - Desde panel admin: `/admin` > sección `CHANGELOG_SYSTEM_MGMT` > botón `FORZAR_SYNC_DB`.
+  - `POST https://irontrain.motiona.xyz/api/changelogs/sync`
+  - Requiere JWT válido + usuario incluido en `ADMIN_USER_IDS`.
+  - Respuesta esperada: `success: true` con `upsertedCount > 0` o `reason: "min_interval"`.
+
+### App In-App Update
+- Abrir la aplicación con una versión anterior.
+- Confirmar que aparece el banner o modal de "Actualización Disponible".
+- Verificar que el botón "Descargar" redirige correctamente a la página de descargas.
+
+---
+*Nota: Esta guía es de carácter mandatorio para mantener la integridad del ecosistema IronTrain.*

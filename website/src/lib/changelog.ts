@@ -45,7 +45,7 @@ function semverKey(version: string): { major: number; minor: number; patch: numb
   return { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3]) };
 }
 
-function compareSemverDesc(a: ChangelogRelease, b: ChangelogRelease): number {
+export function compareSemverDesc(a: ChangelogRelease, b: ChangelogRelease): number {
   const ka = semverKey(a.version);
   const kb = semverKey(b.version);
   if (!ka && !kb) return 0;

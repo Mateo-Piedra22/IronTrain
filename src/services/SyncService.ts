@@ -1,10 +1,13 @@
 import NetInfo from '@react-native-community/netinfo';
 import { format } from 'date-fns';
 import * as FileSystem from 'expo-file-system/legacy';
+import { Config } from '../constants/Config';
 import { useAuthStore } from '../store/authStore';
+import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
 
-const API_BASE_URL = 'https://irontrain.motiona.xyz/api/sync';
+const BACKEND_URL = Config.API_URL;
+const API_BASE_URL = `${BACKEND_URL}/api/sync`;
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 5000;
 const MAX_BATCH_SIZE = 50;
@@ -14,7 +17,10 @@ const PULL_UPSERT_ORDER: ReadonlyArray<string> = [
     'categories',
     'routines',
     'routine_days',
+    'badges',
     'exercises',
+    'exercise_badges',
+    'user_profiles',
     'workouts',
     'workout_sets',
     'routine_exercises',
@@ -23,6 +29,9 @@ const PULL_UPSERT_ORDER: ReadonlyArray<string> = [
     'body_metrics',
     'plate_inventory',
     'settings',
+    'changelog_reactions',
+    'kudos',
+    'activity_feed',
 ];
 
 const PULL_DELETE_ORDER: ReadonlyArray<string> = [...PULL_UPSERT_ORDER].reverse();
@@ -38,14 +47,20 @@ const TABLES_WITH_SOFT_DELETE: ReadonlySet<string> = new Set([
     'goals',
     'measurements',
     'body_metrics',
+    'badges',
+    'exercise_badges',
+    'changelog_reactions',
+    'kudos',
 ]);
 
 const ALLOWED_TABLES = [
     'exercises', 'categories', 'workouts', 'workout_sets',
     'routines', 'routine_days', 'routine_exercises',
     'measurements', 'goals', 'plate_inventory', 'settings',
-    'body_metrics'
+    'body_metrics', 'badges', 'exercise_badges', 'user_profiles',
+    'changelog_reactions', 'kudos', 'activity_feed'
 ];
+
 
 interface SyncPayload {
     id: string;
@@ -80,6 +95,55 @@ export class SyncService {
 
     private async wait(ms: number): Promise<void> {
         await new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    private toSnakeKey(k: string): string {
+        return k.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+    }
+
+    private normalizeIncomingRecord(table: string, raw: unknown): Record<string, unknown> | null {
+        if (!raw || typeof raw !== 'object') return null;
+        const obj = raw as Record<string, unknown>;
+        const out: Record<string, unknown> = {};
+
+        for (const [key, value] of Object.entries(obj)) {
+            // Exclude cloud-only columns that don't exist in local SQLite schema
+            if (key === 'userId' || key === 'user_id') {
+                continue;
+            }
+
+            if (key === 'updatedAt' || key === 'updated_at') {
+                if (typeof value === 'number') {
+                    out.updated_at = value;
+                } else if (typeof value === 'string') {
+                    const ms = Date.parse(value);
+                    if (!Number.isNaN(ms)) out.updated_at = ms;
+                }
+                continue;
+            }
+
+            if (key === 'deletedAt' || key === 'deleted_at') {
+                if (value === null || value === undefined) {
+                    out.deleted_at = null;
+                } else if (typeof value === 'number') {
+                    out.deleted_at = value;
+                } else if (typeof value === 'string') {
+                    const ms = Date.parse(value);
+                    if (!Number.isNaN(ms)) out.deleted_at = ms;
+                }
+                continue;
+            }
+
+            const normalizedKey = key.includes('_') ? key : this.toSnakeKey(key);
+            out[normalizedKey] = value;
+        }
+
+        if (table === 'settings') {
+            // settings has no deleted_at in local schema
+            delete out.deleted_at;
+        }
+
+        return out;
     }
 
     private async requestWithRetry(input: RequestInfo, init: RequestInit): Promise<Response> {
@@ -336,20 +400,23 @@ export class SyncService {
                             const payload = change?.payload && typeof change.payload === 'object' ? change.payload : null;
                             if (!operation || !payload) continue;
 
-                            const recordId = payload.id || payload.recordId;
+                            const normalized = this.normalizeIncomingRecord(table, payload);
+                            if (!normalized) continue;
+
+                            const recordId = normalized.id || normalized.record_id || payload.recordId;
                             if (typeof recordId !== 'string' || recordId.length === 0) continue;
 
                             const local = existingById.get(recordId);
+                            const remoteUpdatedAt = typeof normalized.updated_at === 'number' ? normalized.updated_at : null;
+                            const localUpdatedAt = typeof local?.updated_at === 'number' ? local.updated_at : null;
 
                             if (operation === 'INSERT' || operation === 'UPDATE') {
-                                const remoteUpdatedAt = typeof payload.updated_at === 'number' ? payload.updated_at : null;
-                                const localUpdatedAt = typeof local?.updated_at === 'number' ? local.updated_at : null;
                                 if (remoteUpdatedAt !== null && localUpdatedAt !== null && localUpdatedAt >= remoteUpdatedAt) {
                                     continue;
                                 }
 
-                                const keys = Object.keys(payload);
-                                const values = Object.values(payload);
+                                const keys = Object.keys(normalized);
+                                const values = Object.values(normalized);
                                 const placeholders = keys.map(() => '?').join(', ');
 
                                 try {
@@ -359,8 +426,7 @@ export class SyncService {
                                     );
                                 } catch (e: any) {
                                     const msg = e?.message || '';
-                                    const isFk = msg.includes('FOREIGN KEY constraint failed');
-                                    if (isFk) {
+                                    if (msg.includes('FOREIGN KEY constraint failed')) {
                                         deferredUpserts.push({ table, change });
                                         continue;
                                     }
@@ -370,17 +436,15 @@ export class SyncService {
                             }
 
                             if (operation === 'DELETE') {
-                                const remoteUpdatedAt = typeof payload.updated_at === 'number' ? payload.updated_at : null;
-                                const localUpdatedAt = typeof local?.updated_at === 'number' ? local.updated_at : null;
                                 if (remoteUpdatedAt !== null && localUpdatedAt !== null && localUpdatedAt >= remoteUpdatedAt) {
                                     continue;
                                 }
 
                                 if (TABLES_WITH_SOFT_DELETE.has(table)) {
-                                    const deletedAt = typeof payload.deleted_at === 'number'
-                                        ? payload.deleted_at
-                                        : (typeof payload.updated_at === 'number' ? payload.updated_at : Date.now());
-                                    const updatedAt = typeof payload.updated_at === 'number' ? payload.updated_at : deletedAt;
+                                    const deletedAt = typeof normalized.deleted_at === 'number'
+                                        ? normalized.deleted_at
+                                        : (remoteUpdatedAt !== null ? remoteUpdatedAt : Date.now());
+                                    const updatedAt = remoteUpdatedAt !== null ? remoteUpdatedAt : deletedAt;
                                     await dbService.run(
                                         `UPDATE ${table} SET deleted_at = ?, updated_at = ? WHERE id = ?`,
                                         [deletedAt, updatedAt, recordId]
@@ -422,14 +486,17 @@ export class SyncService {
                                     [recordId]
                                 );
 
-                                const remoteUpdatedAt = typeof payload.updated_at === 'number' ? payload.updated_at : null;
+                                const normalized = this.normalizeIncomingRecord(item.table, payload);
+                                if (!normalized) continue;
+
+                                const remoteUpdatedAt = typeof normalized.updated_at === 'number' ? normalized.updated_at : null;
                                 const localUpdatedAt = typeof localRow?.updated_at === 'number' ? localRow.updated_at : null;
                                 if (remoteUpdatedAt !== null && localUpdatedAt !== null && localUpdatedAt >= remoteUpdatedAt) {
                                     continue;
                                 }
 
-                                const keys = Object.keys(payload);
-                                const values = Object.values(payload);
+                                const keys = Object.keys(normalized);
+                                const values = Object.values(normalized);
                                 const placeholders = keys.map(() => '?').join(', ');
 
                                 try {
@@ -465,6 +532,10 @@ export class SyncService {
             const nextSyncTime = serverTime ? serverTime.toString() : Date.now().toString();
             await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', nextSyncTime]);
 
+            if (byTable.size > 0) {
+                dataEventService.emit('DATA_UPDATED');
+            }
+
         } catch (error) {
             console.error('PULL sync failed:', error);
             throw error; // Throw so syncBidirectional fails loudly
@@ -478,7 +549,7 @@ export class SyncService {
         const tables = [
             'exercises', 'categories', 'workouts', 'workout_sets',
             'routines', 'routine_days', 'routine_exercises',
-            'measurements', 'goals', 'plate_inventory', 'settings', 'body_metrics'
+            'measurements', 'goals', 'plate_inventory', 'settings', 'body_metrics', 'badges', 'exercise_badges'
         ];
 
         const snapshot: Record<string, any[]> = {};
@@ -519,53 +590,9 @@ export class SyncService {
                 'plate_inventory',
                 'settings',
                 'body_metrics',
+                'badges',
+                'exercise_badges',
             ];
-
-            const toSnakeKey = (k: string): string => k.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
-
-            const normalizeRecord = (table: string, raw: unknown): Record<string, unknown> | null => {
-                if (!raw || typeof raw !== 'object') return null;
-                const obj = raw as Record<string, unknown>;
-                const out: Record<string, unknown> = {};
-
-                for (const [key, value] of Object.entries(obj)) {
-                    if (key === 'userId' || key === 'user_id') {
-                        continue;
-                    }
-
-                    if (key === 'updatedAt' || key === 'updated_at') {
-                        if (typeof value === 'number') {
-                            out.updated_at = value;
-                        } else if (typeof value === 'string') {
-                            const ms = Date.parse(value);
-                            if (!Number.isNaN(ms)) out.updated_at = ms;
-                        }
-                        continue;
-                    }
-
-                    if (key === 'deletedAt' || key === 'deleted_at') {
-                        if (value === null || value === undefined) {
-                            out.deleted_at = null;
-                        } else if (typeof value === 'number') {
-                            out.deleted_at = value;
-                        } else if (typeof value === 'string') {
-                            const ms = Date.parse(value);
-                            if (!Number.isNaN(ms)) out.deleted_at = ms;
-                        }
-                        continue;
-                    }
-
-                    const normalizedKey = key.includes('_') ? key : toSnakeKey(key);
-                    out[normalizedKey] = value;
-                }
-
-                if (table === 'settings') {
-                    // settings has no deleted_at; ensure we don't insert unexpected columns
-                    delete out.deleted_at;
-                }
-
-                return out;
-            };
 
             // IMPORTANT:
             // Keep PRAGMA foreign_keys=OFF for the entire restore transaction.
@@ -587,7 +614,7 @@ export class SyncService {
                         const recordsRaw = (snapshot as any)?.[table];
                         const records: unknown[] = Array.isArray(recordsRaw) ? recordsRaw : [];
                         for (const record of records) {
-                            const normalized = normalizeRecord(table, record);
+                            const normalized = this.normalizeIncomingRecord(table, record);
                             if (!normalized) continue;
                             const keys = Object.keys(normalized);
                             if (keys.length === 0) continue;

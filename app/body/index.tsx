@@ -59,9 +59,12 @@ export default function BodyTrackerScreen() {
     const [addModalType, setAddModalType] = useState<MeasurementType | null>(null);
     const [addValue, setAddValue] = useState('');
 
-    // Weight & fat quick-add
+    // Quick selector state
+    const [quickAddType, setQuickAddType] = useState<MeasurementType>('weight');
     const [weight, setWeight] = useState('');
     const [fat, setFat] = useState('');
+    const [genericValue, setGenericValue] = useState('');
+    const [showTypeSelector, setShowTypeSelector] = useState(false);
 
     const loadData = useCallback(async () => {
         try {
@@ -87,21 +90,29 @@ export default function BodyTrackerScreen() {
         }, [loadData])
     );
 
-    const handleLogPrimary = async () => {
-        const w = parseFloat(weight);
-        if (!weight || isNaN(w)) {
-            notify.error('Atención', 'Ingresa tu peso correctamente.');
-            return;
-        }
+    const handleQuickAdd = async () => {
         try {
             const today = format(new Date(), 'yyyy-MM-dd');
-            const wKg = unit === 'kg' ? w : UnitService.lbsToKg(w);
-            await bodyService.add(today, wKg, parseFloat(fat));
-            setWeight('');
-            setFat('');
+            if (quickAddType === 'weight') {
+                const w = parseFloat(weight);
+                if (isNaN(w)) { notify.error('Atención', 'Ingresa tu peso correctamente.'); return; }
+                const wKg = unit === 'kg' ? w : UnitService.lbsToKg(w);
+                await bodyService.add(today, wKg, parseFloat(fat));
+                setWeight('');
+                setFat('');
+            } else {
+                const v = parseFloat(genericValue);
+                if (isNaN(v) || v <= 0) { notify.error('Valor inválido', 'Ingresa un número positivo.'); return; }
+                const cfg = MEASUREMENT_CONFIG.find(c => c.type === quickAddType);
+                const measureUnit = cfg?.unit === 'dynamic' ? unit : (cfg?.unit || 'cm');
+                await bodyService.addMeasurement(quickAddType as MeasurementType, v, measureUnit);
+                setGenericValue('');
+            }
+
             loadData();
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            notify.success('Guardado', 'Tu peso ha sido registrado.');
+            const label = MEASUREMENT_CONFIG.find(c => c.type === quickAddType)?.label || 'Registro';
+            notify.success('Guardado', `${label} registrado correctamente.`);
         } catch (e: any) {
             notify.error('Error', e?.message || 'No se pudo guardar.');
         }
@@ -213,22 +224,51 @@ export default function BodyTrackerScreen() {
                     </View>
                 </View>
 
-                {/* Quick Log — Weight & Fat */}
+                {/* Quick Log — Selectable Metric */}
                 <View style={ss.quickLogCard}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                        <Scale size={16} color={Colors.primary.DEFAULT} />
-                        <Text style={ss.quickLogTitle}>Registro rápido</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                        <TouchableOpacity
+                            onPress={() => setShowTypeSelector(true)}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                        >
+                            <Scale size={16} color={Colors.primary.DEFAULT} />
+                            <Text style={ss.quickLogTitle}>
+                                {MEASUREMENT_CONFIG.find(c => c.type === quickAddType)?.label || 'Registro'}
+                            </Text>
+                            <ChevronDown size={14} color={Colors.iron[400]} />
+                        </TouchableOpacity>
+
+                        {quickAddType === 'weight' && (
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: Colors.iron[400], textTransform: 'uppercase' }}>
+                                + Grasa corporal
+                            </Text>
+                        )}
                     </View>
-                    <View style={ss.inputRow}>
-                        <View style={{ flex: 1 }}>
-                            <IronInput placeholder={`Peso (${unit})`} keyboardType="numeric" value={weight} onChangeText={setWeight} />
+
+                    {quickAddType === 'weight' ? (
+                        <View style={ss.inputRow}>
+                            <View style={{ flex: 1 }}>
+                                <IronInput placeholder={`Peso (${unit})`} keyboardType="numeric" value={weight} onChangeText={setWeight} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <IronInput placeholder="Grasa %" keyboardType="numeric" value={fat} onChangeText={setFat} />
+                            </View>
                         </View>
-                        <View style={{ flex: 1 }}>
-                            <IronInput placeholder="Grasa %" keyboardType="numeric" value={fat} onChangeText={setFat} />
+                    ) : (
+                        <View style={ss.inputRow}>
+                            <View style={{ flex: 1 }}>
+                                <IronInput
+                                    placeholder={`Valor (${MEASUREMENT_CONFIG.find(c => c.type === quickAddType)?.unit})`}
+                                    keyboardType="numeric"
+                                    value={genericValue}
+                                    onChangeText={setGenericValue}
+                                />
+                            </View>
                         </View>
-                    </View>
-                    <View style={{ marginTop: 10 }}>
-                        <IronButton label="GUARDAR" onPress={handleLogPrimary} />
+                    )}
+
+                    <View style={{ marginTop: 12 }}>
+                        <IronButton label="GUARDAR REGISTRO" onPress={handleQuickAdd} />
                     </View>
                 </View>
 
@@ -462,6 +502,49 @@ export default function BodyTrackerScreen() {
                     </View>
                 </Pressable>
             </Modal >
+            {/* Metric Selector Modal (Quick Add) */}
+            <Modal visible={showTypeSelector} transparent animationType="slide" onRequestClose={() => setShowTypeSelector(false)}>
+                <Pressable style={ss.modalOverlay} onPress={() => setShowTypeSelector(false)}>
+                    <View style={[ss.modalContainer, { maxHeight: '80%', padding: 0, overflow: 'hidden' }]}>
+                        <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: Colors.iron[200] }}>
+                            <Text style={ss.modalTitle}>Seleccionar Métrica</Text>
+                        </View>
+                        <ScrollView>
+                            {MEASUREMENT_CONFIG.map((cfg) => (
+                                <TouchableOpacity
+                                    key={cfg.type}
+                                    style={[
+                                        ss.selectorItem,
+                                        quickAddType === cfg.type && { backgroundColor: Colors.primary.DEFAULT + '10' }
+                                    ]}
+                                    onPress={() => {
+                                        setQuickAddType(cfg.type);
+                                        setShowTypeSelector(false);
+                                        Haptics.selectionAsync();
+                                    }}
+                                >
+                                    <View style={[ss.measureIconCircle, { backgroundColor: cfg.color + '15', width: 32, height: 32 }]}>
+                                        <cfg.Icon size={14} color={cfg.color} />
+                                    </View>
+                                    <Text style={[
+                                        ss.selectorText,
+                                        quickAddType === cfg.type && { color: Colors.primary.DEFAULT, fontWeight: '900' }
+                                    ]}>
+                                        {cfg.label}
+                                    </Text>
+                                    {quickAddType === cfg.type && <Plus size={16} color={Colors.primary.DEFAULT} />}
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                        <TouchableOpacity
+                            style={{ padding: 16, alignItems: 'center', backgroundColor: Colors.iron[100] }}
+                            onPress={() => setShowTypeSelector(false)}
+                        >
+                            <Text style={{ fontWeight: '800', color: Colors.iron[950] }}>Cerrar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </Pressable>
+            </Modal>
         </SafeAreaWrapper >
     );
 }
@@ -586,4 +669,20 @@ const ss = StyleSheet.create({
     modalBtnCancelText: { fontWeight: '800', fontSize: 14, color: Colors.iron[950] },
     modalBtnSave: { backgroundColor: Colors.primary.DEFAULT },
     modalBtnSaveText: { fontWeight: '800', fontSize: 14, color: '#fff' },
+
+    // Selector
+    selectorItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        gap: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.iron[100],
+    },
+    selectorText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: Colors.iron[950],
+        flex: 1,
+    }
 });

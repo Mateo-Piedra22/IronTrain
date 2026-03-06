@@ -1,4 +1,5 @@
 import { EmptyChartPlaceholder } from '@/components/EmptyChartPlaceholder';
+import { BadgePill } from '@/components/ui/BadgePill';
 import { ExerciseVolumeRow, VolumeSeriesPoint } from '@/src/services/AnalysisService';
 import { Colors } from '@/src/theme';
 import { useRouter } from 'expo-router';
@@ -147,6 +148,11 @@ export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, 
                                         <Text style={styles.exerciseCategory}>{e.categoryName}</Text>
                                     </View>
                                     <Text style={styles.exerciseName} numberOfLines={1}>{e.exerciseName}</Text>
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                                        {e.badges?.map((b, i) => (
+                                            <BadgePill key={i} name={b.name} color={b.color} icon={b.icon} size="xs" />
+                                        ))}
+                                    </View>
                                     <Text style={styles.exerciseSets}>{e.setCount} series</Text>
                                 </View>
 
