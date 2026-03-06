@@ -5,6 +5,8 @@ import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
 import { runDbTransaction } from '../../../../src/lib/db-transaction';
 
+export const runtime = 'nodejs';
+
 const toCamelCaseKey = (key: string): string => key.replace(/_([a-z])/g, (_, ch: string) => ch.toUpperCase());
 const scopeSettingsKey = (userId: string, key: string): string => {
     const trimmed = key.trim();

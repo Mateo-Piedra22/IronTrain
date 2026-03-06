@@ -5,6 +5,8 @@ import { verifyAuth } from '../../../../src/lib/auth';
 import { runDbTransaction } from '../../../../src/lib/db-transaction';
 import { applyWorkoutScoring } from '../../../../src/lib/social-scoring';
 
+export const runtime = 'nodejs';
+
 // Convert snake_case from SQLite payload to camelCase for Drizzle
 const toCamelCase = (snakeObj: any) => {
     if (!snakeObj || typeof snakeObj !== 'object') return snakeObj;

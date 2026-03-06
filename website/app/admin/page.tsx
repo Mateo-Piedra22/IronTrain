@@ -27,6 +27,7 @@ import { sendSegmentedPush } from '../../src/lib/firebase-admin';
 import { getSyncHealthReport } from '../../src/lib/sync-health';
 
 export const revalidate = 0;
+export const runtime = 'nodejs';
 
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
 

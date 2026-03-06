@@ -68,7 +68,7 @@ export async function getSyncHealthReport(): Promise<SyncHealthReport> {
     return {
         generatedAt: new Date().toISOString(),
         db: {
-            driver: 'drizzle-orm/neon-serverless',
+            driver: 'drizzle-orm/node-postgres',
             databaseUrlConfigured: Boolean(process.env.DATABASE_URL && process.env.DATABASE_URL.trim().length > 0),
             pingMs,
             ok: dbOk,

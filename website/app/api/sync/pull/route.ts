@@ -4,6 +4,8 @@ import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
 
+export const runtime = 'nodejs';
+
 const toSnakeCase = (camelObj: Record<string, unknown>): Record<string, unknown> => {
     if (!camelObj || typeof camelObj !== 'object') return camelObj;
     const snakeObj: Record<string, unknown> = {};

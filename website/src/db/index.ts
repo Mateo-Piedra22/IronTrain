@@ -1,10 +1,13 @@
-import { neonConfig, Pool } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import { WebSocket as WsWebSocket } from 'ws';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 
-// We fall back to a mock string for build purposes if env is missing
 const dbUrl = process.env.DATABASE_URL || 'postgres://user:pass@host/db';
-neonConfig.webSocketConstructor = (globalThis as any).WebSocket || (WsWebSocket as any);
-const pool = new Pool({ connectionString: dbUrl });
+const pool = new Pool({
+    connectionString: dbUrl,
+    max: 10,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+    ssl: dbUrl.includes('sslmode=require') ? undefined : { rejectUnauthorized: false },
+});
 
 export const db = drizzle({ client: pool });

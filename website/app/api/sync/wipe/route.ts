@@ -6,6 +6,8 @@ import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
 import { runDbTransaction } from '../../../../src/lib/db-transaction';
 
+export const runtime = 'nodejs';
+
 const RATE_ACTION = 'wipe';
 const WINDOW_MS = 60 * 60 * 1000;
 const MAX_PER_WINDOW = 2;

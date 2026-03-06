@@ -20,21 +20,6 @@ function clearBootstrapError(): void {
     lastTransactionBootstrapErrorAt = null;
 }
 
-function isNeonHttpNoTransactionError(error: unknown): boolean {
-    if (!(error instanceof Error)) return false;
-    return error.message.toLowerCase().includes('no transactions support in neon-http driver');
-}
-
-function isTransactionBootstrapError(error: unknown): boolean {
-    if (!(error instanceof Error)) return false;
-    const message = error.message.toLowerCase();
-    return (
-        message.includes("cannot read properties of undefined (reading 'session')") ||
-        message.includes('cannot read properties of undefined (reading "session")') ||
-        isNeonHttpNoTransactionError(error)
-    );
-}
-
 async function detectTransactionSupport(transaction: TransactionRunner): Promise<boolean> {
     const cacheAgeMs = Date.now() - transactionSupportCheckedAt;
     if (transactionSupportCache !== null && cacheAgeMs < TRANSACTION_SUPPORT_CACHE_TTL_MS) return transactionSupportCache;
@@ -46,13 +31,9 @@ async function detectTransactionSupport(transaction: TransactionRunner): Promise
         transactionSupportCache = true;
         transactionSupportCheckedAt = Date.now();
     } catch (error) {
-        if (isTransactionBootstrapError(error)) {
-            rememberBootstrapError(error);
-            transactionSupportCache = false;
-            transactionSupportCheckedAt = Date.now();
-        } else {
-            throw error;
-        }
+        rememberBootstrapError(error);
+        transactionSupportCache = false;
+        transactionSupportCheckedAt = Date.now();
     }
     return transactionSupportCache;
 }
@@ -87,28 +68,13 @@ export async function runDbTransaction<T>(fn: (trx: any) => Promise<T>): Promise
     if (typeof transaction !== 'function') {
         transactionSupportCache = false;
         transactionSupportCheckedAt = Date.now();
-        clearBootstrapError();
-        return fn(db as any);
+        throw new Error('Database transaction method unavailable');
     }
     const supportsNativeTransaction = await detectTransactionSupport(transaction);
     if (!supportsNativeTransaction) {
-        return fn(db as any);
+        throw new Error('Native transaction support unavailable');
     }
-    let callbackStarted = false;
-    try {
-        const result = await transaction(async (trx) => {
-            callbackStarted = true;
-            return fn(trx);
-        });
-        clearBootstrapError();
-        return result;
-    } catch (error) {
-        if (!callbackStarted && isTransactionBootstrapError(error)) {
-            rememberBootstrapError(error);
-            transactionSupportCache = false;
-            transactionSupportCheckedAt = Date.now();
-            return fn(db as any);
-        }
-        throw error;
-    }
+    const result = await transaction(fn);
+    clearBootstrapError();
+    return result;
 }

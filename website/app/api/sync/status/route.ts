@@ -4,6 +4,8 @@ import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
 
+export const runtime = 'nodejs';
+
 export async function GET(req: NextRequest) {
     try {
         const userId = await verifyAuth(req);
