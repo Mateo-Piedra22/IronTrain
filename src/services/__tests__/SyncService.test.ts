@@ -32,6 +32,7 @@ describe('SyncService', () => {
     getFirst.mockImplementation(async (sql: string) => {
       if (sql.includes('FROM plate_inventory')) return { count: 5 };
       if (sql.includes('FROM settings')) return { count: 5 };
+      if (sql.includes('FROM user_profiles')) return { count: 5 };
       if (sql.includes('deleted_at IS NULL')) return { count: 1 };
       if (sql.includes('deleted_at IS NOT NULL')) return { count: 2 };
       return { count: 0 };
@@ -44,8 +45,7 @@ describe('SyncService', () => {
     expect(res.counts?.plate_inventory).toEqual({ active: 5, deleted: 0, total: 5 });
     expect(res.counts?.settings).toEqual({ active: 5, deleted: 0, total: 5 });
 
-    // active total: 10 soft-delete tables * 1 + 2 non-soft-delete tables * 5 = 20
-    expect(res.recordCount).toBe(20);
+    expect(res.recordCount).toBe(30);
     expect(res.hasData).toBe(true);
   });
 
@@ -203,5 +203,33 @@ describe('SyncService', () => {
     });
 
     await expect((syncService as any).pullRemoteChanges('token-1')).resolves.toBeUndefined();
+  });
+
+  it('normalizes scoped cloud settings keys to local keys during pull', async () => {
+    (dbService.getFirst as jest.Mock).mockResolvedValue({ value: '0' });
+    (dbService.getAll as jest.Mock).mockResolvedValue([]);
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        changes: [
+          {
+            table: 'settings',
+            operation: 'UPDATE',
+            payload: {
+              key: 'user-abc:last_pull_sync',
+              value: '123',
+              updated_at: 22,
+            },
+          },
+        ],
+        serverTime: 44,
+      }),
+    });
+
+    await (syncService as any).pullRemoteChanges('token-1');
+
+    const insertCall = (dbService.run as jest.Mock).mock.calls.find((c) => String(c[0]).includes('INSERT OR REPLACE INTO settings'));
+    expect(insertCall).toBeDefined();
+    expect(insertCall?.[1]).toEqual(expect.arrayContaining(['last_pull_sync']));
   });
 });

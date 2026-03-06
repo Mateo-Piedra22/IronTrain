@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../../src/db';
 import * as schema from '../../../../../src/db/schema';
 import { verifyAuth } from '../../../../../src/lib/auth';
+import { runDbTransaction } from '../../../../../src/lib/db-transaction';
 import { formatActorName, getUserBrief, notifyUserById } from '../../../../../src/lib/social-notifications';
 
 const MAX_PAYLOAD_SIZE = 1_000_000; // 1MB max payload
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
                 ? (payload as { routine: { name: string } }).routine.name.slice(0, 120)
                 : null;
 
-        await db.transaction(async (trx) => {
+        await runDbTransaction(async (trx) => {
             await trx.insert(schema.sharesInbox).values({
                 id: newId,
                 senderId: userId,

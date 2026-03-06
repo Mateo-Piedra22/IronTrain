@@ -20,6 +20,13 @@ const toSnakeCase = (camelObj: Record<string, unknown>): Record<string, unknown>
     return snakeObj;
 };
 
+const unscopedSettingsKey = (userId: string, key: unknown): string => {
+    if (typeof key !== 'string') return '';
+    const prefix = `${userId}:`;
+    if (key.startsWith(prefix)) return key.slice(prefix.length);
+    return key;
+};
+
 export async function GET(req: NextRequest) {
     try {
         const userId = await verifyAuth(req);
@@ -112,10 +119,14 @@ export async function GET(req: NextRequest) {
                         },
                     });
                 } else if (!record.deletedAt) {
+                    const payloadRecord =
+                        tableName === 'settings'
+                            ? { ...(record as Record<string, unknown>), key: unscopedSettingsKey(userId, (record as Record<string, unknown>).key) }
+                            : (record as Record<string, unknown>);
                     changes.push({
                         table: tableName,
                         operation: 'UPDATE',
-                        payload: toSnakeCase(record as Record<string, unknown>),
+                        payload: toSnakeCase(payloadRecord),
                     });
                 }
             }

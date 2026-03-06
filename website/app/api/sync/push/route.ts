@@ -1,8 +1,8 @@
 import { eq, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
+import { runDbTransaction } from '../../../../src/lib/db-transaction';
 import { applyWorkoutScoring } from '../../../../src/lib/social-scoring';
 
 // Convert snake_case from SQLite payload to camelCase for Drizzle
@@ -14,6 +14,40 @@ const toCamelCase = (snakeObj: any) => {
         camelObj[camelKey] = value;
     }
     return camelObj;
+};
+
+const MAX_OPERATIONS_PER_REQUEST = 500;
+const SUPPORTED_OPERATIONS = new Set(['INSERT', 'UPDATE', 'DELETE']);
+const SOFT_DELETE_TABLES = new Set([
+    'categories',
+    'exercises',
+    'workouts',
+    'workout_sets',
+    'routines',
+    'routine_days',
+    'routine_exercises',
+    'measurements',
+    'goals',
+    'body_metrics',
+    'badges',
+    'exercise_badges',
+    'changelog_reactions',
+    'kudos',
+    'activity_feed',
+]);
+
+const scopeSettingsKey = (userId: string, key: string): string => {
+    const trimmed = key.trim();
+    if (trimmed.startsWith(`${userId}:`)) return trimmed;
+    return `${userId}:${trimmed}`;
+};
+
+const getOwnerIdForRecord = (tableName: string, record: Record<string, unknown>): string | null => {
+    if (tableName === 'user_profiles') return typeof record.id === 'string' ? record.id : null;
+    if (tableName === 'kudos') return typeof record.giverId === 'string' ? record.giverId : null;
+    if (tableName === 'changelog_reactions') return typeof record.userId === 'string' ? record.userId : null;
+    if (tableName === 'settings') return typeof record.userId === 'string' ? record.userId : null;
+    return typeof record.userId === 'string' ? record.userId : null;
 };
 
 // Main POST handler
@@ -34,6 +68,9 @@ export async function POST(req: NextRequest) {
         const operations = body?.operations;
         if (!Array.isArray(operations)) {
             return NextResponse.json({ error: 'Invalid payload: operations must be an array' }, { status: 400 });
+        }
+        if (operations.length > MAX_OPERATIONS_PER_REQUEST) {
+            return NextResponse.json({ error: `Too many operations (max ${MAX_OPERATIONS_PER_REQUEST})` }, { status: 413 });
         }
 
         const tableMap: Record<string, any> = {
@@ -60,17 +97,32 @@ export async function POST(req: NextRequest) {
         const processedIds: string[] = [];
         const results: any[] = [];
 
-        await db.transaction(async (trx) => {
+        await runDbTransaction(async (trx) => {
             for (const op of operations) {
-                const { table: tableName, operation, payload: rawPayload, id: opId } = op;
+                const tableName = typeof op?.table === 'string' ? op.table : '';
+                const operation = typeof op?.operation === 'string' ? op.operation.toUpperCase() : '';
+                const rawPayload = op?.payload;
+                const opId = typeof op?.id === 'string' && op.id.length > 0 ? op.id : crypto.randomUUID();
                 const tableSchema = tableMap[tableName];
 
+                if (!SUPPORTED_OPERATIONS.has(operation)) {
+                    results.push({ id: opId, status: 'error', reason: 'invalid_operation' });
+                    continue;
+                }
                 if (!tableSchema) {
                     results.push({ id: opId, status: 'ignored_unsupported_table' });
                     continue;
                 }
+                if (!rawPayload || typeof rawPayload !== 'object' || Array.isArray(rawPayload)) {
+                    results.push({ id: opId, status: 'error', reason: 'invalid_payload' });
+                    continue;
+                }
 
                 const payload = toCamelCase(rawPayload);
+                if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+                    results.push({ id: opId, status: 'error', reason: 'invalid_payload' });
+                    continue;
+                }
 
                 // Strip sensitive fields
                 delete (payload as any).isModerated;
@@ -78,16 +130,40 @@ export async function POST(req: NextRequest) {
 
                 try {
                     // Normalize updatedAt
-                    const updatedAt = payload.updatedAt ? new Date(payload.updatedAt) : new Date();
+                    const candidateUpdatedAt = payload.updatedAt ? new Date(payload.updatedAt as any) : new Date();
+                    const updatedAt = Number.isNaN(candidateUpdatedAt.getTime()) ? new Date() : candidateUpdatedAt;
                     const shouldEvaluateWorkoutScore = tableName === 'workouts' && operation !== 'DELETE' && payload.status === 'completed' && typeof (payload.id || payload.key) === 'string';
 
                     const pkCol = tableName === 'settings' ? tableSchema.key : tableSchema.id;
+                    if (tableName === 'user_profiles') {
+                        payload.id = userId;
+                    }
+                    if (tableName === 'settings') {
+                        const rawKey = typeof payload.key === 'string' ? payload.key : '';
+                        if (!rawKey.trim()) {
+                            results.push({ id: opId, status: 'error', reason: 'invalid_settings_key' });
+                            continue;
+                        }
+                        payload.key = scopeSettingsKey(userId, rawKey);
+                        payload.userId = userId;
+                    }
                     const recordId = payload.id || payload.key;
+                    if ((operation === 'UPDATE' || operation === 'DELETE') && (typeof recordId !== 'string' || recordId.length === 0)) {
+                        results.push({ id: opId, status: 'error', reason: 'missing_record_id' });
+                        continue;
+                    }
 
                     let existingRecord;
                     if (recordId) {
                         const queryKey = tableName.replace(/_([a-z])/g, (g: string) => g[1].toUpperCase());
                         existingRecord = await (trx.query as any)[queryKey].findFirst({ where: eq(pkCol, recordId) });
+                    }
+                    if (existingRecord) {
+                        const ownerId = getOwnerIdForRecord(tableName, existingRecord as Record<string, unknown>);
+                        if (ownerId && ownerId !== userId) {
+                            results.push({ id: opId, status: 'error', reason: 'forbidden_owner_mismatch' });
+                            continue;
+                        }
                     }
 
                     if (existingRecord) {
@@ -102,19 +178,27 @@ export async function POST(req: NextRequest) {
 
                         // UPDATE or DELETE existing record
                         if (operation === 'DELETE') {
-                            await trx.update(tableSchema).set({ deletedAt: new Date(), updatedAt }).where(eq(pkCol, recordId));
+                            if (SOFT_DELETE_TABLES.has(tableName)) {
+                                await trx.update(tableSchema).set({ deletedAt: new Date(), updatedAt }).where(eq(pkCol, recordId));
+                            } else {
+                                await trx.delete(tableSchema).where(eq(pkCol, recordId));
+                            }
 
                             // Update counts
-                            if (tableName === 'kudos' && !existingRecord.deletedAt) {
+                            if (tableName === 'kudos' && (existingRecord as any).deletedAt == null) {
                                 await trx.update(schema.activityFeed).set({ kudoCount: sql`${schema.activityFeed.kudoCount} - 1`, updatedAt: new Date() }).where(eq(schema.activityFeed.id, existingRecord.feedId));
-                            } else if (tableName === 'changelog_reactions' && !existingRecord.deletedAt) {
+                            } else if (tableName === 'changelog_reactions' && (existingRecord as any).deletedAt == null) {
                                 await trx.update(schema.changelogs).set({ reactionCount: sql`${schema.changelogs.reactionCount} - 1`, updatedAt: new Date() }).where(eq(schema.changelogs.id, existingRecord.changelogId));
                             }
                         } else {
-                            await trx.update(tableSchema).set({ ...payload, updatedAt, deletedAt: null }).where(eq(pkCol, recordId));
+                            const updatePayload: Record<string, unknown> = { ...payload, updatedAt };
+                            if (SOFT_DELETE_TABLES.has(tableName)) {
+                                updatePayload.deletedAt = null;
+                            }
+                            await trx.update(tableSchema).set(updatePayload as any).where(eq(pkCol, recordId));
 
                             // If it was deleted and now it's not (undelete)
-                            if (existingRecord.deletedAt && !payload.deletedAt) {
+                            if ((existingRecord as any).deletedAt && !payload.deletedAt) {
                                 if (tableName === 'kudos') {
                                     await trx.update(schema.activityFeed).set({ kudoCount: sql`${schema.activityFeed.kudoCount} + 1`, updatedAt: new Date() }).where(eq(schema.activityFeed.id, existingRecord.feedId));
                                 } else if (tableName === 'changelog_reactions') {
@@ -130,7 +214,7 @@ export async function POST(req: NextRequest) {
                             else if (tableName === 'kudos') payload.giverId = userId;
                             else if (tableName === 'changelog_reactions') payload.userId = userId;
                             else if (tableName === 'settings') payload.userId = userId;
-                            else if (tableName !== 'changelogs') payload.userId = userId;
+                            else payload.userId = userId;
 
                             await trx.insert(tableSchema).values({ ...payload, updatedAt });
 

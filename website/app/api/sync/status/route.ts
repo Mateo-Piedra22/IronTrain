@@ -12,36 +12,43 @@ export async function GET(req: NextRequest) {
         }
 
         const tables = [
-            { key: 'categories', table: schema.categories, supportsDelete: true },
-            { key: 'exercises', table: schema.exercises, supportsDelete: true },
-            { key: 'workouts', table: schema.workouts, supportsDelete: true },
-            { key: 'workout_sets', table: schema.workoutSets, supportsDelete: true },
-            { key: 'routines', table: schema.routines, supportsDelete: true },
-            { key: 'routine_days', table: schema.routineDays, supportsDelete: true },
-            { key: 'routine_exercises', table: schema.routineExercises, supportsDelete: true },
-            { key: 'measurements', table: schema.measurements, supportsDelete: true },
-            { key: 'goals', table: schema.goals, supportsDelete: true },
-            { key: 'body_metrics', table: schema.bodyMetrics, supportsDelete: true },
-            { key: 'plate_inventory', table: schema.plateInventory, supportsDelete: false },
-            { key: 'settings', table: schema.settings, supportsDelete: false },
+            { key: 'categories', table: schema.categories, supportsDelete: true, ownerField: 'userId' },
+            { key: 'exercises', table: schema.exercises, supportsDelete: true, ownerField: 'userId' },
+            { key: 'workouts', table: schema.workouts, supportsDelete: true, ownerField: 'userId' },
+            { key: 'workout_sets', table: schema.workoutSets, supportsDelete: true, ownerField: 'userId' },
+            { key: 'routines', table: schema.routines, supportsDelete: true, ownerField: 'userId' },
+            { key: 'routine_days', table: schema.routineDays, supportsDelete: true, ownerField: 'userId' },
+            { key: 'routine_exercises', table: schema.routineExercises, supportsDelete: true, ownerField: 'userId' },
+            { key: 'measurements', table: schema.measurements, supportsDelete: true, ownerField: 'userId' },
+            { key: 'goals', table: schema.goals, supportsDelete: true, ownerField: 'userId' },
+            { key: 'body_metrics', table: schema.bodyMetrics, supportsDelete: true, ownerField: 'userId' },
+            { key: 'plate_inventory', table: schema.plateInventory, supportsDelete: false, ownerField: 'userId' },
+            { key: 'settings', table: schema.settings, supportsDelete: false, ownerField: 'userId' },
+            { key: 'badges', table: schema.badges, supportsDelete: true, ownerField: 'userId' },
+            { key: 'exercise_badges', table: schema.exerciseBadges, supportsDelete: true, ownerField: 'userId' },
+            { key: 'user_profiles', table: schema.userProfiles, supportsDelete: false, ownerField: 'id' },
+            { key: 'changelog_reactions', table: schema.changelogReactions, supportsDelete: true, ownerField: 'userId' },
+            { key: 'kudos', table: schema.kudos, supportsDelete: true, ownerField: 'giverId' },
+            { key: 'activity_feed', table: schema.activityFeed, supportsDelete: true, ownerField: 'userId' },
         ] as const;
 
         const countsEntries = await Promise.all(
             tables.map(async (t) => {
+                const ownerClause = eq((t.table as any)[t.ownerField], userId);
                 const [active] = await db
                     .select({ count: sql<number>`count(*)` })
                     .from(t.table)
                     .where(
                         t.supportsDelete
-                            ? and(eq((t.table as any).userId, userId), isNull((t.table as any).deletedAt))
-                            : eq((t.table as any).userId, userId)
+                            ? and(ownerClause, isNull((t.table as any).deletedAt))
+                            : ownerClause
                     );
 
                 const [deleted] = t.supportsDelete
                     ? await db
                         .select({ count: sql<number>`count(*)` })
                         .from(t.table)
-                        .where(and(eq((t.table as any).userId, userId), sql`${(t.table as any).deletedAt} is not null`))
+                        .where(and(ownerClause, sql`${(t.table as any).deletedAt} is not null`))
                     : [{ count: 0 }];
 
                 const activeCount = Number(active?.count || 0);

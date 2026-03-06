@@ -3,8 +3,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
+import { runDbTransaction } from '../../../../src/lib/db-transaction';
 
 const toCamelCaseKey = (key: string): string => key.replace(/_([a-z])/g, (_, ch: string) => ch.toUpperCase());
+const scopeSettingsKey = (userId: string, key: string): string => {
+    const trimmed = key.trim();
+    if (trimmed.startsWith(`${userId}:`)) return trimmed;
+    return `${userId}:${trimmed}`;
+};
+const unscopedSettingsKey = (userId: string, key: string): string => {
+    const prefix = `${userId}:`;
+    if (key.startsWith(prefix)) return key.slice(prefix.length);
+    return key;
+};
 
 const toDateFromAny = (value: unknown): Date | undefined => {
     if (value === null || value === undefined) return undefined;
@@ -99,7 +110,8 @@ export async function GET(req: NextRequest) {
         snapshot.goals = await db.select().from(schema.goals).where(eq(schema.goals.userId, userId));
         snapshot.body_metrics = await db.select().from(schema.bodyMetrics).where(eq(schema.bodyMetrics.userId, userId));
         snapshot.plate_inventory = await db.select().from(schema.plateInventory).where(eq(schema.plateInventory.userId, userId));
-        snapshot.settings = await db.select().from(schema.settings).where(eq(schema.settings.userId, userId));
+        const settingsRows = await db.select().from(schema.settings).where(eq(schema.settings.userId, userId));
+        snapshot.settings = settingsRows.map((row) => ({ ...row, key: unscopedSettingsKey(userId, row.key) }));
         snapshot.badges = await db.select().from(schema.badges).where(eq(schema.badges.userId, userId));
         snapshot.exercise_badges = await db.select().from(schema.exerciseBadges).where(eq(schema.exerciseBadges.userId, userId));
         snapshot.changelog_reactions = await db.select().from(schema.changelogReactions).where(eq(schema.changelogReactions.userId, userId));
@@ -152,13 +164,15 @@ export async function POST(req: NextRequest) {
         const goals = normalizeSnapshotArray<GoalInsert>(snapshot.goals, userId, ['id', 'userId', 'type', 'title', 'targetValue']);
         const bodyMetrics = normalizeSnapshotArray<BodyMetricInsert>(snapshot.body_metrics, userId, ['id', 'userId', 'date']);
         const plateInventory = normalizeSnapshotArray<PlateInventoryInsert>(snapshot.plate_inventory, userId, ['id', 'userId', 'weight', 'count', 'available', 'unit']);
-        const settingsRows = normalizeSnapshotArray<SettingsInsert>(snapshot.settings, userId, ['key', 'userId', 'value']);
+        const settingsRows = normalizeSnapshotArray<SettingsInsert>(snapshot.settings, userId, ['key', 'userId', 'value'])
+            .map((row) => ({ ...row, key: scopeSettingsKey(userId, String(row.key || '')) }))
+            .filter((row) => String(row.key || '').length > 0);
         const badges = normalizeSnapshotArray<BadgeInsert>(snapshot.badges, userId, ['id', 'userId', 'name', 'color']);
         const exerciseBadges = normalizeSnapshotArray<ExerciseBadgeInsert>(snapshot.exercise_badges, userId, ['id', 'userId', 'exerciseId', 'badgeId']);
         const changelogReactions = normalizeSnapshotArray<ChangelogReactionInsert>(snapshot.changelog_reactions, userId, ['id', 'userId', 'changelogId']);
         const kudos = normalizeSnapshotArray<KudosInsert>(snapshot.kudos, userId, ['id', 'giverId', 'feedId']);
 
-        await db.transaction(async (trx) => {
+        await runDbTransaction(async (trx) => {
             // Delete existing data for the user
             await trx.delete(schema.workoutSets).where(eq(schema.workoutSets.userId, userId));
             await trx.delete(schema.workouts).where(eq(schema.workouts.userId, userId));

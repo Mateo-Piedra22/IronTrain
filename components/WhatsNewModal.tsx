@@ -32,7 +32,7 @@ export const WhatsNewModal: React.FC<Props> = ({ isVisible, release, onClose }) 
             onRequestClose={onClose}
         >
             <Pressable style={ss.overlay} onPress={onClose}>
-                <Pressable onPress={() => { }}>
+                <Pressable onPress={() => { }} style={ss.modalShell}>
                     <Animated.View entering={FadeIn} exiting={FadeOut} style={ss.container}>
                     <View style={ss.header}>
                         <View style={ss.iconCircle}>
@@ -90,8 +90,9 @@ const ss = StyleSheet.create({
     },
     container: {
         width: '100%',
-        maxWidth: 360,
-        maxHeight: '80%',
+        maxWidth: 520,
+        minWidth: 320,
+        maxHeight: '86%',
         backgroundColor: Colors.surface,
         borderRadius: 20,
         borderWidth: 1,
@@ -102,6 +103,10 @@ const ss = StyleSheet.create({
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.2,
         shadowRadius: 24,
+    },
+    modalShell: {
+        width: '100%',
+        alignItems: 'center',
     },
     header: {
         flexDirection: 'row',
@@ -122,7 +127,7 @@ const ss = StyleSheet.create({
     },
     title: {
         color: Colors.iron[950],
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: '900',
         letterSpacing: -0.3,
     },
@@ -161,9 +166,10 @@ const ss = StyleSheet.create({
     },
     itemText: {
         flex: 1,
-        color: Colors.iron[500],
-        fontSize: 14,
-        lineHeight: 22,
+        color: Colors.iron[700],
+        fontSize: 15,
+        lineHeight: 24,
+        fontWeight: '600',
     },
     richBold: {
         fontWeight: '900',

@@ -139,6 +139,13 @@ export class SyncService {
         }
 
         if (table === 'settings') {
+            const keyValue = out.key;
+            if (typeof keyValue === 'string' && keyValue.includes(':')) {
+                const pieces = keyValue.split(':');
+                if (pieces.length > 1) {
+                    out.key = pieces.slice(1).join(':');
+                }
+            }
             // settings has no deleted_at in local schema
             delete out.deleted_at;
         }
@@ -592,6 +599,10 @@ export class SyncService {
                 'body_metrics',
                 'badges',
                 'exercise_badges',
+                'user_profiles',
+                'activity_feed',
+                'changelog_reactions',
+                'kudos',
             ];
 
             // IMPORTANT:
@@ -695,6 +706,12 @@ export class SyncService {
             { key: 'body_metrics', table: 'body_metrics', supportsDelete: true },
             { key: 'plate_inventory', table: 'plate_inventory', supportsDelete: false },
             { key: 'settings', table: 'settings', supportsDelete: false },
+            { key: 'badges', table: 'badges', supportsDelete: true },
+            { key: 'exercise_badges', table: 'exercise_badges', supportsDelete: true },
+            { key: 'user_profiles', table: 'user_profiles', supportsDelete: false },
+            { key: 'changelog_reactions', table: 'changelog_reactions', supportsDelete: true },
+            { key: 'kudos', table: 'kudos', supportsDelete: true },
+            { key: 'activity_feed', table: 'activity_feed', supportsDelete: true },
         ];
 
         const counts: Record<string, { active: number; deleted: number; total: number }> = {};

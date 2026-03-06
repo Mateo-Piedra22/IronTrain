@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
+import { runDbTransaction } from '../../../../src/lib/db-transaction';
 
 const RATE_ACTION = 'wipe';
 const WINDOW_MS = 60 * 60 * 1000;
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
             status: 'started',
         });
 
-        await db.transaction(async (trx) => {
+        await runDbTransaction(async (trx) => {
             await trx.delete(schema.workoutSets).where(eq(schema.workoutSets.userId, userId));
             await trx.delete(schema.workouts).where(eq(schema.workouts.userId, userId));
             await trx.delete(schema.routineExercises).where(eq(schema.routineExercises.userId, userId));

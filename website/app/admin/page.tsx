@@ -18,11 +18,13 @@ import {
 } from 'lucide-react';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { SyncHealthPanel } from '../../src/components/admin/SyncHealthPanel';
 import { db } from '../../src/db';
 import * as schema from '../../src/db/schema';
 import { auth } from '../../src/lib/auth/server';
 import { syncChangelogToDatabase } from '../../src/lib/changelog-db-sync';
 import { sendSegmentedPush } from '../../src/lib/firebase-admin';
+import { getSyncHealthReport } from '../../src/lib/sync-health';
 
 export const revalidate = 0;
 
@@ -382,7 +384,8 @@ export default async function AdminPanel(props: {
         globalEventsData,
         socialProfilesData,
         scoreBreakdownRows,
-        recentScoreEvents
+        recentScoreEvents,
+        syncHealthReport
     ] = await Promise.all([
         db.select({
             id: schema.routines.id,
@@ -455,6 +458,7 @@ export default async function AdminPanel(props: {
             metadata: schema.scoreEvents.metadata,
             createdAt: schema.scoreEvents.createdAt,
         }).from(schema.scoreEvents).orderBy(desc(schema.scoreEvents.createdAt)).limit(500),
+        getSyncHealthReport(),
     ]);
 
     const changelogs = (changelogsData || []).map(c => ({
@@ -619,6 +623,8 @@ export default async function AdminPanel(props: {
                     <div className="text-[9px] text-orange-400/60 font-black mt-2 uppercase tracking-wide">Urgent_Action_Required</div>
                 </div>
             </div>
+
+            <SyncHealthPanel initialReport={syncHealthReport} />
 
             {/* SECCIÓN 02: SOCIAL */}
             <div className="mb-12">

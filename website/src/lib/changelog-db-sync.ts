@@ -1,6 +1,7 @@
 import { db } from '../db';
 import * as schema from '../db/schema';
 import { getChangelog } from './changelog';
+import { runDbTransaction } from './db-transaction';
 
 let lastSyncAt = 0;
 let inFlightSync: Promise<ChangelogSyncResult> | null = null;
@@ -47,7 +48,7 @@ export async function syncChangelogToDatabase(options?: { force?: boolean; minIn
         }
 
         let upsertedCount = 0;
-        await db.transaction(async (trx) => {
+        await runDbTransaction(async (trx) => {
             for (const release of releases) {
                 const version = String(release.version || '').trim();
                 if (!version) continue;

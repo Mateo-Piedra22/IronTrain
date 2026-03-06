@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../../src/db';
 import * as schema from '../../../../../src/db/schema';
 import { verifyAuth } from '../../../../../src/lib/auth';
+import { runDbTransaction } from '../../../../../src/lib/db-transaction';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const now = new Date();
         let status: 'added' | 'removed' = 'added';
 
-        await db.transaction(async (trx) => {
+        await runDbTransaction(async (trx) => {
             const [existing] = await trx.select()
                 .from(schema.changelogReactions)
                 .where(eq(schema.changelogReactions.id, reactionId))

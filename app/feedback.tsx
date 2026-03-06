@@ -87,11 +87,15 @@ export default function FeedbackScreen() {
                         Tus datos de dispositivo y versión se adjuntarán automáticamente para que podamos replicar errores.
                     </Text>
 
-                    <View style={s.contextRow}>
-                        <Text style={s.contextPill}>Adjunta: versión</Text>
-                        <Text style={s.contextPill}>OS</Text>
-                        <Text style={s.contextPill}>modelo</Text>
-                        <Text style={s.contextPill}>usuario</Text>
+                    <View style={s.contextBox}>
+                        <Text style={s.contextTitle}>Se adjunta automáticamente</Text>
+                        <Text style={s.contextHint}>Esto es informativo, no es un botón.</Text>
+                        <View style={s.contextRow}>
+                            <Text style={s.contextPill}>Versión</Text>
+                            <Text style={s.contextPill}>Sistema operativo</Text>
+                            <Text style={s.contextPill}>Modelo</Text>
+                            <Text style={s.contextPill}>Usuario</Text>
+                        </View>
                     </View>
 
                     <Text style={s.sectionTitle}>¿Qué nos quieres contar?</Text>
@@ -213,20 +217,42 @@ const s = StyleSheet.create({
         lineHeight: 22,
         marginBottom: 16,
     },
+    contextBox: {
+        borderWidth: 1,
+        borderColor: Colors.iron[200],
+        backgroundColor: Colors.white,
+        borderRadius: 14,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 28,
+    },
+    contextTitle: {
+        color: Colors.iron[700],
+        fontSize: 12,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        letterSpacing: 0.6,
+    },
+    contextHint: {
+        color: Colors.iron[500],
+        fontSize: 11,
+        fontWeight: '700',
+        marginTop: 2,
+    },
     contextRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 8,
-        marginBottom: 28,
+        marginTop: 10,
     },
     contextPill: {
         borderWidth: 1,
         borderColor: Colors.iron[300],
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.iron[50],
         paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 999,
-        color: Colors.iron[500],
+        color: Colors.iron[600],
         fontSize: 11,
         fontWeight: '700',
     },

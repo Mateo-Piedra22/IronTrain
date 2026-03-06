@@ -57,11 +57,13 @@ export async function POST(req: NextRequest) {
             );
 
         } else if (action === 'reject') {
-            // Only the receiver can reject a pending request
-            if (!isUserB || rel.status !== 'pending') {
-                return NextResponse.json({ error: 'Cannot reject: not a pending request for you' }, { status: 400 });
+            if (rel.status !== 'pending') {
+                return NextResponse.json({ error: 'Cannot reject: relation is not pending' }, { status: 400 });
             }
-            // Hard delete the request
+            const canRejectPending = isUserB || isUserA;
+            if (!canRejectPending) {
+                return NextResponse.json({ error: 'Cannot reject: unauthorized pending relation' }, { status: 400 });
+            }
             await db.delete(schema.friendships).where(eq(schema.friendships.id, requestId));
 
         } else if (action === 'remove') {

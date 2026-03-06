@@ -98,7 +98,7 @@ export class SocialService {
         return data.profile;
     }
 
-    static async updateProfile(displayName: string, username?: string, isPublic?: number) {
+    static async updateProfile(displayName: string, username?: string | null, isPublic?: number) {
         const headers = await this.getHeaders();
         const res = await fetch(`${API_URL}/api/social/profile`, {
             method: 'PUT',

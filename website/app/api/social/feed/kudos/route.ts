@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../../src/db';
 import * as schema from '../../../../../src/db/schema';
 import { verifyAuth } from '../../../../../src/lib/auth';
+import { runDbTransaction } from '../../../../../src/lib/db-transaction';
 import { formatActorName, getUserBrief, notifyUserById } from '../../../../../src/lib/social-notifications';
 
 export async function POST(req: NextRequest) {
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
         const now = new Date();
         let action: 'added' | 'removed' = 'added';
 
-        await db.transaction(async (trx) => {
+        await runDbTransaction(async (trx) => {
             const [row] = await trx
                 .select()
                 .from(schema.kudos)

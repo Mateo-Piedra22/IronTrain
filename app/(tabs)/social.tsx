@@ -26,6 +26,7 @@ import {
 } from 'react-native';
 
 type SocialTabKey = 'leaderboard' | 'friends' | 'inbox' | 'search';
+const USERNAME_REGEX = /^[a-z0-9_]+$/;
 
 export default function SocialTab() {
     const [profile, setProfile] = useState<SocialProfile | null>(null);
@@ -143,19 +144,33 @@ export default function SocialTab() {
     };
 
     const handleSaveProfile = async () => {
-        const normalizedDisplayName = profileFormDisplayName.trim();
+        const normalizedDisplayName = profileFormDisplayName.replace(/\s+/g, ' ').trim();
         const normalizedUsername = profileFormUsername.trim().toLowerCase();
 
         if (!normalizedDisplayName) {
             confirm.error('Error', 'El nombre visible es obligatorio.');
             return;
         }
+        if (normalizedDisplayName.length < 2 || normalizedDisplayName.length > 64) {
+            confirm.error('Error', 'El nombre visible debe tener entre 2 y 64 caracteres.');
+            return;
+        }
+        if (normalizedUsername.length > 0) {
+            if (normalizedUsername.length < 3 || normalizedUsername.length > 20) {
+                confirm.error('Error', 'El username debe tener entre 3 y 20 caracteres.');
+                return;
+            }
+            if (!USERNAME_REGEX.test(normalizedUsername)) {
+                confirm.error('Error', 'El username solo permite letras, números y guion bajo.');
+                return;
+            }
+        }
 
         setProfileSaving(true);
         try {
             await SocialService.updateProfile(
                 normalizedDisplayName,
-                normalizedUsername.length > 0 ? normalizedUsername : undefined,
+                normalizedUsername.length > 0 ? normalizedUsername : null,
                 profileFormPublic ? 1 : 0
             );
             setProfile((prev) => prev ? ({
@@ -266,13 +281,20 @@ export default function SocialTab() {
         setActiveFriend(friend);
     };
 
+    const handleOpenFriendInRanking = async () => {
+        if (!activeFriend) return;
+        setActiveTab('leaderboard');
+        setActiveFriend(null);
+        await handleExpandFriend(activeFriend.friendId);
+    };
+
     const closeFriendModal = () => {
         if (!friendActionLoading) {
             setActiveFriend(null);
         }
     };
 
-    const handleFriendAction = async (action: 'accept' | 'reject' | 'remove' | 'block') => {
+    const executeFriendAction = async (action: 'accept' | 'reject' | 'remove' | 'block') => {
         if (!activeFriend) return;
         setFriendActionLoading(true);
         try {
@@ -285,6 +307,46 @@ export default function SocialTab() {
         } finally {
             setFriendActionLoading(false);
         }
+    };
+
+    const handleFriendAction = async (action: 'accept' | 'reject' | 'remove' | 'block') => {
+        if (action === 'remove') {
+            confirm.ask(
+                'Eliminar amistad',
+                'Vas a eliminar a este amigo de tu lista. Podrás volver a enviar solicitud después.',
+                () => {
+                    confirm.hide();
+                    executeFriendAction('remove');
+                },
+                'Eliminar'
+            );
+            return;
+        }
+        if (action === 'block') {
+            confirm.ask(
+                'Bloquear usuario',
+                'Se bloqueará esta relación social. Esta acción impacta solicitudes y visibilidad entre ambos.',
+                () => {
+                    confirm.hide();
+                    executeFriendAction('block');
+                },
+                'Bloquear'
+            );
+            return;
+        }
+        if (action === 'reject' && activeFriend?.isSender) {
+            confirm.ask(
+                'Cancelar solicitud',
+                '¿Querés cancelar la solicitud enviada a este usuario?',
+                () => {
+                    confirm.hide();
+                    executeFriendAction('reject');
+                },
+                'Cancelar solicitud'
+            );
+            return;
+        }
+        executeFriendAction(action);
     };
 
     if (!authState.token) {
@@ -676,18 +738,24 @@ export default function SocialTab() {
                                 placeholder="Tu nombre visible"
                                 placeholderTextColor={Colors.iron[500]}
                             />
+                            <Text style={styles.modalFieldHint}>
+                                Entre 2 y 64 caracteres. Evitá datos sensibles.
+                            </Text>
 
                             <Text style={styles.modalLabel}>Username</Text>
                             <TextInput
                                 style={styles.modalInput}
                                 value={profileFormUsername}
-                                onChangeText={setProfileFormUsername}
+                                onChangeText={(value) => setProfileFormUsername(value.replace(/\s+/g, '').toLowerCase())}
                                 maxLength={32}
                                 autoCapitalize="none"
                                 autoCorrect={false}
                                 placeholder="sin espacios"
                                 placeholderTextColor={Colors.iron[500]}
                             />
+                            <Text style={styles.modalFieldHint}>
+                                Dejá vacío para quitar username. Permitido: a-z, 0-9 y _
+                            </Text>
 
                             <View style={styles.privacyRow}>
                                 <View style={{ flex: 1 }}>
@@ -740,6 +808,24 @@ export default function SocialTab() {
                                         ? 'Bloqueado'
                                         : 'Amistad aceptada'}
                             </Text>
+                            {activeFriend ? (
+                                <View style={styles.friendInfoCard}>
+                                    <Text style={styles.friendInfoLabel}>ID Social</Text>
+                                    <TouchableOpacity style={styles.friendInfoCopyBtn} onPress={async () => {
+                                        await Clipboard.setStringAsync(activeFriend.friendId);
+                                        confirm.success('Copiado', 'ID del amigo copiado al portapapeles.');
+                                    }}>
+                                        <Text style={styles.friendInfoId} numberOfLines={1} ellipsizeMode="middle">{activeFriend.friendId}</Text>
+                                        <Copy size={14} color={Colors.iron[600]} />
+                                    </TouchableOpacity>
+                                    {activeFriend.status === 'accepted' ? (
+                                        <TouchableOpacity style={styles.friendInfoActionBtn} onPress={handleOpenFriendInRanking}>
+                                            <Scale size={14} color={Colors.primary.DEFAULT} />
+                                            <Text style={styles.friendInfoActionText}>Ver comparación en ranking</Text>
+                                        </TouchableOpacity>
+                                    ) : null}
+                                </View>
+                            ) : null}
                         </View>
 
                         <View style={styles.modalActionsStack}>
@@ -753,6 +839,12 @@ export default function SocialTab() {
                                     </TouchableOpacity>
                                 </View>
                             )}
+                            {activeFriend?.status === 'pending' && activeFriend?.isSender && (
+                                <TouchableOpacity style={styles.modalSecondaryBtn} disabled={friendActionLoading} onPress={() => handleFriendAction('reject')}>
+                                    <XCircle size={14} color={Colors.iron[600]} />
+                                    <Text style={styles.modalSecondaryText}>Cancelar solicitud</Text>
+                                </TouchableOpacity>
+                            )}
 
                             {activeFriend?.status === 'accepted' && (
                                 <View style={styles.dualActionRow}>
@@ -765,6 +857,7 @@ export default function SocialTab() {
                                     </TouchableOpacity>
                                 </View>
                             )}
+                            {friendActionLoading ? <ActivityIndicator size="small" color={Colors.primary.DEFAULT} style={{ marginTop: 4 }} /> : null}
                         </View>
                     </Pressable>
                 </Pressable>
@@ -906,7 +999,7 @@ const styles = StyleSheet.create({
     },
     profileStats: {
         fontSize: 14,
-        color: Colors.iron[500],
+        color: Colors.iron[600],
         marginBottom: 12,
     },
     profileMetaRow: {
@@ -929,7 +1022,7 @@ const styles = StyleSheet.create({
     },
     profileVisibilityText: {
         fontSize: 11,
-        color: Colors.iron[500],
+        color: Colors.iron[200],
         fontWeight: '800',
         textTransform: 'uppercase',
     },
@@ -960,7 +1053,7 @@ const styles = StyleSheet.create({
         borderColor: Colors.iron[700],
     },
     idText: {
-        color: Colors.iron[400],
+        color: Colors.iron[300],
         fontFamily: 'monospace',
         fontSize: 12,
         flex: 1,
@@ -990,7 +1083,7 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.primary.DEFAULT,
     },
     tabText: {
-        color: Colors.iron[500],
+        color: Colors.iron[600],
         fontWeight: '800',
         fontSize: 12,
         letterSpacing: 0.6,
@@ -1003,7 +1096,7 @@ const styles = StyleSheet.create({
         minHeight: 200,
     },
     emptyText: {
-        color: Colors.iron[500],
+        color: Colors.iron[600],
         textAlign: 'center',
         marginTop: 40,
         fontSize: 15,
@@ -1024,16 +1117,14 @@ const styles = StyleSheet.create({
         borderWidth: 2,
     },
     expandedComparisonBox: {
-        backgroundColor: Colors.iron[900],
-        marginHorizontal: 16,
+        backgroundColor: Colors.surface,
+        marginHorizontal: 8,
         marginBottom: 8,
         padding: 16,
-        borderBottomLeftRadius: 16,
-        borderBottomRightRadius: 16,
-        borderTopWidth: 1,
-        borderColor: Colors.iron[800],
-        marginTop: -8, // tuck under the main row
-        zIndex: -1,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
+        marginTop: 4,
     },
     compareHeader: {
         flexDirection: 'row',
@@ -1045,13 +1136,13 @@ const styles = StyleSheet.create({
         borderColor: Colors.iron[800],
     },
     compareTitle: {
-        color: Colors.iron[300],
+        color: Colors.iron[600],
         fontSize: 13,
         fontWeight: 'bold',
         textTransform: 'uppercase',
     },
     compareEmptyText: {
-        color: Colors.iron[500],
+        color: Colors.iron[600],
         fontSize: 13,
         fontStyle: 'italic',
         textAlign: 'center',
@@ -1059,7 +1150,9 @@ const styles = StyleSheet.create({
     },
     compareRow: {
         marginBottom: 12,
-        backgroundColor: Colors.iron[950],
+        backgroundColor: Colors.iron[900],
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
         borderRadius: 8,
         padding: 12,
     },
@@ -1070,7 +1163,7 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     compareExerciseName: {
-        color: Colors.white,
+        color: Colors.iron[950],
         fontSize: 14,
         fontWeight: 'bold',
         textTransform: 'capitalize',
@@ -1100,7 +1193,7 @@ const styles = StyleSheet.create({
     },
     compareValue: {
         fontSize: 18,
-        color: Colors.iron[400],
+        color: Colors.iron[700],
         fontWeight: '900',
     },
     compareValueHighlight: {
@@ -1108,7 +1201,7 @@ const styles = StyleSheet.create({
     },
     compareLabel: {
         fontSize: 11,
-        color: Colors.iron[500],
+        color: Colors.iron[600],
         fontWeight: 'bold',
         marginTop: 2,
     },
@@ -1144,7 +1237,7 @@ const styles = StyleSheet.create({
     segmentText: {
         fontSize: 12,
         fontWeight: 'bold',
-        color: Colors.iron[500],
+        color: Colors.iron[700],
         textTransform: 'uppercase',
     },
     segmentTextActive: {
@@ -1179,7 +1272,7 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     friendStatus: {
-        color: Colors.iron[500],
+        color: Colors.iron[600],
         fontSize: 12,
         textTransform: 'uppercase',
     },
@@ -1285,7 +1378,7 @@ const styles = StyleSheet.create({
     },
     premiumDescription: {
         fontSize: 14,
-        color: Colors.iron[500],
+        color: Colors.iron[600],
         lineHeight: 20,
     },
     premiumActions: {
@@ -1320,7 +1413,7 @@ const styles = StyleSheet.create({
         borderColor: Colors.iron[600],
     },
     premiumBtnTextSecondary: {
-        color: Colors.iron[400],
+        color: Colors.iron[700],
         fontWeight: '800',
         fontSize: 13,
         textTransform: 'uppercase',
@@ -1333,7 +1426,7 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.iron[900],
     },
     premiumStatusText: {
-        color: Colors.iron[500],
+        color: Colors.iron[600],
         fontWeight: '800',
         fontStyle: 'italic',
     },
@@ -1366,7 +1459,7 @@ const styles = StyleSheet.create({
     },
     activityDesc: {
         fontSize: 13,
-        color: Colors.iron[500],
+        color: Colors.iron[600],
     },
     activityDate: {
         fontSize: 11,
@@ -1399,7 +1492,7 @@ const styles = StyleSheet.create({
         opacity: 0.45,
     },
     kudoText: {
-        color: Colors.iron[400],
+        color: Colors.iron[700],
         fontSize: 13,
         fontWeight: '700',
     },
@@ -1408,7 +1501,7 @@ const styles = StyleSheet.create({
     },
     ownActivityHint: {
         marginLeft: 10,
-        color: Colors.iron[500],
+        color: Colors.iron[600],
         fontSize: 11,
         fontWeight: '700',
         alignSelf: 'center',
@@ -1459,19 +1552,26 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     modalLabel: {
-        color: Colors.iron[500],
+        color: Colors.iron[600],
         fontSize: 12,
         fontWeight: '800',
         textTransform: 'uppercase',
     },
+    modalFieldHint: {
+        color: Colors.iron[600],
+        fontSize: 11,
+        fontWeight: '700',
+        marginTop: -6,
+        marginBottom: 2,
+    },
     modalInput: {
-        backgroundColor: Colors.iron[950],
+        backgroundColor: Colors.white,
         borderWidth: 1,
-        borderColor: Colors.iron[700],
+        borderColor: Colors.iron[300],
         borderRadius: 12,
         paddingHorizontal: 14,
         paddingVertical: 12,
-        color: Colors.iron[400],
+        color: Colors.iron[950],
         fontWeight: '700',
     },
     privacyRow: {
@@ -1482,7 +1582,7 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     privacyHint: {
-        color: Colors.iron[500],
+        color: Colors.iron[600],
         fontSize: 12,
     },
     modalActions: {
@@ -1509,7 +1609,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
     },
     modalCancelText: {
-        color: Colors.iron[400],
+        color: Colors.iron[700],
         fontSize: 13,
         fontWeight: '800',
         textTransform: 'uppercase',
@@ -1534,9 +1634,58 @@ const styles = StyleSheet.create({
         color: Colors.primary.DEFAULT,
     },
     friendModalStatus: {
-        color: Colors.iron[500],
+        color: Colors.iron[600],
         fontSize: 13,
         textTransform: 'uppercase',
+        fontWeight: '800',
+    },
+    friendInfoCard: {
+        marginTop: 8,
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
+        borderRadius: 12,
+        padding: 10,
+        backgroundColor: Colors.iron[900],
+        gap: 8,
+    },
+    friendInfoLabel: {
+        color: Colors.iron[600],
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+    friendInfoCopyBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+        borderWidth: 1,
+        borderColor: Colors.iron[300],
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        backgroundColor: Colors.white,
+    },
+    friendInfoId: {
+        flex: 1,
+        color: Colors.iron[700],
+        fontSize: 12,
+        fontFamily: 'monospace',
+    },
+    friendInfoActionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        borderWidth: 1,
+        borderColor: Colors.primary.DEFAULT + '40',
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        backgroundColor: Colors.primary.DEFAULT + '10',
+    },
+    friendInfoActionText: {
+        color: Colors.primary.DEFAULT,
+        fontSize: 12,
         fontWeight: '800',
     },
     dualActionRow: {
@@ -1556,7 +1705,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
     },
     modalSecondaryText: {
-        color: Colors.iron[400],
+        color: Colors.iron[700],
         fontSize: 12,
         fontWeight: '800',
         textTransform: 'uppercase',
