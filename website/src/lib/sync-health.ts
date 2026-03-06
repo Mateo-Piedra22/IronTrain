@@ -21,6 +21,8 @@ export type SyncHealthReport = {
         hasTransactionMethod: boolean;
         supportsNativeTransaction: boolean;
         mode: 'native' | 'fallback_db';
+        lastBootstrapErrorMessage: string | null;
+        lastBootstrapErrorAt: string | null;
     };
     operations: {
         pull: OperationHealth;
@@ -75,6 +77,8 @@ export async function getSyncHealthReport(): Promise<SyncHealthReport> {
             hasTransactionMethod: txDiag.hasTransactionMethod,
             supportsNativeTransaction: txDiag.supportsNativeTransaction,
             mode: txDiag.mode,
+            lastBootstrapErrorMessage: txDiag.lastBootstrapErrorMessage,
+            lastBootstrapErrorAt: txDiag.lastBootstrapErrorAt,
         },
         operations: {
             pull: {

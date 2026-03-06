@@ -20,6 +20,8 @@ type SyncHealthReport = {
         hasTransactionMethod: boolean;
         supportsNativeTransaction: boolean;
         mode: 'native' | 'fallback_db';
+        lastBootstrapErrorMessage: string | null;
+        lastBootstrapErrorAt: string | null;
     };
     operations: {
         pull: OperationHealth;
@@ -150,9 +152,16 @@ export function SyncHealthPanel({ initialReport }: SyncHealthPanelProps) {
                         <div><span className="font-black">MODE:</span> {report.transaction.mode}</div>
                         <div><span className="font-black">HAS_METHOD:</span> {report.transaction.hasTransactionMethod ? 'YES' : 'NO'}</div>
                         <div><span className="font-black">NATIVE_TX:</span> {report.transaction.supportsNativeTransaction ? 'YES' : 'NO'}</div>
+                        <div><span className="font-black">BOOTSTRAP_FALLBACK:</span> {report.transaction.lastBootstrapErrorMessage ? 'YES' : 'NO'}</div>
+                        <div><span className="font-black">LAST_BOOTSTRAP_ERROR_AT:</span> {formatSignalDate(report.transaction.lastBootstrapErrorAt)}</div>
                         <div><span className="font-black">GENERATED_AT:</span> {formatSignalDate(report.generatedAt)}</div>
                         <div className="mt-2"><span className="font-black">API:</span> /api/admin/sync-health</div>
                     </div>
+                    {report.transaction.lastBootstrapErrorMessage ? (
+                        <div className="mt-3 border border-amber-700 bg-amber-100 text-amber-900 px-2 py-2 text-[10px] font-black leading-relaxed break-words">
+                            LAST_BOOTSTRAP_ERROR: {report.transaction.lastBootstrapErrorMessage}
+                        </div>
+                    ) : null}
                 </div>
             </div>
         </div>
