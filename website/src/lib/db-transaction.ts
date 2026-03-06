@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm';
 import { db } from '../db';
 
 type TransactionRunner = <T>(fn: (trx: any) => Promise<T>) => Promise<T>;
@@ -23,18 +22,8 @@ function clearBootstrapError(): void {
 async function detectTransactionSupport(transaction: TransactionRunner): Promise<boolean> {
     const cacheAgeMs = Date.now() - transactionSupportCheckedAt;
     if (transactionSupportCache !== null && cacheAgeMs < TRANSACTION_SUPPORT_CACHE_TTL_MS) return transactionSupportCache;
-    try {
-        await transaction(async (trx) => {
-            await (trx as any).execute(sql`select 1`);
-        });
-        clearBootstrapError();
-        transactionSupportCache = true;
-        transactionSupportCheckedAt = Date.now();
-    } catch (error) {
-        rememberBootstrapError(error);
-        transactionSupportCache = false;
-        transactionSupportCheckedAt = Date.now();
-    }
+    transactionSupportCache = true;
+    transactionSupportCheckedAt = Date.now();
     return transactionSupportCache;
 }
 
@@ -66,6 +55,7 @@ export async function getDbTransactionDiagnostics() {
 export async function runDbTransaction<T>(fn: (trx: any) => Promise<T>): Promise<T> {
     const transaction = (db as unknown as { transaction?: TransactionRunner }).transaction;
     if (typeof transaction !== 'function') {
+        rememberBootstrapError(new Error('Database transaction method unavailable'));
         transactionSupportCache = false;
         transactionSupportCheckedAt = Date.now();
         throw new Error('Database transaction method unavailable');
@@ -74,7 +64,16 @@ export async function runDbTransaction<T>(fn: (trx: any) => Promise<T>): Promise
     if (!supportsNativeTransaction) {
         throw new Error('Native transaction support unavailable');
     }
-    const result = await transaction(fn);
-    clearBootstrapError();
-    return result;
+    try {
+        const result = await transaction(fn);
+        clearBootstrapError();
+        transactionSupportCache = true;
+        transactionSupportCheckedAt = Date.now();
+        return result;
+    } catch (error) {
+        rememberBootstrapError(error);
+        transactionSupportCache = false;
+        transactionSupportCheckedAt = Date.now();
+        throw error;
+    }
 }
