@@ -59,6 +59,9 @@ export function SyncHealthPanel({ initialReport }: SyncHealthPanelProps) {
         try {
             const response = await fetch('/api/admin/sync-health', { cache: 'no-store' });
             const data = await response.json();
+            if (response.status === 401 || response.status === 403) {
+                throw new Error('Sesión admin no autorizada para refrescar Sync Health');
+            }
             if (!response.ok || !data?.report) {
                 throw new Error(data?.error || 'No se pudo actualizar el health de sync');
             }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '../../../../src/lib/auth';
+import { auth } from '../../../../src/lib/auth/server';
 import { getSyncHealthReport } from '../../../../src/lib/sync-health';
 
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '')
@@ -13,7 +14,18 @@ function isAdminUser(userId: string): boolean {
 
 export async function GET(req: NextRequest) {
     try {
-        const userId = await verifyAuth(req);
+        let userId: string | null = null;
+        try {
+            const { data } = await auth.getSession();
+            userId = data?.user?.id ?? null;
+        } catch {
+            userId = null;
+        }
+
+        if (!userId) {
+            userId = await verifyAuth(req);
+        }
+
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         if (!isAdminUser(userId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
