@@ -56,7 +56,7 @@ export async function getSyncHealthReport(): Promise<SyncHealthReport> {
 
     const txDiag = await getDbTransactionDiagnostics();
     const writeMode = txDiag.supportsNativeTransaction ? 'native' : 'fallback_db';
-    const writeOk = dbOk && (txDiag.supportsNativeTransaction || !txDiag.supportsNativeTransaction);
+    const writeOk = dbOk && txDiag.supportsNativeTransaction;
 
     const [latestProfile, latestWorkout, latestScoreEvent, latestWipeAudit] = await Promise.all([
         db.select({ updatedAt: schema.userProfiles.updatedAt }).from(schema.userProfiles).orderBy(desc(schema.userProfiles.updatedAt)).limit(1),
@@ -89,17 +89,17 @@ export async function getSyncHealthReport(): Promise<SyncHealthReport> {
             push: {
                 ok: writeOk,
                 mode: writeMode,
-                reason: writeMode === 'native' ? 'transacción nativa activa' : 'modo fallback controlado sin transacción',
+                reason: writeMode === 'native' ? 'transacción nativa activa' : 'degradado: fallback sin garantías transaccionales',
             },
             snapshot: {
                 ok: writeOk,
                 mode: writeMode,
-                reason: writeMode === 'native' ? 'replace transaccional activo' : 'replace en modo fallback controlado',
+                reason: writeMode === 'native' ? 'replace transaccional activo' : 'degradado: replace en fallback no atómico',
             },
             wipe: {
                 ok: writeOk,
                 mode: writeMode,
-                reason: writeMode === 'native' ? 'wipe transaccional activo' : 'wipe en modo fallback controlado',
+                reason: writeMode === 'native' ? 'wipe transaccional activo' : 'degradado: wipe en fallback no atómico',
             },
             status: {
                 ok: dbOk,
