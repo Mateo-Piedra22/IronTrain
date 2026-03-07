@@ -157,6 +157,14 @@ export class SyncService {
             out[normalizedKey] = value;
         }
 
+        // --- ID Standardization for Protected Records ---
+        const recordName = typeof out.name === 'string' ? out.name : '';
+
+        if (table === 'categories' && (recordName === 'Sin categoría' || recordName === 'Uncategorized')) {
+            out.id = 'uncategorized';
+            out.is_system = 1;
+        }
+
         if (table === 'settings') {
             const keyValue = out.key;
             if (typeof keyValue === 'string' && keyValue.includes(':')) {

@@ -78,11 +78,22 @@ export async function GET(req: NextRequest) {
                                 gt(table.updatedAt, sinceDate)
                             ));
                     }
-                } else if (tableName === 'changelogs' || tableName === 'badges' || tableName === 'categories') {
-                    // Public or Global tables
+                } else if (tableName === 'changelogs') {
+                    // Fully global tables (no owner)
                     queryResult = await db.select()
                         .from(table)
                         .where(gt(table.updatedAt, sinceDate));
+                } else if (tableName === 'categories' || tableName === 'exercises' || tableName === 'badges' || tableName === 'exercise_badges') {
+                    // Pull globals (isSystem=1) OR user-owned OR records with no userId (shouldn't happen but safe)
+                    queryResult = await db.select()
+                        .from(table)
+                        .where(and(
+                            or(
+                                eq(table.isSystem, 1),
+                                eq(table.userId, userId)
+                            ),
+                            gt(table.updatedAt, sinceDate)
+                        ));
                 } else if (tableName === 'friendships') {
                     // Friendship tables - both sides
                     queryResult = await db.select()

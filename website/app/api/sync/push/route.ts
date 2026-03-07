@@ -142,8 +142,13 @@ export async function POST(req: NextRequest) {
                         if (existingRecord) {
                             // Check ownership if available
                             const ownerId = existingRecord.userId || existingRecord.id;
+                            const isSystemRecord = existingRecord.isSystem === 1 || existingRecord.is_system === 1;
+
                             if (ownerId && ownerId !== userId && !['friendships', 'activity_feed', 'kudos', 'changelog_reactions'].includes(tableName)) {
-                                throw new Error('Ownership mismatch');
+                                // Industrial Rule: Allow "Public/System" records with deterministic IDs to be shared/merged
+                                if (!isSystemRecord) {
+                                    throw new Error('Ownership mismatch');
+                                }
                             }
 
                             // Stale check

@@ -9,6 +9,7 @@ const UNCATEGORIZED_ID = 'uncategorized';
 const UNCATEGORIZED_NAME = 'Sin categoría';
 const LEGACY_UNCATEGORIZED_ID = 'sys-cat-1';
 
+
 export class DatabaseService {
     private db: SQLite.SQLiteDatabase | null = null;
     private isInitialized = false;
@@ -835,6 +836,109 @@ export class DatabaseService {
         } catch (e) {
             console.warn('Migration 16 failed:', e);
         }
+
+        // Migration 17: Generic Name-Based Deduplication (Repairing Sync Issues)
+        try {
+            console.log('[Migration] Running Migration 17: Generic Deduplication Repair');
+            await this.executeRaw('PRAGMA foreign_keys = OFF;');
+            await this.withTransaction(async () => {
+
+                // 1. Uncategorized Consistency
+                const uncategorizedRows = await this.getAll<{ id: string }>(
+                    "SELECT id FROM categories WHERE name = ? OR id = ? OR id = ?",
+                    [UNCATEGORIZED_NAME, UNCATEGORIZED_ID, LEGACY_UNCATEGORIZED_ID]
+                );
+                if (uncategorizedRows.length > 0) {
+                    for (const row of uncategorizedRows) {
+                        if (row.id !== UNCATEGORIZED_ID) {
+                            await this.run('UPDATE exercises SET category_id = ? WHERE category_id = ?', [UNCATEGORIZED_ID, row.id]);
+                            await this.run('DELETE FROM categories WHERE id = ?', [row.id]);
+                        }
+                    }
+                    await this.run(
+                        "INSERT OR REPLACE INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, 999, '#64748b')",
+                        [UNCATEGORIZED_ID, UNCATEGORIZED_NAME]
+                    );
+                }
+
+                // 2. Generic Category Deduplication (by Name)
+                const duplicateCats = await this.getAll<{ name: string }>(
+                    "SELECT name FROM categories WHERE name != ? GROUP BY name HAVING COUNT(*) > 1",
+                    [UNCATEGORIZED_NAME]
+                );
+                for (const cat of duplicateCats) {
+                    const instances = await this.getAll<{ id: string }>("SELECT id FROM categories WHERE name = ? ORDER BY is_system DESC, id ASC", [cat.name]);
+                    const masterId = instances[0].id;
+                    const duplicates = instances.slice(1);
+                    for (const dupe of duplicates) {
+                        await this.run('UPDATE exercises SET category_id = ? WHERE category_id = ?', [masterId, dupe.id]);
+                        await this.run('DELETE FROM categories WHERE id = ?', [dupe.id]);
+                    }
+                }
+
+                // 3. Generic Badge Deduplication (by Name)
+                const duplicateBadges = await this.getAll<{ name: string }>("SELECT name FROM badges GROUP BY name HAVING COUNT(*) > 1");
+                for (const b of duplicateBadges) {
+                    const instances = await this.getAll<{ id: string }>("SELECT id FROM badges WHERE name = ? ORDER BY id ASC", [b.name]);
+                    const masterId = instances[0].id;
+                    const duplicates = instances.slice(1);
+                    for (const dupe of duplicates) {
+                        await this.run('UPDATE exercise_badges SET badge_id = ? WHERE badge_id = ?', [masterId, dupe.id]);
+                        await this.run('DELETE FROM badges WHERE id = ?', [dupe.id]);
+                    }
+                }
+
+                // 4. Badge-Aware Exercise Deduplication (Name + Category + Badges)
+                const allExs = await this.getAll<{ id: string, name: string, category_id: string }>(
+                    "SELECT id, name, category_id FROM exercises"
+                );
+
+                const exerciseMap = new Map<string, string[]>();
+
+                for (const ex of allExs) {
+                    const badgeRows = await this.getAll<{ badge_id: string }>(
+                        "SELECT badge_id FROM exercise_badges WHERE exercise_id = ? AND deleted_at IS NULL ORDER BY badge_id ASC",
+                        [ex.id]
+                    );
+                    const badgeSig = badgeRows.map(b => b.badge_id).join('|');
+                    const signature = `${ex.category_id}#${ex.name.toLowerCase()}#${badgeSig}`;
+
+                    if (!exerciseMap.has(signature)) {
+                        exerciseMap.set(signature, []);
+                    }
+                    exerciseMap.get(signature)!.push(ex.id);
+                }
+
+                for (const [signature, ids] of exerciseMap.entries()) {
+                    if (ids.length > 1) {
+                        const masterId = ids[0];
+                        const duplicates = ids.slice(1);
+                        console.log(`[Migration] Merging ${duplicates.length} duplicate exercises for signature: ${signature}`);
+                        for (const dupeId of duplicates) {
+                            await this.run('UPDATE workout_sets SET exercise_id = ? WHERE exercise_id = ?', [masterId, dupeId]);
+                            await this.run('UPDATE routine_exercises SET exercise_id = ? WHERE exercise_id = ?', [masterId, dupeId]);
+                            await this.run('UPDATE exercise_badges SET exercise_id = ? WHERE exercise_id = ?', [masterId, dupeId]);
+                            await this.run('UPDATE user_exercise_prs SET exercise_id = ? WHERE exercise_id = ?', [masterId, dupeId]);
+                            await this.run('DELETE FROM exercises WHERE id = ?', [dupeId]);
+                        }
+                    }
+                }
+
+                // 5. Junction Table Cleanup (Final safety)
+                await this.executeRaw(`
+                    DELETE FROM exercise_badges 
+                    WHERE rowid NOT IN (
+                        SELECT MIN(rowid) 
+                        FROM exercise_badges 
+                        GROUP BY exercise_id, badge_id
+                    )
+                `);
+            });
+            await this.executeRaw('PRAGMA foreign_keys = ON;');
+        } catch (e) {
+            console.error('[Migration] Migration 17 failed:', e);
+            await this.executeRaw('PRAGMA foreign_keys = ON;');
+        }
     }
 
     private async seedDatabase(): Promise<void> {
@@ -842,159 +946,21 @@ export class DatabaseService {
         if (seedDisabled === '1') {
             return;
         }
-        const result = await this.getFirst<{ count: number }>('SELECT count(*) as count FROM categories');
-        if (result && result.count > 0) {
-            return; // Already seeded
+
+        // Just ensure Sin categoría exists. No other system data.
+        const uncategorized = await this.getFirst('SELECT id FROM categories WHERE id = ? OR name = ?', [UNCATEGORIZED_ID, UNCATEGORIZED_NAME]);
+        if (!uncategorized) {
+            await this.run(
+                'INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, 999, "#64748b")',
+                [UNCATEGORIZED_ID, UNCATEGORIZED_NAME]
+            );
         }
-
-
-
-        // Default Categories
-        // Default Categories - Standardized to Grayscale/Orange Industrial Theme
-        const categories = [
-            { name: 'Pecho', color: '#fb923c' }, // Primary Orange
-            { name: 'Espalda', color: '#94a3b8' }, // Slate 400
-            { name: 'Piernas', color: '#f97316' }, // Darker Orange
-            { name: 'Hombros', color: '#cbd5e1' }, // Slate 300
-            { name: 'Bíceps', color: '#ffedd5' }, // Orange 100
-            { name: 'Tríceps', color: '#fed7aa' }, // Orange 200
-            { name: 'Abdominales', color: '#64748b' }, // Slate 500
-            { name: 'Cardio', color: '#475569' } // Slate 600
-        ];
-
-        // Optimize seeding with a Transaction
-        try {
-            await this.withTransaction(async () => {
-                for (const [index, cat] of categories.entries()) {
-                    const catId = this.generateId();
-                    await this.run(
-                        'INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, ?, ?)',
-                        [catId, cat.name, index, cat.color]
-                    );
-
-                    // Seed Basic Exercises for each category
-                    const exercises = this.getInitialExercises(cat.name);
-                    for (const ex of exercises) {
-                        await this.run(
-                            'INSERT INTO exercises (id, category_id, name, type, is_system) VALUES (?, ?, ?, ?, 1)',
-                            [this.generateId(), catId, ex.name, ex.type]
-                        );
-                    }
-                }
-            });
-        } catch (error) {
-            console.error('Seeding failed', error);
-            throw error;
-        }
-
-        // Seeding Badges (System Default)
-        await this.seedBadges();
     }
-
 
     private async seedBadges(): Promise<void> {
-        try {
-            const countRes = await this.getFirst<{ count: number }>('SELECT count(*) as count FROM badges');
-            if (countRes && countRes.count > 0) return;
-
-            // Hardcoded Deterministic UUIDs for System Badges to ensure cross-device consistency
-            const systemBadges = [
-                // Equipment
-                { id: 'bad-eq-001', name: 'Barra', color: '#475569', icon: 'BarChart', group_name: 'equipamiento' },
-                { id: 'bad-eq-002', name: 'Mancuernas', color: '#64748b', icon: 'BicepsFlexed', group_name: 'equipamiento' },
-                { id: 'bad-eq-003', name: 'Barra Z', color: '#475569', icon: 'Activity', group_name: 'equipamiento' },
-                { id: 'bad-eq-004', name: 'Poleas', color: '#64748b', icon: 'Settings', group_name: 'equipamiento' },
-                { id: 'bad-eq-005', name: 'Máquina', color: '#475569', icon: 'Box', group_name: 'equipamiento' },
-                { id: 'bad-eq-006', name: 'Peso Corporal', color: '#64748b', icon: 'User', group_name: 'equipamiento' },
-                { id: 'bad-eq-007', name: 'Smith Machine', color: '#475569', icon: 'Lock', group_name: 'equipamiento' },
-
-                // Position
-                { id: 'bad-ps-001', name: 'Plano', color: '#f97316', icon: 'Minus', group_name: 'posicion' },
-                { id: 'bad-ps-002', name: 'Inclinado', color: '#fbbf24', icon: 'TrendingUp', group_name: 'posicion' },
-                { id: 'bad-ps-003', name: 'Declinado', color: '#d97706', icon: 'TrendingDown', group_name: 'posicion' },
-                { id: 'bad-ps-004', name: 'Sentado', color: '#f59e0b', icon: 'Armchair', group_name: 'posicion' },
-                { id: 'bad-ps-005', name: 'De Pie', color: '#fb923c', icon: 'Accessibility', group_name: 'posicion' },
-
-                // Variation
-                { id: 'bad-vr-001', name: 'Unilateral', color: '#3b82f6', icon: 'Hand', group_name: 'variacion' },
-                { id: 'bad-vr-002', name: 'Agarre Ancho', color: '#6366f1', icon: 'Maximize', group_name: 'variacion' },
-                { id: 'bad-vr-003', name: 'Agarre Estrecho', color: '#4f46e5', icon: 'Minimize', group_name: 'variacion' },
-            ];
-
-            await this.withTransaction(async () => {
-                const now = Date.now();
-                for (const badge of systemBadges) {
-                    await this.run(
-                        'INSERT INTO badges (id, name, color, icon, group_name, is_system, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?)',
-                        [badge.id, badge.name, badge.color, badge.icon, badge.group_name, now]
-                    );
-                }
-            });
-            console.log(`Seeded ${systemBadges.length} system badges.`);
-        } catch (e) {
-            console.warn('Failed to seed badges:', e);
-        }
+        // No longer seeding system badges as user builds their own.
     }
 
-    private getInitialExercises(categoryName: string): { name: string; type: ExerciseType }[] {
-        const commonType: ExerciseType = 'weight_reps';
-
-        switch (categoryName) {
-            case 'Pecho':
-                return [
-                    { name: 'Press de Banca (Barra)', type: commonType },
-                    { name: 'Press Inclinado (Mancuernas)', type: commonType },
-                    { name: 'Aperturas', type: commonType },
-                    { name: 'Flexiones', type: 'reps_only' }
-                ];
-            case 'Espalda':
-                return [
-                    { name: 'Dominadas', type: 'reps_only' },
-                    { name: 'Remo con Barra', type: commonType },
-                    { name: 'Jalón al Pecho', type: commonType },
-                    { name: 'Peso Muerto', type: commonType }
-                ];
-            case 'Piernas':
-                return [
-                    { name: 'Sentadilla', type: commonType },
-                    { name: 'Prensa', type: commonType },
-                    { name: 'Estocadas', type: commonType },
-                    { name: 'Extensiones de Cuádriceps', type: commonType },
-                    { name: 'Curl Femoral', type: commonType }
-                ];
-            case 'Hombros':
-                return [
-                    { name: 'Press Militar', type: commonType },
-                    { name: 'Elevaciones Laterales', type: commonType },
-                    { name: 'Pájaros (Posterior)', type: commonType }
-                ];
-            case 'Bíceps':
-                return [
-                    { name: 'Curl con Barra', type: commonType },
-                    { name: 'Curl Martillo', type: commonType }
-                ];
-            case 'Tríceps':
-                return [
-                    { name: 'Fondos', type: 'reps_only' },
-                    { name: 'Press Francés', type: commonType },
-                    { name: 'Extensiones en Polea', type: commonType }
-                ];
-            case 'Abdominales':
-                return [
-                    { name: 'Crunch', type: 'reps_only' },
-                    { name: 'Plancha', type: 'distance_time' }, // using time
-                    { name: 'Elevación de Piernas', type: 'reps_only' }
-                ];
-            case 'Cardio':
-                return [
-                    { name: 'Cinta de Correr', type: 'distance_time' },
-                    { name: 'Bicicleta', type: 'distance_time' },
-                    { name: 'Elíptica', type: 'distance_time' }
-                ];
-            default:
-                return [];
-        }
-    }
 
     // --- CATEGORIES ---
 
