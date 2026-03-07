@@ -74,30 +74,43 @@ export async function GET(req: NextRequest) {
             WITH UserStats AS (
                 SELECT 
                     LOWER(e.name) as exercise_name,
+                    (
+                        SELECT STRING_AGG(b.name, ', ' ORDER BY b.name)
+                        FROM exercise_badges eb
+                        JOIN badges b ON eb.badge_id = b.id
+                        WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL
+                    ) as badge_names,
                     MAX(e.name) as display_name,
                     MAX((${userWeightExpr}) * (1.0 + (s.reps / 30.0))) as max_1rm_kg
                 FROM workout_sets s
                 JOIN exercises e ON s.exercise_id = e.id
                 WHERE s.user_id = ${userId} AND s.weight > 0 AND s.reps > 0 AND s.completed = 1 AND s.deleted_at IS NULL
-                GROUP BY LOWER(e.name)
+                GROUP BY LOWER(e.name), badge_names
             ),
             FriendStats AS (
                 SELECT 
                     LOWER(e.name) as exercise_name,
+                    (
+                        SELECT STRING_AGG(b.name, ', ' ORDER BY b.name)
+                        FROM exercise_badges eb
+                        JOIN badges b ON eb.badge_id = b.id
+                        WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL
+                    ) as badge_names,
                     MAX(e.name) as display_name,
                     MAX((${friendWeightExpr}) * (1.0 + (s.reps / 30.0))) as max_1rm_kg
                 FROM workout_sets s
                 JOIN exercises e ON s.exercise_id = e.id
                 WHERE s.user_id = ${friendId} AND s.weight > 0 AND s.reps > 0 AND s.completed = 1 AND s.deleted_at IS NULL
-                GROUP BY LOWER(e.name)
+                GROUP BY LOWER(e.name), badge_names
             )
             SELECT 
                 COALESCE(u.display_name, f.display_name) as "exerciseName",
+                u.badge_names as "badgeNames",
                 FLOOR(u.max_1rm_kg) as "user1RMKg",
                 FLOOR(f.max_1rm_kg) as "friend1RMKg"
             FROM UserStats u
-            JOIN FriendStats f ON u.exercise_name = f.exercise_name
-            ORDER BY u.exercise_name ASC;
+            JOIN FriendStats f ON u.exercise_name = f.exercise_name AND COALESCE(u.badge_names, '') = COALESCE(f.badge_names, '')
+            ORDER BY u.exercise_name ASC, u.badge_names ASC;
         `;
 
         const result = await db.execute(query);
@@ -110,8 +123,11 @@ export async function GET(req: NextRequest) {
             const user1RM = Math.round(user1RMKg * convert);
             const friend1RM = Math.round(friend1RMKg * convert);
 
+            const baseName = String(data.exerciseName || 'Ejercicio');
+            const badgesText = data.badgeNames ? ` (${data.badgeNames})` : '';
+
             return {
-                exerciseName: String(data.exerciseName || 'Ejercicio'),
+                exerciseName: `${baseName}${badgesText}`,
                 user1RM,
                 friend1RM,
                 unit: responseUnit,

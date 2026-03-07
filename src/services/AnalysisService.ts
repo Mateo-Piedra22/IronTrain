@@ -150,18 +150,20 @@ export class AnalysisService {
             results.forEach(raw => {
                 const r: any = raw;
                 const eNameStr = String(r.exerciseName || r.exercisename || r.name);
+                const eIdStr = String(r.exerciseId || r.exercise_id);
                 // Epley: weight * (1 + reps/30)
                 const epley = Math.round(r.weight * (1 + r.reps / 30));
 
                 // If we don't have this exercise or this set provides a higher 1RM
-                if (!maxes[eNameStr] || epley > maxes[eNameStr].estimated1RM) {
+                // Keying by Exercise ID is more precise than Name
+                if (!maxes[eIdStr] || epley > maxes[eIdStr].estimated1RM) {
                     const badges = r.badges_csv ? r.badges_csv.split(',').map((s: string) => {
                         const [name, color, icon] = s.split('|');
                         return { name, color, icon: icon || undefined };
                     }) : [];
 
-                    maxes[eNameStr] = {
-                        exerciseId: String(r.exerciseId || r.exercise_id),
+                    maxes[eIdStr] = {
+                        exerciseId: eIdStr,
                         exerciseName: eNameStr,
                         weight: r.weight,
                         reps: r.reps,

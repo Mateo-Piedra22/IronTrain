@@ -89,7 +89,7 @@ export default function FeedbackScreen() {
 
                     <View style={s.contextBox}>
                         <Text style={s.contextTitle}>Se adjunta automáticamente</Text>
-                        <Text style={s.contextHint}>Esto es informativo, no es un botón.</Text>
+                        <Text style={s.contextHint}>Adjuntamos estos datos automáticamente para mejorar la calidad del reporte.</Text>
                         <View style={s.contextRow}>
                             <Text style={s.contextPill}>Versión</Text>
                             <Text style={s.contextPill}>Sistema operativo</Text>
@@ -227,7 +227,7 @@ const s = StyleSheet.create({
         marginBottom: 28,
     },
     contextTitle: {
-        color: Colors.iron[700],
+        color: Colors.iron[950],
         fontSize: 12,
         fontWeight: '800',
         textTransform: 'uppercase',

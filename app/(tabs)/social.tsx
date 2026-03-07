@@ -1120,7 +1120,7 @@ const styles = StyleSheet.create({
         borderColor: Colors.iron[700],
     },
     idText: {
-        color: Colors.iron[300],
+        color: Colors.iron[200],
         fontFamily: 'monospace',
         fontSize: 12,
         flex: 1,
@@ -1304,7 +1304,7 @@ const styles = StyleSheet.create({
     segmentText: {
         fontSize: 12,
         fontWeight: 'bold',
-        color: Colors.iron[700],
+        color: Colors.iron[500],
         textTransform: 'uppercase',
     },
     segmentTextActive: {
@@ -1676,9 +1676,9 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
     },
     modalCancelText: {
-        color: Colors.iron[700],
+        color: Colors.iron[500],
         fontSize: 13,
-        fontWeight: '800',
+        fontWeight: 'bold',
         textTransform: 'uppercase',
     },
     modalPrimaryBtn: {
@@ -1735,7 +1735,7 @@ const styles = StyleSheet.create({
     },
     friendInfoId: {
         flex: 1,
-        color: Colors.iron[700],
+        color: Colors.iron[950],
         fontSize: 12,
         fontFamily: 'monospace',
     },
@@ -1772,7 +1772,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
     },
     modalSecondaryText: {
-        color: Colors.iron[700],
+        color: Colors.iron[950],
         fontSize: 12,
         fontWeight: '800',
         textTransform: 'uppercase',
@@ -1788,7 +1788,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
     },
     modalDangerText: {
-        color: withAlpha(Colors.red, '99'),
+        color: Colors.red,
         fontSize: 12,
         fontWeight: '900',
         textTransform: 'uppercase',
@@ -1834,7 +1834,7 @@ const styles = StyleSheet.create({
     },
     goalsDesc: {
         fontSize: 12,
-        color: Colors.iron[600],
+        color: Colors.iron[200],
         lineHeight: 18,
         marginBottom: 12,
     },

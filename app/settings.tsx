@@ -184,25 +184,34 @@ export default function SettingsScreen() {
 
             const formatMergedDetail = () => {
                 const order = [
-                    'categories', 'exercises',
+                    'categories', 'exercises', 'badges', 'exercise_badges',
                     'routines', 'routine_days', 'routine_exercises',
-                    'workouts', 'workout_sets',
-                    'measurements', 'goals',
-                    'body_metrics', 'plate_inventory', 'settings'
+                    'workouts', 'workout_sets', 'user_exercise_prs',
+                    'measurements', 'goals', 'body_metrics',
+                    'plate_inventory', 'settings', 'user_profiles',
+                    'score_events', 'kudos', 'activity_feed', 'changelog_reactions'
                 ];
                 const labels: Record<string, string> = {
                     categories: 'Categorías',
                     exercises: 'Ejercicios',
+                    badges: 'Equipamiento',
+                    exercise_badges: 'Posición / Equipo',
                     routines: 'Rutinas',
                     routine_days: 'Días de Rutina',
                     routine_exercises: 'Ejercicios en Rutina',
                     workouts: 'Entrenamientos',
                     workout_sets: 'Series',
+                    user_exercise_prs: 'Récords Personales',
                     measurements: 'Mediciones',
                     goals: 'Objetivos',
                     body_metrics: 'Métricas Corporales',
                     plate_inventory: 'Inventario de Discos',
-                    settings: 'Ajustes'
+                    settings: 'Ajustes',
+                    user_profiles: 'Perfiles',
+                    score_events: 'Eventos de Puntos',
+                    kudos: 'Kudos/Likes',
+                    activity_feed: 'Muro Social',
+                    changelog_reactions: 'Reacciones'
                 };
 
                 const lines: string[] = [];
