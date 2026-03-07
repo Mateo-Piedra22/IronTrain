@@ -73,7 +73,7 @@ function resolveStreakMultiplier(cfg: ScoreConfig, streakWeeks: number): number 
     return 1;
 }
 
-async function getOrCreateScoreConfig(trx: any): Promise<ScoreConfig> {
+export async function getOrCreateScoreConfig(trx: any): Promise<ScoreConfig> {
     const [row] = await trx.select().from(schema.socialScoringConfig).where(eq(schema.socialScoringConfig.id, 'default')).limit(1);
     if (row) return row as ScoreConfig;
     await trx.insert(schema.socialScoringConfig).values({ id: 'default' });
@@ -114,7 +114,7 @@ function isBigThreeExercise(name: string): boolean {
     return false;
 }
 
-async function isAdverseWeather(lat: number, lon: number, coldThresholdC: number): Promise<{ adverse: boolean; reason: string | null; tempC: number | null }> {
+export async function isAdverseWeather(lat: number, lon: number, coldThresholdC: number): Promise<{ adverse: boolean; reason: string | null; tempC: number | null }> {
     const apiKey = process.env.OPENWEATHER_API_KEY;
     if (!apiKey) return { adverse: false, reason: null, tempC: null };
     try {
