@@ -84,16 +84,25 @@ export async function GET(req: NextRequest) {
                         or(eq(table.userId, userId), eq(table.friendId, userId)),
                         gt(table.updatedAt, sinceDate)
                     ));
-            } else if (tableName === 'user_profiles') {
-                // User's own profile pull
+            } else if (tableName === 'kudos') {
+                // User's own kudos pull (giver_id)
                 queryResult = await db.select()
                     .from(table)
                     .where(and(
-                        eq(table.id, userId),
+                        eq(table.giverId, userId),
+                        gt(table.updatedAt, sinceDate)
+                    ));
+            } else if (tableName === 'changelog_reactions' || tableName === 'user_profiles') {
+                // Tables where the ID field or a specific 'userId' field is used
+                const idCol = tableName === 'user_profiles' ? table.id : table.userId;
+                queryResult = await db.select()
+                    .from(table)
+                    .where(and(
+                        eq(idCol, userId),
                         gt(table.updatedAt, sinceDate)
                     ));
             } else {
-                // User-owned tables
+                // Standard user-owned tables
                 queryResult = await db.select()
                     .from(table)
                     .where(and(

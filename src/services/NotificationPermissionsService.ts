@@ -4,18 +4,13 @@ import { confirm } from '../store/confirmStore';
 
 class NotificationPermissionsService {
     /**
-     * Revisa y solicita progresivamente permisos para Notificaciones Push (Nivel OS).
-     * Devuelve `true` si ya tiene permiso o si el usuario acepta.
-     * Si fue denegado previamente, abre un prompt informando que debe ir a ajustes.
+     * Revisa el estado de permisos para Notificaciones Push (Nivel OS).
+     * Solo retorna el estado actual; RootLayout ya maneja la lógica de registro.
      */
     async requestPermission(explainContext = false): Promise<boolean> {
         try {
-            const settings = await notifee.requestPermission({
-                sound: true,
-                announcement: true,
-                badge: true,
-                alert: true,
-            });
+            // Check status without prompting (RootLayout handles push registration)
+            const settings = await notifee.getNotificationSettings();
 
             if (settings.authorizationStatus === AuthorizationStatus.AUTHORIZED ||
                 settings.authorizationStatus === AuthorizationStatus.PROVISIONAL) {

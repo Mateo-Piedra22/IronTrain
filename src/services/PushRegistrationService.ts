@@ -24,12 +24,16 @@ export class PushRegistrationService {
             }
 
             if (finalStatus !== 'granted') {
+                console.log('Failed to get push token for push notification!');
                 return null;
             }
 
-            const nativeTokenResponse = await Notifications.getDevicePushTokenAsync();
-            const token = String(nativeTokenResponse?.data || '');
-            const tokenType = String((nativeTokenResponse as any)?.type || Platform.OS);
+            // use getExpoPushTokenAsync as it handles provider initialization better in managed/prebuild
+            const tokenResponse = await Notifications.getExpoPushTokenAsync({
+                projectId: '76d89df6-9ab1-4903-af08-64d0bc630646'
+            });
+            const token = tokenResponse.data;
+            const tokenType = 'expo';
             if (!token) return null;
 
             if (Platform.OS === 'ios' && this.looksLikeApnsToken(token)) {
