@@ -65,61 +65,80 @@ export async function GET(req: NextRequest) {
         const changes: Array<{ table: string; operation: string; payload: Record<string, unknown> }> = [];
 
         for (const [tableName, table] of Object.entries(tableMap)) {
-            let queryResult;
-            if (tableName === 'activity_feed') {
-                queryResult = await db.select()
-                    .from(table)
-                    .where(and(
-                        inArray(table.userId, allRelevantUserIdsForFeed),
-                        gt(table.updatedAt, sinceDate)
-                    ));
-            } else if (tableName === 'changelogs' || tableName === 'badges' || tableName === 'categories') {
-                // Public or Global tables
-                queryResult = await db.select()
-                    .from(table)
-                    .where(gt(table.updatedAt, sinceDate));
-            } else if (tableName === 'friendships') {
-                // Friendship tables - both sides
-                queryResult = await db.select()
-                    .from(table)
-                    .where(and(
-                        or(eq(table.userId, userId), eq(table.friendId, userId)),
-                        gt(table.updatedAt, sinceDate)
-                    ));
-            } else if (tableName === 'kudos') {
-                // User's own kudos pull (giver_id)
-                queryResult = await db.select()
-                    .from(table)
-                    .where(and(
-                        eq(table.giverId, userId),
-                        gt(table.updatedAt, sinceDate)
-                    ));
-            } else if (tableName === 'changelog_reactions' || tableName === 'user_profiles') {
-                // Tables where the ID field or a specific 'userId' field is used
-                const idCol = tableName === 'user_profiles' ? table.id : table.userId;
-                queryResult = await db.select()
-                    .from(table)
-                    .where(and(
-                        eq(idCol, userId),
-                        gt(table.updatedAt, sinceDate)
-                    ));
-            } else {
-                // Standard user-owned tables
-                queryResult = await db.select()
-                    .from(table)
-                    .where(and(
-                        eq(table.userId, userId),
-                        gt(table.updatedAt, sinceDate)
-                    ));
-            }
+            try {
+                let queryResult: any[] = [];
+                if (tableName === 'activity_feed') {
+                    if (allRelevantUserIdsForFeed.length === 0) {
+                        queryResult = [];
+                    } else {
+                        queryResult = await db.select()
+                            .from(table)
+                            .where(and(
+                                inArray(table.userId, allRelevantUserIdsForFeed),
+                                gt(table.updatedAt, sinceDate)
+                            ));
+                    }
+                } else if (tableName === 'changelogs' || tableName === 'badges' || tableName === 'categories') {
+                    // Public or Global tables
+                    queryResult = await db.select()
+                        .from(table)
+                        .where(gt(table.updatedAt, sinceDate));
+                } else if (tableName === 'friendships') {
+                    // Friendship tables - both sides
+                    queryResult = await db.select()
+                        .from(table)
+                        .where(and(
+                            or(eq(table.userId, userId), eq(table.friendId, userId)),
+                            gt(table.updatedAt, sinceDate)
+                        ));
+                } else if (tableName === 'kudos') {
+                    // User's own kudos pull (giver_id)
+                    queryResult = await db.select()
+                        .from(table)
+                        .where(and(
+                            eq(table.giverId, userId),
+                            gt(table.updatedAt, sinceDate)
+                        ));
+                } else if (tableName === 'changelog_reactions' || tableName === 'user_profiles') {
+                    // Tables where the ID field or a specific 'userId' field is used
+                    const idCol = tableName === 'user_profiles' ? table.id : table.userId;
+                    if (!idCol) {
+                        console.warn(`[Sync Pull] Missing id column for ${tableName}`);
+                        queryResult = [];
+                    } else {
+                        queryResult = await db.select()
+                            .from(table)
+                            .where(and(
+                                eq(idCol, userId),
+                                gt(table.updatedAt, sinceDate)
+                            ));
+                    }
+                } else {
+                    // Standard user-owned tables
+                    if (!table.userId) {
+                        console.warn(`[Sync Pull] Table ${tableName} missing userId despite being in owner block`);
+                        queryResult = [];
+                    } else {
+                        queryResult = await db.select()
+                            .from(table)
+                            .where(and(
+                                eq(table.userId, userId),
+                                gt(table.updatedAt, sinceDate)
+                            ));
+                    }
+                }
 
-            for (const record of queryResult) {
-                const operation = (record.deletedAt && record.deletedAt > sinceDate) ? 'DELETE' : (record.createdAt > sinceDate ? 'INSERT' : 'UPDATE');
-                changes.push({
-                    table: tableName,
-                    operation,
-                    payload: toSnakeCase(record as Record<string, unknown>)
-                });
+                for (const record of queryResult) {
+                    const operation = (record.deletedAt && record.deletedAt > sinceDate) ? 'DELETE' : (record.createdAt > sinceDate ? 'INSERT' : 'UPDATE');
+                    changes.push({
+                        table: tableName,
+                        operation,
+                        payload: toSnakeCase(record as Record<string, unknown>)
+                    });
+                }
+            } catch (tableError: any) {
+                console.error(`[Sync Pull] Error pulling table ${tableName}:`, tableError.message);
+                // We keep going for other tables but this might indicate a schema mismatch
             }
         }
 

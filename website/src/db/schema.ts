@@ -51,7 +51,7 @@ export const workouts = pgTable('workouts', {
     endTime: bigint('end_time', { mode: 'number' }),
     finishLat: real('finish_lat'),
     finishLon: real('finish_lon'),
-    name: text('name').notNull(),
+    name: text('name'),
     notes: text('notes'),
     status: text('status'),
     duration: bigint('duration', { mode: 'number' }),
