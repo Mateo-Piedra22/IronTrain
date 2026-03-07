@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { Config } from '../constants/Config';
+import { dataEventService } from './DataEventService';
 
 const API_URL = Config.API_URL;
 
@@ -109,7 +110,6 @@ export class SocialService {
         if (!res.ok) throw new Error(data.error || 'Failed to update profile');
 
         // Emit event for real-time UI updates
-        const { dataEventService } = await import('./DataEventService');
         dataEventService.emit('SOCIAL_UPDATED');
 
         return data.success;
@@ -150,7 +150,6 @@ export class SocialService {
         if (!res.ok) throw new Error(data.error || 'Failed to send request');
 
         // Emit event for real-time UI updates
-        const { dataEventService } = await import('./DataEventService');
         dataEventService.emit('SOCIAL_UPDATED');
 
         return data.success;
@@ -167,7 +166,6 @@ export class SocialService {
         if (!res.ok) throw new Error(data.error || 'Failed to respond');
 
         // Emit event for real-time UI updates
-        const { dataEventService } = await import('./DataEventService');
         dataEventService.emit('SOCIAL_UPDATED');
 
         return data.success;
@@ -193,7 +191,6 @@ export class SocialService {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to send');
         try {
-            const { dataEventService } = await import('./DataEventService');
             dataEventService.emit('SOCIAL_UPDATED');
         } catch { }
         return data.success;
@@ -210,7 +207,6 @@ export class SocialService {
         if (!res.ok) throw new Error(data.error || 'Failed to respond');
 
         // Emit event for real-time UI updates
-        const { dataEventService } = await import('./DataEventService');
         dataEventService.emit('SOCIAL_UPDATED');
 
         return data.success;
@@ -229,7 +225,6 @@ export class SocialService {
             const data = await res.json();
             if (!res.ok) return 'error';
             try {
-                const { dataEventService } = await import('./DataEventService');
                 dataEventService.emit('SOCIAL_UPDATED');
             } catch { }
             return data.action === 'removed' ? 'removed' : 'added';

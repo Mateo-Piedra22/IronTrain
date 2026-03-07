@@ -2,7 +2,7 @@ import { ConsistencyHeatmap } from '@/components/ConsistencyHeatmap';
 import { GoalsWidget } from '@/components/GoalsWidget';
 import { VolumeChart } from '@/components/analysis/VolumeChart';
 import { CardioSummary, CategoryVolumeRow, RepsOnlySummary, WeightOnlySummary, WorkoutComparison, WorkoutStreak, WorkoutSummary } from '@/src/services/AnalysisService';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { useRouter } from 'expo-router';
 import { Activity, BarChart3, ChevronRight, Clock, Flame, Ruler, Scale, TrendingDown, TrendingUp, Trophy, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -70,7 +70,7 @@ export function AnalysisOverview({
                 {/* Last 7 Days Card */}
                 <View style={[styles.heroCard, { flex: 1 }]}>
                     <View style={styles.heroIconRow}>
-                        <View style={[styles.heroIconCircle, { backgroundColor: Colors.primary.DEFAULT + '15' }]}>
+                        <View style={[styles.heroIconCircle, { backgroundColor: withAlpha(Colors.primary.DEFAULT, '15') }]}>
                             <Activity size={16} color={Colors.primary.DEFAULT} />
                         </View>
                         <Text style={styles.heroLabel}>Últimos 7 días</Text>
@@ -82,8 +82,8 @@ export function AnalysisOverview({
                 {/* Streak Card */}
                 <View style={[styles.heroCard, { flex: 1 }]}>
                     <View style={styles.heroIconRow}>
-                        <View style={[styles.heroIconCircle, { backgroundColor: '#ff6b0015' }]}>
-                            <Flame size={16} color="#ff6b00" />
+                        <View style={[styles.heroIconCircle, { backgroundColor: withAlpha(Colors.yellow, '15') }]}>
+                            <Flame size={16} color={Colors.yellow} />
                         </View>
                         <Text style={styles.heroLabel}>Racha</Text>
                     </View>
@@ -113,15 +113,15 @@ export function AnalysisOverview({
                     {comparison?.workoutChangePct != null && (
                         <View style={[
                             styles.changeBadge,
-                            { backgroundColor: comparison.workoutChangePct >= 0 ? '#dcfce7' : '#fee2e2' }
+                            { backgroundColor: comparison.workoutChangePct >= 0 ? withAlpha(Colors.green, '33') : withAlpha(Colors.red, '33') }
                         ]}>
                             {comparison.workoutChangePct >= 0
-                                ? <TrendingUp size={12} color="#166534" />
-                                : <TrendingDown size={12} color="#991b1b" />}
+                                ? <TrendingUp size={12} color={Colors.green} />
+                                : <TrendingDown size={12} color={Colors.red} />}
                             <Text style={{
                                 fontSize: 11,
                                 fontWeight: '800',
-                                color: comparison.workoutChangePct >= 0 ? '#166534' : '#991b1b',
+                                color: comparison.workoutChangePct >= 0 ? Colors.green : Colors.red,
                             }}>
                                 {comparison.workoutChangePct > 0 ? '+' : ''}{comparison.workoutChangePct}%
                             </Text>
@@ -388,9 +388,9 @@ function BodySnapshotWidget({ unit, displayWeight }: { unit: string; displayWeig
                         {latestWeight.delta !== null && (
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 }}>
                                 {latestWeight.delta > 0
-                                    ? <TrendingUp size={10} color="#166534" />
-                                    : latestWeight.delta < 0 ? <TrendingDown size={10} color="#991b1b" /> : null}
-                                <Text style={{ fontSize: 10, fontWeight: '800', color: latestWeight.delta > 0 ? '#166534' : latestWeight.delta < 0 ? '#991b1b' : Colors.iron[500] }}>
+                                    ? <TrendingUp size={10} color={Colors.green} />
+                                    : latestWeight.delta < 0 ? <TrendingDown size={10} color={Colors.red} /> : null}
+                                <Text style={{ fontSize: 10, fontWeight: '800', color: latestWeight.delta > 0 ? Colors.green : latestWeight.delta < 0 ? Colors.red : Colors.iron[500] }}>
                                     {latestWeight.delta > 0 ? '+' : ''}{Math.round(displayWeight(latestWeight.delta) * 10) / 10} {unit}
                                 </Text>
                             </View>
@@ -407,9 +407,9 @@ function BodySnapshotWidget({ unit, displayWeight }: { unit: string; displayWeig
                         {latestFat.delta !== null && (
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 }}>
                                 {latestFat.delta > 0
-                                    ? <TrendingUp size={10} color="#991b1b" />
-                                    : latestFat.delta < 0 ? <TrendingDown size={10} color="#166534" /> : null}
-                                <Text style={{ fontSize: 10, fontWeight: '800', color: latestFat.delta < 0 ? '#166534' : latestFat.delta > 0 ? '#991b1b' : Colors.iron[500] }}>
+                                    ? <TrendingUp size={10} color={Colors.red} />
+                                    : latestFat.delta < 0 ? <TrendingDown size={10} color={Colors.green} /> : null}
+                                <Text style={{ fontSize: 10, fontWeight: '800', color: latestFat.delta < 0 ? Colors.green : latestFat.delta > 0 ? Colors.red : Colors.iron[500] }}>
                                     {latestFat.delta > 0 ? '+' : ''}{latestFat.delta}%
                                 </Text>
                             </View>
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.iron[700],
         elevation: 2,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 3,
-        backgroundColor: Colors.primary.DEFAULT + '15',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '15'),
         paddingHorizontal: 6,
         paddingVertical: 2,
         borderRadius: 8,
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
         padding: 20,
         marginBottom: 24,
         elevation: 2,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
@@ -701,7 +701,7 @@ const styles = StyleSheet.create({
         borderColor: Colors.iron[700],
         overflow: 'hidden',
         elevation: 2,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
@@ -789,7 +789,7 @@ const styles = StyleSheet.create({
         width: 30,
         height: 30,
         borderRadius: 8,
-        backgroundColor: Colors.primary.DEFAULT + '12',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '12'),
         alignItems: 'center',
         justifyContent: 'center',
     },

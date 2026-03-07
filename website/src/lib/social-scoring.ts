@@ -247,10 +247,33 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
 
     if (!workout) return { totalAwarded: 0 };
 
-    const cfg = await getOrCreateScoreConfig(trx);
+    console.log(`[Scoring] Applying score for user=${userId} workout=${workoutId}`);
+    const cfg = await getOrCreateScoreConfig(trx).catch(e => {
+        console.warn(`[Scoring] Failed to fetch config, using defaults: ${e.message}`);
+        return DEFAULT_SCORE_CONFIG;
+    });
     const now = new Date();
-    const streak = await ensureStreakState(trx, userId, Number(workout.date), cfg);
-    const globalMultiplier = await getActiveGlobalMultiplier(trx, now);
+    let streak;
+    try {
+        streak = await ensureStreakState(trx, userId, Number(workout.date), cfg);
+    } catch (e) {
+        console.error(`[Scoring] ensureStreakState fail for ${userId}:`, e);
+        // Fallback to minimal streak state to avoid crashing
+        streak = { multiplier: 1, currentStreak: 1, highestStreak: 1 };
+    }
+    let globalMultiplier = 1;
+    try {
+        globalMultiplier = await getActiveGlobalMultiplier(trx, now);
+    } catch (e) {
+        console.warn(`[Scoring] getActiveGlobalMultiplier fail for ${userId}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    let goalDays = 3;
+    try {
+        goalDays = await getWeeklyGoalDays(trx, userId);
+    } catch (e) {
+        console.warn(`[Scoring] getWeeklyGoalDays fail for ${userId}: ${e instanceof Error ? e.message : String(e)}`);
+    }
     let totalAwarded = 0;
 
     totalAwarded += await awardEvent({
@@ -267,7 +290,6 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
 
     const weekStart = weekStartUtcSeconds(Number(workout.date));
     const weekEnd = weekStart + (7 * 86400) - 1;
-    const goalDays = await getWeeklyGoalDays(trx, userId);
 
     const [weekCountRow] = await trx
         .select({ count: sql<number>`count(*)`.mapWith(Number) })
@@ -385,25 +407,29 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
     }
 
     if (cfg.weatherBonusEnabled === 1 && Number.isFinite(workout.finishLat) && Number.isFinite(workout.finishLon)) {
-        const weather = await isAdverseWeather(Number(workout.finishLat), Number(workout.finishLon), cfg.coldThresholdC);
-        if (weather.adverse) {
-            totalAwarded += await awardEvent({
-                trx,
-                userId,
-                workoutId,
-                eventType: 'weather_bonus',
-                eventKey: `weather:${workoutId}`,
-                pointsBase: cfg.adverseWeatherPoints,
-                streakMultiplier: streak.multiplier,
-                globalMultiplier,
-                metadata: {
+        try {
+            const weather = await isAdverseWeather(Number(workout.finishLat), Number(workout.finishLon), cfg.coldThresholdC);
+            if (weather.adverse) {
+                totalAwarded += await awardEvent({
+                    trx,
+                    userId,
                     workoutId,
-                    lat: Number(workout.finishLat),
-                    lon: Number(workout.finishLon),
-                    reason: weather.reason,
-                    tempC: weather.tempC,
-                },
-            });
+                    eventType: 'weather_bonus',
+                    eventKey: `weather:${workoutId}`,
+                    pointsBase: cfg.adverseWeatherPoints,
+                    streakMultiplier: streak.multiplier,
+                    globalMultiplier,
+                    metadata: {
+                        workoutId,
+                        lat: Number(workout.finishLat),
+                        lon: Number(workout.finishLon),
+                        reason: weather.reason,
+                        tempC: weather.tempC,
+                    },
+                });
+            }
+        } catch (e) {
+            console.warn(`[Scoring] Weather check failed for workout=${workoutId}, skipping: ${e instanceof Error ? e.message : String(e)}`);
         }
     }
 

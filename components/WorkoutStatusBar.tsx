@@ -1,7 +1,7 @@
 import { feedbackService } from '@/src/services/FeedbackService';
 import { systemNotificationService } from '@/src/services/SystemNotificationService';
 import { workoutService } from '@/src/services/WorkoutService';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { Workout, WorkoutSet } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { Check, Pencil, Play, Square, Timer } from 'lucide-react-native';
@@ -315,7 +315,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
                         <View style={st.row}>
                             {/* Status pill */}
                             <Pressable style={[st.pill, st.pillComplete]} onPress={() => setShowStatePicker(true)}>
-                                <Check size={10} color="#fff" strokeWidth={3} />
+                                <Check size={10} color={Colors.white} strokeWidth={3} />
                                 <Text style={st.pillTextComplete}>Finalizado</Text>
                             </Pressable>
 
@@ -352,7 +352,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
                             <Pressable style={[st.pill, isPaused ? st.pillPaused : st.pillActive]} onPress={() => setShowStatePicker(true)}>
                                 <Animated.View style={[
                                     st.liveDot,
-                                    { backgroundColor: isPaused ? '#d97706' : Colors.primary.DEFAULT },
+                                    { backgroundColor: isPaused ? Colors.yellow : Colors.primary.DEFAULT },
                                     { opacity: isPaused ? 1 : dotPulse },
                                 ]} />
                                 <Text style={[st.pillTextActive, isPaused && st.pillTextPaused]}>
@@ -387,7 +387,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
                                     {isPaused ? (
                                         <Play size={13} color={Colors.primary.DEFAULT} fill={Colors.primary.DEFAULT} />
                                     ) : (
-                                        <Timer size={13} color="#d97706" />
+                                        <Timer size={13} color={Colors.yellow} />
                                     )}
                                 </Pressable>
                                 <Pressable onPress={handleFinish} style={st.ctrlBtnFinish} hitSlop={4}>
@@ -414,7 +414,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
                         {/* Actions */}
                         <View style={st.controlsRow}>
                             <Pressable onPress={handleStart} style={st.primaryBtn} hitSlop={6}>
-                                <Play size={11} color="#fff" fill="#fff" />
+                                <Play size={11} color={Colors.white} fill={Colors.white} />
                                 <Text style={st.primaryBtnText}>Iniciar</Text>
                             </Pressable>
                             <Pressable onPress={handleFinish} style={st.secondaryBtn} hitSlop={6}>
@@ -450,7 +450,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
                         </Pressable>
 
                         <Pressable onPress={() => handleSelectState('paused')} style={[st.pickerOption, phase === 'active' && isPaused && st.pickerOptionActive]}>
-                            <View style={[st.pickerDot, { backgroundColor: '#d97706' }]} />
+                            <View style={[st.pickerDot, { backgroundColor: Colors.yellow }]} />
                             <Text style={[st.pickerOptionText, phase === 'active' && isPaused && st.pickerOptionTextActive]}>En pausa</Text>
                         </Pressable>
 
@@ -482,13 +482,13 @@ const st = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 12,
         elevation: 2,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.04,
         shadowRadius: 6,
     },
     cardActive: {
-        borderColor: Colors.primary.DEFAULT + '30',
+        borderColor: withAlpha(Colors.primary.DEFAULT, '30'),
     },
 
     // Layout
@@ -513,12 +513,12 @@ const st = StyleSheet.create({
         borderColor: Colors.iron[300],
     },
     pillActive: {
-        backgroundColor: Colors.primary.DEFAULT + '10',
-        borderColor: Colors.primary.DEFAULT + '25',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '10'),
+        borderColor: withAlpha(Colors.primary.DEFAULT, '25'),
     },
     pillPaused: {
-        backgroundColor: 'rgba(217, 119, 6, 0.08)',
-        borderColor: 'rgba(217, 119, 6, 0.20)',
+        backgroundColor: withAlpha(Colors.yellow, '14'),
+        borderColor: withAlpha(Colors.yellow, '33'),
     },
     pillComplete: {
         backgroundColor: Colors.primary.DEFAULT,
@@ -535,12 +535,12 @@ const st = StyleSheet.create({
         color: Colors.primary.DEFAULT,
     },
     pillTextPaused: {
-        color: '#d97706',
+        color: Colors.yellow,
     },
     pillTextComplete: {
         fontSize: 11,
         fontWeight: '800',
-        color: '#fff',
+        color: Colors.white,
     },
     liveDot: {
         width: 6,
@@ -601,7 +601,7 @@ const st = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.iron[300],
         elevation: 1,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.04,
         shadowRadius: 2,
@@ -610,11 +610,11 @@ const st = StyleSheet.create({
         width: 34,
         height: 34,
         borderRadius: 12,
-        backgroundColor: Colors.primary.DEFAULT + '0A',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '0A'),
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: Colors.primary.DEFAULT + '25',
+        borderColor: withAlpha(Colors.primary.DEFAULT, '25'),
     },
 
     // ─── Action buttons ──────────────────────────────────────────────────────
@@ -627,7 +627,7 @@ const st = StyleSheet.create({
         borderRadius: 12,
         backgroundColor: Colors.primary.DEFAULT,
         elevation: 2,
-        shadowColor: Colors.primary.DEFAULT,
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 4,
@@ -635,7 +635,7 @@ const st = StyleSheet.create({
     primaryBtnText: {
         fontSize: 12,
         fontWeight: '800',
-        color: '#fff',
+        color: Colors.white,
     },
     secondaryBtn: {
         flexDirection: 'row',
@@ -680,7 +680,7 @@ const st = StyleSheet.create({
     // ─── Modal State Picker ────────────────────────────────────────────────
     pickerOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: ThemeFx.backdrop,
         justifyContent: 'center',
         alignItems: 'center',
         padding: 24,
@@ -694,7 +694,7 @@ const st = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.iron[700],
         elevation: 8,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.2,
         shadowRadius: 24,
@@ -721,7 +721,7 @@ const st = StyleSheet.create({
         marginBottom: 4,
     },
     pickerOptionActive: {
-        backgroundColor: Colors.primary.DEFAULT + '15',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '15'),
     },
     pickerOptionText: {
         fontSize: 15,

@@ -1,5 +1,6 @@
 import { Badge, Routine, RoutineDay, RoutineExercise } from '../types/db';
 import { uuidV4 } from '../utils/uuid';
+import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
 
 export interface RoutineWithDays extends Routine {
@@ -127,7 +128,6 @@ class RoutineService {
         await dbService.queueSyncMutation('routines', id, 'INSERT', { id, name, description: description || null, is_public: isPublic });
 
         // Emit for real-time UI updates
-        const { dataEventService } = await import('./DataEventService');
         dataEventService.emit('DATA_UPDATED');
 
         return id;
@@ -138,7 +138,6 @@ class RoutineService {
         await dbService.queueSyncMutation('routines', id, 'UPDATE', { name, description: description || null, is_public: isPublic });
 
         // Emit for real-time UI updates
-        const { dataEventService } = await import('./DataEventService');
         dataEventService.emit('DATA_UPDATED');
     }
 
@@ -149,7 +148,6 @@ class RoutineService {
         await dbService.queueSyncMutation('routines', id, 'DELETE');
 
         // Emit for real-time UI updates
-        const { dataEventService } = await import('./DataEventService');
         dataEventService.emit('DATA_UPDATED');
     }
 
@@ -482,7 +480,6 @@ class RoutineService {
 
             // Emit event for real-time UI updates across tabs (e.g. Social -> Library)
             try {
-                const { dataEventService } = await import('./DataEventService');
                 dataEventService.emit('DATA_UPDATED');
             } catch (e) {
                 console.error('Error emitting DATA_UPDATED after import:', e);

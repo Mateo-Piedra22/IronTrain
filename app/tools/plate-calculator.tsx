@@ -3,7 +3,7 @@ import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { configService } from '@/src/services/ConfigService';
 import { PlateCalculatorService, PlateLoadout } from '@/src/services/PlateCalculatorService';
 import { settingsService } from '@/src/services/SettingsService';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { PlateInventory, PlateType } from '@/src/types/db';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { ChevronDown, ChevronLeft, ChevronUp, Disc, PaintBucket, Plus, Settings, Trash2, X } from 'lucide-react-native';
@@ -12,16 +12,16 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpa
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const getPlateColor = (weight: number, unit: string, type?: PlateType) => {
-    if (!type || type === 'standard') return '#3f3f46';
+    if (!type || type === 'standard') return Colors.iron[600];
 
     const w = unit === 'kg' ? weight : weight / 2.20462;
-    if (w >= 25) return '#ef4444'; // Red
-    if (w >= 20) return '#3b82f6'; // Blue
-    if (w >= 15) return '#eab308'; // Yellow
-    if (w >= 10) return '#22c55e'; // Green
-    if (w >= 5) return '#f4f4f5';  // White
-    if (w >= 2.5) return '#1c1917'; // Black
-    return '#d4d4d8';              // Silver
+    if (w >= 25) return Colors.red;
+    if (w >= 20) return Colors.blue;
+    if (w >= 15) return Colors.yellow;
+    if (w >= 10) return Colors.green;
+    if (w >= 5) return Colors.white;
+    if (w >= 2.5) return Colors.black;
+    return Colors.iron[300];
 };
 
 const getPlateGeometry = (weight: number, unit: string, type?: PlateType) => {
@@ -160,7 +160,7 @@ export default function PlateCalculator() {
                                     <View key={`${i}-${j}`} style={{
                                         height: geo.height, width: geo.width,
                                         backgroundColor: p.color || getPlateColor(p.plate, unit, p.type),
-                                        borderColor: '#00000020', borderWidth: 1, borderRadius: 3,
+                                        borderColor: withAlpha(Colors.black, '20'), borderWidth: 1, borderRadius: 3,
                                     }} />
                                 );
                             })}
@@ -174,7 +174,7 @@ export default function PlateCalculator() {
                 {loadout.perSide.map((p, idx) => (
                     <View key={idx} style={[ss.plateRow, idx < loadout.perSide.length - 1 && ss.plateRowBorder]}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                            <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: p.color || getPlateColor(p.plate, unit, p.type), borderWidth: 1, borderColor: '#00000020' }} />
+                            <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: p.color || getPlateColor(p.plate, unit, p.type), borderWidth: 1, borderColor: withAlpha(Colors.black, '20') }} />
                             <Text style={ss.plateWeight}>{p.plate} {unit}</Text>
                             {p.type && p.type !== 'standard' && (
                                 <View style={{ backgroundColor: getPlateColor(p.plate, unit, p.type) + '20', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
@@ -261,7 +261,7 @@ export default function PlateCalculator() {
 
                 {/* Calculate CTA */}
                 <Pressable onPress={calculate} style={ss.calcBtn} accessibilityRole="button" accessibilityLabel="Calcular discos">
-                    <Disc size={18} color="#fff" />
+                    <Disc size={18} color={Colors.white} />
                     <Text style={ss.calcBtnText}>CALCULAR</Text>
                 </Pressable>
 
@@ -282,7 +282,7 @@ export default function PlateCalculator() {
                         {closestBelow && (
                             <View style={{ marginBottom: closestAbove ? 14 : 0 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                                    <ChevronDown size={14} color="#ef4444" />
+                                    <ChevronDown size={14} color={Colors.red} />
                                     <Text style={{ color: Colors.iron[950], fontWeight: '700', fontSize: 13 }}>Más cercano por debajo: {closestBelow.totalWeight} {unit}</Text>
                                 </View>
                                 {closestBelow.perSide.map((p) => (
@@ -302,7 +302,7 @@ export default function PlateCalculator() {
                         {closestAbove && (
                             <View>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                                    <ChevronUp size={14} color="#22c55e" />
+                                    <ChevronUp size={14} color={Colors.green} />
                                     <Text style={{ color: Colors.iron[950], fontWeight: '700', fontSize: 13 }}>Más cercano por arriba: {closestAbove.totalWeight} {unit}</Text>
                                 </View>
                                 {closestAbove.perSide.map((p) => (
@@ -380,7 +380,7 @@ export default function PlateCalculator() {
                                                 style={[ss.colorBtn, { backgroundColor: editingPlate.color || getPlateColor(parseFloat(editingPlate.weight) || 0, unit, editingPlate.type) }]}
                                                 onPress={() => setIsColorPickerVisible(true)}
                                             >
-                                                <PaintBucket size={18} color={editingPlate.color ? '#fff' : '#000'} />
+                                                <PaintBucket size={18} color={editingPlate.color ? Colors.white : Colors.black} />
                                             </TouchableOpacity>
                                             <TouchableOpacity onPress={() => setEditingPlate({ ...editingPlate, color: undefined })}>
                                                 <Text style={{ color: Colors.iron[400], fontWeight: '700', fontSize: 12 }}>RESTABLECER AUTO</Text>
@@ -410,8 +410,8 @@ export default function PlateCalculator() {
 
                                     <View style={{ flexDirection: 'row', gap: 12, marginTop: 'auto', paddingTop: 16 }}>
                                         {editingPlate.originalWeight !== undefined && (
-                                            <TouchableOpacity onPress={deletePlateEditor} style={[ss.calcBtn, { flex: 0, paddingHorizontal: 20, backgroundColor: '#ef4444' }]}>
-                                                <Trash2 size={18} color="#fff" />
+                                            <TouchableOpacity onPress={deletePlateEditor} style={[ss.calcBtn, { flex: 0, paddingHorizontal: 20, backgroundColor: Colors.red }]}>
+                                                <Trash2 size={18} color={Colors.white} />
                                             </TouchableOpacity>
                                         )}
                                         <TouchableOpacity onPress={savePlateEditor} style={[ss.calcBtn, { flex: 1, marginBottom: 0 }]}>
@@ -455,7 +455,7 @@ export default function PlateCalculator() {
                                         >
                                             <View style={{ flex: 1 }}>
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                    <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: p.color || getPlateColor(p.weight, unit, p.type), borderWidth: 1, borderColor: '#00000020' }} />
+                                                    <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: p.color || getPlateColor(p.weight, unit, p.type), borderWidth: 1, borderColor: withAlpha(Colors.black, '20') }} />
                                                     <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 16 }}>{p.weight} {p.unit}</Text>
                                                     {p.type && p.type !== 'standard' && (
                                                         <View style={{ backgroundColor: Colors.iron[200], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
@@ -498,7 +498,7 @@ export default function PlateCalculator() {
 
 
 const ss = StyleSheet.create({
-    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
+    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
     pageTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 24, letterSpacing: -1 },
     pageSub: { color: Colors.primary.DEFAULT, fontSize: 12, fontWeight: '800', marginTop: 2, letterSpacing: 0.5 },
     headerBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: Colors.iron[200], borderWidth: 1, borderColor: Colors.iron[300], justifyContent: 'center', alignItems: 'center' },
@@ -510,10 +510,10 @@ const ss = StyleSheet.create({
     barChip: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: Colors.iron[700], backgroundColor: Colors.surface, alignItems: 'center' },
     barChipActive: { backgroundColor: Colors.primary.DEFAULT, borderColor: Colors.primary.DEFAULT },
     barChipText: { fontWeight: '800', fontSize: 14, color: Colors.iron[500] },
-    barChipTextActive: { color: '#fff' },
+    barChipTextActive: { color: Colors.white },
     calcBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary.DEFAULT, paddingVertical: 16, borderRadius: 16, marginBottom: 24, shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-    calcBtnText: { color: '#fff', fontWeight: '900', fontSize: 16, letterSpacing: 1 },
-    card: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], padding: 20, marginBottom: 12, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 },
+    calcBtnText: { color: Colors.white, fontWeight: '900', fontSize: 16, letterSpacing: 1 },
+    card: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], padding: 20, marginBottom: 12, elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 },
     loadoutHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     loadoutLabel: { fontSize: 10, fontWeight: '800', color: Colors.iron[400], textTransform: 'uppercase', letterSpacing: 1 },
     loadoutTotal: { fontSize: 20, fontWeight: '900', color: Colors.iron[950], fontVariant: ['tabular-nums'] },

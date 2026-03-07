@@ -4,7 +4,7 @@ import { routineService } from '@/src/services/RoutineService';
 import { SocialComparisonEntry, SocialFriend, SocialInboxItem, SocialLeaderboardEntry, SocialProfile, SocialSearchUser, SocialService } from '@/src/services/SocialService';
 import { useAuthStore } from '@/src/store/authStore';
 import { confirm } from '@/src/store/confirmStore';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { CheckCircle, Copy, Dumbbell, Flame, Globe, Info, Lock as LockIcon, Scale, Settings, Shield as ShieldIcon, Trophy, UserCheck, UserMinus as UserMinusIcon, XCircle, X as XIcon } from 'lucide-react-native';
@@ -480,7 +480,7 @@ export default function SocialTab() {
                                                 activeOpacity={0.7}
                                             >
                                                 <View style={styles.rankRow}>
-                                                    <Text style={[styles.rankNumber, { color: i === 0 ? '#ffd700' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : Colors.iron[500] }]}>
+                                                    <Text style={[styles.rankNumber, { color: i === 0 ? Colors.yellow : i === 1 ? Colors.iron[300] : i === 2 ? Colors.primary.light : Colors.iron[500] }]}>
                                                         {i + 1}
                                                     </Text>
                                                     <View>
@@ -490,7 +490,7 @@ export default function SocialTab() {
                                                 </View>
                                                 {user.stats?.currentStreak >= 3 && (
                                                     <View style={styles.streakBadge}>
-                                                        <Flame size={12} color="#ef4444" fill="#ef4444" style={{ marginRight: 4 }} />
+                                                        <Flame size={12} color={Colors.red} fill={Colors.red} style={{ marginRight: 4 }} />
                                                         <Text style={styles.streakText}>Racha: {user.stats.currentStreak}</Text>
                                                     </View>
                                                 )}
@@ -517,7 +517,7 @@ export default function SocialTab() {
                                                                     <View style={styles.compareRowHeader}>
                                                                         <Text style={styles.compareExerciseName}>{comp.exerciseName}</Text>
                                                                         {diff > 0 && (
-                                                                            <Text style={[styles.compareDiff, { color: userWon ? '#16a34a' : '#ef4444' }]}>
+                                                                            <Text style={[styles.compareDiff, { color: userWon ? Colors.green : Colors.red }]}>
                                                                                 {userWon ? '+' : '-'}{diff.toFixed(1)}{comp.unit}
                                                                             </Text>
                                                                         )}
@@ -622,13 +622,13 @@ export default function SocialTab() {
                                                     <View style={styles.premiumResolved}>
                                                         {item.status === 'accepted' ? (
                                                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                                <CheckCircle size={16} color="#16a34a" style={{ marginRight: 6 }} />
-                                                                <Text style={[styles.premiumStatusText, { color: '#16a34a' }]}>Rutina Importada</Text>
+                                                                <CheckCircle size={16} color={Colors.green} style={{ marginRight: 6 }} />
+                                                                <Text style={[styles.premiumStatusText, { color: Colors.green }]}>Rutina Importada</Text>
                                                             </View>
                                                         ) : (
                                                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                                <XCircle size={16} color="#ef4444" style={{ marginRight: 6 }} />
-                                                                <Text style={[styles.premiumStatusText, { color: '#ef4444' }]}>Rutina Rechazada</Text>
+                                                                <XCircle size={16} color={Colors.red} style={{ marginRight: 6 }} />
+                                                                <Text style={[styles.premiumStatusText, { color: Colors.red }]}>Rutina Rechazada</Text>
                                                             </View>
                                                         )}
                                                     </View>
@@ -645,8 +645,8 @@ export default function SocialTab() {
                                         return (
                                             <View key={item.id} style={styles.activityRow}>
                                                 <View style={styles.activityHeader}>
-                                                    <View style={[styles.activityIconBox, isPr ? { backgroundColor: '#ffd70030' } : {}]}>
-                                                        {isPr ? <Trophy size={18} color="#ffd700" /> : isRoutineShared ? <Globe size={18} color={Colors.primary.DEFAULT} /> : <Dumbbell size={18} color={Colors.iron[400]} />}
+                                                    <View style={[styles.activityIconBox, isPr ? { backgroundColor: withAlpha(Colors.yellow, '30') } : {}]}>
+                                                        {isPr ? <Trophy size={18} color={Colors.yellow} /> : isRoutineShared ? <Globe size={18} color={Colors.primary.DEFAULT} /> : <Dumbbell size={18} color={Colors.iron[400]} />}
                                                     </View>
                                                     <View style={{ flex: 1 }}>
                                                         <Text style={styles.activityUser}>@{item.senderUsername || item.senderName}</Text>
@@ -665,7 +665,7 @@ export default function SocialTab() {
                                                         onPress={() => !isOwnActivity && handleToggleKudo(item.id)}
                                                         disabled={!!isOwnActivity}
                                                     >
-                                                        <Flame size={18} color={item.hasKudoed ? '#f97316' : Colors.iron[400]} fill={item.hasKudoed ? '#f97316' : "transparent"} />
+                                                        <Flame size={18} color={item.hasKudoed ? Colors.yellow : Colors.iron[400]} fill={item.hasKudoed ? Colors.yellow : "transparent"} />
                                                         <Text style={[styles.kudoText, item.hasKudoed && styles.kudoTextActive]}>
                                                             {item.kudosCount || 0} Kudos
                                                         </Text>
@@ -935,7 +935,7 @@ const styles = StyleSheet.create({
         height: 60,
         backgroundColor: Colors.iron[900],
         zIndex: 10,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.3,
         shadowRadius: 3,
@@ -1251,19 +1251,19 @@ const styles = StyleSheet.create({
         borderColor: Colors.iron[700],
     },
     streakBadge: {
-        backgroundColor: '#ef444420',
+        backgroundColor: withAlpha(Colors.red, '20'),
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#ef444450',
+        borderColor: withAlpha(Colors.red, '50'),
         flexDirection: 'row',
         alignItems: 'center',
     },
     streakText: {
         fontSize: 12,
         fontWeight: 'bold',
-        color: '#ef4444',
+        color: Colors.red,
     },
     friendName: {
         color: Colors.iron[950],
@@ -1330,7 +1330,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     searchBtnText: {
-        color: '#fff',
+        color: Colors.white,
         fontWeight: 'bold',
     },
     // Premium Routine Card Styles
@@ -1341,7 +1341,7 @@ const styles = StyleSheet.create({
         borderColor: Colors.iron[700],
         overflow: 'hidden',
         elevation: 6,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.25,
         shadowRadius: 10,
@@ -1484,8 +1484,8 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.iron[800],
     },
     kudoBtnActive: {
-        backgroundColor: '#f9731615',
-        borderColor: '#f9731640',
+        backgroundColor: withAlpha(Colors.yellow, '15'),
+        borderColor: withAlpha(Colors.yellow, '40'),
         borderWidth: 1,
     },
     kudoBtnDisabled: {
@@ -1497,7 +1497,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     kudoTextActive: {
-        color: '#f97316',
+        color: Colors.yellow,
     },
     ownActivityHint: {
         marginLeft: 10,
@@ -1508,7 +1508,7 @@ const styles = StyleSheet.create({
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: ThemeFx.backdrop,
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 20,
@@ -1677,11 +1677,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 8,
         borderWidth: 1,
-        borderColor: Colors.primary.DEFAULT + '40',
+        borderColor: withAlpha(Colors.primary.DEFAULT, '40'),
         borderRadius: 10,
         paddingHorizontal: 10,
         paddingVertical: 8,
-        backgroundColor: Colors.primary.DEFAULT + '10',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '10'),
     },
     friendInfoActionText: {
         color: Colors.primary.DEFAULT,
@@ -1714,14 +1714,14 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#7f1d1d',
+        backgroundColor: withAlpha(Colors.red, '40'),
         borderWidth: 1,
-        borderColor: '#991b1b',
+        borderColor: withAlpha(Colors.red, '55'),
         borderRadius: 12,
         paddingVertical: 12,
     },
     modalDangerText: {
-        color: '#fecaca',
+        color: withAlpha(Colors.red, '99'),
         fontSize: 12,
         fontWeight: '900',
         textTransform: 'uppercase',

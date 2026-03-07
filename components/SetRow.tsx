@@ -1,4 +1,4 @@
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import * as Haptics from 'expo-haptics';
 import { ArrowDownCircle, Check, CirclePause, Copy, Dumbbell, Flame, MessageSquare, RefreshCw, Skull, Trash2, Trophy } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
@@ -23,12 +23,12 @@ interface SetRowProps {
 
 export const SET_TYPE_CONFIG: { key: string; label: string; shortLabel: string; Icon: any; bg: string; text: string }[] = [
     { key: 'normal', label: 'Serie Normal', shortLabel: 'SERIE', Icon: Dumbbell, bg: Colors.iron[200], text: Colors.iron[500] },
-    { key: 'warmup', label: 'Calentamiento', shortLabel: 'CALENT', Icon: Flame, bg: '#fef3c7', text: '#92400e' },
-    { key: 'failure', label: 'Al Fallo', shortLabel: 'FALLO', Icon: Skull, bg: '#fee2e2', text: '#991b1b' },
-    { key: 'drop', label: 'Drop Set', shortLabel: 'DROP', Icon: ArrowDownCircle, bg: '#f3e8ff', text: '#6d28d9' },
-    { key: 'myo_reps', label: 'Myo-Reps', shortLabel: 'MYO', Icon: RefreshCw, bg: '#dbeafe', text: '#1e40af' },
-    { key: 'rest_pause', label: 'Rest-Pause', shortLabel: 'R-P', Icon: CirclePause, bg: '#d1fae5', text: '#065f46' },
-    { key: 'pr', label: 'Récord Personal', shortLabel: 'PR', Icon: Trophy, bg: Colors.primary.DEFAULT + '15', text: Colors.primary.DEFAULT },
+    { key: 'warmup', label: 'Calentamiento', shortLabel: 'CALENT', Icon: Flame, bg: withAlpha(Colors.yellow, '35'), text: Colors.iron[600] },
+    { key: 'failure', label: 'Al Fallo', shortLabel: 'FALLO', Icon: Skull, bg: withAlpha(Colors.red, '20'), text: Colors.red },
+    { key: 'drop', label: 'Drop Set', shortLabel: 'DROP', Icon: ArrowDownCircle, bg: withAlpha(Colors.primary.light, '30'), text: Colors.primary.dark },
+    { key: 'myo_reps', label: 'Myo-Reps', shortLabel: 'MYO', Icon: RefreshCw, bg: withAlpha(Colors.blue, '25'), text: Colors.blue },
+    { key: 'rest_pause', label: 'Rest-Pause', shortLabel: 'R-P', Icon: CirclePause, bg: withAlpha(Colors.green, '25'), text: Colors.green },
+    { key: 'pr', label: 'Récord Personal', shortLabel: 'PR', Icon: Trophy, bg: withAlpha(Colors.primary.DEFAULT, '15'), text: Colors.primary.DEFAULT },
 ];
 
 export const TYPE_COLORS: Record<string, { bg: string; text: string }> = Object.fromEntries(
@@ -153,7 +153,7 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
                         style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
                         accessibilityRole="button" accessibilityLabel={`Eliminar serie ${index + 1}`}
                     >
-                        <Trash2 size={22} color="white" />
+                        <Trash2 size={22} color={Colors.white} />
                         <Text style={ss.swipeLabel}>BORRAR</Text>
                     </TouchableOpacity>
                 </Animated.View>
@@ -177,7 +177,7 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
                         style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
                         accessibilityRole="button" accessibilityLabel={`Copiar serie ${index + 1}`}
                     >
-                        <Copy size={22} color="white" />
+                        <Copy size={22} color={Colors.white} />
                         <Text style={ss.swipeLabel}>COPIAR</Text>
                     </TouchableOpacity>
                 </Animated.View>
@@ -193,7 +193,7 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
         padding: 8,
         borderRadius: 10,
         color: completed ? Colors.primary.DEFAULT : Colors.iron[950],
-        backgroundColor: completed ? Colors.primary.DEFAULT + '08' : Colors.iron[200],
+        backgroundColor: completed ? withAlpha(Colors.primary.DEFAULT, '08') : Colors.iron[200],
     });
 
     return (
@@ -347,8 +347,8 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
                                     <View style={{ flex: 1 }}>
                                         <Text style={[ss.pickerLabel, isSelected && { color: cfg.text, fontWeight: '900' }]}>{cfg.label}</Text>
                                     </View>
-                                    {isSelected && <View style={[ss.pickerCheck, { backgroundColor: cfg.text }]}>
-                                        <Check size={12} color="#fff" />
+                                {isSelected && <View style={[ss.pickerCheck, { backgroundColor: cfg.text }]}>
+                                        <Check size={12} color={Colors.white} />
                                     </View>}
                                 </Pressable>
                             );
@@ -363,24 +363,24 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
 const ss = StyleSheet.create({
     card: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
     cardDefault: { borderColor: Colors.iron[300], backgroundColor: Colors.surface },
-    cardCompleted: { borderColor: Colors.primary.DEFAULT, backgroundColor: '#fffbf7' },
+    cardCompleted: { borderColor: Colors.primary.DEFAULT, backgroundColor: Colors.iron[50] },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1 },
     headerDefault: { backgroundColor: Colors.iron[200], borderBottomColor: Colors.iron[200] },
-    headerCompleted: { backgroundColor: Colors.primary.DEFAULT + '08', borderBottomColor: Colors.primary.DEFAULT + '20' },
+    headerCompleted: { backgroundColor: withAlpha(Colors.primary.DEFAULT, '08'), borderBottomColor: withAlpha(Colors.primary.DEFAULT, '20') },
     body: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10 },
     separator: { color: Colors.iron[300], fontWeight: '900', fontSize: 20 },
     inputLabel: { fontSize: 9, color: Colors.iron[400], fontWeight: '800', marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
     checkBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     checkBtnActive: { backgroundColor: Colors.primary.DEFAULT, shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2 },
     checkBtnInactive: { backgroundColor: Colors.iron[200], borderWidth: 1, borderColor: Colors.iron[300] },
-    notesInput: { fontSize: 13, backgroundColor: '#fef9f0', color: Colors.iron[700], padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#fef3c720' },
-    swipeDelete: { justifyContent: 'center', alignItems: 'flex-end', borderTopRightRadius: 14, borderBottomRightRadius: 14, marginLeft: -16, width: 96, backgroundColor: '#ef4444' },
+    notesInput: { fontSize: 13, backgroundColor: withAlpha(Colors.yellow, '14'), color: Colors.iron[700], padding: 10, borderRadius: 10, borderWidth: 1, borderColor: withAlpha(Colors.yellow, '20') },
+    swipeDelete: { justifyContent: 'center', alignItems: 'flex-end', borderTopRightRadius: 14, borderBottomRightRadius: 14, marginLeft: -16, width: 96, backgroundColor: Colors.red },
     swipeCopy: { justifyContent: 'center', alignItems: 'flex-start', width: 96, borderTopLeftRadius: 14, borderBottomLeftRadius: 14, marginRight: -16, backgroundColor: Colors.primary.dark },
-    swipeLabel: { color: '#fff', fontSize: 9, fontWeight: '800', marginTop: 4, letterSpacing: 0.5 },
-    pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 32 },
-    pickerContainer: { backgroundColor: Colors.surface, borderRadius: 20, padding: 20, width: '100%', maxWidth: 340, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 24, elevation: 10 },
+    swipeLabel: { color: Colors.white, fontSize: 9, fontWeight: '800', marginTop: 4, letterSpacing: 0.5 },
+    pickerOverlay: { flex: 1, backgroundColor: withAlpha(Colors.black, '8C'), justifyContent: 'center', alignItems: 'center', padding: 32 },
+    pickerContainer: { backgroundColor: Colors.surface, borderRadius: 20, padding: 20, width: '100%', maxWidth: 340, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 24, elevation: 10 },
     pickerTitle: { fontSize: 16, fontWeight: '900', color: Colors.iron[950], marginBottom: 14, letterSpacing: -0.3 },
-    pickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: 'transparent', marginBottom: 4, gap: 12 },
+    pickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: withAlpha(Colors.black, '00'), marginBottom: 4, gap: 12 },
     pickerIconCircle: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
     pickerLabel: { fontSize: 14, fontWeight: '700', color: Colors.iron[950] },
     pickerCheck: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },

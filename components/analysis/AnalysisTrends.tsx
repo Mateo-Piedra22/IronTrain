@@ -1,7 +1,7 @@
 import { EmptyChartPlaceholder } from '@/components/EmptyChartPlaceholder';
 import { BadgePill } from '@/components/ui/BadgePill';
 import { ExerciseVolumeRow, VolumeSeriesPoint } from '@/src/services/AnalysisService';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { useRouter } from 'expo-router';
 import { ChevronRight, Minus, TrendingDown, TrendingUp, Zap } from 'lucide-react-native';
 import React, { useMemo } from 'react';
@@ -76,14 +76,14 @@ export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, 
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                             <View style={[
                                 styles.trendIconCircle,
-                                { backgroundColor: isUp ? '#dcfce7' : isDown ? '#fee2e2' : Colors.iron[200] }
+                                { backgroundColor: isUp ? withAlpha(Colors.green, '33') : isDown ? withAlpha(Colors.red, '33') : Colors.iron[200] }
                             ]}>
-                                {isUp ? <TrendingUp size={16} color="#166534" />
-                                    : isDown ? <TrendingDown size={16} color="#991b1b" />
+                                {isUp ? <TrendingUp size={16} color={Colors.green} />
+                                    : isDown ? <TrendingDown size={16} color={Colors.red} />
                                         : <Minus size={16} color={Colors.iron[500]} />}
                             </View>
                             <Text style={[styles.trendCellValue, {
-                                color: isUp ? '#166534' : isDown ? '#991b1b' : Colors.iron[950]
+                                color: isUp ? Colors.green : isDown ? Colors.red : Colors.iron[950]
                             }]}>
                                 {isUp ? 'Subiendo' : isDown ? 'Bajando' : 'Estable'}
                             </Text>
@@ -94,8 +94,8 @@ export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, 
                     <View style={[styles.trendCell, { borderLeftWidth: 1, borderLeftColor: Colors.iron[300], paddingLeft: 16 }]}>
                         <Text style={styles.trendCellLabel}>Cambio</Text>
                         <Text style={[styles.trendCellValue, styles.trendChangeValue, {
-                            color: volumeTrend.changePct && volumeTrend.changePct > 0 ? '#166534'
-                                : volumeTrend.changePct && volumeTrend.changePct < 0 ? '#991b1b'
+                            color: volumeTrend.changePct && volumeTrend.changePct > 0 ? Colors.green
+                                : volumeTrend.changePct && volumeTrend.changePct < 0 ? Colors.red
                                     : Colors.iron[950]
                         }]}>
                             {volumeTrend.changePct == null ? '—' : `${volumeTrend.changePct >= 0 ? '+' : ''}${volumeTrend.changePct}%`}
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.surface, borderRadius: 16,
         borderWidth: 1, borderColor: Colors.iron[700],
         padding: 20, marginBottom: 24,
-        elevation: 2, shadowColor: '#000',
+        elevation: 2, shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8,
     },
     trendHeader: { marginBottom: 16 },
@@ -215,12 +215,12 @@ const styles = StyleSheet.create({
     exerciseCard: {
         backgroundColor: Colors.surface, padding: 14, borderRadius: 14,
         borderWidth: 1, borderColor: Colors.iron[700],
-        elevation: 1, shadowColor: '#000',
+        elevation: 1, shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4,
     },
     rankBadge: {
         width: 28, height: 28, borderRadius: 14,
-        backgroundColor: Colors.primary.DEFAULT + '15',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '15'),
         justifyContent: 'center', alignItems: 'center',
     },
     rankText: { fontSize: 13, fontWeight: '900', color: Colors.primary.DEFAULT },

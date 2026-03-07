@@ -1,6 +1,6 @@
 import { BadgePill } from '@/components/ui/BadgePill';
 import { AnalysisService, PowerliftingPRs } from '@/src/services/AnalysisService';
-import { Colors } from '@/src/theme';
+import { Colors, withAlpha } from '@/src/theme';
 import { AlertCircle, Crown, Info, Trophy } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -32,9 +32,9 @@ export function PRCenter() {
     };
 
     const liftData = [
-        { label: 'SQUAT', value: data.squat?.weight ?? 0, color: '#ef4444', name: data.squatName },
-        { label: 'BENCH', value: data.bench?.weight ?? 0, color: '#3b82f6', name: data.benchName },
-        { label: 'DEADLIFT', value: data.deadlift?.weight ?? 0, color: '#f59e0b', name: data.deadliftName },
+        { label: 'SQUAT', value: data.squat?.weight ?? 0, color: Colors.red, name: data.squatName },
+        { label: 'BENCH', value: data.bench?.weight ?? 0, color: Colors.blue, name: data.benchName },
+        { label: 'DEADLIFT', value: data.deadlift?.weight ?? 0, color: Colors.yellow, name: data.deadliftName },
     ];
 
     const maxLift = Math.max(...liftData.map(l => l.value), 1);
@@ -47,7 +47,7 @@ export function PRCenter() {
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
                     <View style={styles.trophyCircle}>
-                        <Trophy size={18} color="#f59e0b" />
+                        <Trophy size={18} color={Colors.yellow} />
                     </View>
                     <View>
                         <Text style={styles.title}>Sala de Trofeos</Text>
@@ -61,10 +61,10 @@ export function PRCenter() {
                         accessibilityRole="button"
                         accessibilityLabel="Info sobre sala de trofeos"
                     >
-                        <Info size={14} color={showInfo ? '#f59e0b' : Colors.iron[400]} />
+                        <Info size={14} color={showInfo ? Colors.yellow : Colors.iron[400]} />
                     </TouchableOpacity>
                     <View style={styles.totalBadge}>
-                        <Crown size={12} color="#f59e0b" />
+                        <Crown size={12} color={Colors.yellow} />
                         <Text style={styles.totalValue}>{data.totalKg}</Text>
                         <Text style={styles.totalUnit}>kg</Text>
                     </View>
@@ -75,7 +75,7 @@ export function PRCenter() {
             {showInfo && (
                 <View style={styles.infoPanel}>
                     <View style={styles.infoPanelHeader}>
-                        <AlertCircle size={14} color="#f59e0b" />
+                        <AlertCircle size={14} color={Colors.yellow} />
                         <Text style={styles.infoPanelTitle}>¿Cómo funciona?</Text>
                     </View>
                     <Text style={styles.infoPanelText}>
@@ -167,11 +167,11 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.surface,
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: '#f59e0b30',
+        borderColor: withAlpha(Colors.yellow, '30'),
         padding: 20,
         marginBottom: 12,
         elevation: 3,
-        shadowColor: '#f59e0b',
+        shadowColor: Colors.yellow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.08,
         shadowRadius: 12,
@@ -191,16 +191,16 @@ const styles = StyleSheet.create({
         width: 38,
         height: 38,
         borderRadius: 19,
-        backgroundColor: '#f59e0b15',
+        backgroundColor: withAlpha(Colors.yellow, '15'),
         borderWidth: 1,
-        borderColor: '#f59e0b30',
+        borderColor: withAlpha(Colors.yellow, '30'),
         justifyContent: 'center',
         alignItems: 'center',
     },
     title: {
         fontSize: 16,
         fontWeight: '900',
-        color: '#f59e0b',
+        color: Colors.yellow,
         letterSpacing: -0.3,
     },
     subtitle: {
@@ -224,31 +224,31 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        backgroundColor: '#f59e0b15',
+        backgroundColor: withAlpha(Colors.yellow, '15'),
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#f59e0b30',
+        borderColor: withAlpha(Colors.yellow, '30'),
     },
     totalValue: {
         fontSize: 18,
         fontWeight: '900',
-        color: '#f59e0b',
+        color: Colors.yellow,
     },
     totalUnit: {
         fontSize: 10,
         fontWeight: '700',
-        color: '#b45309',
+        color: Colors.iron[600],
         textTransform: 'uppercase',
     },
 
     // Info Panel
     infoPanel: {
-        backgroundColor: '#f59e0b08',
+        backgroundColor: withAlpha(Colors.yellow, '08'),
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#f59e0b20',
+        borderColor: withAlpha(Colors.yellow, '20'),
         padding: 14,
         marginBottom: 16,
     },
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     infoPanelTitle: {
         fontSize: 13,
         fontWeight: '800',
-        color: '#f59e0b',
+        color: Colors.yellow,
     },
     infoPanelText: {
         fontSize: 12,

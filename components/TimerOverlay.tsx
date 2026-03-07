@@ -1,5 +1,5 @@
 import { useTimerStore } from '@/src/store/timerStore';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx } from '@/src/theme';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { Pause, Play, RotateCcw, X } from 'lucide-react-native';
 import React, { useContext, useEffect } from 'react';
@@ -78,7 +78,7 @@ export function TimerOverlay() {
 }
 
 const ss = StyleSheet.create({
-    container: { position: 'absolute', backgroundColor: Colors.iron[950], borderWidth: 1, borderColor: Colors.iron[600], borderRadius: 16, flexDirection: 'row', alignItems: 'center', padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 10, zIndex: 50 },
+    container: { position: 'absolute', backgroundColor: Colors.iron[950], borderWidth: 1, borderColor: Colors.iron[600], borderRadius: 16, flexDirection: 'row', alignItems: 'center', padding: 12, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 10, zIndex: 50 },
     label: { color: Colors.iron[400], fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
     time: { color: Colors.iron[100], fontWeight: '900', fontSize: 22, fontVariant: ['tabular-nums'] },
     controls: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: Colors.iron[600], paddingLeft: 12, gap: 6 },
@@ -86,5 +86,5 @@ const ss = StyleSheet.create({
     addBtnText: { color: Colors.iron[100], fontWeight: '800', fontSize: 12 },
     actionBtn: { padding: 8, backgroundColor: Colors.iron[600], borderRadius: 10 },
     actionBtnPrimary: { padding: 8, backgroundColor: Colors.primary.DEFAULT, borderRadius: 10 },
-    stopBtn: { padding: 8, backgroundColor: '#dc2626', borderRadius: 10 },
+    stopBtn: { padding: 8, backgroundColor: Colors.red, borderRadius: 10 },
 });

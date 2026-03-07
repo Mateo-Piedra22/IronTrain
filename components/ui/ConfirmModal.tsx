@@ -1,5 +1,5 @@
 import { IronButton } from '@/components/IronButton';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { AlertTriangle, CheckCircle, Info, XCircle } from 'lucide-react-native';
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -25,10 +25,10 @@ interface ConfirmModalProps {
 
 const VARIANT_CONFIG: Record<ModalVariant, { icon: React.ReactNode; accentColor: string }> = {
     info: { icon: <Info size={22} color={Colors.primary.DEFAULT} />, accentColor: Colors.primary.DEFAULT },
-    warning: { icon: <AlertTriangle size={22} color="#d97706" />, accentColor: '#d97706' },
-    error: { icon: <XCircle size={22} color="#ef4444" />, accentColor: '#ef4444' },
-    success: { icon: <CheckCircle size={22} color="#16a34a" />, accentColor: '#16a34a' },
-    destructive: { icon: <AlertTriangle size={22} color="#ef4444" />, accentColor: '#ef4444' },
+    warning: { icon: <AlertTriangle size={22} color={Colors.yellow} />, accentColor: Colors.yellow },
+    error: { icon: <XCircle size={22} color={Colors.red} />, accentColor: Colors.red },
+    success: { icon: <CheckCircle size={22} color={Colors.green} />, accentColor: Colors.green },
+    destructive: { icon: <AlertTriangle size={22} color={Colors.red} />, accentColor: Colors.red },
 };
 
 /**
@@ -87,7 +87,7 @@ export function ConfirmModal({ visible, onClose, title, message, variant = 'info
                                         <Pressable
                                             onPress={btn.onPress}
                                             style={st.destructiveBtn}
-                                            android_ripple={{ color: 'rgba(239,68,68,0.15)' }}
+                                            android_ripple={{ color: withAlpha(Colors.red, '26') }}
                                         >
                                             <Text style={st.destructiveBtnText}>{btn.label}</Text>
                                         </Pressable>
@@ -115,7 +115,7 @@ export function ConfirmModal({ visible, onClose, title, message, variant = 'info
 const st = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: ThemeFx.backdrop,
         justifyContent: 'center',
         alignItems: 'center',
         padding: 24,
@@ -129,9 +129,9 @@ const st = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.iron[700],
         elevation: 8,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2,
+        shadowOpacity: ThemeFx.shadowOpacityStrong,
         shadowRadius: 24,
     },
     header: {
@@ -189,9 +189,9 @@ const st = StyleSheet.create({
         width: '100%',
     },
     destructiveBtn: {
-        backgroundColor: '#ef444412',
+        backgroundColor: withAlpha(Colors.red, '12'),
         borderWidth: 1,
-        borderColor: '#ef444425',
+        borderColor: withAlpha(Colors.red, '25'),
         borderRadius: 12,
         paddingVertical: 14,
         alignItems: 'center',
@@ -201,6 +201,6 @@ const st = StyleSheet.create({
     destructiveBtnText: {
         fontWeight: '700',
         fontSize: 16,
-        color: '#ef4444',
+        color: Colors.red,
     },
 });

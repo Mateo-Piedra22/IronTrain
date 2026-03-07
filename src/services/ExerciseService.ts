@@ -1,5 +1,6 @@
 import { Exercise, ExerciseType } from '../types/db';
 import { uuidV4 } from '../utils/uuid';
+import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
 export { Exercise };
 
@@ -43,7 +44,6 @@ export class ExerciseService {
         await dbService.queueSyncMutation('exercises', id, 'INSERT', { id, category_id: data.category_id, name: data.name, type: data.type, notes: data.notes ?? null, is_system: 0 });
 
         // Emit for real-time UI updates
-        const { dataEventService } = await import('./DataEventService');
         dataEventService.emit('DATA_UPDATED');
 
         return id;
@@ -119,7 +119,6 @@ export class ExerciseService {
             await dbService.queueSyncMutation('exercises', id, 'UPDATE', data);
 
             // Emit for real-time UI updates
-            const { dataEventService } = await import('./DataEventService');
             dataEventService.emit('DATA_UPDATED');
         } catch (e) {
             throw e;
@@ -144,7 +143,6 @@ export class ExerciseService {
         await dbService.queueSyncMutation('exercises', id, 'DELETE');
 
         // Emit for real-time UI updates
-        const { dataEventService } = await import('./DataEventService');
         dataEventService.emit('DATA_UPDATED');
     }
 

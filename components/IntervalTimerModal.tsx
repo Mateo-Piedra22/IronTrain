@@ -1,4 +1,4 @@
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { ChevronDown, Minus, Pause, Play, Plus, RotateCcw, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -222,10 +222,10 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
 
     const getPhaseConfig = () => {
         switch (phase) {
-            case 'prepare': return { bg: '#92400e', label: 'PREPÁRATE', ringColor: '#fbbf24', accentBg: 'rgba(251,191,36,0.15)' };
-            case 'work': return { bg: '#3e1c1c', label: '¡TRABAJO!', ringColor: '#d4a574', accentBg: 'rgba(212,165,116,0.12)' };
-            case 'rest': return { bg: '#14532d', label: 'DESCANSO', ringColor: '#86efac', accentBg: 'rgba(134,239,172,0.12)' };
-            case 'finished': return { bg: '#3e1c1c', label: '¡COMPLETADO!', ringColor: '#d4a574', accentBg: 'rgba(212,165,116,0.12)' };
+            case 'prepare': return { bg: '#92400e', label: 'PREPÁRATE', ringColor: '#fbbf24', accentBg: withAlpha(Colors.yellow, '26') };
+            case 'work': return { bg: '#3e1c1c', label: '¡TRABAJO!', ringColor: '#d4a574', accentBg: withAlpha(Colors.primary.light, '1F') };
+            case 'rest': return { bg: '#14532d', label: 'DESCANSO', ringColor: '#86efac', accentBg: withAlpha(Colors.green, '1F') };
+            case 'finished': return { bg: '#3e1c1c', label: '¡COMPLETADO!', ringColor: '#d4a574', accentBg: withAlpha(Colors.primary.light, '1F') };
             default: return { bg: Colors.iron[900], label: '', ringColor: Colors.primary.DEFAULT, accentBg: 'transparent' };
         }
     };
@@ -259,8 +259,8 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                                     const isActive = preset.work === workSec && preset.rest === restSec && preset.rounds === rounds;
                                     return (
                                         <Pressable key={preset.id} onPress={() => applyPreset(preset)} style={[ss.presetCard, isActive && ss.presetCardActive]}>
-                                            <Text style={[ss.presetCardName, isActive && { color: '#fff' }]}>{preset.name}</Text>
-                                            <Text style={[ss.presetCardDesc, isActive && { color: 'rgba(255,255,255,0.7)' }]}>{preset.description}</Text>
+                                            <Text style={[ss.presetCardName, isActive && { color: Colors.white }]}>{preset.name}</Text>
+                                            <Text style={[ss.presetCardDesc, isActive && { color: withAlpha(Colors.white, 'B3') }]}>{preset.description}</Text>
                                         </Pressable>
                                     );
                                 })}
@@ -270,8 +270,8 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                                     const isActive = preset.work === workSec && preset.rest === restSec && preset.rounds === rounds;
                                     return (
                                         <Pressable key={preset.id} onPress={() => applyPreset(preset)} style={[ss.presetCard, isActive && ss.presetCardActive]}>
-                                            <Text style={[ss.presetCardName, isActive && { color: '#fff' }]}>{preset.name}</Text>
-                                            <Text style={[ss.presetCardDesc, isActive && { color: 'rgba(255,255,255,0.7)' }]}>{preset.description}</Text>
+                                            <Text style={[ss.presetCardName, isActive && { color: Colors.white }]}>{preset.name}</Text>
+                                            <Text style={[ss.presetCardDesc, isActive && { color: withAlpha(Colors.white, 'B3') }]}>{preset.description}</Text>
                                         </Pressable>
                                     );
                                 })}
@@ -346,7 +346,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                         </Text>
                     </View>
                     <TouchableOpacity onPress={handleClose} style={ss.activeCloseBtn} activeOpacity={0.8}>
-                        <X color="white" size={18} />
+                        <X color={Colors.white} size={18} />
                     </TouchableOpacity>
                 </View>
 
@@ -355,9 +355,9 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                     <View style={[ss.pillsRow, { top: insets.top + 52 }]}>
                         {Array.from({ length: rounds }, (_, i) => (
                             <View key={i} style={[ss.pill, {
-                                backgroundColor: i < currentRound - 1 ? 'rgba(255,255,255,0.85)' :
+                                backgroundColor: i < currentRound - 1 ? withAlpha(Colors.white, 'D9') :
                                     i === currentRound - 1 ? phaseConfig.ringColor :
-                                        'rgba(255,255,255,0.15)',
+                                        withAlpha(Colors.white, '26'),
                             }]} />
                         ))}
                     </View>
@@ -371,7 +371,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                         <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
                             <View style={{ alignItems: 'center', justifyContent: 'center', width: RING_SIZE, height: RING_SIZE }}>
                                 <Svg width={RING_SIZE} height={RING_SIZE} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
-                                    <Circle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS} stroke="rgba(255,255,255,0.08)" strokeWidth={RING_STROKE} fill="none" />
+                                    <Circle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS} stroke={withAlpha(Colors.white, '14')} strokeWidth={RING_STROKE} fill="none" />
                                     <AnimatedCircle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS} stroke={phaseConfig.ringColor} strokeWidth={RING_STROKE} fill="none" strokeLinecap="round" strokeDasharray={`${RING_CIRCUMFERENCE}`} strokeDashoffset={strokeDashoffset} />
                                 </Svg>
                                 <Text style={ss.timerBig}>{formatTime(timeLeft)}</Text>
@@ -388,7 +388,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                     </Text>
                     {phase !== 'prepare' && (
                         <View style={ss.elapsedChip}>
-                            <Zap size={12} color="rgba(255,255,255,0.5)" />
+                            <Zap size={12} color={withAlpha(Colors.white, '80')} />
                             <Text style={ss.elapsedInfo}>{formatDuration(elapsedTotal)}</Text>
                         </View>
                     )}
@@ -399,16 +399,16 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                     <View style={[ss.controlsRow, { bottom: insets.bottom + 32 }]}>
                         <View style={{ alignItems: 'center', gap: 6 }}>
                             <TouchableOpacity onPress={handleReset} style={ss.controlBtn} activeOpacity={0.8}>
-                                <RotateCcw color="white" size={22} />
+                                <RotateCcw color={Colors.white} size={22} />
                             </TouchableOpacity>
                             <Text style={ss.controlLabel}>Reset</Text>
                         </View>
                         <TouchableOpacity onPress={handlePause} style={ss.pauseBtn} activeOpacity={0.9}>
-                            {isPaused ? <Play color="black" size={28} fill="black" /> : <Pause color="black" size={28} fill="black" />}
+                            {isPaused ? <Play color={Colors.black} size={28} fill={Colors.black} /> : <Pause color={Colors.black} size={28} fill={Colors.black} />}
                         </TouchableOpacity>
                         <View style={{ alignItems: 'center', gap: 6 }}>
                             <TouchableOpacity onPress={handleSkipPhase} style={ss.controlBtn} activeOpacity={0.8}>
-                                <ChevronDown color="white" size={22} />
+                                <ChevronDown color={Colors.white} size={22} />
                             </TouchableOpacity>
                             <Text style={ss.controlLabel}>Saltar</Text>
                         </View>
@@ -430,7 +430,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                         </View>
                         <View style={{ flexDirection: 'row', gap: 12 }}>
                             <Pressable onPress={handleReset} style={ss.repeatBtn}>
-                                <RotateCcw color="white" size={16} />
+                                <RotateCcw color={Colors.white} size={16} />
                                 <Text style={ss.repeatBtnText}>Repetir</Text>
                             </Pressable>
                             <Pressable onPress={handleClose} style={ss.doneBtn}>
@@ -447,7 +447,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
 const ss = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.iron[900] },
     idleHeader: { marginBottom: 12, paddingHorizontal: 20, paddingTop: 16, flexDirection: 'row', alignItems: 'center', gap: 16 },
-    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
+    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
     pageTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 24, letterSpacing: -1 },
     pageSub: { color: Colors.primary.DEFAULT, fontSize: 12, fontWeight: '800', marginTop: 2, letterSpacing: 0.5 },
     closeBtn: { padding: 8 },
@@ -475,37 +475,37 @@ const ss = StyleSheet.create({
     summaryValue: { color: Colors.iron[950], fontWeight: '800' },
     summaryTotal: { borderTopWidth: 1, borderTopColor: Colors.iron[700], marginTop: 4, paddingTop: 8, flexDirection: 'row', alignItems: 'center' },
     startBtn: { backgroundColor: Colors.primary.DEFAULT, borderRadius: 16, paddingVertical: 16, alignItems: 'center', elevation: 2, shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
-    startBtnText: { color: '#fff', fontWeight: '900', fontSize: 16, textTransform: 'uppercase', letterSpacing: 1 },
+    startBtnText: { color: Colors.white, fontWeight: '900', fontSize: 16, textTransform: 'uppercase', letterSpacing: 1 },
     // ─── Active Screen ───────────────────────────────────────────────────────
     activeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     activeTopBar: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, zIndex: 10 },
-    activePhaseChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, gap: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    activePhaseChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: withAlpha(Colors.white, '1F'), borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, gap: 8, borderWidth: 1, borderColor: withAlpha(Colors.white, '1A') },
     activePhaseIndicator: { width: 8, height: 8, borderRadius: 4 },
-    activePhaseChipText: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '900', letterSpacing: 1.5 },
-    activeCloseBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    activePhaseChipText: { color: withAlpha(Colors.white, 'D9'), fontSize: 11, fontWeight: '900', letterSpacing: 1.5 },
+    activeCloseBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: withAlpha(Colors.white, '1F'), alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: withAlpha(Colors.white, '1A') },
     pillsRow: { position: 'absolute', flexDirection: 'row', gap: 4, paddingHorizontal: 20, left: 0, right: 0 },
     pill: { height: 4, borderRadius: 2, flex: 1 },
-    phaseLabel: { color: 'rgba(255,255,255,0.6)', fontWeight: '900', fontSize: 14, marginBottom: 20, textTransform: 'uppercase', letterSpacing: 6 },
-    timerBig: { color: '#fff', fontWeight: '900', fontSize: 72, fontVariant: ['tabular-nums'], textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 },
-    roundInfo: { color: 'rgba(255,255,255,0.45)', fontSize: 15, fontWeight: '700', marginTop: 16 },
-    elapsedChip: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 },
-    elapsedInfo: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '700' },
+    phaseLabel: { color: withAlpha(Colors.white, '99'), fontWeight: '900', fontSize: 14, marginBottom: 20, textTransform: 'uppercase', letterSpacing: 6 },
+    timerBig: { color: Colors.white, fontWeight: '900', fontSize: 72, fontVariant: ['tabular-nums'], textShadowColor: withAlpha(Colors.black, '26'), textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 },
+    roundInfo: { color: withAlpha(Colors.white, '73'), fontSize: 15, fontWeight: '700', marginTop: 16 },
+    elapsedChip: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, backgroundColor: withAlpha(Colors.white, '14'), paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 },
+    elapsedInfo: { color: withAlpha(Colors.white, '66'), fontSize: 12, fontWeight: '700' },
     controlsRow: { position: 'absolute', flexDirection: 'row', gap: 28, alignItems: 'flex-start' },
-    controlBtn: { width: 54, height: 54, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 27, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
-    controlLabel: { color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-    pauseBtn: { width: 72, height: 72, backgroundColor: '#fff', borderRadius: 36, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12 },
+    controlBtn: { width: 54, height: 54, backgroundColor: withAlpha(Colors.white, '1A'), borderRadius: 27, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: withAlpha(Colors.white, '1F') },
+    controlLabel: { color: withAlpha(Colors.white, '59'), fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+    pauseBtn: { width: 72, height: 72, backgroundColor: Colors.white, borderRadius: 36, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12 },
     // ─── Finished Screen ─────────────────────────────────────────────────────
     finishedControls: { position: 'absolute', width: '100%', paddingHorizontal: 20 },
-    finishedCard: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-    finSectionLabel: { color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 14 },
+    finishedCard: { backgroundColor: withAlpha(Colors.white, '14'), borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: withAlpha(Colors.white, '14') },
+    finSectionLabel: { color: withAlpha(Colors.white, '59'), fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 14 },
     finishedRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-    finishedLabel: { color: 'rgba(255,255,255,0.5)', fontWeight: '600', fontSize: 14 },
-    finishedValue: { color: '#fff', fontWeight: '800', fontSize: 14 },
-    finishedTotalRow: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)', marginTop: 6, paddingTop: 12, flexDirection: 'row', justifyContent: 'space-between' },
-    finishedTotalLabel: { color: 'rgba(255,255,255,0.7)', fontWeight: '800', fontSize: 14 },
-    finishedTotalValue: { color: '#fff', fontWeight: '900', fontSize: 16 },
-    repeatBtn: { flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', borderRadius: 16, paddingVertical: 15, backgroundColor: 'rgba(255,255,255,0.06)' },
-    repeatBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-    doneBtn: { flex: 1, backgroundColor: '#fff', borderRadius: 16, paddingVertical: 15, alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.15, shadowRadius: 8 },
-    doneBtnText: { color: '#1a1a1a', fontWeight: '900', fontSize: 15 },
+    finishedLabel: { color: withAlpha(Colors.white, '80'), fontWeight: '600', fontSize: 14 },
+    finishedValue: { color: Colors.white, fontWeight: '800', fontSize: 14 },
+    finishedTotalRow: { borderTopWidth: 1, borderTopColor: withAlpha(Colors.white, '1A'), marginTop: 6, paddingTop: 12, flexDirection: 'row', justifyContent: 'space-between' },
+    finishedTotalLabel: { color: withAlpha(Colors.white, 'B3'), fontWeight: '800', fontSize: 14 },
+    finishedTotalValue: { color: Colors.white, fontWeight: '900', fontSize: 16 },
+    repeatBtn: { flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: withAlpha(Colors.white, '4D'), borderRadius: 16, paddingVertical: 15, backgroundColor: withAlpha(Colors.white, '0F') },
+    repeatBtnText: { color: Colors.white, fontWeight: '800', fontSize: 15 },
+    doneBtn: { flex: 1, backgroundColor: Colors.white, borderRadius: 16, paddingVertical: 15, alignItems: 'center', elevation: 4, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.15, shadowRadius: 8 },
+    doneBtnText: { color: Colors.black, fontWeight: '900', fontSize: 15 },
 });

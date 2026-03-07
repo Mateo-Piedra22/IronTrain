@@ -5,7 +5,7 @@ import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { BodyMetric, bodyService } from '@/src/services/BodyService';
 import { configService } from '@/src/services/ConfigService';
 import { UnitService } from '@/src/services/UnitService';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { Measurement, MeasurementType } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { format } from 'date-fns';
@@ -30,16 +30,16 @@ interface MeasurementConfig {
 
 const MEASUREMENT_CONFIG: MeasurementConfig[] = [
     { type: 'weight', label: 'Peso Corporal', Icon: Scale, color: Colors.primary.DEFAULT, unit: 'dynamic', group: 'primary' },
-    { type: 'body_fat', label: 'Grasa Corporal', Icon: TrendingDown, color: '#ef4444', unit: '%', group: 'primary' },
-    { type: 'neck', label: 'Cuello', Icon: Circle, color: '#3b82f6', unit: 'cm', group: 'upper' },
-    { type: 'shoulders', label: 'Hombros', Icon: Ruler, color: '#8b5cf6', unit: 'cm', group: 'upper' },
-    { type: 'chest', label: 'Pecho', Icon: Circle, color: '#ef4444', unit: 'cm', group: 'upper' },
-    { type: 'bicep', label: 'Bíceps', Icon: Circle, color: '#f97316', unit: 'cm', group: 'upper' },
-    { type: 'forearm', label: 'Antebrazo', Icon: Ruler, color: '#f59e0b', unit: 'cm', group: 'upper' },
-    { type: 'waist', label: 'Cintura', Icon: Circle, color: '#eab308', unit: 'cm', group: 'core' },
-    { type: 'hips', label: 'Caderas', Icon: Circle, color: '#22c55e', unit: 'cm', group: 'core' },
-    { type: 'thigh', label: 'Muslo', Icon: Circle, color: '#14b8a6', unit: 'cm', group: 'lower' },
-    { type: 'calf', label: 'Pantorrilla', Icon: Circle, color: '#06b6d4', unit: 'cm', group: 'lower' },
+    { type: 'body_fat', label: 'Grasa Corporal', Icon: TrendingDown, color: Colors.red, unit: '%', group: 'primary' },
+    { type: 'neck', label: 'Cuello', Icon: Circle, color: Colors.blue, unit: 'cm', group: 'upper' },
+    { type: 'shoulders', label: 'Hombros', Icon: Ruler, color: Colors.primary.light, unit: 'cm', group: 'upper' },
+    { type: 'chest', label: 'Pecho', Icon: Circle, color: Colors.red, unit: 'cm', group: 'upper' },
+    { type: 'bicep', label: 'Bíceps', Icon: Circle, color: Colors.yellow, unit: 'cm', group: 'upper' },
+    { type: 'forearm', label: 'Antebrazo', Icon: Ruler, color: Colors.primary.DEFAULT, unit: 'cm', group: 'upper' },
+    { type: 'waist', label: 'Cintura', Icon: Circle, color: Colors.yellow, unit: 'cm', group: 'core' },
+    { type: 'hips', label: 'Caderas', Icon: Circle, color: Colors.green, unit: 'cm', group: 'core' },
+    { type: 'thigh', label: 'Muslo', Icon: Circle, color: Colors.green, unit: 'cm', group: 'lower' },
+    { type: 'calf', label: 'Pantorrilla', Icon: Circle, color: Colors.blue, unit: 'cm', group: 'lower' },
 ];
 
 const GROUP_LABELS: Record<string, string> = {
@@ -348,7 +348,7 @@ export default function BodyTrackerScreen() {
                                                 style={ss.measureHeader}
                                             >
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                                    <View style={[ss.measureIconCircle, { backgroundColor: cfg.color + '15' }]}>
+                                                    <View style={[ss.measureIconCircle, { backgroundColor: withAlpha(cfg.color, '15') }]}>
                                                         <cfg.Icon size={16} color={cfg.color} />
                                                     </View>
                                                     <View>
@@ -367,14 +367,14 @@ export default function BodyTrackerScreen() {
                                                     {/* Trend indicator */}
                                                     {trend.delta !== null && (
                                                         <View style={[ss.trendBadge, {
-                                                            backgroundColor: trend.delta > 0 ? '#dcfce720' : trend.delta < 0 ? '#fee2e220' : Colors.iron[200],
+                                                            backgroundColor: trend.delta > 0 ? withAlpha(Colors.green, '20') : trend.delta < 0 ? withAlpha(Colors.red, '20') : Colors.iron[200],
                                                         }]}>
-                                                            {trend.delta > 0 ? <TrendingUp size={10} color="#166534" /> :
-                                                                trend.delta < 0 ? <TrendingDown size={10} color="#991b1b" /> :
+                                                            {trend.delta > 0 ? <TrendingUp size={10} color={Colors.green} /> :
+                                                                trend.delta < 0 ? <TrendingDown size={10} color={Colors.red} /> :
                                                                     <Minus size={10} color={Colors.iron[500]} />}
                                                             <Text style={{
                                                                 fontSize: 10, fontWeight: '800',
-                                                                color: trend.delta > 0 ? '#166534' : trend.delta < 0 ? '#991b1b' : Colors.iron[500],
+                                                                color: trend.delta > 0 ? Colors.green : trend.delta < 0 ? Colors.red : Colors.iron[500],
                                                             }}>
                                                                 {trend.delta > 0 ? '+' : ''}{trend.delta}
                                                             </Text>
@@ -515,7 +515,7 @@ export default function BodyTrackerScreen() {
                                     key={cfg.type}
                                     style={[
                                         ss.selectorItem,
-                                        quickAddType === cfg.type && { backgroundColor: Colors.primary.DEFAULT + '10' }
+                                        quickAddType === cfg.type && { backgroundColor: withAlpha(Colors.primary.DEFAULT, '10') }
                                     ]}
                                     onPress={() => {
                                         setQuickAddType(cfg.type);
@@ -523,7 +523,7 @@ export default function BodyTrackerScreen() {
                                         Haptics.selectionAsync();
                                     }}
                                 >
-                                    <View style={[ss.measureIconCircle, { backgroundColor: cfg.color + '15', width: 32, height: 32 }]}>
+                                    <View style={[ss.measureIconCircle, { backgroundColor: withAlpha(cfg.color, '15'), width: 32, height: 32 }]}>
                                         <cfg.Icon size={14} color={cfg.color} />
                                     </View>
                                     <Text style={[
@@ -550,7 +550,7 @@ export default function BodyTrackerScreen() {
 }
 
 const ss = StyleSheet.create({
-    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
+    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
     pageTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 24, letterSpacing: -1 },
     pageSub: { color: Colors.primary.DEFAULT, fontSize: 12, fontWeight: '800', marginTop: 2, letterSpacing: 0.5 },
     quickLogCard: {
@@ -613,9 +613,9 @@ const ss = StyleSheet.create({
         width: 28,
         height: 28,
         borderRadius: 14,
-        backgroundColor: Colors.primary.DEFAULT + '12',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '12'),
         borderWidth: 1,
-        borderColor: Colors.primary.DEFAULT + '30',
+        borderColor: withAlpha(Colors.primary.DEFAULT, '30'),
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -638,14 +638,14 @@ const ss = StyleSheet.create({
     historyValue: { fontSize: 14, fontWeight: '900', color: Colors.iron[950], marginTop: 2 },
 
     // Modal
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 32 },
+    modalOverlay: { flex: 1, backgroundColor: withAlpha(Colors.black, '8C'), justifyContent: 'center', alignItems: 'center', padding: 32 },
     modalContainer: {
         backgroundColor: Colors.surface,
         borderRadius: 20,
         padding: 24,
         width: '100%',
         maxWidth: 340,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.18,
         shadowRadius: 24,
@@ -668,7 +668,7 @@ const ss = StyleSheet.create({
     modalBtnCancel: { backgroundColor: Colors.iron[200] },
     modalBtnCancelText: { fontWeight: '800', fontSize: 14, color: Colors.iron[950] },
     modalBtnSave: { backgroundColor: Colors.primary.DEFAULT },
-    modalBtnSaveText: { fontWeight: '800', fontSize: 14, color: '#fff' },
+    modalBtnSaveText: { fontWeight: '800', fontSize: 14, color: Colors.white },
 
     // Selector
     selectorItem: {

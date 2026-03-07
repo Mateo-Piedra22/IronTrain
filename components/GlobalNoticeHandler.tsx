@@ -2,7 +2,7 @@ import { Config } from '@/src/constants/Config';
 import { AppNotification, AppNotificationService } from '@/src/services/AppNotificationService';
 import { ChangelogRelease, ChangelogService } from '@/src/services/ChangelogService';
 import { useAuthStore } from '@/src/store/authStore';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { useRouter } from 'expo-router';
 import { Bell, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
@@ -155,18 +155,18 @@ export const GlobalNoticeHandler: React.FC = () => {
                 />
             )}
 
-            {/* 2. Custom BroadCast Modal */}
             {activeNotification && activeNotification.type === 'modal' && (
                 <Modal visible={true} transparent animationType="fade">
-                    <Pressable style={ss.modalOverlay} onPress={handleCloseNotification}>
-                        <Pressable style={ss.modalContainer} onPress={() => { }}>
+                    <View style={ss.modalOverlay}>
+                        <Pressable style={ss.modalBackdropPressable} onPress={handleCloseNotification} />
+                        <View style={ss.modalContainer}>
                             <View style={ss.modalHeader}>
                                 <View style={ss.iconCircle}>
                                     <Bell size={20} color={Colors.primary.DEFAULT} />
                                 </View>
                                 <Text style={ss.modalTitle}>{activeNotification.title}</Text>
                                 <TouchableOpacity onPress={handleCloseNotification} accessibilityRole="button" accessibilityLabel="Cerrar notificación">
-                                    <X size={20} color={Colors.iron[400]} />
+                                    <X size={20} color={Colors.iron[500]} />
                                 </TouchableOpacity>
                             </View>
                             <View style={ss.modalBody}>
@@ -188,8 +188,8 @@ export const GlobalNoticeHandler: React.FC = () => {
                             <TouchableOpacity style={ss.modalButton} onPress={handleCloseNotification} accessibilityRole="button" accessibilityLabel="Cerrar modal de notificación">
                                 <Text style={ss.modalButtonText}>CERRAR</Text>
                             </TouchableOpacity>
-                        </Pressable>
-                    </Pressable>
+                        </View>
+                    </View>
                 </Modal>
             )}
 
@@ -201,7 +201,7 @@ export const GlobalNoticeHandler: React.FC = () => {
                     style={ss.toastContainer}
                 >
                     <View style={ss.toastIcon}>
-                        <Bell size={16} color="#1a1a2e" />
+                        <Bell size={16} color={Colors.white} />
                     </View>
                     <TouchableOpacity
                         style={ss.toastContent}
@@ -229,24 +229,30 @@ export const GlobalNoticeHandler: React.FC = () => {
 const ss = StyleSheet.create({
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 24,
     },
+    modalBackdropPressable: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: ThemeFx.backdrop,
+    },
     modalContainer: {
         width: '100%',
         maxWidth: 360,
+        minHeight: 260,
+        maxHeight: '86%',
         backgroundColor: Colors.surface,
         borderRadius: 20,
         borderWidth: 1,
         borderColor: Colors.iron[700],
         padding: 24,
         elevation: 8,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2,
+        shadowOpacity: ThemeFx.shadowOpacityStrong,
         shadowRadius: 24,
+        overflow: 'hidden',
     },
     modalHeader: {
         flexDirection: 'row',
@@ -258,7 +264,7 @@ const ss = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 12,
-        backgroundColor: Colors.primary.DEFAULT + '14',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '14'),
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -270,14 +276,16 @@ const ss = StyleSheet.create({
         letterSpacing: -0.3,
     },
     modalBody: {
+        flexShrink: 1,
+        minHeight: 120,
         maxHeight: 360,
         marginBottom: 16,
-        backgroundColor: Colors.iron[50] + '80',
+        backgroundColor: withAlpha(Colors.iron[50], 'CC'),
         borderRadius: 12,
         padding: 4,
     },
     modalMessageScroll: {
-        flexGrow: 0,
+        maxHeight: 310,
     },
     modalMessageContent: {
         paddingVertical: 12,
@@ -292,8 +300,9 @@ const ss = StyleSheet.create({
     },
     modalMessage: {
         fontSize: 14,
-        color: Colors.iron[500],
+        color: Colors.iron[950],
         lineHeight: 22,
+        fontWeight: '500',
     },
     richBold: {
         fontWeight: '900',
@@ -329,9 +338,9 @@ const ss = StyleSheet.create({
         borderColor: Colors.iron[700],
         zIndex: 9999,
         elevation: 10,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
+        shadowOpacity: ThemeFx.shadowOpacityStrong,
         shadowRadius: 8,
     },
     toastIcon: {
@@ -353,10 +362,10 @@ const ss = StyleSheet.create({
         textTransform: 'uppercase',
     },
     toastMessage: {
-        color: Colors.iron[500],
+        color: Colors.iron[950],
         fontSize: 12,
         marginTop: 2,
-        fontWeight: '700',
+        fontWeight: '500',
     },
     toastClose: {
         padding: 8,

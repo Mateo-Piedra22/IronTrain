@@ -1,4 +1,4 @@
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { useContext, useEffect, useRef, useState } from 'react';
@@ -52,7 +52,7 @@ export function RestTimer() {
 }
 
 const ss = StyleSheet.create({
-    fabIdle: { position: 'absolute', backgroundColor: Colors.surface, borderRadius: 28, width: 56, height: 56, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6, borderWidth: 1, borderColor: Colors.primary.DEFAULT + '30' },
-    fabActive: { position: 'absolute', backgroundColor: Colors.surface, borderRadius: 28, paddingHorizontal: 20, height: 56, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6, borderWidth: 1, borderColor: Colors.primary.DEFAULT },
+    fabIdle: { position: 'absolute', backgroundColor: Colors.surface, borderRadius: 28, width: 56, height: 56, alignItems: 'center', justifyContent: 'center', shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6, borderWidth: 1, borderColor: withAlpha(Colors.primary.DEFAULT, '30') },
+    fabActive: { position: 'absolute', backgroundColor: Colors.surface, borderRadius: 28, paddingHorizontal: 20, height: 56, flexDirection: 'row', alignItems: 'center', shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6, borderWidth: 1, borderColor: Colors.primary.DEFAULT },
     timerText: { color: Colors.iron[950], fontSize: 18, fontWeight: '900', marginRight: 14, fontVariant: ['tabular-nums'] },
 });

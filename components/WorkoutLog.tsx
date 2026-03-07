@@ -1,6 +1,6 @@
 import { dbService } from '@/src/services/DatabaseService';
 import { workoutService } from '@/src/services/WorkoutService';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -153,7 +153,7 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
                             style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
                             accessibilityRole="button" accessibilityLabel={`Eliminar ${group.exercise_name}`}
                         >
-                            <Trash2 size={22} color="white" />
+                            <Trash2 size={22} color={Colors.white} />
                             <Text style={ss.swipeLabel}>ELIMINAR</Text>
                         </TouchableOpacity>
                     </Animated.View>
@@ -172,7 +172,7 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
                             style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
                             accessibilityRole="button" accessibilityLabel={`Mantener para reordenar ${group.exercise_name}`}
                         >
-                            <GripVertical size={20} color="white" />
+                            <GripVertical size={20} color={Colors.white} />
                             <Text style={ss.swipeLabel}>ORDENAR</Text>
                         </TouchableOpacity>
                     </Animated.View>
@@ -273,7 +273,7 @@ const ss = StyleSheet.create({
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
     emptyTitle: { color: Colors.iron[400], textAlign: 'center', fontSize: 16, marginTop: 16, fontWeight: '700' },
     emptySub: { color: Colors.iron[400], textAlign: 'center', marginTop: 8, fontSize: 13 },
-    swipeRight: { justifyContent: 'center', alignItems: 'flex-end', borderTopRightRadius: 14, borderBottomRightRadius: 14, marginVertical: 1, marginLeft: -20, width: 96, backgroundColor: Colors.red, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
-    swipeLeft: { justifyContent: 'center', alignItems: 'flex-start', width: 96, borderTopLeftRadius: 14, borderBottomLeftRadius: 14, marginVertical: 1, marginRight: -20, backgroundColor: Colors.primary.dark, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
-    swipeLabel: { color: '#fff', fontSize: 9, fontWeight: '900', marginTop: 4, letterSpacing: 0.5 },
+    swipeRight: { justifyContent: 'center', alignItems: 'flex-end', borderTopRightRadius: 14, borderBottomRightRadius: 14, marginVertical: 1, marginLeft: -20, width: 96, backgroundColor: Colors.red, shadowColor: ThemeFx.shadowColor, shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+    swipeLeft: { justifyContent: 'center', alignItems: 'flex-start', width: 96, borderTopLeftRadius: 14, borderBottomLeftRadius: 14, marginVertical: 1, marginRight: -20, backgroundColor: Colors.primary.dark, shadowColor: ThemeFx.shadowColor, shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+    swipeLabel: { color: Colors.white, fontSize: 9, fontWeight: '900', marginTop: 4, letterSpacing: 0.5 },
 });

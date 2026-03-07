@@ -7,7 +7,7 @@ import { AppConfig, configService, NotificationPreferences } from '@/src/service
 import { dbService } from '@/src/services/DatabaseService';
 import { updateService } from '@/src/services/UpdateService';
 import { useUpdateStore } from '@/src/store/updateStore';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
@@ -479,10 +479,10 @@ export default function SettingsScreen() {
                                         notify.success('Sesión cerrada', 'Te has desconectado correctamente.');
                                     }, 'Cerrar Sesión');
                                 }}
-                                style={{ backgroundColor: '#ef444415', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                                style={{ backgroundColor: withAlpha(Colors.red, '15'), paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}
                             >
-                                <LogOut size={16} color="#ef4444" />
-                                <Text style={{ color: '#ef4444', fontWeight: '800', fontSize: 14 }}>Salir</Text>
+                                <LogOut size={16} color={Colors.red} />
+                                <Text style={{ color: Colors.red, fontWeight: '800', fontSize: 14 }}>Salir</Text>
                             </TouchableOpacity>
                         </View>
                     ) : (
@@ -501,8 +501,8 @@ export default function SettingsScreen() {
                                     opacity: auth.isLoading ? 0.7 : 1
                                 }}
                             >
-                                <User size={18} color="white" />
-                                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>
+                                <User size={18} color={Colors.white} />
+                                <Text style={{ color: Colors.white, fontWeight: '800', fontSize: 15 }}>
                                     {auth.isLoading ? 'Conectando...' : 'Iniciar Sesión (vía Web)'}
                                 </Text>
                             </TouchableOpacity>
@@ -741,16 +741,16 @@ export default function SettingsScreen() {
 
                     <TouchableOpacity onPress={handleCloudSnapshot} style={[s.settingRow, s.settingRowBorder]}>
                         <View style={s.settingLeft}>
-                            <View style={[s.settingIconCircle, { backgroundColor: '#3b82f615' }]}><CloudLightning size={16} color="#3b82f6" /></View>
-                            <Text style={[s.settingLabel, { color: '#3b82f6' }]}>Forzar Sync a Nube Neon</Text>
+                            <View style={[s.settingIconCircle, { backgroundColor: withAlpha(Colors.blue, '15') }]}><CloudLightning size={16} color={Colors.blue} /></View>
+                            <Text style={[s.settingLabel, { color: Colors.blue }]}>Forzar Sync a Nube Neon</Text>
                         </View>
-                        <ChevronRight size={16} color="#3b82f6" />
+                        <ChevronRight size={16} color={Colors.blue} />
                     </TouchableOpacity>
 
                     <TouchableOpacity onPress={handleRestore} style={s.settingRow}>
                         <View style={s.settingLeft}>
-                            <View style={[s.settingIconCircle, { backgroundColor: '#ef444415' }]}><RefreshCw size={16} color="#ef4444" /></View>
-                            <Text style={[s.settingLabel, { color: '#ef4444' }]}>Restaurar backup</Text>
+                            <View style={[s.settingIconCircle, { backgroundColor: withAlpha(Colors.red, '15') }]}><RefreshCw size={16} color={Colors.red} /></View>
+                            <Text style={[s.settingLabel, { color: Colors.red }]}>Restaurar backup</Text>
                         </View>
                         <ChevronRight size={16} color={Colors.iron[400]} />
                     </TouchableOpacity>
@@ -758,27 +758,27 @@ export default function SettingsScreen() {
 
                 {/* Danger Zone */}
                 <SectionHeader icon={Shield} title="Zona de riesgo" />
-                <View style={[s.card, { borderColor: '#ef444430', marginBottom: 24 }]}>
+                <View style={[s.card, { borderColor: withAlpha(Colors.red, '30'), marginBottom: 24 }]}>
                     <TouchableOpacity onPress={handleResetDB} style={[s.settingRow, s.settingRowBorder]}>
                         <View style={s.settingLeft}>
-                            <View style={[s.settingIconCircle, { backgroundColor: '#ef444415' }]}><Trash2 size={16} color="#ef4444" /></View>
+                            <View style={[s.settingIconCircle, { backgroundColor: withAlpha(Colors.red, '15') }]}><Trash2 size={16} color={Colors.red} /></View>
                             <View style={{ flex: 1 }}>
-                                <Text style={[s.settingLabel, { color: '#ef4444' }]}>Restablecer de fábrica</Text>
+                                <Text style={[s.settingLabel, { color: Colors.red }]}>Restablecer de fábrica</Text>
                                 <Text style={s.settingSubtitle}>Borra todos los datos locales.</Text>
                             </View>
                         </View>
-                        <ChevronRight size={16} color="#ef4444" />
+                        <ChevronRight size={16} color={Colors.red} />
                     </TouchableOpacity>
 
                     <TouchableOpacity onPress={handleFullAccountWipe} style={s.settingRow}>
                         <View style={s.settingLeft}>
-                            <View style={[s.settingIconCircle, { backgroundColor: '#ef444420' }]}><AlertTriangle size={16} color="#ef4444" /></View>
+                            <View style={[s.settingIconCircle, { backgroundColor: withAlpha(Colors.red, '20') }]}><AlertTriangle size={16} color={Colors.red} /></View>
                             <View style={{ flex: 1 }}>
-                                <Text style={[s.settingLabel, { color: '#ef4444' }]}>Vaciar cuenta (Local + Nube)</Text>
+                                <Text style={[s.settingLabel, { color: Colors.red }]}>Vaciar cuenta (Local + Nube)</Text>
                                 <Text style={s.settingSubtitle}>Borrado total e irreversible en todas partes.</Text>
                             </View>
                         </View>
-                        <ChevronRight size={16} color="#ef4444" />
+                        <ChevronRight size={16} color={Colors.red} />
                     </TouchableOpacity>
                 </View>
 
@@ -837,7 +837,7 @@ export default function SettingsScreen() {
                             accessibilityRole="button"
                             accessibilityLabel="Abrir descarga"
                         >
-                            <Download size={16} color="white" />
+                            <Download size={16} color={Colors.white} />
                             <Text style={s.updateBtnPrimaryText}>{updateStatus === 'update_pending' ? 'Ver notas' : 'Descargar'}</Text>
                         </TouchableOpacity>
                     </View>
@@ -850,18 +850,18 @@ export default function SettingsScreen() {
 }
 
 const s = StyleSheet.create({
-    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
+    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
     pageTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 24, letterSpacing: -1 },
     pageSub: { color: Colors.primary.DEFAULT, fontSize: 12, fontWeight: '800', marginTop: 2, letterSpacing: 0.5 },
     sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 28, marginBottom: 10 },
     sectionAccent: { width: 3, height: 16, borderRadius: 2, backgroundColor: Colors.primary.DEFAULT },
     sectionTitle: { fontSize: 11, fontWeight: '800', color: Colors.iron[500], textTransform: 'uppercase', letterSpacing: 1 },
-    card: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], overflow: 'hidden', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 },
+    card: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], overflow: 'hidden', elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 },
     cardInnerPadded: { padding: 16 },
     settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
     settingRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.iron[200] },
     settingLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 12 },
-    settingIconCircle: { width: 36, height: 36, borderRadius: 12, backgroundColor: Colors.primary.DEFAULT + '12', justifyContent: 'center', alignItems: 'center' },
+    settingIconCircle: { width: 36, height: 36, borderRadius: 12, backgroundColor: withAlpha(Colors.primary.DEFAULT, '12'), justifyContent: 'center', alignItems: 'center' },
     settingLabel: { fontSize: 15, fontWeight: '800', color: Colors.iron[950], letterSpacing: -0.2 },
     settingSubtitle: { fontSize: 12, color: Colors.iron[500], marginTop: 2, lineHeight: 16 },
     roundLabel: { fontSize: 13, fontWeight: '800', color: Colors.iron[500] },
@@ -870,18 +870,18 @@ const s = StyleSheet.create({
     stepperBtnText: { fontSize: 18, fontWeight: '700', color: Colors.iron[950], lineHeight: 20 },
     stepperValue: { fontSize: 14, fontWeight: '800', color: Colors.iron[950], minWidth: 40, textAlign: 'center' },
     chipGroup: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-    chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100, borderWidth: 1, borderColor: Colors.iron[300], backgroundColor: Colors.surface, elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 },
+    chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100, borderWidth: 1, borderColor: Colors.iron[300], backgroundColor: Colors.surface, elevation: 1, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 },
     chipActive: { backgroundColor: Colors.primary.DEFAULT, borderColor: Colors.primary.DEFAULT, elevation: 2 },
     chipText: { fontSize: 13, fontWeight: '800', color: Colors.iron[600] },
-    chipTextActive: { color: '#fff' },
-    dayChip: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.iron[300], alignItems: 'center', justifyContent: 'center', elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 },
+    chipTextActive: { color: Colors.white },
+    dayChip: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.iron[300], alignItems: 'center', justifyContent: 'center', elevation: 1, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 },
     dayChipActive: { backgroundColor: Colors.primary.DEFAULT, borderColor: Colors.primary.DEFAULT, elevation: 2, shadowColor: Colors.primary.DEFAULT, shadowOpacity: 0.25, shadowRadius: 4 },
     dayChipText: { fontSize: 14, fontWeight: '800', color: Colors.iron[500] },
-    dayChipTextActive: { color: '#fff' },
+    dayChipTextActive: { color: Colors.white },
     updateBtn: { flex: 1, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.iron[300], borderRadius: 14, paddingVertical: 14, alignItems: 'center', elevation: 1 },
     updateBtnText: { fontSize: 14, fontWeight: '800', color: Colors.iron[950] },
     updateBtnPrimary: { flex: 1, backgroundColor: Colors.primary.DEFAULT, borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, elevation: 3 },
-    updateBtnPrimaryText: { fontSize: 14, fontWeight: '800', color: '#fff' },
+    updateBtnPrimaryText: { fontSize: 14, fontWeight: '800', color: Colors.white },
     footer: { textAlign: 'center', color: Colors.iron[400], fontSize: 12, marginTop: 32, marginBottom: 20 },
 });
 
@@ -894,7 +894,7 @@ const ns = StyleSheet.create({
     },
     groupIcon: {
         width: 34, height: 34, borderRadius: 10,
-        backgroundColor: Colors.primary.DEFAULT + '12',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '12'),
         justifyContent: 'center', alignItems: 'center',
     },
     groupTitle: {
@@ -904,7 +904,7 @@ const ns = StyleSheet.create({
         fontSize: 11, color: Colors.iron[500], marginTop: 1,
     },
     badge: {
-        backgroundColor: Colors.primary.DEFAULT + '18',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '18'),
         borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
     },
     badgeText: {

@@ -1,4 +1,4 @@
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -100,12 +100,12 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
         <Modal visible={visible} animationType="fade" transparent>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 }}
+                style={{ flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center', padding: 16 }}
             >
                 <View style={{
                     backgroundColor: Colors.surface, width: '100%', maxWidth: 360,
                     borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.iron[700],
-                    elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24,
+                    elevation: 8, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24,
                 }}>
                     <Text style={{ fontSize: 20, fontWeight: '900', color: Colors.iron[950], marginBottom: 20, letterSpacing: -0.3 }}>
                         {initialData ? 'Editar ejercicio' : 'Nuevo ejercicio'}
@@ -138,7 +138,7 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
                                     onPress={() => setCategoryId(cat.id)}
                                     style={[
                                         { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.iron[200], borderWidth: 1, borderColor: Colors.iron[300], flexDirection: 'row', alignItems: 'center' },
-                                        isActive && { backgroundColor: catColor + '18', borderColor: catColor }
+                                        isActive && { backgroundColor: withAlpha(catColor, '18'), borderColor: catColor }
                                     ]}
                                     accessibilityRole="button"
                                 >
@@ -207,7 +207,7 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
                                     onPress={() => setType(t.id)}
                                     style={[
                                         { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, backgroundColor: Colors.iron[200], borderWidth: 1, borderColor: Colors.iron[300] },
-                                        isActive && { backgroundColor: Colors.primary.DEFAULT + '12', borderColor: Colors.primary.DEFAULT }
+                                        isActive && { backgroundColor: withAlpha(Colors.primary.DEFAULT, '12'), borderColor: Colors.primary.DEFAULT }
                                     ]}
                                     accessibilityRole="button"
                                 >
@@ -249,7 +249,7 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
 }
 
 const ss = StyleSheet.create({
-    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    overlay: { flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'flex-end' },
     sheet: { backgroundColor: Colors.iron[900], borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '85%', borderTopWidth: 1, borderTopColor: Colors.iron[700] },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.iron[200] },
     headerBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: Colors.iron[200], borderWidth: 1, borderColor: Colors.iron[300], justifyContent: 'center', alignItems: 'center' },
@@ -260,11 +260,11 @@ const ss = StyleSheet.create({
     catChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: Colors.iron[700], backgroundColor: 'transparent' },
     catChipText: { fontSize: 13, fontWeight: '700', color: Colors.iron[500] },
     typeCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderRadius: 14, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.iron[700] },
-    typeCardActive: { borderColor: Colors.primary.DEFAULT, backgroundColor: Colors.primary.DEFAULT + '08' },
+    typeCardActive: { borderColor: Colors.primary.DEFAULT, backgroundColor: withAlpha(Colors.primary.DEFAULT, '08') },
     typeLabel: { fontSize: 14, fontWeight: '800', color: Colors.iron[950] },
     typeDesc: { fontSize: 11, color: Colors.iron[400], marginTop: 2 },
     activeIndicator: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary.DEFAULT },
     bottomBar: { padding: 16, backgroundColor: Colors.iron[900], borderTopWidth: 1, borderTopColor: Colors.iron[200], marginBottom: 16 },
     saveBtn: { backgroundColor: Colors.primary.DEFAULT, paddingVertical: 16, borderRadius: 14, alignItems: 'center', shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 },
-    saveBtnText: { color: '#fff', fontWeight: '900', fontSize: 16, letterSpacing: 0.3 },
+    saveBtnText: { color: Colors.white, fontWeight: '900', fontSize: 16, letterSpacing: 0.3 },
 });

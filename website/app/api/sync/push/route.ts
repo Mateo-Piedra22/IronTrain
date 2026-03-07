@@ -238,8 +238,15 @@ export async function POST(req: NextRequest) {
                             (existingRecord as any)?.status !== 'completed'
                         );
 
+                    // 4. If a workout was completed, apply social scoring (non-blocking for sync)
                     if (shouldEvaluateWorkoutScore && statusTransitionedToCompleted) {
-                        await applyWorkoutScoring(trx, userId, payload.id || payload.key);
+                        try {
+                            await applyWorkoutScoring(trx, userId, payload.id || payload.key);
+                        } catch (scoringError: any) {
+                            const scoringMsg = scoringError instanceof Error ? scoringError.message : String(scoringError);
+                            console.warn(`[Sync] Social scoring failed for workout=${payload.id || payload.key}, sync continues. Error: ${scoringMsg}`);
+                            // We do NOT rethrow here because the data sync itself succeeded.
+                        }
                     }
                     processedIds.push(opId);
                     results.push({ id: opId, status: 'success' });

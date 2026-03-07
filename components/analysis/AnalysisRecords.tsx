@@ -2,7 +2,7 @@ import { EmptyChartPlaceholder } from '@/components/EmptyChartPlaceholder';
 import { PRCenter } from '@/components/PRCenter';
 import { BadgePill } from '@/components/ui/BadgePill';
 import { OneRMProgressRow, OneRepMax } from '@/src/services/AnalysisService';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { useRouter } from 'expo-router';
 import { ChevronRight, TrendingUp, Trophy } from 'lucide-react-native';
 import React from 'react';
@@ -81,7 +81,7 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
             <View style={{ marginTop: 32 }}>
                 <View style={styles.sectionHeader}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={[styles.sectionAccent, { backgroundColor: '#16a34a' }]} />
+                        <View style={[styles.sectionAccent, { backgroundColor: Colors.green }]} />
                         <TrendingUp size={16} color={Colors.iron[950]} />
                         <Text style={styles.sectionTitle}>Mayores Progresos</Text>
                     </View>
@@ -101,8 +101,8 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
                             onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: prog.exerciseId, exerciseId: prog.exerciseId, exerciseName: prog.exerciseName } } as any)}
                         >
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <View style={[styles.rankBadge, { backgroundColor: '#16a34a15' }]}>
-                                    <TrendingUp size={14} color="#16a34a" />
+                                <View style={[styles.rankBadge, { backgroundColor: withAlpha(Colors.green, '15') }]}>
+                                    <TrendingUp size={14} color={Colors.green} />
                                 </View>
 
                                 <View style={{ flex: 1, marginLeft: 12 }}>
@@ -118,8 +118,8 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
                                 </View>
 
                                 <View style={styles.ormValueContainer}>
-                                    <Text style={[styles.ormValue, { color: '#16a34a' }]}>+{Math.round(prog.delta)}</Text>
-                                    <Text style={[styles.ormUnit, { color: '#16a34a' }]}>
+                                    <Text style={[styles.ormValue, { color: Colors.green }]}>+{Math.round(prog.delta)}</Text>
+                                    <Text style={[styles.ormUnit, { color: Colors.green }]}>
                                         {prog.deltaPct ? `${prog.deltaPct}%` : 'kg'}
                                     </Text>
                                 </View>
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
         letterSpacing: -0.3,
     },
     rangeBadge: {
-        backgroundColor: Colors.primary.DEFAULT + '15',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '15'),
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 10,
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.iron[700],
         elevation: 1,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.04,
         shadowRadius: 4,
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
         width: 28,
         height: 28,
         borderRadius: 14,
-        backgroundColor: Colors.primary.DEFAULT + '15',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '15'),
         justifyContent: 'center',
         alignItems: 'center',
     },

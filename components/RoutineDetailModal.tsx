@@ -5,7 +5,7 @@ import { RoutineDayWithExercises, routineService } from '@/src/services/RoutineS
 import { SocialService } from '@/src/services/SocialService';
 import { useAuthStore } from '@/src/store/authStore';
 import { confirm } from '@/src/store/confirmStore';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { Routine } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { Calendar, ChevronRight, Dumbbell, Edit3, GripVertical, Plus, Send, Share2, Trash2, User, Users, X } from 'lucide-react-native';
@@ -295,8 +295,8 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                     </View>
                 </View>
                 <TouchableOpacity onPress={() => handleDeleteExercise(item.id, item.exercise_name)}
-                    style={{ padding: 8, backgroundColor: '#ef444412', borderRadius: 10, borderWidth: 1, borderColor: '#ef444425' }}>
-                    <Trash2 size={14} color="#ef4444" />
+                    style={{ padding: 8, backgroundColor: withAlpha(Colors.red, '12'), borderRadius: 10, borderWidth: 1, borderColor: withAlpha(Colors.red, '25') }}>
+                    <Trash2 size={14} color={Colors.red} />
                 </TouchableOpacity>
             </View>
         </ScaleDecorator>
@@ -319,7 +319,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                             </Text>
                         </View>
                         <TouchableOpacity onPress={handleClose} style={st.closeBtn}>
-                            <X size={18} color="#fff" />
+                            <X size={18} color={Colors.white} />
                         </TouchableOpacity>
                     </View>
 
@@ -329,9 +329,9 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
                             <View style={st.contentArea}>
                                 {routine?.is_moderated === 1 ? (
-                                    <View style={[st.infoCard, { borderLeftColor: '#f59e0b', backgroundColor: '#fef3c730' }]}>
-                                        <Text style={{ color: '#b45309', fontWeight: '900', fontSize: 12, marginBottom: 4 }}>⚠️ ESTADO: OCULTA</Text>
-                                        <Text style={[st.infoCardText, { color: '#92400e' }]}>
+                                    <View style={[st.infoCard, { borderLeftColor: Colors.yellow, backgroundColor: withAlpha(Colors.yellow, '30') }]}>
+                                        <Text style={{ color: Colors.iron[600], fontWeight: '900', fontSize: 12, marginBottom: 4 }}>⚠️ ESTADO: OCULTA</Text>
+                                        <Text style={[st.infoCardText, { color: Colors.iron[600] }]}>
                                             {routine.moderation_message || 'Esta rutina ha sido ocultada del directorio público por un administrador.'}
                                         </Text>
                                     </View>
@@ -364,9 +364,9 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                         </TouchableOpacity>
                                     </View>
                                     <View style={{ flex: 1 }}>
-                                        <TouchableOpacity style={[st.smallBtn, { borderColor: '#ef444430' }]} onPress={handleDeleteRoutine}>
-                                            <Trash2 size={12} color="#ef4444" />
-                                            <Text style={[st.smallBtnText, { color: '#ef4444' }]}>Del</Text>
+                                        <TouchableOpacity style={[st.smallBtn, { borderColor: withAlpha(Colors.red, '30') }]} onPress={handleDeleteRoutine}>
+                                            <Trash2 size={12} color={Colors.red} />
+                                            <Text style={[st.smallBtnText, { color: Colors.red }]}>Del</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -408,9 +408,9 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                         <Edit3 size={14} color={Colors.primary.DEFAULT} />
                                         <Text style={st.smallBtnText}>Renombrar</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity style={[st.smallBtn, { borderColor: '#ef444430' }]} onPress={handleDeleteDay}>
-                                        <Trash2 size={14} color="#ef4444" />
-                                        <Text style={[st.smallBtnText, { color: '#ef4444' }]}>Eliminar día</Text>
+                                    <TouchableOpacity style={[st.smallBtn, { borderColor: withAlpha(Colors.red, '30') }]} onPress={handleDeleteDay}>
+                                        <Trash2 size={14} color={Colors.red} />
+                                        <Text style={[st.smallBtnText, { color: Colors.red }]}>Eliminar día</Text>
                                     </TouchableOpacity>
                                 </View>
 
@@ -498,7 +498,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                     <Text style={st.headerSub}>Tocá uno para agregarlo a {selectedDay?.name}</Text>
                                 </View>
                                 <TouchableOpacity onPress={() => setAddExerciseVisible(false)} style={st.closeBtn}>
-                                    <X size={18} color="#fff" />
+                                    <X size={18} color={Colors.white} />
                                 </TouchableOpacity>
                             </View>
                             <View style={{ flex: 1 }}>
@@ -519,7 +519,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                     <Text style={st.headerSub}>Comparte esta rutina al inbox de un amigo</Text>
                                 </View>
                                 <TouchableOpacity onPress={() => setFriendPickerVisible(false)} style={st.closeBtn}>
-                                    <X size={18} color="#fff" />
+                                    <X size={18} color={Colors.white} />
                                 </TouchableOpacity>
                             </View>
                             <View style={{ flex: 1, padding: 16, backgroundColor: Colors.iron[100] }}>
@@ -545,7 +545,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                                     borderWidth: 1,
                                                     borderColor: Colors.iron[300],
                                                     elevation: 2,
-                                                    shadowColor: '#000',
+                                                    shadowColor: ThemeFx.shadowColor,
                                                     shadowOffset: { width: 0, height: 2 },
                                                     shadowOpacity: 0.05,
                                                     shadowRadius: 4
@@ -582,7 +582,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
 const st = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.7)',
+        backgroundColor: withAlpha(Colors.black, 'B3'),
         justifyContent: 'center',
         paddingHorizontal: 16,
         paddingVertical: 48,
@@ -666,7 +666,7 @@ const st = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.iron[300],
         elevation: 2,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 6,
@@ -684,8 +684,8 @@ const st = StyleSheet.create({
     },
     dayIconBox: {
         width: 36, height: 36, borderRadius: 10,
-        backgroundColor: Colors.primary.DEFAULT + '20',
-        borderWidth: 1, borderColor: Colors.primary.DEFAULT + '40',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '20'),
+        borderWidth: 1, borderColor: withAlpha(Colors.primary.DEFAULT, '40'),
         justifyContent: 'center', alignItems: 'center',
     },
     dayTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
@@ -725,7 +725,7 @@ const st = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.iron[300],
         elevation: 2,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 6,
@@ -734,8 +734,8 @@ const st = StyleSheet.create({
     exCardActive: { borderColor: Colors.primary.DEFAULT, elevation: 4, shadowOpacity: 0.12 },
     exIconBox: {
         width: 38, height: 38, borderRadius: 11,
-        backgroundColor: Colors.primary.DEFAULT + '15',
-        borderWidth: 1, borderColor: Colors.primary.DEFAULT + '30',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '15'),
+        borderWidth: 1, borderColor: withAlpha(Colors.primary.DEFAULT, '30'),
         alignItems: 'center', justifyContent: 'center',
     },
     exCardTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
@@ -750,9 +750,9 @@ const st = StyleSheet.create({
         marginTop: 8,
         borderRadius: 14,
         borderWidth: 1.5,
-        borderColor: Colors.primary.DEFAULT + '40',
+        borderColor: withAlpha(Colors.primary.DEFAULT, '40'),
         borderStyle: 'dashed',
-        backgroundColor: Colors.primary.DEFAULT + '06',
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '06'),
     },
     addRowText: { color: Colors.primary.DEFAULT, fontWeight: '800', fontSize: 14 },
 
@@ -772,7 +772,7 @@ const st = StyleSheet.create({
     // Inner form modals
     innerOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: ThemeFx.backdrop,
         justifyContent: 'center',
         alignItems: 'center',
         padding: 16,
@@ -786,7 +786,7 @@ const st = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.iron[700],
         elevation: 8,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.2,
         shadowRadius: 24,

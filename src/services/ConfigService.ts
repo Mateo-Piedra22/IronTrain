@@ -1,3 +1,4 @@
+import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
 
 export interface NotificationPreferences {
@@ -233,7 +234,6 @@ class ConfigService {
 
         // Emit event for real-time UI updates
         try {
-            const { dataEventService } = await import('./DataEventService');
             dataEventService.emit('SETTINGS_UPDATED', { key, value });
         } catch (e) {
             // Emitter might not be ready or failed
