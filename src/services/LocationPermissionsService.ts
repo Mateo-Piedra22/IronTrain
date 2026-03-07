@@ -47,6 +47,33 @@ class LocationPermissionsService {
             return false;
         }
     }
+
+    async getCurrentLocation(): Promise<{ lat: number; lon: number; city: string | null } | null> {
+        try {
+            const hasPermission = await this.requestWeatherBonusPermission(true);
+            if (!hasPermission) return null;
+
+            const position = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.High,
+            });
+
+            const { latitude: lat, longitude: lon } = position.coords;
+
+            // Reverse geocoding to get city name
+            const [address] = await Location.reverseGeocodeAsync({
+                latitude: lat,
+                longitude: lon,
+            });
+
+            return {
+                lat,
+                lon,
+                city: address?.city ?? address?.subregion ?? address?.region ?? null,
+            };
+        } catch {
+            return null;
+        }
+    }
 }
 
 export const locationPermissionsService = new LocationPermissionsService();

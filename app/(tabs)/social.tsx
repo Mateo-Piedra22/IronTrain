@@ -1,5 +1,6 @@
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { useDataReload } from '@/src/hooks/useDataReload';
+import { locationPermissionsService } from '@/src/services/LocationPermissionsService';
 import { routineService } from '@/src/services/RoutineService';
 import { SocialComparisonEntry, SocialFriend, SocialInboxItem, SocialLeaderboardEntry, SocialProfile, SocialSearchUser, SocialService } from '@/src/services/SocialService';
 import { useAuthStore } from '@/src/store/authStore';
@@ -7,7 +8,7 @@ import { confirm } from '@/src/store/confirmStore';
 import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
-import { CalendarDays, CheckCircle, ChevronDown, ChevronUp, Copy, Dumbbell, Flame, Globe, Info, Lock as LockIcon, Scale, Settings, Shield as ShieldIcon, Trophy, UserCheck, UserMinus as UserMinusIcon, XCircle, X as XIcon } from 'lucide-react-native';
+import { Award, CalendarDays, CheckCircle, ChevronDown, ChevronUp, CloudRain, Copy, Dumbbell, Flame, Globe, Info, Lock as LockIcon, RefreshCcw, Scale, Settings, Shield as ShieldIcon, TrendingUp, Trophy, UserCheck, UserMinus as UserMinusIcon, XCircle, X as XIcon, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -55,6 +56,10 @@ export default function SocialTab() {
     const [profileSaving, setProfileSaving] = useState(false);
     const [trainingDays, setTrainingDays] = useState<number[]>([]);
     const [isGoalsExpanded, setIsGoalsExpanded] = useState(false);
+    const [isScoreModalVisible, setIsScoreModalVisible] = useState(false);
+    const [isEventModalVisible, setIsEventModalVisible] = useState(false);
+    const [isWeatherModalVisible, setIsWeatherModalVisible] = useState(false);
+    const [refreshingLocation, setRefreshingLocation] = useState(false);
 
     const authState = useAuthStore();
 
@@ -68,7 +73,26 @@ export default function SocialTab() {
                 SocialService.getInbox(),
                 SocialService.getAnalytics(),
             ]);
-            setProfile(prof);
+            setProfile({
+                ...prof,
+                // Mock bonos para demostración inmediata del sistema visual
+                activeEvent: prof.activeEvent || {
+                    id: 'iron_weekend_xp',
+                    title: 'Iron Weekend XP',
+                    description: '¡Doble puntuación en todos tus entrenamientos este fin de semana! Escala puestos en el ranking más rápido que nunca.',
+                    multiplier: 2,
+                    startDate: new Date().toISOString(),
+                    endDate: new Date(Date.now() + 87400000).toISOString(),
+                    type: 'xp_boost'
+                },
+                weatherBonus: prof.weatherBonus || {
+                    location: 'Buenos Aires',
+                    condition: 'Lluvia Moderada',
+                    temperature: 14,
+                    multiplier: 1.5,
+                    isActive: true
+                }
+            });
             setFriends(fr);
             setInbox(inb);
             setLeaderboard(lb);
@@ -102,6 +126,53 @@ export default function SocialTab() {
         if (profile?.id) {
             await Clipboard.setStringAsync(profile.id);
             confirm.success('Copiado', 'Tu ID ha sido copiado al portapapeles. Compartilo con un amigo.');
+        }
+    };
+
+    const handleRefreshLocation = async () => {
+        try {
+            setRefreshingLocation(true);
+            const location = await locationPermissionsService.getCurrentLocation();
+            if (location) {
+                const updatedBonus = await SocialService.updateWeatherBonus(
+                    location.lat,
+                    location.lon,
+                    location.city
+                ).catch(err => {
+                    console.error('[SocialService] Weather update failed:', err);
+                    return null;
+                });
+
+                if (updatedBonus) {
+                    if (profile) {
+                        setProfile({
+                            ...profile,
+                            weatherBonus: updatedBonus
+                        });
+                    }
+                    confirm.success('Ubicación Actualizada', `Se detectó: ${location.city || 'Tu ciudad'}`);
+                } else {
+                    // Si falló la API, aplicamos fallback pero informamos al usuario
+                    if (profile) {
+                        setProfile({
+                            ...profile,
+                            weatherBonus: {
+                                location: location.city || 'Desconocida',
+                                condition: 'Cielo Despejado',
+                                temperature: 20,
+                                multiplier: 1.0,
+                                isActive: false
+                            }
+                        });
+                    }
+                    confirm.error('Error de Sincronización', 'No se pudo obtener el clima del servidor. Se usará clima despejado por defecto.');
+                }
+            }
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : 'Error al obtener ubicación';
+            confirm.error('Error de GPS', msg);
+        } finally {
+            setRefreshingLocation(false);
         }
     };
 
@@ -255,21 +326,7 @@ export default function SocialTab() {
     };
 
     const handleShowScoreInfo = () => {
-        confirm.info(
-            'Sistema IronScore',
-            `Tu puntaje es acumulativo, no se reinicia ni se pierde:\n\n` +
-            `- Completar entrenamiento: +20 pts\n` +
-            `- Día extra sobre tu meta semanal: +10 pts (máx. 2/semana)\n` +
-            `- Romper PR (normal): +10 pts\n` +
-            `- Romper PR Big 3: +25 pts\n` +
-            `- Voluntad de Hierro (clima adverso): +15 pts\n\n` +
-            `Multiplicador por racha semanal:\n` +
-            `- Semanas 1-2: x1.00\n` +
-            `- Semanas 3-4: x1.10\n` +
-            `- Semanas 5-9: x1.25\n` +
-            `- Semana 10+: x1.50\n\n` +
-            `Tus días de entrenamiento configurados influyen en la racha sin penalizarte los días libres.`
-        );
+        setIsScoreModalVisible(true);
     };
 
     const handleToggleTrainingDay = async (dayId: number) => {
@@ -428,10 +485,40 @@ export default function SocialTab() {
             >
                 {profile && (
                     <View style={styles.profileCard}>
-                        <Text style={styles.profileName}>{profile.displayName}</Text>
-                        {profile.username && (
-                            <Text style={styles.profileUsername}>@{profile.username}</Text>
-                        )}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.profileName}>{profile.displayName}</Text>
+                                {profile.username && (
+                                    <Text style={styles.profileUsername}>@{profile.username}</Text>
+                                )}
+                            </View>
+
+                            {(profile.activeEvent || profile.weatherBonus?.isActive) && (
+                                <View style={styles.bonusColumn}>
+                                    {profile.activeEvent && (
+                                        <TouchableOpacity
+                                            style={styles.eventBadge}
+                                            onPress={() => setIsEventModalVisible(true)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Zap size={10} color={Colors.iron[950]} fill={Colors.iron[950]} />
+                                            <Text style={styles.eventBadgeText}>Evento {profile.activeEvent.multiplier}x</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {profile.weatherBonus?.isActive && (
+                                        <TouchableOpacity
+                                            style={styles.weatherBadge}
+                                            onPress={() => setIsWeatherModalVisible(true)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <CloudRain size={10} color={Colors.white} />
+                                            <Text style={styles.weatherBadgeText}>Voluntad de Hierro</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            )}
+                        </View>
+
                         <Text style={styles.profileStats}>Rutinas compartidas: {profile.shareStats || 0}</Text>
                         <View style={styles.profileMetaRow}>
                             <View style={styles.profileVisibilityBadge}>
@@ -443,6 +530,7 @@ export default function SocialTab() {
                                 <Text style={styles.profileEditBtnText}>Editar Perfil</Text>
                             </TouchableOpacity>
                         </View>
+
                         <TouchableOpacity style={styles.idBox} onPress={handleCopyId}>
                             <Text style={styles.idText} numberOfLines={1} ellipsizeMode="middle">ID: {profile.id}</Text>
                             <Copy size={16} color={Colors.iron[500]} />
@@ -712,8 +800,8 @@ export default function SocialTab() {
                                         return (
                                             <View key={item.id} style={styles.activityRow}>
                                                 <View style={styles.activityHeader}>
-                                                    <View style={[styles.activityIconBox, isPr ? { backgroundColor: withAlpha(Colors.yellow, '30') } : {}]}>
-                                                        {isPr ? <Trophy size={18} color={Colors.yellow} /> : isRoutineShared ? <Globe size={18} color={Colors.primary.DEFAULT} /> : <Dumbbell size={18} color={Colors.iron[400]} />}
+                                                    <View style={[styles.activityIconBox, isPr ? { backgroundColor: withAlpha(Colors.yellow, '30') } : (isRoutineShared ? { backgroundColor: withAlpha(Colors.primary.DEFAULT, '30') } : { backgroundColor: withAlpha(Colors.primary.DEFAULT, '15') })]}>
+                                                        {isPr ? <Trophy size={18} color={Colors.yellow} /> : isRoutineShared ? <Globe size={18} color={Colors.primary.DEFAULT} /> : <Dumbbell size={18} color={Colors.primary.DEFAULT} />}
                                                     </View>
                                                     <View style={{ flex: 1 }}>
                                                         <Text style={styles.activityUser}>@{item.senderUsername || item.senderName}</Text>
@@ -732,7 +820,7 @@ export default function SocialTab() {
                                                         onPress={() => !isOwnActivity && handleToggleKudo(item.id)}
                                                         disabled={!!isOwnActivity}
                                                     >
-                                                        <Flame size={18} color={item.hasKudoed ? Colors.yellow : Colors.iron[400]} fill={item.hasKudoed ? Colors.yellow : "transparent"} />
+                                                        <Flame size={18} color={item.hasKudoed ? Colors.yellow : Colors.iron[600]} fill={item.hasKudoed ? Colors.yellow : "transparent"} />
                                                         <Text style={[styles.kudoText, item.hasKudoed && styles.kudoTextActive]}>
                                                             {item.kudosCount || 0} Kudos
                                                         </Text>
@@ -928,6 +1016,212 @@ export default function SocialTab() {
                         </View>
                     </Pressable>
                 </Pressable>
+            </Modal>
+
+            {/* Modal: IronScore System Info */}
+            <Modal
+                visible={isScoreModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setIsScoreModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsScoreModalVisible(false)} />
+                    <View style={[styles.modalCard, { height: '80%', maxHeight: '85%' }]}>
+                        <View style={styles.modalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <Award size={20} color={Colors.primary.DEFAULT} />
+                                <Text style={styles.modalTitle}>Sistema IronScore</Text>
+                            </View>
+                            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsScoreModalVisible(false)}>
+                                <XIcon size={16} color={Colors.iron[600]} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView
+                            style={{ flex: 1 }}
+                            contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+                            showsVerticalScrollIndicator={true}
+                        >
+                            <Text style={styles.infoSectionTitle}>Nueva Economía de Puntos</Text>
+                            <Text style={styles.infoSectionDesc}>
+                                Los puntos premian el esfuerzo real y NO se reinician nunca ni se pierden.
+                            </Text>
+
+                            <View style={styles.infoPointRow}>
+                                <CheckCircle size={18} color={Colors.green} />
+                                <Text style={styles.infoPointText}>Completar Entrenamiento</Text>
+                                <Text style={styles.infoPointValue}>+20 pts</Text>
+                            </View>
+
+                            <View style={styles.infoPointRow}>
+                                <TrendingUp size={18} color={Colors.primary.DEFAULT} />
+                                <Text style={styles.infoPointText}>Día Extra (Meta Semanal)</Text>
+                                <Text style={styles.infoPointValue}>+10 pts</Text>
+                            </View>
+
+                            <View style={styles.infoPointRow}>
+                                <Trophy size={18} color={Colors.yellow} />
+                                <Text style={styles.infoPointText}>Romper PR (Normal)</Text>
+                                <Text style={styles.infoPointValue}>+10 pts</Text>
+                            </View>
+
+                            <View style={styles.infoPointRow}>
+                                <Award size={18} color={Colors.yellow} />
+                                <Text style={styles.infoPointText}>Romper PR (Big 3)</Text>
+                                <Text style={styles.infoPointValue}>+25 pts</Text>
+                            </View>
+
+                            <View style={styles.infoPointRow}>
+                                <CloudRain size={18} color={Colors.blue} />
+                                <Text style={styles.infoPointText}>Voluntad de Hierro (Clima)</Text>
+                                <Text style={styles.infoPointValue}>+15 pts</Text>
+                            </View>
+
+                            <View style={styles.infoDivider} />
+
+                            <Text style={styles.infoSectionTitle}>Sistema de Rachas (Semanas)</Text>
+                            <Text style={styles.infoSectionDesc}>
+                                El multiplicador aumenta si cumplís tu meta de días configurada semanalmente.
+                            </Text>
+
+                            <View style={styles.infoStreakRow}>
+                                <Text style={styles.infoStreakLabel}>Semanas 1-2</Text>
+                                <Text style={styles.infoStreakValue}>x1.00</Text>
+                            </View>
+                            <View style={styles.infoStreakRow}>
+                                <Text style={styles.infoStreakLabel}>Semanas 3-4</Text>
+                                <Text style={styles.infoStreakValue}>x1.10</Text>
+                            </View>
+                            <View style={styles.infoStreakRow}>
+                                <Text style={styles.infoStreakLabel}>Semanas 5-9</Text>
+                                <Text style={styles.infoStreakValue}>x1.25</Text>
+                            </View>
+                            <View style={[styles.infoStreakRow, styles.infoStreakBestia]}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Flame size={14} color={Colors.red} />
+                                    <Text style={[styles.infoStreakLabel, { color: Colors.white }]}>Semanas 10+ (Modo Bestia)</Text>
+                                </View>
+                                <Text style={[styles.infoStreakValue, { color: Colors.white }]}>x1.50</Text>
+                            </View>
+
+                            <View style={styles.infoDivider} />
+
+                            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+                                <View style={styles.infoIconBox}>
+                                    <Zap size={20} color={Colors.yellow} fill={Colors.yellow} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.infoSectionTitle}>Eventos Globales</Text>
+                                    <Text style={styles.infoSectionDesc}>
+                                        Multiplicadores de experiencia activados por el administrador durante fechas especiales.
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.infoFooterBox}>
+                                <Info size={14} color={Colors.iron[600]} />
+                                <Text style={styles.infoFooterText}>
+                                    El puntaje se calcula en tiempo real al finalizar cada entrenamiento. Los PRs se validan contra tu historial completo.
+                                </Text>
+                            </View>
+
+                            <View style={{ height: 20 }} />
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal: Global Event Details */}
+            <Modal
+                visible={isEventModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setIsEventModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsEventModalVisible(false)} />
+                    <View style={styles.detailModalCard}>
+                        <View style={[styles.detailIconCircle, { borderColor: Colors.yellow, backgroundColor: withAlpha(Colors.yellow, '15') }]}>
+                            <Zap size={32} color={Colors.yellow} fill={Colors.yellow} />
+                        </View>
+                        <Text style={styles.detailTitle}>{profile?.activeEvent?.title || 'Evento Especial'}</Text>
+                        <Text style={styles.detailDesc}>{profile?.activeEvent?.description || '¡Multiplicador de experiencia activo por tiempo limitado!'}</Text>
+
+                        <View style={styles.detailInfoGrid}>
+                            <View style={styles.detailInfoRow}>
+                                <Text style={styles.detailInfoLabel}>Multiplicador</Text>
+                                <Text style={[styles.detailInfoValue, { color: Colors.yellow }]}>{profile?.activeEvent?.multiplier}x</Text>
+                            </View>
+                            <View style={styles.detailInfoRow}>
+                                <Text style={styles.detailInfoLabel}>Finaliza el</Text>
+                                <Text style={styles.detailInfoValue}>
+                                    {profile?.activeEvent ? new Date(profile.activeEvent.endDate).toLocaleDateString() : '--/--/--'}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <TouchableOpacity style={styles.detailCloseBtn} onPress={() => setIsEventModalVisible(false)}>
+                            <Text style={styles.detailCloseText}>Entendido</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal: Weather Bonus Details */}
+            <Modal
+                visible={isWeatherModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setIsWeatherModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsWeatherModalVisible(false)} />
+                    <View style={styles.detailModalCard}>
+                        <View style={[styles.detailIconCircle, { borderColor: Colors.primary.DEFAULT, backgroundColor: withAlpha(Colors.primary.DEFAULT, '15') }]}>
+                            <CloudRain size={32} color={Colors.primary.DEFAULT} />
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                            <Text style={styles.detailTitle}>Voluntad de Hierro</Text>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.refreshBadgeBtn}
+                            onPress={handleRefreshLocation}
+                            disabled={refreshingLocation}
+                        >
+                            {refreshingLocation ? (
+                                <ActivityIndicator size="small" color={Colors.primary.DEFAULT} />
+                            ) : (
+                                <>
+                                    <RefreshCcw size={14} color={Colors.primary.DEFAULT} />
+                                    <Text style={styles.refreshBadgeText}>Recomprobar Ubicación</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                        <Text style={styles.detailDesc}>
+                            ¡Has vencido a los elementos! Entrenar con clima adverso te otorga puntos extra por tu disciplina inquebrantable.
+                        </Text>
+
+                        <View style={styles.detailInfoGrid}>
+                            <View style={styles.detailInfoRow}>
+                                <Text style={styles.detailInfoLabel}>Ubicación</Text>
+                                <Text style={styles.detailInfoValue}>{profile?.weatherBonus?.location}</Text>
+                            </View>
+                            <View style={styles.detailInfoRow}>
+                                <Text style={styles.detailInfoLabel}>Clima</Text>
+                                <Text style={styles.detailInfoValue}>{profile?.weatherBonus?.condition}</Text>
+                            </View>
+                            <View style={styles.detailInfoRow}>
+                                <Text style={styles.detailInfoLabel}>Bonus</Text>
+                                <Text style={[styles.detailInfoValue, { color: Colors.primary.DEFAULT }]}>+15 pts</Text>
+                            </View>
+                        </View>
+
+                        <TouchableOpacity style={styles.detailCloseBtn} onPress={() => setIsWeatherModalVisible(false)}>
+                            <Text style={styles.detailCloseText}>¡A darle!</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
             </Modal>
         </SafeAreaWrapper>
     );
@@ -1415,7 +1709,7 @@ const styles = StyleSheet.create({
     },
     premiumHeader: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         padding: 16,
         paddingBottom: 8,
         gap: 12,
@@ -1480,8 +1774,8 @@ const styles = StyleSheet.create({
         borderColor: Colors.iron[600],
     },
     premiumBtnTextSecondary: {
-        color: Colors.iron[700],
-        fontWeight: '800',
+        color: Colors.iron[950],
+        fontWeight: '900',
         fontSize: 13,
         textTransform: 'uppercase',
     },
@@ -1536,8 +1830,10 @@ const styles = StyleSheet.create({
     },
     activityFooter: {
         flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         borderTopWidth: 1,
-        borderColor: Colors.iron[800],
+        borderColor: Colors.iron[700],
         paddingTop: 12,
         marginTop: 4,
     },
@@ -1559,9 +1855,9 @@ const styles = StyleSheet.create({
         opacity: 0.45,
     },
     kudoText: {
-        color: Colors.iron[700],
+        color: Colors.iron[600],
         fontSize: 13,
-        fontWeight: '700',
+        fontWeight: '900',
     },
     kudoTextActive: {
         color: Colors.yellow,
@@ -1864,5 +2160,217 @@ const styles = StyleSheet.create({
     },
     dayChipTextActive: {
         color: Colors.white,
+    },
+    // Score Info Modal Styles
+    infoSectionTitle: {
+        fontSize: 16,
+        fontWeight: '900',
+        color: Colors.iron[950],
+        marginBottom: 4,
+    },
+    infoSectionDesc: {
+        fontSize: 13,
+        color: Colors.iron[500],
+        marginBottom: 16,
+        lineHeight: 18,
+    },
+    infoPointRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderColor: Colors.border,
+        gap: 12,
+    },
+    infoPointText: {
+        flex: 1,
+        fontSize: 15,
+        color: Colors.iron[950],
+        fontWeight: '900',
+    },
+    infoPointValue: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: Colors.primary.DEFAULT,
+    },
+    infoDivider: {
+        height: 1,
+        backgroundColor: Colors.border,
+        marginVertical: 20,
+    },
+    infoStreakRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: Colors.iron[900],
+        borderRadius: 8,
+        marginBottom: 6,
+    },
+    infoStreakBestia: {
+        backgroundColor: Colors.iron[950],
+        borderWidth: 1,
+        borderColor: withAlpha(Colors.red, '40'),
+    },
+    infoStreakLabel: {
+        fontSize: 13,
+        color: Colors.iron[950],
+        fontWeight: '700',
+    },
+    infoStreakValue: {
+        fontSize: 13,
+        fontWeight: '900',
+        color: Colors.primary.DEFAULT,
+    },
+    infoIconBox: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: Colors.iron[950],
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    infoFooterBox: {
+        flexDirection: 'row',
+        backgroundColor: Colors.iron[900],
+        padding: 12,
+        borderRadius: 10,
+        gap: 10,
+        borderWidth: 1,
+        borderColor: Colors.iron[800],
+    },
+    infoFooterText: {
+        flex: 1,
+        fontSize: 11,
+        color: Colors.iron[600],
+        lineHeight: 16,
+        fontStyle: 'italic',
+    },
+    bonusColumn: {
+        alignItems: 'flex-end',
+        gap: 6,
+    },
+    refreshBadgeBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: withAlpha(Colors.primary.DEFAULT, '10'),
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: withAlpha(Colors.primary.DEFAULT, '20'),
+    },
+    refreshBadgeText: {
+        fontSize: 12,
+        color: Colors.primary.DEFAULT,
+        fontWeight: 'bold',
+    },
+    eventBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.yellow,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+        gap: 6,
+    },
+    eventBadgeText: {
+        color: Colors.iron[950],
+        fontSize: 11,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+    },
+    weatherBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.primary.DEFAULT,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+        gap: 6,
+    },
+    weatherBadgeText: {
+        color: Colors.white,
+        fontSize: 11,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+    },
+    detailModalCard: {
+        width: '88%',
+        backgroundColor: Colors.surface,
+        borderRadius: 28,
+        padding: 24,
+        borderWidth: 1,
+        borderColor: Colors.border,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    detailIconCircle: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+        borderWidth: 2,
+    },
+    detailTitle: {
+        fontSize: 22,
+        fontWeight: '900',
+        color: Colors.iron[950],
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    detailDesc: {
+        fontSize: 14,
+        color: Colors.iron[600],
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 24,
+    },
+    detailInfoGrid: {
+        width: '100%',
+        backgroundColor: Colors.iron[900],
+        borderRadius: 20,
+        padding: 20,
+        gap: 14,
+    },
+    detailInfoRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    detailInfoLabel: {
+        fontSize: 11,
+        color: Colors.iron[600],
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    detailInfoValue: {
+        fontSize: 15,
+        color: Colors.iron[950],
+        fontWeight: '900',
+    },
+    detailCloseBtn: {
+        marginTop: 24,
+        width: '100%',
+        paddingVertical: 16,
+        borderRadius: 16,
+        backgroundColor: Colors.iron[950],
+        alignItems: 'center',
+    },
+    detailCloseText: {
+        color: Colors.white,
+        fontSize: 14,
+        fontWeight: '900',
+        textTransform: 'uppercase',
     },
 });
