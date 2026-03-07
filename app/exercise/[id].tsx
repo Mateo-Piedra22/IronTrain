@@ -13,7 +13,7 @@ import { ExerciseService } from '@/src/services/ExerciseService';
 import { UnitService } from '@/src/services/UnitService';
 import { workoutService } from '@/src/services/WorkoutService';
 import { useTimerStore } from '@/src/store/timerStore';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { Exercise, WorkoutSet } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { formatTimeSeconds } from '@/src/utils/time';
@@ -626,8 +626,8 @@ export default function ExerciseDetailScreen() {
         return (
             <IronCard className="mb-4">
                 {workoutLocked && (
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#ef444410', borderRadius: 12, borderWidth: 1, borderColor: '#ef444425', padding: 12, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: '#ef4444' }}>
-                        <Info size={14} color="#ef4444" style={{ marginRight: 8, marginTop: 2 }} />
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: withAlpha(Colors.red, '10'), borderRadius: 12, borderWidth: 1, borderColor: withAlpha(Colors.red, '25'), padding: 12, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: Colors.red }}>
+                        <Info size={14} color={Colors.red} style={{ marginRight: 8, marginTop: 2 }} />
                         <View style={{ flex: 1 }}>
                             <Text style={{ color: Colors.iron[950], fontWeight: '800', fontSize: 13 }}>Entrenamiento finalizado</Text>
                             <Text style={{ color: Colors.iron[400], fontSize: 11, marginTop: 2 }}>Para editar, reabre el entrenamiento desde su pantalla.</Text>
@@ -732,7 +732,7 @@ export default function ExerciseDetailScreen() {
                                     }
                                 })();
                                 return (
-                                    <View key={`${s.id}-${idx}`} style={{ backgroundColor: Colors.surface, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
+                                    <View key={`${s.id}-${idx}`} style={{ backgroundColor: Colors.surface, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                                 <View style={{ backgroundColor: Colors.iron[200], paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: Colors.iron[300] }}>
@@ -809,7 +809,7 @@ export default function ExerciseDetailScreen() {
                     <View key={i} style={{ flexDirection: 'row', marginBottom: 16 }}>
                         {/* Left Date Column */}
                         <View style={{ width: 56, alignItems: 'center', marginRight: 12, paddingTop: 4 }}>
-                            <View style={{ backgroundColor: Colors.surface, borderRadius: 14, paddingHorizontal: 6, paddingVertical: 10, alignItems: 'center', width: '100%', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 }}>
+                            <View style={{ backgroundColor: Colors.surface, borderRadius: 14, paddingHorizontal: 6, paddingVertical: 10, alignItems: 'center', width: '100%', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 }}>
                                 <Text style={{ fontWeight: '900', color: Colors.iron[950], fontSize: 20 }}>{dateDisplay.day}</Text>
                                 <Text style={{ color: Colors.iron[500], fontSize: 9, textTransform: 'uppercase', fontWeight: '900', letterSpacing: 1, marginTop: 2 }}>{dateDisplay.month}</Text>
                             </View>
@@ -818,7 +818,7 @@ export default function ExerciseDetailScreen() {
 
                         {/* Right Content Card */}
                         <View style={{ flex: 1, paddingTop: 4 }}>
-                            <View style={{ padding: 16, backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
+                            <View style={{ padding: 16, backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottomWidth: 1, borderBottomColor: Colors.iron[200], paddingBottom: 12 }}>
                                     <Text style={{ fontSize: 12, color: Colors.iron[500], fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>Sesión completada</Text>
                                     {workoutId && (
@@ -1350,7 +1350,7 @@ export default function ExerciseDetailScreen() {
                 </View>
             ) : analysisTab === 'prs' ? (
                 <View style={{ gap: 16 }}>
-                    <View style={{ backgroundColor: Colors.surface, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }}>
+                    <View style={{ backgroundColor: Colors.surface, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: Colors.iron[200] }}>
                             <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: Colors.primary.DEFAULT + '15', justifyContent: 'center', alignItems: 'center' }}>
                                 <Trophy size={20} color={Colors.primary.DEFAULT} />
@@ -1417,8 +1417,8 @@ export default function ExerciseDetailScreen() {
                             accessibilityRole="button"
                             accessibilityLabel="Iniciar descanso"
                         >
-                            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14 }}>Iniciar descanso ({configService.get('defaultRestTimer')}s)</Text>
-                            <Timer size={18} color="#fff" />
+                            <Text style={{ color: Colors.white, fontWeight: '900', fontSize: 14 }}>Iniciar descanso ({configService.get('defaultRestTimer')}s)</Text>
+                            <Timer size={18} color={Colors.white} />
                         </TouchableOpacity>
 
                         <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -1480,11 +1480,11 @@ export default function ExerciseDetailScreen() {
                                     if (workoutLocked) { notify.info('Bloqueado', 'El entrenamiento finalizó. Para editar debés reabrirlo.'); return; }
                                     setWarmupVisible(true);
                                 }}
-                                style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: '#fbbf2415', borderWidth: 1, borderColor: '#fbbf2430', justifyContent: 'center', alignItems: 'center' }}
+                                style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: withAlpha(Colors.yellow, '15'), borderWidth: 1, borderColor: withAlpha(Colors.yellow, '30'), justifyContent: 'center', alignItems: 'center' }}
                                 accessibilityRole="button"
                                 accessibilityLabel="Abrir calculadora de calentamiento"
                             >
-                                <Zap size={16} color="#fbbf24" fill="#fbbf24" />
+                                <Zap size={16} color={Colors.yellow} fill={Colors.yellow} />
                             </TouchableOpacity>
                         )}
                     </View>
@@ -1492,10 +1492,10 @@ export default function ExerciseDetailScreen() {
             }} />
 
             {notes && (
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#fbbf2410', borderBottomWidth: 1, borderBottomColor: '#fbbf2425', padding: 12 }}>
-                    <View style={{ width: 3, height: '100%' as any, borderRadius: 2, backgroundColor: '#fbbf24', marginRight: 10, minHeight: 18 }} />
-                    <Info size={14} color="#fbbf24" style={{ marginTop: 1, marginRight: 8 }} />
-                    <Text style={{ color: '#fbbf24', fontWeight: '700', flex: 1, fontSize: 13, lineHeight: 18 }}>{notes}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: withAlpha(Colors.yellow, '10'), borderBottomWidth: 1, borderBottomColor: withAlpha(Colors.yellow, '25'), padding: 12 }}>
+                    <View style={{ width: 3, height: '100%' as any, borderRadius: 2, backgroundColor: Colors.yellow, marginRight: 10, minHeight: 18 }} />
+                    <Info size={14} color={Colors.yellow} style={{ marginTop: 1, marginRight: 8 }} />
+                    <Text style={{ color: Colors.yellow, fontWeight: '700', flex: 1, fontSize: 13, lineHeight: 18 }}>{notes}</Text>
                 </View>
             )}
 
@@ -1512,7 +1512,7 @@ export default function ExerciseDetailScreen() {
                         >
                             <Text style={{
                                 fontWeight: '800', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5,
-                                color: activeTab === tab ? '#fff' : Colors.iron[500]
+                                color: activeTab === tab ? Colors.white : Colors.iron[500]
                             }}>
                                 {tab === 'track' ? 'Registrar' : tab === 'history' ? 'Historial' : 'Análisis'}
                             </Text>

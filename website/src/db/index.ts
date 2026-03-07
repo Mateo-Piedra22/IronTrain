@@ -1,5 +1,6 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
+import * as schema from './schema';
 
 function normalizeDbUrl(rawUrl: string): string {
     try {
@@ -29,4 +30,4 @@ const pool = new Pool({
     connectionTimeoutMillis: 10_000,
 });
 
-export const db = drizzle({ client: pool });
+export const db = drizzle({ client: pool, schema });

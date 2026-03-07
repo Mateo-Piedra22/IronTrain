@@ -12,7 +12,7 @@ Construir un sistema de tema mantenible, escalable y social-ready para la app m�
 - Existen muchos usos directos de color en pantallas y componentes.
 - Se inició la base de Fase A con tipado de tokens y motor de patches.
 - Se corrigieron modales críticos para scroll/contraste y consistencia visual.
-- Inventario parcial de literales de color tras lotes 5 y 6: 265 ocurrencias en 51 archivos app/components/src.
+- Inventario parcial de literales de color tras lotes 7 y 8: 191 ocurrencias en 46 archivos app/components/src.
 
 ## Principios de Implementación
 - No romper flujo productivo: compatibilidad retroactiva mientras se migra.
@@ -110,6 +110,11 @@ Checklist de salida:
 - Modificado: `components/ExerciseFormModal.tsx`
 - Modificado: `components/TimerOverlay.tsx`
 - Modificado: `components/RestTimer.tsx`
+- Modificado: `app/exercise/[id].tsx`
+- Modificado: `components/CalculatorsModal.tsx`
+- Modificado: `components/CategoryManager.tsx`
+- Modificado: `components/BadgeSelectorModal.tsx`
+- Modificado: `components/ui/ColorPicker.tsx`
 - Modificado: `src/theme.ts`
 - Modificado: `src/theme-engine.ts`
 - Creado: `docs/plans/2026-03-07-app-theming-execution-plan.md`
@@ -119,7 +124,8 @@ Checklist de salida:
 - Cierre lote 3: 373 ocurrencias en 61 archivos.
 - Cierre lote 4: 311 ocurrencias en 58 archivos.
 - Cierre lote 5-6: 265 ocurrencias en 51 archivos.
-- Delta acumulado desde línea base: -276 ocurrencias y -18 archivos con literales directos.
+- Cierre lote 7-8: 191 ocurrencias en 46 archivos.
+- Delta acumulado desde línea base: -350 ocurrencias y -23 archivos con literales directos.
 
 ## Criterios de “Listo para Fase B”
 - Base de tokens tipada y estable.

@@ -1,4 +1,4 @@
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { Badge } from '@/src/types/db';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
@@ -30,7 +30,7 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
     const [isCreating, setIsCreating] = useState(false);
     const [editingBadge, setEditingBadge] = useState<Badge | null>(null);
     const [newName, setNewName] = useState('');
-    const [newColor, setNewColor] = useState('#3b82f6');
+    const [newColor, setNewColor] = useState(Colors.blue);
     const [newGroup, setNewGroup] = useState<'equipamiento' | 'variacion' | 'posicion' | 'otro'>('otro');
     const [showColorPicker, setShowColorPicker] = useState(false);
 
@@ -197,7 +197,7 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
                                 <View style={styles.formFooter}>
                                     {editingBadge && (
                                         <TouchableOpacity onPress={() => handleDeleteBadge(editingBadge.id)} style={styles.deleteBtn}>
-                                            <Trash2 size={18} color="#ef4444" />
+                                            <Trash2 size={18} color={Colors.red} />
                                         </TouchableOpacity>
                                     )}
                                     <TouchableOpacity
@@ -226,13 +226,13 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
                                         onPress={() => {
                                             setIsCreating(true);
                                             setNewName('');
-                                            setNewColor('#3b82f6');
+                                            setNewColor(Colors.blue);
                                             setNewGroup('otro');
                                             LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                                         }}
                                         style={styles.addBtn}
                                     >
-                                        <Plus size={20} color="#fff" />
+                                        <Plus size={20} color={Colors.white} />
                                     </TouchableOpacity>
                                 </View>
 
@@ -302,7 +302,7 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
 }
 
 const styles = StyleSheet.create({
-    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+    overlay: { flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center' },
     centeredView: { width: '100%', maxWidth: 360, padding: 16 },
     modalContent: {
         backgroundColor: Colors.surface,
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
         borderColor: Colors.iron[300],
         overflow: 'hidden',
         elevation: 10,
-        shadowColor: '#000',
+        shadowColor: ThemeFx.shadowColor,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.2,
         shadowRadius: 20,
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
 
     footer: { padding: 16, borderTopWidth: 1, borderTopColor: Colors.iron[100] },
     confirmBtn: { backgroundColor: Colors.primary.DEFAULT, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-    confirmBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+    confirmBtnText: { color: Colors.white, fontWeight: '800', fontSize: 15 },
 
     // Form View
     formContent: { padding: 20 },
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
     },
     groupPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     groupChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: Colors.iron[100], borderWidth: 1, borderColor: Colors.iron[200] },
-    groupChipActive: { backgroundColor: Colors.primary.DEFAULT + '12', borderColor: Colors.primary.DEFAULT },
+    groupChipActive: { backgroundColor: withAlpha(Colors.primary.DEFAULT, '12'), borderColor: Colors.primary.DEFAULT },
     groupChipText: { color: Colors.iron[500], fontSize: 11, fontWeight: '700' },
     groupChipTextActive: { color: Colors.primary.DEFAULT },
     colorSelector: {
@@ -384,12 +384,12 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.iron[200]
     },
-    colorDot: { width: 24, height: 24, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
+    colorDot: { width: 24, height: 24, borderRadius: 12, borderWidth: 1, borderColor: withAlpha(Colors.black, '1A') },
     colorHex: { color: Colors.iron[950], fontWeight: '700', fontSize: 14 },
     previewContainer: { marginTop: 20, alignItems: 'center', backgroundColor: Colors.iron[50], padding: 16, borderRadius: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: Colors.iron[300] },
     formFooter: { flexDirection: 'row', gap: 10, marginTop: 24 },
-    deleteBtn: { width: 50, height: 50, borderRadius: 14, backgroundColor: '#ef444415', borderWidth: 1, borderColor: '#ef444430', justifyContent: 'center', alignItems: 'center' },
+    deleteBtn: { width: 50, height: 50, borderRadius: 14, backgroundColor: withAlpha(Colors.red, '15'), borderWidth: 1, borderColor: withAlpha(Colors.red, '30'), justifyContent: 'center', alignItems: 'center' },
     saveBtn: { flex: 1, height: 50, backgroundColor: Colors.primary.DEFAULT, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
     disabledBtn: { opacity: 0.5 },
-    saveBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 }
+    saveBtnText: { color: Colors.white, fontWeight: '800', fontSize: 15 }
 });

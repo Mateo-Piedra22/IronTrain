@@ -158,7 +158,14 @@ export async function POST(req: NextRequest) {
                     let existingRecord;
                     if (recordId) {
                         const queryKey = tableName.replace(/_([a-z])/g, (g: string) => g[1].toUpperCase());
-                        existingRecord = await (trx.query as any)[queryKey].findFirst({ where: eq(pkCol, recordId) });
+                        // Defensive check for Drizzle query API
+                        if (trx.query && (trx.query as any)[queryKey]) {
+                            existingRecord = await (trx.query as any)[queryKey].findFirst({ where: eq(pkCol, recordId) });
+                        } else {
+                            // Fallback to standard select if query API is unavailable
+                            const results = await trx.select().from(tableSchema).where(eq(pkCol, recordId)).limit(1);
+                            existingRecord = results[0];
+                        }
                     }
                     if (existingRecord) {
                         const ownerId = getOwnerIdForRecord(tableName, existingRecord as Record<string, unknown>);
@@ -259,9 +266,14 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ success: true, processed: processedIds.length, results });
 
-    } catch (error: any) {
-        const message = error instanceof Error ? error.message : 'Internal server error';
-        console.error('Fatal Sync Push Error:', message);
-        return NextResponse.json({ error: 'Internal server error', message }, { status: 500 });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown fatal error';
+        const stack = error instanceof Error ? error.stack : undefined;
+        console.error('Fatal Sync Push Error:', message, stack);
+        return NextResponse.json({
+            error: 'Internal server error',
+            message: message,
+            stack: process.env.NODE_ENV === 'development' ? stack : undefined
+        }, { status: 500 });
     }
 }

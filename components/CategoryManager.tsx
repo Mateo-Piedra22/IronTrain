@@ -1,6 +1,6 @@
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { Pencil, Plus, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
@@ -18,7 +18,7 @@ export function CategoryManager() {
     const [modalVisible, setModalVisible] = useState(false);
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [categoryName, setCategoryName] = useState('');
-    const [selectedColor, setSelectedColor] = useState('#3b82f6');
+    const [selectedColor, setSelectedColor] = useState(Colors.blue);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const insets = useSafeAreaInsets();
     const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
@@ -94,11 +94,11 @@ export function CategoryManager() {
         if (category) {
             setEditingCategory(category);
             setCategoryName(category.name);
-            setSelectedColor(category.color || '#3b82f6');
+            setSelectedColor(category.color || Colors.blue);
         } else {
             setEditingCategory(null);
             setCategoryName('');
-            setSelectedColor('#3b82f6');
+            setSelectedColor(Colors.blue);
         }
         setModalVisible(true);
     };
@@ -119,16 +119,16 @@ export function CategoryManager() {
                             flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                             padding: 16, marginBottom: 12, backgroundColor: Colors.surface,
                             borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300],
-                            borderLeftWidth: 4, borderLeftColor: item.color || '#3b82f6',
-                            elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6,
+                            borderLeftWidth: 4, borderLeftColor: item.color || Colors.blue,
+                            elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6,
                         }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                                 <View style={{
                                     width: 36, height: 36, borderRadius: 10,
-                                    backgroundColor: (item.color || '#3b82f6') + '20',
+                                    backgroundColor: withAlpha(item.color || Colors.blue, '20'),
                                     justifyContent: 'center', alignItems: 'center',
                                 }}>
-                                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: item.color || '#3b82f6' }} />
+                                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: item.color || Colors.blue }} />
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
@@ -156,11 +156,11 @@ export function CategoryManager() {
                                 {!item.is_system && (
                                     <TouchableOpacity
                                         onPress={() => handleDelete(item)}
-                                        style={{ padding: 8, backgroundColor: '#ef444412', borderRadius: 10, borderWidth: 1, borderColor: '#ef444425' }}
+                                        style={{ padding: 8, backgroundColor: withAlpha(Colors.red, '12'), borderRadius: 10, borderWidth: 1, borderColor: withAlpha(Colors.red, '25') }}
                                         accessibilityRole="button"
                                         accessibilityLabel={`Eliminar categoría ${item.name}`}
                                     >
-                                        <Trash2 size={14} color="#ef4444" />
+                                        <Trash2 size={14} color={Colors.red} />
                                     </TouchableOpacity>
                                 )}
                             </View>
@@ -180,16 +180,16 @@ export function CategoryManager() {
                 accessibilityRole="button"
                 accessibilityLabel="Crear categoría"
             >
-                <Plus color="white" size={24} />
+                <Plus color={Colors.white} size={24} />
             </TouchableOpacity>
 
             {modalVisible && (
                 <Modal transparent visible animationType="fade" onRequestClose={() => setModalVisible(false)}>
-                    <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 }} edges={['top', 'bottom', 'left', 'right']}>
+                    <SafeAreaView style={{ flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center', padding: 16 }} edges={['top', 'bottom', 'left', 'right']}>
                         <View style={{
                             backgroundColor: Colors.surface, width: '100%', maxWidth: 360,
                             borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.iron[700],
-                            elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24,
+                            elevation: 8, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24,
                         }}>
                             <Text style={{ fontSize: 20, fontWeight: '900', color: Colors.iron[950], marginBottom: 20, letterSpacing: -0.3 }}>
                                 {editingCategory ? 'Editar categoría' : 'Nueva categoría'}

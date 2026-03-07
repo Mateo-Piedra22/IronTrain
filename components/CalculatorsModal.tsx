@@ -70,7 +70,7 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
                             <Text style={s.headerSubtitle}>Herramientas de entrenamiento</Text>
                         </View>
                         <TouchableOpacity onPress={onClose} style={s.closeBtn} accessibilityRole="button" accessibilityLabel="Cerrar calculadoras">
-                            <X color="white" size={20} />
+                            <X color={Colors.white} size={20} />
                         </TouchableOpacity>
                     </View>
 
@@ -133,16 +133,16 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
                                         <Text style={[s.tableHeaderText, { flex: 1.5, textAlign: 'right' }]}>PESO ({unit})</Text>
                                     </View>
                                     {[
-                                        { pct: 1.00, reps: '1', zone: 'MÁXIMA', color: '#ef4444' },
-                                        { pct: 0.95, reps: '2', zone: 'MÁXIMA', color: '#ef4444' },
-                                        { pct: 0.90, reps: '4', zone: 'FUERZA', color: '#3b82f6' },
-                                        { pct: 0.85, reps: '6', zone: 'FUERZA', color: '#3b82f6' },
-                                        { pct: 0.80, reps: '8', zone: 'HIPERTROFIA', color: '#10b981' },
-                                        { pct: 0.75, reps: '10', zone: 'HIPERTROFIA', color: '#10b981' },
-                                        { pct: 0.70, reps: '12', zone: 'RESISTENCIA', color: '#8b5cf6' },
-                                        { pct: 0.65, reps: '16', zone: 'RESISTENCIA', color: '#8b5cf6' },
-                                        { pct: 0.60, reps: '20', zone: 'TÉCNICA', color: '#6b7280' },
-                                        { pct: 0.50, reps: '30+', zone: 'TÉCNICA', color: '#6b7280' },
+                                        { pct: 1.00, reps: '1', zone: 'MÁXIMA', color: Colors.red },
+                                        { pct: 0.95, reps: '2', zone: 'MÁXIMA', color: Colors.red },
+                                        { pct: 0.90, reps: '4', zone: 'FUERZA', color: Colors.blue },
+                                        { pct: 0.85, reps: '6', zone: 'FUERZA', color: Colors.blue },
+                                        { pct: 0.80, reps: '8', zone: 'HIPERTROFIA', color: Colors.green },
+                                        { pct: 0.75, reps: '10', zone: 'HIPERTROFIA', color: Colors.green },
+                                        { pct: 0.70, reps: '12', zone: 'RESISTENCIA', color: Colors.primary.light },
+                                        { pct: 0.65, reps: '16', zone: 'RESISTENCIA', color: Colors.primary.light },
+                                        { pct: 0.60, reps: '20', zone: 'TÉCNICA', color: Colors.iron[500] },
+                                        { pct: 0.50, reps: '30+', zone: 'TÉCNICA', color: Colors.iron[500] },
                                     ].map((row, idx, arr) => {
                                         const weight = CalculatorService.roundToIncrement(oneRm * row.pct, rounding);
                                         return (
@@ -180,7 +180,7 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
                                     {warmup.length > 0 ? warmup.map((ws, idx) => (
                                         <View key={`${ws.weight}-${idx}`} style={[s.tableRow, idx < warmup.length - 1 && s.tableRowBorder]}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#eab308' }} />
+                                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.yellow }} />
                                                 <Text style={s.tableWeightText}>{ws.weight} {unit}</Text>
                                             </View>
                                             <Text style={s.tablePct}>{ws.reps} reps</Text>
@@ -259,7 +259,7 @@ const s = StyleSheet.create({
     tab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
     tabActive: { backgroundColor: Colors.primary.DEFAULT },
     tabText: { fontWeight: '800', fontSize: 13, color: Colors.iron[500] },
-    tabTextActive: { color: '#fff' },
+    tabTextActive: { color: Colors.white },
     sectionTitle: { fontSize: 17, fontWeight: '900', color: Colors.iron[950], marginBottom: 12, letterSpacing: -0.3 },
     card: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], padding: 20, marginBottom: 20 },
     cardLabel: { fontSize: 10, fontWeight: '800', color: Colors.iron[500], textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
@@ -267,7 +267,7 @@ const s = StyleSheet.create({
     chip: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: Colors.iron[300], backgroundColor: Colors.iron[200], alignItems: 'center' },
     chipActive: { backgroundColor: Colors.primary.DEFAULT, borderColor: Colors.primary.DEFAULT },
     chipText: { fontWeight: '800', fontSize: 13, color: Colors.iron[500] },
-    chipTextActive: { color: '#fff' },
+    chipTextActive: { color: Colors.white },
     resultBox: { marginTop: 20, backgroundColor: Colors.iron[200], padding: 20, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[300], alignItems: 'center' },
     resultLabel: { fontSize: 10, fontWeight: '800', color: Colors.iron[500], textTransform: 'uppercase', letterSpacing: 1 },
     resultValue: { fontSize: 40, fontWeight: '900', color: Colors.iron[950], letterSpacing: -1, marginTop: 4 },
