@@ -36,6 +36,8 @@ const SOFT_DELETE_TABLES = new Set([
     'changelog_reactions',
     'kudos',
     'activity_feed',
+    'score_events',
+    'user_exercise_prs',
 ]);
 
 const scopeSettingsKey = (userId: string, key: string): string => {
@@ -94,6 +96,8 @@ export async function POST(req: NextRequest) {
             'changelog_reactions': schema.changelogReactions,
             'kudos': schema.kudos,
             'activity_feed': schema.activityFeed,
+            'score_events': schema.scoreEvents,
+            'user_exercise_prs': schema.userExercisePrs,
         };
 
         const processedIds: string[] = [];
@@ -130,133 +134,128 @@ export async function POST(req: NextRequest) {
                 delete (payload as any).isModerated;
                 delete (payload as any).moderationMessage;
 
+                // Robust filtering: Only keep keys that exist in the Drizzle table schema
+                const validKeys = new Set(Object.keys(tableSchema));
+                for (const key of Object.keys(payload)) {
+                    if (!validKeys.has(key) && key !== 'updatedAt' && key !== 'deletedAt' && key !== 'userId') {
+                        delete (payload as any)[key];
+                    }
+                }
+
                 try {
-                    // Normalize updatedAt
-                    const candidateUpdatedAt = payload.updatedAt ? new Date(payload.updatedAt as any) : new Date();
-                    const updatedAt = Number.isNaN(candidateUpdatedAt.getTime()) ? new Date() : candidateUpdatedAt;
-                    const shouldEvaluateWorkoutScore = tableName === 'workouts' && operation !== 'DELETE' && payload.status === 'completed' && typeof (payload.id || payload.key) === 'string';
+                    await trx.transaction(async (innerTrx: any) => {
+                        // Normalize updatedAt
+                        const candidateUpdatedAt = payload.updatedAt ? new Date(payload.updatedAt as any) : new Date();
+                        const updatedAt = Number.isNaN(candidateUpdatedAt.getTime()) ? new Date() : candidateUpdatedAt;
+                        const shouldEvaluateWorkoutScore = tableName === 'workouts' && operation !== 'DELETE' && payload.status === 'completed' && typeof (payload.id || payload.key) === 'string';
 
-                    const pkCol = tableName === 'settings' ? tableSchema.key : tableSchema.id;
-                    if (tableName === 'user_profiles') {
-                        payload.id = userId;
-                    }
-                    if (tableName === 'settings') {
-                        const rawKey = typeof payload.key === 'string' ? payload.key : '';
-                        if (!rawKey.trim()) {
-                            results.push({ id: opId, status: 'error', reason: 'invalid_settings_key' });
-                            continue;
+                        const pkCol = tableName === 'settings' ? tableSchema.key : tableSchema.id;
+                        if (tableName === 'user_profiles') {
+                            payload.id = userId;
                         }
-                        payload.key = scopeSettingsKey(userId, rawKey);
-                        payload.userId = userId;
-                    }
-                    const recordId = payload.id || payload.key;
-                    if ((operation === 'UPDATE' || operation === 'DELETE') && (typeof recordId !== 'string' || recordId.length === 0)) {
-                        results.push({ id: opId, status: 'error', reason: 'missing_record_id' });
-                        continue;
-                    }
-
-                    let existingRecord;
-                    if (recordId) {
-                        const queryKey = tableName.replace(/_([a-z])/g, (g: string) => g[1].toUpperCase());
-                        // Defensive check for Drizzle query API
-                        if (trx.query && (trx.query as any)[queryKey]) {
-                            existingRecord = await (trx.query as any)[queryKey].findFirst({ where: eq(pkCol, recordId) });
-                        } else {
-                            // Fallback to standard select if query API is unavailable
-                            const results = await trx.select().from(tableSchema).where(eq(pkCol, recordId)).limit(1);
-                            existingRecord = results[0];
+                        if (tableName === 'settings') {
+                            const rawKey = typeof payload.key === 'string' ? payload.key : '';
+                            if (!rawKey.trim()) {
+                                results.push({ id: opId, status: 'error', reason: 'invalid_settings_key' });
+                                return;
+                            }
+                            payload.key = scopeSettingsKey(userId, rawKey);
+                            payload.userId = userId;
                         }
-                    }
-                    if (existingRecord) {
-                        const ownerId = getOwnerIdForRecord(tableName, existingRecord as Record<string, unknown>);
-                        if (ownerId && ownerId !== userId) {
-                            results.push({ id: opId, status: 'error', reason: 'forbidden_owner_mismatch' });
-                            continue;
-                        }
-                    }
-
-                    if (existingRecord) {
-                        const existingUpdatedAtValue = (existingRecord as any)?.updatedAt;
-                        const existingUpdatedAtMs = existingUpdatedAtValue instanceof Date ? existingUpdatedAtValue.getTime() : Number(existingUpdatedAtValue);
-                        const incomingUpdatedAtMs = updatedAt.getTime();
-                        const hasComparableTimestamps = Number.isFinite(existingUpdatedAtMs) && Number.isFinite(incomingUpdatedAtMs);
-                        if (hasComparableTimestamps && incomingUpdatedAtMs < existingUpdatedAtMs) {
-                            results.push({ id: opId, status: 'ignored_stale' });
-                            continue;
+                        const recordId = payload.id || payload.key;
+                        if ((operation === 'UPDATE' || operation === 'DELETE') && (typeof recordId !== 'string' || recordId.length === 0)) {
+                            results.push({ id: opId, status: 'error', reason: 'missing_record_id' });
+                            return;
                         }
 
-                        // UPDATE or DELETE existing record
-                        if (operation === 'DELETE') {
-                            if (SOFT_DELETE_TABLES.has(tableName)) {
-                                await trx.update(tableSchema).set({ deletedAt: new Date(), updatedAt }).where(eq(pkCol, recordId));
+                        let existingRecord;
+                        if (recordId) {
+                            const queryKey = tableName.replace(/_([a-z])/g, (g: string) => g[1].toUpperCase());
+                            if (innerTrx.query && (innerTrx.query as any)[queryKey]) {
+                                existingRecord = await (innerTrx.query as any)[queryKey].findFirst({ where: eq(pkCol, recordId) });
                             } else {
-                                await trx.delete(tableSchema).where(eq(pkCol, recordId));
+                                const selectRes = await innerTrx.select().from(tableSchema).where(eq(pkCol, recordId)).limit(1);
+                                existingRecord = selectRes[0];
+                            }
+                        }
+
+                        if (existingRecord) {
+                            const ownerId = getOwnerIdForRecord(tableName, existingRecord as Record<string, unknown>);
+                            if (ownerId && ownerId !== userId) {
+                                results.push({ id: opId, status: 'error', reason: 'forbidden_owner_mismatch' });
+                                return;
                             }
 
-                            // Update counts
-                            if (tableName === 'kudos' && (existingRecord as any).deletedAt == null) {
-                                await trx.update(schema.activityFeed).set({ kudoCount: sql`${schema.activityFeed.kudoCount} - 1`, updatedAt: new Date() }).where(eq(schema.activityFeed.id, existingRecord.feedId));
-                            } else if (tableName === 'changelog_reactions' && (existingRecord as any).deletedAt == null) {
-                                await trx.update(schema.changelogs).set({ reactionCount: sql`${schema.changelogs.reactionCount} - 1`, updatedAt: new Date() }).where(eq(schema.changelogs.id, existingRecord.changelogId));
+                            const existingUpdatedAtValue = (existingRecord as any)?.updatedAt;
+                            const existingUpdatedAtMs = existingUpdatedAtValue instanceof Date ? existingUpdatedAtValue.getTime() : Number(existingUpdatedAtValue);
+                            const incomingUpdatedAtMs = updatedAt.getTime();
+                            const hasComparableTimestamps = Number.isFinite(existingUpdatedAtMs) && Number.isFinite(incomingUpdatedAtMs);
+                            if (hasComparableTimestamps && incomingUpdatedAtMs < existingUpdatedAtMs) {
+                                results.push({ id: opId, status: 'ignored_stale' });
+                                return;
+                            }
+
+                            if (operation === 'DELETE') {
+                                if (SOFT_DELETE_TABLES.has(tableName)) {
+                                    await innerTrx.update(tableSchema).set({ deletedAt: new Date(), updatedAt }).where(eq(pkCol, recordId));
+                                } else {
+                                    await innerTrx.delete(tableSchema).where(eq(pkCol, recordId));
+                                }
+
+                                if (tableName === 'kudos' && (existingRecord as any).deletedAt == null) {
+                                    await innerTrx.update(schema.activityFeed).set({ kudoCount: sql`${schema.activityFeed.kudoCount} - 1`, updatedAt: new Date() }).where(eq(schema.activityFeed.id, existingRecord.feedId));
+                                } else if (tableName === 'changelog_reactions' && (existingRecord as any).deletedAt == null) {
+                                    await innerTrx.update(schema.changelogs).set({ reactionCount: sql`${schema.changelogs.reactionCount} - 1`, updatedAt: new Date() }).where(eq(schema.changelogs.id, existingRecord.changelogId));
+                                }
+                            } else {
+                                const updatePayload: Record<string, unknown> = { ...payload, updatedAt };
+                                if (SOFT_DELETE_TABLES.has(tableName)) {
+                                    updatePayload.deletedAt = null;
+                                }
+                                await innerTrx.update(tableSchema).set(updatePayload as any).where(eq(pkCol, recordId));
+
+                                if ((existingRecord as any).deletedAt && !payload.deletedAt) {
+                                    if (tableName === 'kudos') {
+                                        await innerTrx.update(schema.activityFeed).set({ kudoCount: sql`${schema.activityFeed.kudoCount} + 1`, updatedAt: new Date() }).where(eq(schema.activityFeed.id, existingRecord.feedId));
+                                    } else if (tableName === 'changelog_reactions') {
+                                        await innerTrx.update(schema.changelogs).set({ reactionCount: sql`${schema.changelogs.reactionCount} + 1`, updatedAt: new Date() }).where(eq(schema.changelogs.id, existingRecord.changelogId));
+                                    }
+                                }
                             }
                         } else {
-                            const updatePayload: Record<string, unknown> = { ...payload, updatedAt };
-                            if (SOFT_DELETE_TABLES.has(tableName)) {
-                                updatePayload.deletedAt = null;
-                            }
-                            await trx.update(tableSchema).set(updatePayload as any).where(eq(pkCol, recordId));
+                            if (operation !== 'DELETE') {
+                                if (tableName === 'user_profiles') payload.id = userId;
+                                else if (tableName === 'kudos') payload.giverId = userId;
+                                else if (tableName === 'changelog_reactions') payload.userId = userId;
+                                else if (tableName === 'settings') payload.userId = userId;
+                                else payload.userId = userId;
 
-                            // If it was deleted and now it's not (undelete)
-                            if ((existingRecord as any).deletedAt && !payload.deletedAt) {
+                                await innerTrx.insert(tableSchema).values({ ...payload, updatedAt });
+
                                 if (tableName === 'kudos') {
-                                    await trx.update(schema.activityFeed).set({ kudoCount: sql`${schema.activityFeed.kudoCount} + 1`, updatedAt: new Date() }).where(eq(schema.activityFeed.id, existingRecord.feedId));
+                                    await innerTrx.update(schema.activityFeed).set({ kudoCount: sql`${schema.activityFeed.kudoCount} + 1`, updatedAt: new Date() }).where(eq(schema.activityFeed.id, payload.feedId));
                                 } else if (tableName === 'changelog_reactions') {
-                                    await trx.update(schema.changelogs).set({ reactionCount: sql`${schema.changelogs.reactionCount} + 1`, updatedAt: new Date() }).where(eq(schema.changelogs.id, existingRecord.changelogId));
+                                    await innerTrx.update(schema.changelogs).set({ reactionCount: sql`${schema.changelogs.reactionCount} + 1`, updatedAt: new Date() }).where(eq(schema.changelogs.id, payload.changelogId));
                                 }
                             }
                         }
-                    } else {
-                        // INSERT
-                        if (operation !== 'DELETE') {
-                            // Ensure the record being inserted belongs to the user
-                            if (tableName === 'user_profiles') payload.id = userId;
-                            else if (tableName === 'kudos') payload.giverId = userId;
-                            else if (tableName === 'changelog_reactions') payload.userId = userId;
-                            else if (tableName === 'settings') payload.userId = userId;
-                            else payload.userId = userId;
 
-                            await trx.insert(tableSchema).values({ ...payload, updatedAt });
+                        const statusTransitionedToCompleted =
+                            tableName === 'workouts' &&
+                            operation !== 'DELETE' &&
+                            payload.status === 'completed' &&
+                            (!existingRecord || (existingRecord as any)?.status !== 'completed');
 
-                            // Update counts
-                            if (tableName === 'kudos') {
-                                await trx.update(schema.activityFeed).set({ kudoCount: sql`${schema.activityFeed.kudoCount} + 1`, updatedAt: new Date() }).where(eq(schema.activityFeed.id, payload.feedId));
-                            } else if (tableName === 'changelog_reactions') {
-                                await trx.update(schema.changelogs).set({ reactionCount: sql`${schema.changelogs.reactionCount} + 1`, updatedAt: new Date() }).where(eq(schema.changelogs.id, payload.changelogId));
+                        if (shouldEvaluateWorkoutScore && statusTransitionedToCompleted) {
+                            try {
+                                await applyWorkoutScoring(innerTrx, userId, payload.id || payload.key);
+                            } catch (scoringError: any) {
+                                console.warn(`[Sync] Social scoring failed for workout=${payload.id || payload.key}, error: ${scoringError.message}`);
                             }
                         }
-                    }
-
-                    const statusTransitionedToCompleted =
-                        tableName === 'workouts' &&
-                        operation !== 'DELETE' &&
-                        payload.status === 'completed' &&
-                        (
-                            !existingRecord ||
-                            (existingRecord as any)?.status !== 'completed'
-                        );
-
-                    // 4. If a workout was completed, apply social scoring (non-blocking for sync)
-                    if (shouldEvaluateWorkoutScore && statusTransitionedToCompleted) {
-                        try {
-                            await applyWorkoutScoring(trx, userId, payload.id || payload.key);
-                        } catch (scoringError: any) {
-                            const scoringMsg = scoringError instanceof Error ? scoringError.message : String(scoringError);
-                            console.warn(`[Sync] Social scoring failed for workout=${payload.id || payload.key}, sync continues. Error: ${scoringMsg}`);
-                            // We do NOT rethrow here because the data sync itself succeeded.
-                        }
-                    }
-                    processedIds.push(opId);
-                    results.push({ id: opId, status: 'success' });
+                        processedIds.push(opId);
+                        results.push({ id: opId, status: 'success' });
+                    });
                 } catch (err: any) {
                     console.error(`[Push] Error processing ${tableName}:${opId}:`, err);
                     results.push({ id: opId, status: 'error', reason: err.message });

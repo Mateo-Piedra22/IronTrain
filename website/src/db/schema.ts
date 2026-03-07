@@ -345,6 +345,7 @@ export const userExercisePrs = pgTable('user_exercise_prs', {
     best1RmKg: real('best_1rm_kg').notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
 });
 
 export const scoreEvents = pgTable('score_events', {
@@ -352,12 +353,14 @@ export const scoreEvents = pgTable('score_events', {
     userId: text('user_id').notNull(),
     workoutId: text('workout_id'),
     eventType: text('event_type').notNull(),
-    eventKey: text('event_key').notNull().unique(),
+    eventKey: text('event_key').unique(), // Removed .notNull() to allow flexibility if needed, but unique is key
     pointsBase: integer('points_base').notNull(),
     streakMultiplier: real('streak_multiplier').default(1).notNull(),
     globalMultiplier: real('global_multiplier').default(1).notNull(),
     pointsAwarded: integer('points_awarded').notNull(),
     metadata: text('metadata'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
 });
 

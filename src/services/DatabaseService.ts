@@ -266,9 +266,38 @@ export class DatabaseService {
         share_stats INTEGER DEFAULT 0,
         current_streak INTEGER DEFAULT 0,
         highest_streak INTEGER DEFAULT 0,
+        score_lifetime INTEGER DEFAULT 0 NOT NULL,
+        streak_weeks INTEGER DEFAULT 0 NOT NULL,
+        streak_multiplier REAL DEFAULT 1 NOT NULL,
+        streak_week_evaluated_at TEXT,
         last_active_date INTEGER,
         push_token TEXT,
-        updated_at INTEGER DEFAULT 0
+        updated_at INTEGER DEFAULT 0,
+        deleted_at INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS user_exercise_prs (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        exercise_id TEXT NOT NULL,
+        weight REAL,
+        reps INTEGER,
+        one_rep_max REAL,
+        date INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS score_events (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        points INTEGER NOT NULL,
+        date INTEGER NOT NULL,
+        reference_id TEXT,
+        metadata TEXT,
+        created_at INTEGER NOT NULL,
+        deleted_at INTEGER
       );
 
       CREATE TABLE IF NOT EXISTS changelog_reactions (
@@ -589,25 +618,37 @@ export class DatabaseService {
         const syncableTables = [
             'categories', 'exercises', 'workouts', 'workout_sets',
             'routines', 'routine_days', 'routine_exercises',
-            'measurements', 'goals', 'plate_inventory', 'settings'
+            'measurements', 'goals', 'plate_inventory', 'settings',
+            'body_metrics', 'badges', 'exercise_badges', 'user_profiles',
+            'changelog_reactions', 'kudos', 'activity_feed',
+            'user_exercise_prs', 'score_events'
         ];
 
+        const softDeleteTables = [
+            'categories', 'exercises', 'workouts', 'workout_sets',
+            'routines', 'routine_days', 'routine_exercises',
+            'measurements', 'goals', 'body_metrics', 'badges',
+            'exercise_badges', 'changelog_reactions', 'kudos', 'activity_feed',
+            'user_exercise_prs', 'score_events'
+        ];
+
+        console.log('Running Migration 9: Ensuring updated_at and deleted_at on all tables');
         for (const table of syncableTables) {
             try {
                 const info = await this.getAll<{ name: string }>(`PRAGMA table_info('${table}')`);
                 const columns = info.map(c => c.name);
 
                 if (!columns.includes('updated_at')) {
-                    console.log(`Migration 9: Adding updated_at to ${table}`);
+                    console.log(`[Migration] Adding updated_at to ${table}`);
                     await this.executeRaw(`ALTER TABLE ${table} ADD COLUMN updated_at INTEGER DEFAULT 0`);
                 }
 
-                if (!columns.includes('deleted_at') && !['settings', 'plate_inventory', 'goals'].includes(table)) {
-                    console.log(`Migration 9: Adding deleted_at to ${table}`);
+                if (!columns.includes('deleted_at') && softDeleteTables.includes(table)) {
+                    console.log(`[Migration] Adding deleted_at to ${table}`);
                     await this.executeRaw(`ALTER TABLE ${table} ADD COLUMN deleted_at INTEGER`);
                 }
             } catch (e) {
-                console.warn(`Migration 9 failed for ${table}:`, e);
+                console.error(`[Migration] Migration 9 failed for ${table}:`, e);
             }
         }
 
@@ -704,6 +745,95 @@ export class DatabaseService {
             }
         } catch (e) {
             console.warn('Migration 14 failed (workouts finish location):', e);
+        }
+
+        // Migration 15: Social scoring columns and tables
+        try {
+            const userProfileInfo = await this.getAll<{ name: string }>("PRAGMA table_info('user_profiles')");
+            const userProfileColumns = userProfileInfo.map(c => c.name);
+            const scoringColumns = {
+                'score_lifetime': 'INTEGER DEFAULT 0 NOT NULL',
+                'streak_weeks': 'INTEGER DEFAULT 0 NOT NULL',
+                'streak_multiplier': 'REAL DEFAULT 1 NOT NULL',
+                'streak_week_evaluated_at': 'TEXT'
+            };
+
+            for (const [col, def] of Object.entries(scoringColumns)) {
+                if (!userProfileColumns.includes(col)) {
+                    console.log(`[Migration] Adding ${col} to user_profiles`);
+                    await this.executeRaw(`ALTER TABLE user_profiles ADD COLUMN ${col} ${def}`);
+                }
+            }
+
+            // Create new scoring tables if missing
+            await this.executeRaw(`
+                CREATE TABLE IF NOT EXISTS user_exercise_prs (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    user_id TEXT NOT NULL,
+                    exercise_id TEXT NOT NULL,
+                    weight REAL,
+                    reps INTEGER,
+                    one_rep_max REAL,
+                    date INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    deleted_at INTEGER
+                )
+            `);
+            await this.executeRaw(`
+                CREATE TABLE IF NOT EXISTS score_events (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    user_id TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    points INTEGER NOT NULL,
+                    date INTEGER NOT NULL,
+                    reference_id TEXT,
+                    metadata TEXT,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    deleted_at INTEGER
+                )
+            `);
+        } catch (e) {
+            console.error('[Migration] Migration 15 failed (social scoring):', e);
+        }
+
+        // Migration 16: Robust alignment of scoring tables with remote schema (Social 2.1.0)
+        try {
+            console.log('[Migration] Running Migration 16: Scoring alignment');
+            const prInfo = await this.getAll<{ name: string }>("PRAGMA table_info('user_exercise_prs')");
+            const prCols = prInfo.map(c => c.name);
+            if (!prCols.includes('exercise_name')) {
+                await this.executeRaw('ALTER TABLE user_exercise_prs ADD COLUMN exercise_name TEXT');
+            }
+            if (!prCols.includes('best_1rm_kg')) {
+                await this.executeRaw('ALTER TABLE user_exercise_prs ADD COLUMN best_1rm_kg REAL');
+            }
+
+            const scoreInfo = await this.getAll<{ name: string }>("PRAGMA table_info('score_events')");
+            const scoreCols = scoreInfo.map(c => c.name);
+            if (!scoreCols.includes('event_type')) {
+                await this.executeRaw('ALTER TABLE score_events ADD COLUMN event_type TEXT');
+            }
+            if (!scoreCols.includes('event_key')) {
+                await this.executeRaw('ALTER TABLE score_events ADD COLUMN event_key TEXT');
+            }
+            if (!scoreCols.includes('points_base')) {
+                await this.executeRaw('ALTER TABLE score_events ADD COLUMN points_base INTEGER');
+            }
+            if (!scoreCols.includes('points_awarded')) {
+                await this.executeRaw('ALTER TABLE score_events ADD COLUMN points_awarded INTEGER');
+            }
+            if (!scoreCols.includes('streak_multiplier')) {
+                await this.executeRaw('ALTER TABLE score_events ADD COLUMN streak_multiplier REAL DEFAULT 1');
+            }
+            if (!scoreCols.includes('global_multiplier')) {
+                await this.executeRaw('ALTER TABLE score_events ADD COLUMN global_multiplier REAL DEFAULT 1');
+            }
+            if (!scoreCols.includes('workout_id')) {
+                await this.executeRaw('ALTER TABLE score_events ADD COLUMN workout_id TEXT');
+            }
+        } catch (e) {
+            console.warn('Migration 16 failed:', e);
         }
     }
 

@@ -89,7 +89,7 @@ export async function runDbTransaction<T>(fn: (trx: any) => Promise<T>): Promise
     }
 
     try {
-        const result = await db.transaction(fn);
+        const result = (await db.transaction.call(db, fn)) as T;
         clearBootstrapError();
         transactionSupportCache = true;
         transactionSupportCheckedAt = Date.now();

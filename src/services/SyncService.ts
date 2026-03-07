@@ -32,6 +32,8 @@ const PULL_UPSERT_ORDER: ReadonlyArray<string> = [
     'changelog_reactions',
     'kudos',
     'activity_feed',
+    'user_exercise_prs',
+    'score_events',
 ];
 
 const PULL_DELETE_ORDER: ReadonlyArray<string> = [...PULL_UPSERT_ORDER].reverse();
@@ -51,6 +53,9 @@ const TABLES_WITH_SOFT_DELETE: ReadonlySet<string> = new Set([
     'exercise_badges',
     'changelog_reactions',
     'kudos',
+    'activity_feed',
+    'user_exercise_prs',
+    'score_events',
 ]);
 
 const ALLOWED_TABLES = [
@@ -58,7 +63,8 @@ const ALLOWED_TABLES = [
     'routines', 'routine_days', 'routine_exercises',
     'measurements', 'goals', 'plate_inventory', 'settings',
     'body_metrics', 'badges', 'exercise_badges', 'user_profiles',
-    'changelog_reactions', 'kudos', 'activity_feed'
+    'changelog_reactions', 'kudos', 'activity_feed',
+    'user_exercise_prs', 'score_events'
 ];
 
 
@@ -101,7 +107,20 @@ export class SyncService {
         return k.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
     }
 
-    private normalizeIncomingRecord(table: string, raw: unknown): Record<string, unknown> | null {
+    private async fetchAllTableSchemas(): Promise<Map<string, Set<string>>> {
+        const schemas = new Map<string, Set<string>>();
+        for (const table of ALLOWED_TABLES) {
+            try {
+                const info = await dbService.getAll<{ name: string }>(`PRAGMA table_info('${table}')`);
+                schemas.set(table, new Set(info.map(c => c.name)));
+            } catch (e) {
+                console.error(`[Sync] Failed to fetch schema for ${table}:`, e);
+            }
+        }
+        return schemas;
+    }
+
+    private normalizeIncomingRecord(table: string, raw: unknown, validColumns?: Set<string>): Record<string, unknown> | null {
         if (!raw || typeof raw !== 'object') return null;
         const obj = raw as Record<string, unknown>;
         const out: Record<string, unknown> = {};
@@ -148,6 +167,15 @@ export class SyncService {
             }
             // settings has no deleted_at in local schema
             delete out.deleted_at;
+        }
+
+        // --- Schema-Aware Robustness Fix: Only keep columns that exist in local SQLite ---
+        if (validColumns) {
+            for (const key of Object.keys(out)) {
+                if (!validColumns.has(key)) {
+                    delete out[key];
+                }
+            }
         }
 
         return out;
@@ -227,8 +255,11 @@ export class SyncService {
             // Reintentar los fallidos que aún no superaron el límite
             await dbService.run(`UPDATE sync_queue SET status = 'pending' WHERE status = 'failed' AND retry_count < ?`, [MAX_RETRIES]);
 
+            // Fetch current local table schemas to ensure sync robustness
+            const tableSchemas = await this.fetchAllTableSchemas();
+
             await this.pushLocalChanges(token);
-            await this.pullRemoteChanges(token, options?.forcePull);
+            await this.pullRemoteChanges(token, options?.forcePull, tableSchemas);
         } catch (error) {
             console.error('[Sync] Bidirectional sync failed:', error);
             throw error;
@@ -354,7 +385,7 @@ export class SyncService {
     /**
      * Pulls remote changes that happened after the last sync timestamp.
      */
-    private async pullRemoteChanges(token: string, forcePull = false): Promise<void> {
+    private async pullRemoteChanges(token: string, forcePull = false, tableSchemas?: Map<string, Set<string>>): Promise<void> {
         // Retrieve the last synced timestamp from local settings
         const lastSyncRecord = await dbService.getFirst<{ value: string }>('SELECT value FROM settings WHERE key = ?', ['last_pull_sync']);
         const lastSyncAt = (lastSyncRecord?.value && !forcePull) ? parseInt(lastSyncRecord.value, 10) : 0;
@@ -389,15 +420,23 @@ export class SyncService {
                     const deferredUpserts: Array<{ table: string; change: any }> = [];
 
                     const applyForTable = async (table: string, tableChanges: any[]): Promise<void> => {
+                        const validColumns = tableSchemas?.get(table);
                         const ids = tableChanges
                             .map((c) => (c?.payload?.id ?? c?.payload?.recordId) as unknown)
                             .filter((v): v is string => typeof v === 'string' && v.length > 0);
 
+                        const hasSoftDelete = TABLES_WITH_SOFT_DELETE.has(table);
+                        const columns = ['id', 'updated_at'];
+                        if (hasSoftDelete) columns.push('deleted_at');
+
                         const existingRows = ids.length > 0
-                            ? await dbService.getAll<{ id: string; updated_at?: number | null; deleted_at?: number | null }>(
-                                `SELECT id, updated_at, deleted_at FROM ${table} WHERE id IN (${ids.map(() => '?').join(', ')})`,
+                            ? await dbService.getAll<any>(
+                                `SELECT ${columns.join(', ')} FROM ${table} WHERE id IN (${ids.map(() => '?').join(', ')})`,
                                 ids
-                            )
+                            ).catch(e => {
+                                console.error(`[Sync] Failed to query existing rows for table ${table}. Columns: ${columns.join(', ')}`, e);
+                                throw e;
+                            })
                             : [];
 
                         const existingById = new Map(existingRows.map((r) => [r.id, r] as const));
@@ -407,7 +446,7 @@ export class SyncService {
                             const payload = change?.payload && typeof change.payload === 'object' ? change.payload : null;
                             if (!operation || !payload) continue;
 
-                            const normalized = this.normalizeIncomingRecord(table, payload);
+                            const normalized = this.normalizeIncomingRecord(table, payload, validColumns);
                             if (!normalized) continue;
 
                             const recordId = normalized.id || normalized.record_id || payload.recordId;
@@ -493,7 +532,7 @@ export class SyncService {
                                     [recordId]
                                 );
 
-                                const normalized = this.normalizeIncomingRecord(item.table, payload);
+                                const normalized = this.normalizeIncomingRecord(item.table, payload, tableSchemas?.get(item.table));
                                 if (!normalized) continue;
 
                                 const remoteUpdatedAt = typeof normalized.updated_at === 'number' ? normalized.updated_at : null;
@@ -716,15 +755,16 @@ export class SyncService {
 
         const counts: Record<string, { active: number; deleted: number; total: number }> = {};
         for (const t of tables) {
-            const activeSql = t.supportsDelete
+            const hasDeleteAt = t.supportsDelete && TABLES_WITH_SOFT_DELETE.has(t.table);
+            const activeSql = hasDeleteAt
                 ? `SELECT COUNT(*) as count FROM ${t.table} WHERE deleted_at IS NULL`
                 : `SELECT COUNT(*) as count FROM ${t.table}`;
-            const deletedSql = t.supportsDelete
+            const deletedSql = hasDeleteAt
                 ? `SELECT COUNT(*) as count FROM ${t.table} WHERE deleted_at IS NOT NULL`
                 : null;
 
             const activeRes = await dbService.getFirst<{ count: number }>(activeSql);
-            const deletedRes = deletedSql ? await dbService.getFirst<{ count: number }>(deletedSql) : ({ count: 0 } as any);
+            const deletedRes = deletedSql ? await dbService.getFirst<{ count: number }>(deletedSql) : { count: 0 };
             const active = activeRes?.count || 0;
             const deleted = deletedRes?.count || 0;
             counts[t.key] = { active, deleted, total: active + deleted };

@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray } from 'drizzle-orm';
+import { and, eq, gt, inArray, or } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
@@ -10,40 +10,25 @@ const toSnakeCase = (camelObj: Record<string, unknown>): Record<string, unknown>
     if (!camelObj || typeof camelObj !== 'object') return camelObj;
     const snakeObj: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(camelObj)) {
+        const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
         if (value instanceof Date) {
-            snakeObj[key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)] = value.getTime();
-            continue;
+            snakeObj[snakeKey] = value.getTime();
+        } else {
+            snakeObj[snakeKey] = typeof value === 'boolean' ? (value ? 1 : 0) : value;
         }
-        const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-        snakeObj[snakeKey] = typeof value === 'boolean' ? (value ? 1 : 0) : value;
     }
-    // Remove internal fields that should not leak to offline clients
-    delete snakeObj.user_id;
     return snakeObj;
 };
 
-const unscopedSettingsKey = (userId: string, key: unknown): string => {
-    if (typeof key !== 'string') return '';
-    const prefix = `${userId}:`;
-    if (key.startsWith(prefix)) return key.slice(prefix.length);
-    return key;
-};
-
 export async function GET(req: NextRequest) {
+    const userId = await verifyAuth(req);
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const searchParams = req.nextUrl.searchParams;
+    const sinceParam = searchParams.get('since');
+    const sinceDate = sinceParam ? new Date(parseInt(sinceParam)) : new Date(0);
+
     try {
-        const userId = await verifyAuth(req);
-        if (!userId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const url = new URL(req.url);
-        const sinceParam = url.searchParams.get('since') || '0';
-        const sinceMs = parseInt(sinceParam, 10);
-        if (isNaN(sinceMs) || sinceMs < 0) {
-            return NextResponse.json({ error: 'Invalid since parameter' }, { status: 400 });
-        }
-        const timestampMarker = new Date(sinceMs);
-
         const tableMap: Record<string, any> = {
             'categories': schema.categories,
             'exercises': schema.exercises,
@@ -64,6 +49,9 @@ export async function GET(req: NextRequest) {
             'changelog_reactions': schema.changelogReactions,
             'kudos': schema.kudos,
             'activity_feed': schema.activityFeed,
+            'score_events': schema.scoreEvents,
+            'user_exercise_prs': schema.userExercisePrs,
+            'friendships': schema.friendships,
         };
 
         // Get friend IDs for the activity feed pull
@@ -74,72 +62,58 @@ export async function GET(req: NextRequest) {
 
         const changes: Array<{ table: string; operation: string; payload: Record<string, unknown> }> = [];
 
-        for (const [tableName, tableSchema] of Object.entries(tableMap)) {
-            const query = db.select().from(tableSchema);
-
-            let whereClause;
-            if (tableName === 'user_profiles') {
-                whereClause = eq(tableSchema.id, userId);
-            } else if (tableName === 'changelogs') {
-                whereClause = eq(tableSchema.isUnreleased, 0);
-            } else if (tableName === 'changelog_reactions') {
-                whereClause = eq(tableSchema.userId, userId);
-            } else if (tableName === 'kudos') {
-                // Pull kudos where I am the giver OR kudos on MY feed items
-                whereClause = eq(tableSchema.giverId, userId);
-                // Note: For full social sync, we might need a more complex OR here, 
-                // but let's stick to items owned/created by user for now to keep it simple and secure.
-            } else if (tableName === 'activity_feed') {
-                // Pull feed items for self and friends
-                if (allRelevantUserIdsForFeed.length > 0) {
-                    whereClause = inArray(tableSchema.userId, allRelevantUserIdsForFeed);
-                } else {
-                    // If no relevant users (e.g., no friends and userId is not in the list for some reason),
-                    // default to just the current user to avoid an empty IN clause error.
-                    whereClause = eq(tableSchema.userId, userId);
-                }
+        for (const [tableName, table] of Object.entries(tableMap)) {
+            let queryResult;
+            if (tableName === 'activity_feed') {
+                queryResult = await db.select()
+                    .from(table)
+                    .where(and(
+                        inArray(table.userId, allRelevantUserIdsForFeed),
+                        gt(table.updatedAt, sinceDate)
+                    ));
+            } else if (tableName === 'changelogs' || tableName === 'badges' || tableName === 'categories') {
+                // Public or Global tables
+                queryResult = await db.select()
+                    .from(table)
+                    .where(gt(table.updatedAt, sinceDate));
+            } else if (tableName === 'friendships') {
+                // Friendship tables - both sides
+                queryResult = await db.select()
+                    .from(table)
+                    .where(and(
+                        or(eq(table.userId, userId), eq(table.friendId, userId)),
+                        gt(table.updatedAt, sinceDate)
+                    ));
             } else {
-                whereClause = eq(tableSchema.userId, userId);
+                // User-owned tables
+                queryResult = await db.select()
+                    .from(table)
+                    .where(and(
+                        eq(table.userId, userId),
+                        gt(table.updatedAt, sinceDate)
+                    ));
             }
 
-            const records = await query.where(
-                and(
-                    whereClause,
-                    gt(tableSchema.updatedAt, timestampMarker)
-                )
-            );
-
-            for (const record of records) {
-                if (record.deletedAt && new Date(record.deletedAt) > timestampMarker) {
-                    changes.push({
-                        table: tableName,
-                        operation: 'DELETE',
-                        payload: {
-                            id: record.id,
-                            updated_at: record.updatedAt instanceof Date ? record.updatedAt.getTime() : Date.now(),
-                            deleted_at: record.deletedAt instanceof Date ? record.deletedAt.getTime() : (record.updatedAt instanceof Date ? record.updatedAt.getTime() : Date.now()),
-                        },
-                    });
-                } else if (!record.deletedAt) {
-                    const payloadRecord =
-                        tableName === 'settings'
-                            ? { ...(record as Record<string, unknown>), key: unscopedSettingsKey(userId, (record as Record<string, unknown>).key) }
-                            : (record as Record<string, unknown>);
-                    changes.push({
-                        table: tableName,
-                        operation: 'UPDATE',
-                        payload: toSnakeCase(payloadRecord),
-                    });
-                }
+            for (const record of queryResult) {
+                const operation = (record.deletedAt && record.deletedAt > sinceDate) ? 'DELETE' : (record.createdAt > sinceDate ? 'INSERT' : 'UPDATE');
+                changes.push({
+                    table: tableName,
+                    operation,
+                    payload: toSnakeCase(record as Record<string, unknown>)
+                });
             }
         }
 
-        const serverTime = Date.now();
-        return NextResponse.json({ success: true, changes, serverTime });
+        return NextResponse.json({
+            timestamp: Date.now(),
+            changes
+        });
 
-    } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Internal server error';
-        console.error('Sync Pull Error:', message);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    } catch (error: any) {
+        console.error('[Sync Pull] Error:', error);
+        return NextResponse.json({
+            error: 'Internal server error',
+            message: error.message
+        }, { status: 500 });
     }
 }
