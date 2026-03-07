@@ -475,7 +475,7 @@ export class DatabaseService {
             if (!systemCat) {
                 console.log('Running Migration Check: Re-creating default category.');
                 await this.run(
-                    'INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, 999, ?)',
+                    'INSERT OR IGNORE INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, 999, ?)',
                     [UNCATEGORIZED_ID, UNCATEGORIZED_NAME, '#64748b']
                 );
             }
@@ -840,8 +840,25 @@ export class DatabaseService {
         // Migration 17: Generic Name-Based Deduplication (Repairing Sync Issues)
         try {
             console.log('[Migration] Running Migration 17: Generic Deduplication Repair');
-            await this.executeRaw('PRAGMA foreign_keys = OFF;');
+            await this.repairDataConsistency();
+        } catch (e) {
+            console.error('[Migration] Migration 17 failed:', e);
+        }
+    }
+
+    /**
+     * Public method to deduplicate categories, exercises, and badges.
+     * Can be called during migrations OR after a sync pull to ensure zero duplicates.
+     */
+    public async repairDataConsistency(): Promise<void> {
+        await this.executeRaw('PRAGMA foreign_keys = OFF;');
+        try {
             await this.withTransaction(async () => {
+
+                // Helper to queue deletions for merged records
+                const queueDelete = async (table: string, id: string) => {
+                    await this.queueSyncMutation(table, id, 'DELETE');
+                };
 
                 // 1. Uncategorized Consistency
                 const uncategorizedRows = await this.getAll<{ id: string }>(
@@ -853,6 +870,7 @@ export class DatabaseService {
                         if (row.id !== UNCATEGORIZED_ID) {
                             await this.run('UPDATE exercises SET category_id = ? WHERE category_id = ?', [UNCATEGORIZED_ID, row.id]);
                             await this.run('DELETE FROM categories WHERE id = ?', [row.id]);
+                            await queueDelete('categories', row.id);
                         }
                     }
                     await this.run(
@@ -873,6 +891,7 @@ export class DatabaseService {
                     for (const dupe of duplicates) {
                         await this.run('UPDATE exercises SET category_id = ? WHERE category_id = ?', [masterId, dupe.id]);
                         await this.run('DELETE FROM categories WHERE id = ?', [dupe.id]);
+                        await queueDelete('categories', dupe.id);
                     }
                 }
 
@@ -885,6 +904,7 @@ export class DatabaseService {
                     for (const dupe of duplicates) {
                         await this.run('UPDATE exercise_badges SET badge_id = ? WHERE badge_id = ?', [masterId, dupe.id]);
                         await this.run('DELETE FROM badges WHERE id = ?', [dupe.id]);
+                        await queueDelete('badges', dupe.id);
                     }
                 }
 
@@ -913,30 +933,96 @@ export class DatabaseService {
                     if (ids.length > 1) {
                         const masterId = ids[0];
                         const duplicates = ids.slice(1);
-                        console.log(`[Migration] Merging ${duplicates.length} duplicate exercises for signature: ${signature}`);
                         for (const dupeId of duplicates) {
                             await this.run('UPDATE workout_sets SET exercise_id = ? WHERE exercise_id = ?', [masterId, dupeId]);
                             await this.run('UPDATE routine_exercises SET exercise_id = ? WHERE exercise_id = ?', [masterId, dupeId]);
                             await this.run('UPDATE exercise_badges SET exercise_id = ? WHERE exercise_id = ?', [masterId, dupeId]);
                             await this.run('UPDATE user_exercise_prs SET exercise_id = ? WHERE exercise_id = ?', [masterId, dupeId]);
                             await this.run('DELETE FROM exercises WHERE id = ?', [dupeId]);
+                            await queueDelete('exercises', dupeId);
                         }
                     }
                 }
 
-                // 5. Junction Table Cleanup (Final safety)
-                await this.executeRaw(`
-                    DELETE FROM exercise_badges 
+                // 5. Workout Sets Deduplication (Sync Glitch: same workout_id + order_index)
+                const dupeSets = await this.getAll<{ id: string }>(`
+                    SELECT id FROM workout_sets 
                     WHERE rowid NOT IN (
-                        SELECT MIN(rowid) 
-                        FROM exercise_badges 
-                        GROUP BY exercise_id, badge_id
+                        SELECT MIN(rowid) FROM workout_sets GROUP BY workout_id, order_index
                     )
                 `);
+                for (const s of dupeSets) {
+                    await this.run('DELETE FROM workout_sets WHERE id = ?', [s.id]);
+                    await queueDelete('workout_sets', s.id);
+                }
+
+                // 6. Routine Day Deduplication
+                const dupeDays = await this.getAll<{ id: string }>(`
+                    SELECT id FROM routine_days 
+                    WHERE rowid NOT IN (
+                        SELECT MIN(rowid) FROM routine_days GROUP BY routine_id, order_index
+                    )
+                `);
+                for (const d of dupeDays) {
+                    await this.run('DELETE FROM routine_days WHERE id = ?', [d.id]);
+                    await queueDelete('routine_days', d.id);
+                }
+
+                // 7. PR Deduplication
+                const dupePRs = await this.getAll<{ id: string }>(`
+                    SELECT id FROM user_exercise_prs
+                    WHERE rowid NOT IN (
+                        SELECT MIN(rowid) FROM user_exercise_prs GROUP BY user_id, exercise_id, weight, reps, date
+                    )
+                `);
+                for (const pr of dupePRs) {
+                    await this.run('DELETE FROM user_exercise_prs WHERE id = ?', [pr.id]);
+                    await queueDelete('user_exercise_prs', pr.id);
+                }
+
+                // 8. Body Metrics / Measurements Deduplication (Keep newest entry per day)
+                const dupeMetrics = await this.getAll<{ id: string }>(`SELECT id FROM body_metrics WHERE rowid NOT IN (SELECT MAX(rowid) FROM body_metrics GROUP BY date)`);
+                for (const m of dupeMetrics) { await this.run('DELETE FROM body_metrics WHERE id = ?', [m.id]); await queueDelete('body_metrics', m.id); }
+
+                const dupeMeasures = await this.getAll<{ id: string }>(`SELECT id FROM measurements WHERE rowid NOT IN (SELECT MAX(rowid) FROM measurements GROUP BY date, type)`);
+                for (const m of dupeMeasures) { await this.run('DELETE FROM measurements WHERE id = ?', [m.id]); await queueDelete('measurements', m.id); }
+
+                // 9. Legacy Fixes & Names
+                await this.run("UPDATE measurements SET unit = 'kg' WHERE type = 'weight' AND (unit IS NULL OR unit = 'cm')");
+                await this.run("UPDATE measurements SET unit = '%' WHERE type = 'body_fat' AND (unit IS NULL OR unit = 'cm')");
+                await this.run(`
+                    UPDATE user_exercise_prs 
+                    SET exercise_name = (SELECT name FROM exercises WHERE exercises.id = user_exercise_prs.exercise_id)
+                    WHERE exercise_name IS NULL OR exercise_name = ''
+                `);
+
+                // 10. Social System Deduplication (Feed, Kudos, Reactions)
+                const dupeReactions = await this.getAll<{ id: string }>(`SELECT id FROM changelog_reactions WHERE rowid NOT IN (SELECT MIN(rowid) FROM changelog_reactions GROUP BY user_id, changelog_id, type)`);
+                for (const r of dupeReactions) { await this.run('DELETE FROM changelog_reactions WHERE id = ?', [r.id]); await queueDelete('changelog_reactions', r.id); }
+
+                const dupeKudos = await this.getAll<{ id: string }>(`SELECT id FROM kudos WHERE rowid NOT IN (SELECT MIN(rowid) FROM kudos GROUP BY feed_id, giver_id)`);
+                for (const k of dupeKudos) { await this.run('DELETE FROM kudos WHERE id = ?', [k.id]); await queueDelete('kudos', k.id); }
+
+                const dupeScore = await this.getAll<{ id: string }>(`SELECT id FROM score_events WHERE rowid NOT IN (SELECT MIN(rowid) FROM score_events GROUP BY user_id, type, reference_id, date)`);
+                for (const s of dupeScore) { await this.run('DELETE FROM score_events WHERE id = ?', [s.id]); await queueDelete('score_events', s.id); }
+
+                const dupeFeed = await this.getAll<{ id: string }>(`SELECT id FROM activity_feed WHERE rowid NOT IN (SELECT MIN(rowid) FROM activity_feed GROUP BY user_id, action_type, reference_id, created_at)`);
+                for (const f of dupeFeed) { await this.run('DELETE FROM activity_feed WHERE id = ?', [f.id]); await queueDelete('activity_feed', f.id); }
+
+                // 11. Cross-Table Integrity Cleanup (Orphans)
+                // Remove kudos whose feed item is gone
+                const orphanKudos = await this.getAll<{ id: string }>(`SELECT id FROM kudos WHERE feed_id NOT IN (SELECT id FROM activity_feed)`);
+                for (const k of orphanKudos) { await this.run('DELETE FROM kudos WHERE id = ?', [k.id]); await queueDelete('kudos', k.id); }
+
+                // Remove reactions whose changelog is gone
+                const orphanReactions = await this.getAll<{ id: string }>(`SELECT id FROM changelog_reactions WHERE changelog_id NOT IN (SELECT id FROM changelogs)`);
+                for (const r of orphanReactions) { await this.run('DELETE FROM changelog_reactions WHERE id = ?', [r.id]); await queueDelete('changelog_reactions', r.id); }
+
+                // 12. Junction Table Cleanup (Final physical safety, no sync needed as it's a junction)
+                await this.executeRaw(`DELETE FROM exercise_badges WHERE rowid NOT IN (SELECT MIN(rowid) FROM exercise_badges GROUP BY exercise_id, badge_id)`);
+                await this.executeRaw(`DELETE FROM routine_exercises WHERE rowid NOT IN (SELECT MIN(rowid) FROM routine_exercises GROUP BY routine_day_id, exercise_id, order_index)`);
             });
-            await this.executeRaw('PRAGMA foreign_keys = ON;');
-        } catch (e) {
-            console.error('[Migration] Migration 17 failed:', e);
+        } finally {
             await this.executeRaw('PRAGMA foreign_keys = ON;');
         }
     }
@@ -1182,7 +1268,7 @@ export class DatabaseService {
 
                 await this.run('DELETE FROM exercises');
                 await this.run('DELETE FROM categories');
-                await this.run("INSERT INTO categories (id, name, is_system, sort_order, color) VALUES ('sys-cat-1', 'Sin categoría', 1, 999, '#64748b')");
+                await this.run("INSERT OR IGNORE INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, 999, '#64748b')", [UNCATEGORIZED_ID, UNCATEGORIZED_NAME]);
 
                 await this.run('DELETE FROM exercise_badges');
                 await this.run('DELETE FROM badges');
@@ -1276,13 +1362,15 @@ export class DatabaseService {
                 lastError = error;
                 const msg = error?.message || '';
                 const isForeignKey = msg.includes('FOREIGN KEY constraint failed');
+                const isUnique = msg.includes('UNIQUE constraint failed');
                 const isLocked = (
                     msg.includes('database is locked')
                     || error?.code === 'SQLITE_BUSY'
-                    || (msg.includes('finalizeAsync') && !isForeignKey)
+                    || (msg.includes('finalizeAsync') && (!isForeignKey && !isUnique))
+                    || (msg.includes('finalizeAsync') && isUnique) // Retry on finalize UNIQUE race
                 );
                 if (isLocked) {
-                    console.warn(`[Database] Busy/Locked (attempt ${i + 1}/${retries}). Retrying...`);
+                    console.warn(`[Database] Busy/Locked/Race (attempt ${i + 1}/${retries}). Retrying...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                     continue;
                 }

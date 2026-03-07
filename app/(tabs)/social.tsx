@@ -7,7 +7,7 @@ import { confirm } from '@/src/store/confirmStore';
 import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
-import { CheckCircle, Copy, Dumbbell, Flame, Globe, Info, Lock as LockIcon, Scale, Settings, Shield as ShieldIcon, Trophy, UserCheck, UserMinus as UserMinusIcon, XCircle, X as XIcon } from 'lucide-react-native';
+import { CalendarDays, CheckCircle, ChevronDown, ChevronUp, Copy, Dumbbell, Flame, Globe, Info, Lock as LockIcon, Scale, Settings, Shield as ShieldIcon, Trophy, UserCheck, UserMinus as UserMinusIcon, XCircle, X as XIcon } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -24,6 +24,9 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+
+import { configService } from '@/src/services/ConfigService';
+import { useSettingsStore } from '@/src/store/useSettingsStore';
 
 type SocialTabKey = 'leaderboard' | 'friends' | 'inbox' | 'search';
 const USERNAME_REGEX = /^[a-z0-9_]+$/;
@@ -50,6 +53,8 @@ export default function SocialTab() {
     const [profileFormUsername, setProfileFormUsername] = useState('');
     const [profileFormPublic, setProfileFormPublic] = useState(true);
     const [profileSaving, setProfileSaving] = useState(false);
+    const [trainingDays, setTrainingDays] = useState<number[]>([]);
+    const [isGoalsExpanded, setIsGoalsExpanded] = useState(false);
 
     const authState = useAuthStore();
 
@@ -75,13 +80,23 @@ export default function SocialTab() {
         }
     }, [authState.token]);
 
+    const loadTrainingDays = useCallback(async () => {
+        const rawDays = await configService.get('training_days');
+        setTrainingDays(Array.isArray(rawDays) ? rawDays : [1, 2, 3, 4, 5, 6]);
+    }, []);
+
     useDataReload(() => {
         loadData();
     }, ['DATA_UPDATED', 'SOCIAL_UPDATED']);
 
+    useDataReload(() => {
+        loadTrainingDays();
+    }, ['SETTINGS_UPDATED']);
+
     useEffect(() => {
         loadData();
-    }, [loadData]);
+        loadTrainingDays();
+    }, [loadData, loadTrainingDays]);
 
     const handleCopyId = async () => {
         if (profile?.id) {
@@ -253,8 +268,19 @@ export default function SocialTab() {
             `- Semanas 3-4: x1.10\n` +
             `- Semanas 5-9: x1.25\n` +
             `- Semana 10+: x1.50\n\n` +
-            `Los eventos globales activos pueden aumentar este multiplicador.`
+            `Tus días de entrenamiento configurados influyen en la racha sin penalizarte los días libres.`
         );
+    };
+
+    const handleToggleTrainingDay = async (dayId: number) => {
+        const isSelected = trainingDays.includes(dayId);
+        const newDays = isSelected
+            ? trainingDays.filter(d => d !== dayId)
+            : [...trainingDays, dayId].sort((a, b) => a - b);
+
+        setTrainingDays(newDays);
+        await configService.set('training_days', newDays);
+        await useSettingsStore.getState().setTrainingDays(newDays);
     };
 
     const handleExpandFriend = async (friendId: string) => {
@@ -421,6 +447,47 @@ export default function SocialTab() {
                             <Text style={styles.idText} numberOfLines={1} ellipsizeMode="middle">ID: {profile.id}</Text>
                             <Copy size={16} color={Colors.iron[500]} />
                         </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.goalsTrigger}
+                            onPress={() => setIsGoalsExpanded(!isGoalsExpanded)}
+                        >
+                            <View style={styles.goalsTriggerLeft}>
+                                <CalendarDays size={18} color={Colors.primary.DEFAULT} />
+                                <Text style={styles.goalsTriggerTitle}>Mi Meta Semanal</Text>
+                            </View>
+                            <View style={styles.goalsTriggerRight}>
+                                <Text style={styles.goalsSummaryText}>{trainingDays.length} días</Text>
+                                {isGoalsExpanded ? <ChevronUp size={18} color={Colors.iron[400]} /> : <ChevronDown size={18} color={Colors.iron[400]} />}
+                            </View>
+                        </TouchableOpacity>
+
+                        {isGoalsExpanded && (
+                            <View style={styles.goalsExpanded}>
+                                <Text style={styles.goalsDesc}>
+                                    Seleccioná los días que planeás entrenar. Los días no marcados como entrenamiento no cortarán tu racha de puntuación.
+                                </Text>
+                                <View style={styles.daysRow}>
+                                    {[
+                                        { id: 1, label: 'L' }, { id: 2, label: 'M' }, { id: 3, label: 'X' },
+                                        { id: 4, label: 'J' }, { id: 5, label: 'V' }, { id: 6, label: 'S' },
+                                        { id: 0, label: 'D' }
+                                    ].map(day => {
+                                        const isSelected = trainingDays.includes(day.id);
+                                        return (
+                                            <TouchableOpacity
+                                                key={day.id}
+                                                onPress={() => handleToggleTrainingDay(day.id)}
+                                                style={[styles.dayChip, isSelected && styles.dayChipActive]}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={[styles.dayChipText, isSelected && styles.dayChipTextActive]}>{day.label}</Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            </View>
+                        )}
                     </View>
                 )}
 
@@ -1725,5 +1792,77 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '900',
         textTransform: 'uppercase',
+    },
+    goalsTrigger: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: Colors.surface,
+        marginTop: 12,
+        padding: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
+    },
+    goalsTriggerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    goalsTriggerTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: Colors.iron[950],
+    },
+    goalsTriggerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    goalsSummaryText: {
+        fontSize: 12,
+        fontWeight: '900',
+        color: Colors.primary.DEFAULT,
+    },
+    goalsExpanded: {
+        marginTop: 8,
+        padding: 14,
+        backgroundColor: Colors.iron[950],
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: withAlpha(Colors.primary.DEFAULT, '30'),
+    },
+    goalsDesc: {
+        fontSize: 12,
+        color: Colors.iron[600],
+        lineHeight: 18,
+        marginBottom: 12,
+    },
+    daysRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 4,
+    },
+    dayChip: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: Colors.iron[900],
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: Colors.iron[800],
+    },
+    dayChipActive: {
+        backgroundColor: Colors.primary.DEFAULT,
+        borderColor: Colors.primary.DEFAULT,
+    },
+    dayChipText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: Colors.iron[600],
+    },
+    dayChipTextActive: {
+        color: Colors.white,
     },
 });

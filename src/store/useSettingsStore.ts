@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { dataEventService } from '../services/DataEventService';
 import { settingsService } from '../services/SettingsService';
 
 interface SettingsState {
@@ -11,7 +12,7 @@ interface SettingsState {
     setTrainingDays: (days: number[]) => Promise<void>;
 }
 
-export const useSettingsStore = create<SettingsState>((set) => ({
+export const useSettingsStore = create<SettingsState>((set, get) => ({
     unitSystem: 'metric',
     alwaysOn: false,
     trainingDays: [1, 2, 3, 4, 5, 6], // default to Mon-Sat 
@@ -39,3 +40,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
         set({ trainingDays: days });
     }
 }));
+
+// Listen for global settings updates (e.g. from SyncService or ConfigService)
+dataEventService.subscribe('SETTINGS_UPDATED', () => {
+    useSettingsStore.getState().loadSettings();
+});

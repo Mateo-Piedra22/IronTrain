@@ -83,68 +83,59 @@ export async function GET(req: NextRequest) {
                     queryResult = await db.select()
                         .from(table)
                         .where(gt(table.updatedAt, sinceDate));
-                } else if (tableName === 'categories' || tableName === 'exercises' || tableName === 'badges' || tableName === 'exercise_badges') {
-                    // Pull globals (isSystem=1) OR user-owned OR records with no userId (shouldn't happen but safe)
-                    queryResult = await db.select()
-                        .from(table)
-                        .where(and(
-                            or(
-                                eq(table.isSystem, 1),
-                                eq(table.userId, userId)
-                            ),
-                            gt(table.updatedAt, sinceDate)
-                        ));
-                } else if (tableName === 'friendships') {
-                    // Friendship tables - both sides
-                    queryResult = await db.select()
-                        .from(table)
-                        .where(and(
-                            or(eq(table.userId, userId), eq(table.friendId, userId)),
-                            gt(table.updatedAt, sinceDate)
-                        ));
-                } else if (tableName === 'kudos') {
-                    // User's own kudos pull (giver_id)
-                    queryResult = await db.select()
-                        .from(table)
-                        .where(and(
-                            eq(table.giverId, userId),
-                            gt(table.updatedAt, sinceDate)
-                        ));
-                } else if (tableName === 'changelog_reactions' || tableName === 'user_profiles') {
-                    // Tables where the ID field or a specific 'userId' field is used
-                    const idCol = tableName === 'user_profiles' ? table.id : table.userId;
-                    if (!idCol) {
-                        console.warn(`[Sync Pull] Missing id column for ${tableName}`);
-                        queryResult = [];
-                    } else {
-                        queryResult = await db.select()
-                            .from(table)
-                            .where(and(
-                                eq(idCol, userId),
-                                gt(table.updatedAt, sinceDate)
-                            ));
-                    }
                 } else {
-                    // Standard user-owned tables
-                    if (!table.userId) {
-                        console.warn(`[Sync Pull] Table ${tableName} missing userId despite being in owner block`);
-                        queryResult = [];
+                    // Pull records based on ownership and system flags
+                    let conditions = [gt(table.updatedAt, sinceDate)];
+
+                    if (tableName === 'friendships') {
+                        conditions.push(or(eq(table.userId, userId), eq(table.friendId, userId)) as any);
+                    } else if (tableName === 'activity_feed') {
+                        if (allRelevantUserIdsForFeed.length === 0) {
+                            queryResult = [];
+                            continue;
+                        }
+                        conditions.push(inArray(table.userId, allRelevantUserIdsForFeed));
+                    } else if (tableName === 'kudos') {
+                        conditions.push(eq(table.giverId, userId));
+                    } else if (tableName === 'changelog_reactions' || tableName === 'user_profiles') {
+                        const idCol = tableName === 'user_profiles' ? table.id : table.userId;
+                        conditions.push(eq(idCol, userId));
                     } else {
-                        queryResult = await db.select()
-                            .from(table)
-                            .where(and(
-                                eq(table.userId, userId),
-                                gt(table.updatedAt, sinceDate)
-                            ));
+                        // Standard ownership check
+                        const ownerCondition = eq(table.userId, userId);
+
+                        // Check if table has isSystem property specifically as a column
+                        const hasIsSystem = !!(table as any).isSystem;
+
+                        if (hasIsSystem) {
+                            conditions.push(or(eq((table as any).isSystem, 1), ownerCondition) as any);
+                        } else {
+                            conditions.push(ownerCondition);
+                        }
                     }
+
+                    queryResult = await db.select()
+                        .from(table)
+                        .where(and(...conditions));
                 }
 
                 for (const record of queryResult) {
                     const operation = (record.deletedAt && record.deletedAt > sinceDate) ? 'DELETE' : (record.createdAt > sinceDate ? 'INSERT' : 'UPDATE');
+
+                    let payload = toSnakeCase(record as Record<string, unknown>);
+
+                    // UN-PREFIX settings keys for the client
+                    if (tableName === 'settings' && payload.key && typeof payload.key === 'string') {
+                        const prefix = `${userId}:`;
+                        if (payload.key.startsWith(prefix)) {
+                            payload.key = payload.key.substring(prefix.length);
+                        }
+                    }
+
                     changes.push({
                         table: tableName,
                         operation,
-                        payload: toSnakeCase(record as Record<string, unknown>)
+                        payload
                     });
                 }
             } catch (tableError: any) {

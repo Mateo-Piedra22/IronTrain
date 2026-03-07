@@ -84,7 +84,7 @@ async function getWeeklyGoalDays(trx: any, userId: string): Promise<number> {
     const [goalSetting] = await trx
         .select({ value: schema.settings.value })
         .from(schema.settings)
-        .where(and(eq(schema.settings.userId, userId), eq(schema.settings.key, 'training_days')))
+        .where(and(eq(schema.settings.userId, userId), eq(schema.settings.key, `${userId}:training_days`)))
         .limit(1);
     return parseTrainingDays(goalSetting?.value);
 }

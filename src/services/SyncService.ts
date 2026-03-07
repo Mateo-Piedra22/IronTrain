@@ -3,6 +3,8 @@ import { format } from 'date-fns';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Config } from '../constants/Config';
 import { useAuthStore } from '../store/authStore';
+import { useSettingsStore } from '../store/useSettingsStore';
+import { configService } from './ConfigService';
 import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
 
@@ -590,6 +592,11 @@ export class SyncService {
                 dataEventService.emit('DATA_UPDATED');
             }
 
+            // --- Post-Sync Clean (Industrial Repair) ---
+            // After downloading changes, fix any potential duplicates from the cloud
+            console.log('[Sync] Performing post-pull consistency check...');
+            await dbService.repairDataConsistency();
+
         } catch (error) {
             console.error('PULL sync failed:', error);
             throw error; // Throw so syncBidirectional fails loudly
@@ -886,7 +893,16 @@ export class SyncService {
 
         await this.restoreDatabaseSnapshot(fileUri);
 
+        // Reload services & stores after snapshot restore
+        await configService.reload();
+        await useSettingsStore.getState().loadSettings();
+
         await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', Date.now().toString()]);
+
+        // Notify app
+        dataEventService.emit('DATA_UPDATED');
+        dataEventService.emit('SETTINGS_UPDATED');
+        dataEventService.emit('SOCIAL_UPDATED');
     }
 }
 
