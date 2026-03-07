@@ -12,12 +12,15 @@ export class SettingsService {
     }
 
     public async setSetting(key: string, value: string, description?: string): Promise<void> {
+        const now = Date.now();
         // Upsert
         await dbService.run(
-            `INSERT INTO settings (key, value, description) VALUES (?, ?, ?)
-             ON CONFLICT(key) DO UPDATE SET value=excluded.value, description=excluded.description`,
-            [key, value, description || null]
+            `INSERT INTO settings (key, value, description, updated_at) VALUES (?, ?, ?, ?)
+             ON CONFLICT(key) DO UPDATE SET value=excluded.value, description=excluded.description, updated_at=excluded.updated_at`,
+            [key, value, description || null, now]
         );
+        // Queue for sync
+        await dbService.queueSyncMutation('settings', key, 'INSERT', { key, value, description, updated_at: now });
     }
 
     // --- Plate Inventory ---

@@ -436,12 +436,13 @@ export class SyncService {
                             .filter((v): v is string => typeof v === 'string' && v.length > 0);
 
                         const hasSoftDelete = TABLES_WITH_SOFT_DELETE.has(table);
-                        const columns = ['id', 'updated_at'];
+                        const pkField = table === 'settings' ? 'key' : 'id';
+                        const columns = [pkField, 'updated_at'];
                         if (hasSoftDelete) columns.push('deleted_at');
 
                         const existingRows = ids.length > 0
                             ? await dbService.getAll<any>(
-                                `SELECT ${columns.join(', ')} FROM ${table} WHERE id IN (${ids.map(() => '?').join(', ')})`,
+                                `SELECT ${columns.join(', ')} FROM ${table} WHERE ${pkField} IN (${ids.map(() => '?').join(', ')})`,
                                 ids
                             ).catch(e => {
                                 console.error(`[Sync] Failed to query existing rows for table ${table}. Columns: ${columns.join(', ')}`, e);

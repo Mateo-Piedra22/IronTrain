@@ -230,7 +230,14 @@ class ConfigService {
         if (typeof value === 'boolean') dbValue = value ? 'true' : 'false';
         else if (typeof value === 'object') dbValue = JSON.stringify(value);
 
-        await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, dbValue]);
+        const now = Date.now();
+        await dbService.run(
+            'INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?)',
+            [key, dbValue, now]
+        );
+
+        // Queue for sync so it reaches the cloud
+        await dbService.queueSyncMutation('settings', key, 'INSERT', { key, value: dbValue, updated_at: now });
 
         // Emit event for real-time UI updates
         try {

@@ -353,7 +353,8 @@ export class DatabaseService {
                     CREATE TABLE IF NOT EXISTS settings (
                         key TEXT PRIMARY KEY NOT NULL,
                         value TEXT NOT NULL,
-                        description TEXT
+                        description TEXT,
+                        updated_at INTEGER DEFAULT 0
                     );
                  `);
             }
@@ -843,6 +844,17 @@ export class DatabaseService {
             await this.repairDataConsistency();
         } catch (e) {
             console.error('[Migration] Migration 17 failed:', e);
+        }
+
+        // Migration 18: Add updated_at to settings table
+        try {
+            const hasUpdatedAt = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('settings') WHERE name='updated_at'");
+            if (!hasUpdatedAt || hasUpdatedAt.count === 0) {
+                console.log('[Migration] Migration 18: Adding updated_at to settings');
+                await this.executeRaw('ALTER TABLE settings ADD COLUMN updated_at INTEGER DEFAULT 0');
+            }
+        } catch (e) {
+            console.warn('Migration 18 failed:', e);
         }
     }
 
