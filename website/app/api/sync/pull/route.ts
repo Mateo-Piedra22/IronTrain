@@ -13,6 +13,8 @@ const toSnakeCase = (camelObj: Record<string, unknown>): Record<string, unknown>
         const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
         if (value instanceof Date) {
             snakeObj[snakeKey] = value.getTime();
+        } else if (typeof value === 'bigint') {
+            snakeObj[snakeKey] = Number(value);
         } else {
             snakeObj[snakeKey] = typeof value === 'boolean' ? (value ? 1 : 0) : value;
         }
