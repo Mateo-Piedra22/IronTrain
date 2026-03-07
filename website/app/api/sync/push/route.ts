@@ -137,8 +137,23 @@ export async function POST(req: NextRequest) {
                 // Robust filtering: Only keep keys that exist in the Drizzle table schema
                 const validKeys = new Set(Object.keys(tableSchema));
                 for (const key of Object.keys(payload)) {
-                    if (!validKeys.has(key) && key !== 'updatedAt' && key !== 'deletedAt' && key !== 'userId') {
+                    if (!validKeys.has(key)) {
                         delete (payload as any)[key];
+                        continue;
+                    }
+
+                    // Safety check: Drizzle bigint columns receive Numbers in the payload (ms timestamps).
+                    // If the schema expects a bigint but we have a number, it's fine as long as Postgres bigint can hold it.
+                    // But if it's a field like 'date' in workouts which we just changed to bigint, 
+                    // we must ensure it's not being treated as an integer by the driver.
+                    const columnMetadata = (tableSchema as any)[key];
+                    if (columnMetadata?.columnType === 'PgBigInt53' || columnMetadata?.dataType === 'bigint') {
+                        const val = (payload as any)[key];
+                        if (typeof val === 'string') {
+                            (payload as any)[key] = BigInt(val);
+                        } else if (typeof val === 'number') {
+                            (payload as any)[key] = BigInt(Math.floor(val));
+                        }
                     }
                 }
 

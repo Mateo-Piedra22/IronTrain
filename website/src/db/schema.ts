@@ -1,4 +1,4 @@
-import { integer, pgTable, real, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, integer, pgTable, real, text, timestamp } from 'drizzle-orm/pg-core';
 
 const commonFields = {
     userId: text('user_id').notNull(),
@@ -46,15 +46,15 @@ export const exercises = pgTable('exercises', {
 
 export const workouts = pgTable('workouts', {
     id: text('id').primaryKey(),
-    date: integer('date').notNull(),
-    startTime: integer('start_time').notNull(),
-    endTime: integer('end_time'),
+    date: bigint('date', { mode: 'number' }).notNull(),
+    startTime: bigint('start_time', { mode: 'number' }).notNull(),
+    endTime: bigint('end_time', { mode: 'number' }),
     finishLat: real('finish_lat'),
     finishLon: real('finish_lon'),
     name: text('name').notNull(),
     notes: text('notes'),
     status: text('status'),
-    duration: integer('duration'),
+    duration: bigint('duration', { mode: 'number' }),
     isTemplate: integer('is_template').default(0),
     ...commonFields,
 });
@@ -67,9 +67,9 @@ export const workoutSets = pgTable('workout_sets', {
     weight: real('weight'),
     reps: integer('reps'),
     distance: real('distance'),
-    time: integer('time'),
+    time: bigint('time', { mode: 'number' }),
     rpe: integer('rpe'),
-    orderIndex: integer('order_index').default(0),
+    orderIndex: bigint('order_index', { mode: 'number' }).default(0),
     completed: integer('completed').default(0),
     notes: text('notes'),
     supersetId: text('superset_id'),

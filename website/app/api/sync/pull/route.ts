@@ -84,6 +84,14 @@ export async function GET(req: NextRequest) {
                         or(eq(table.userId, userId), eq(table.friendId, userId)),
                         gt(table.updatedAt, sinceDate)
                     ));
+            } else if (tableName === 'user_profiles') {
+                // User's own profile pull
+                queryResult = await db.select()
+                    .from(table)
+                    .where(and(
+                        eq(table.id, userId),
+                        gt(table.updatedAt, sinceDate)
+                    ));
             } else {
                 // User-owned tables
                 queryResult = await db.select()
