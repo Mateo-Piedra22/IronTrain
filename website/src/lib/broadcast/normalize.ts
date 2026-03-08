@@ -49,8 +49,8 @@ export function normalizeTargeting(params: {
 export function sortBroadcastItems(items: BroadcastItem[]): BroadcastItem[] {
     return [...items].sort((a, b) => {
         if (a.priority !== b.priority) return b.priority - a.priority;
-        const aTime = a.createdAt.getTime();
-        const bTime = b.createdAt.getTime();
+        const aTime = new Date(a.createdAt).getTime();
+        const bTime = new Date(b.createdAt).getTime();
         if (aTime !== bTime) return bTime - aTime;
         return a.id.localeCompare(b.id);
     });

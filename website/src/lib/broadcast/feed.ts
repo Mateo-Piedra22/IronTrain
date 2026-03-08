@@ -64,7 +64,7 @@ function buildAnnouncementItem(row: typeof schema.adminNotifications.$inferSelec
             reactionCount: row.reactionCount ?? 0,
             userReacted: null,
         },
-        createdAt: row.createdAt,
+        createdAt: new Date(row.createdAt),
     };
 }
 
@@ -106,7 +106,7 @@ function buildChangelogItem(row: typeof schema.changelogs.$inferSelect): Broadca
             reactionCount: row.reactionCount ?? 0,
             userReacted: null,
         },
-        createdAt: row.date,
+        createdAt: new Date(row.date),
     };
 }
 
@@ -136,7 +136,7 @@ function buildGlobalEventItem(row: typeof schema.globalEvents.$inferSelect, now:
             reactionCount: 0,
             userReacted: null,
         },
-        createdAt: row.updatedAt,
+        createdAt: new Date(row.updatedAt),
     };
 }
 
@@ -206,9 +206,9 @@ export async function buildBroadcastFeed(params: {
         const fourteenDaysAgo = Math.floor((Date.now() - 14 * 24 * 60 * 60 * 1000) / 1000);
 
         const ctx: SegmentContext = {
-            isNewUser: profile ? (profile.updatedAt.getTime() > now.getTime() - 7 * 24 * 60 * 60 * 1000) : false,
-            isActiveUser: lastWorkout ? (lastWorkout.date > sevenDaysAgo) : false,
-            isInactiveUser: lastWorkout ? (lastWorkout.date < fourteenDaysAgo) : true,
+            isNewUser: profile ? (new Date(profile.updatedAt).getTime() > now.getTime() - 7 * 24 * 60 * 60 * 1000) : false,
+            isActiveUser: lastWorkout ? (Number(lastWorkout.date) > sevenDaysAgo) : false,
+            isInactiveUser: lastWorkout ? (Number(lastWorkout.date) < fourteenDaysAgo) : true,
             hasReceivedRecentSystem,
         };
 

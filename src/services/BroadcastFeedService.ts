@@ -96,8 +96,6 @@ export class BroadcastFeedService {
 
             const res = await fetch(url, {
                 headers,
-                // Add a timeout to avoid hangs on bad connectivity
-                signal: AbortController ? AbortSignal.timeout(8000) : undefined
             });
 
             if (res.ok) {

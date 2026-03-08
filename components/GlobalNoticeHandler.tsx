@@ -320,9 +320,9 @@ const ss = StyleSheet.create({
         overflow: 'hidden',
     },
     modalHeader: {
-        alignItems: 'center',
-        gap: 12,
+        alignItems: 'flex-start',
         marginBottom: 20,
+        gap: 12,
     },
     iconCircle: {
         width: 52,
@@ -338,7 +338,8 @@ const ss = StyleSheet.create({
         fontWeight: '900',
         color: Colors.iron[950],
         letterSpacing: -0.3,
-        textAlign: 'center',
+        textAlign: 'left',
+        flexShrink: 1,
     },
     modalBody: {
         flexShrink: 1,

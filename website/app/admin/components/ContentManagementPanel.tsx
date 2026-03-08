@@ -250,6 +250,12 @@ export default function ContentManagementPanel({
                                                     <div className="text-[8px] opacity-40 font-black">CLCK</div>
                                                     <div className="text-xs font-black">{stats.clicked}</div>
                                                 </div>
+                                                {n.reactionCount > 0 && (
+                                                    <div className="bg-orange-500/10 p-1 border border-orange-500/20 col-span-2">
+                                                        <div className="text-[8px] text-orange-600 font-black">REACTIONS (KUDOS)</div>
+                                                        <div className="text-xs font-black text-orange-700">{n.reactionCount}</div>
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="flex items-center justify-end gap-3 pt-2">
                                                 <Link
@@ -332,6 +338,10 @@ export default function ContentManagementPanel({
                                                     </button>
                                                 </form>
                                             )}
+                                            <div className="flex items-center gap-1 bg-orange-500/10 px-1.5 py-0.5 rounded-sm border border-orange-500/10">
+                                                <span className="text-[8px] font-black text-orange-600 mr-0.5">KUDOS</span>
+                                                <span className="text-[10px] font-black text-orange-700">{c.reactionCount || 0}</span>
+                                            </div>
                                             <Link
                                                 href={`?tab=${searchParams.get('tab') || 'content'}&section=changelog&editChangelogId=${c.id}`}
                                                 className="text-[10px] font-black uppercase hover:underline"
