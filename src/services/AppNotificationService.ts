@@ -20,7 +20,7 @@ const BACKEND_URL = Config.API_URL;
 const API_URL = `${BACKEND_URL}/api/notifications`;
 
 export class AppNotificationService {
-    static async getActiveNotifications(): Promise<AppNotification[]> {
+    static async getActiveNotifications(isFeed = false): Promise<AppNotification[]> {
         try {
             const version = ChangelogService.getAppVersion();
             const { user, token } = useAuthStore.getState();
@@ -28,6 +28,7 @@ export class AppNotificationService {
 
             let url = `${API_URL}?version=${version}&platform=${platform}`;
             if (user?.id) url += `&userId=${user.id}`;
+            if (isFeed) url += `&feed=true`;
 
             const headers: Record<string, string> = {};
             if (token) headers['Authorization'] = `Bearer ${token}`;

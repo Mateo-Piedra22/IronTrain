@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { Bell, ChevronLeft, Info } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 function isSameVersion(a: string, b: string) {
@@ -80,20 +80,21 @@ export default function UpdatesScreen() {
     const [releases, setReleases] = useState<ChangelogRelease[]>([]);
     const [news, setNews] = useState<AppNotification[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
 
     const loadData = useCallback(async () => {
         setIsLoading(true);
         try {
             await Promise.all([
                 ChangelogService.sync(),
-                AppNotificationService.getActiveNotifications().then(setNews)
+                AppNotificationService.getActiveNotifications(true).then(setNews)
             ]);
             const rels = await ChangelogService.getReleases();
             setReleases(rels);
 
-            const latest = rels[0];
-            if (latest?.version) {
-                configService.set('lastViewedChangelogVersion', latest.version);
+            if (rels.length > 0) {
+                setExpandedVersion(rels[0].version); // Expand the latest one by default
+                configService.set('lastViewedChangelogVersion', rels[0].version);
             }
         } finally {
             setIsLoading(false);
@@ -105,28 +106,6 @@ export default function UpdatesScreen() {
             loadData();
         }, [loadData])
     );
-
-    const combinedItems = useMemo(() => {
-        const items: Array<{ type: 'version' | 'news'; data: any; sortDate: number }> = [];
-
-        releases.forEach(r => {
-            let dateVal = 0;
-            if (r.date) {
-                try { dateVal = new Date(r.date).getTime(); } catch { }
-            }
-            items.push({ type: 'version', data: r, sortDate: dateVal });
-        });
-
-        news.forEach(n => {
-            let dateVal = 0;
-            if (n.createdAt) {
-                try { dateVal = new Date(n.createdAt).getTime(); } catch { }
-            }
-            items.push({ type: 'news', data: n, sortDate: dateVal });
-        });
-
-        return items.sort((a, b) => b.sortDate - a.sortDate);
-    }, [releases, news]);
 
     const renderNews = (n: AppNotification) => {
         return (
@@ -157,9 +136,14 @@ export default function UpdatesScreen() {
 
     const renderRelease = (r: ChangelogRelease) => {
         const isCurrent = isSameVersion(r.version, appVersion);
+        const isExpanded = expandedVersion === r.version;
         return (
             <View key={r.version} style={ss.releaseCard}>
-                <View style={ss.releaseHeader}>
+                <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => setExpandedVersion(isExpanded ? null : r.version)}
+                    style={ss.releaseHeader}
+                >
                     <View style={{ flex: 1, paddingRight: 12 }}>
                         <View style={ss.releaseTop}>
                             <Text style={ss.releaseVersion}>v{r.version}</Text>
@@ -171,27 +155,29 @@ export default function UpdatesScreen() {
                         </View>
                         <Text style={ss.releaseDate}>{r.date ?? '—'}</Text>
                     </View>
-                    <Info size={16} color={Colors.iron[400]} />
-                </View>
+                    <Info size={18} color={isExpanded ? Colors.primary.DEFAULT : Colors.iron[400]} />
+                </TouchableOpacity>
 
-                <View style={ss.releaseBody}>
-                    <View style={{ gap: 10 }}>
-                        {r.items.map((it, idx) => (
-                            <View key={`${r.version}-${idx}`} style={ss.itemRow}>
-                                <View style={ss.itemBulletWrapper}>
-                                    <View style={ss.itemBulletDot} />
+                {isExpanded && (
+                    <View style={ss.releaseBody}>
+                        <View style={{ gap: 10 }}>
+                            {r.items.map((it, idx) => (
+                                <View key={`${r.version}-${idx}`} style={ss.itemRow}>
+                                    <View style={ss.itemBulletWrapper}>
+                                        <View style={ss.itemBulletDot} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        {renderFormattedText(it, ss.itemText, ss.itemBold)}
+                                    </View>
                                 </View>
-                                <View style={{ flex: 1 }}>
-                                    {renderFormattedText(it, ss.itemText, ss.itemBold)}
-                                </View>
-                            </View>
-                        ))}
-                    </View>
+                            ))}
+                        </View>
 
-                    <View style={ss.releaseFooter}>
-                        <KudosButton id={r.version} type="version" initialCount={r.reactionCount} />
+                        <View style={ss.releaseFooter}>
+                            <KudosButton id={r.version} type="version" initialCount={r.reactionCount} />
+                        </View>
                     </View>
-                </View>
+                )}
             </View>
         );
     };
@@ -200,7 +186,7 @@ export default function UpdatesScreen() {
         <SafeAreaWrapper style={{ flex: 1, backgroundColor: Colors.iron[900] }} edges={['top', 'left', 'right', 'bottom']}>
             <Stack.Screen options={{ headerShown: false }} />
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-                <View style={{ marginBottom: 28, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                <View style={{ marginBottom: 20, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
                     <TouchableOpacity onPress={() => router.back()} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
                         <ChevronLeft size={20} color={Colors.iron[950]} />
                     </TouchableOpacity>
@@ -215,16 +201,36 @@ export default function UpdatesScreen() {
                         <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
                         <Text style={ss.loadingText}>Sincronizando novedades...</Text>
                     </View>
-                ) : combinedItems.length > 0 ? (
-                    <View>
-                        {combinedItems.map(item =>
-                            item.type === 'news' ? renderNews(item.data) : renderRelease(item.data)
-                        )}
-                    </View>
                 ) : (
-                    <View style={ss.emptyCard}>
-                        <Text style={ss.emptyTitle}>Sin novedades recientes</Text>
-                        <Text style={ss.emptySub}>No hemos encontrado anuncios ni versiones nuevas todavía.</Text>
+                    <View>
+                        {/* Section 1: Official News */}
+                        {news.length > 0 && (
+                            <View style={{ marginBottom: 12 }}>
+                                <View style={ss.sectionHeader}>
+                                    <Text style={ss.sectionTitle}>ANUNCIOS</Text>
+                                    <View style={ss.sectionLine} />
+                                </View>
+                                {news.map(n => renderNews(n))}
+                            </View>
+                        )}
+
+                        {/* Section 2: App Versions */}
+                        {releases.length > 0 && (
+                            <View>
+                                <View style={ss.sectionHeader}>
+                                    <Text style={ss.sectionTitle}>HISTORIAL DE VERSIONES</Text>
+                                    <View style={ss.sectionLine} />
+                                </View>
+                                {releases.map(r => renderRelease(r))}
+                            </View>
+                        )}
+
+                        {news.length === 0 && releases.length === 0 && (
+                            <View style={ss.emptyCard}>
+                                <Text style={ss.emptyTitle}>Sin novedades recientes</Text>
+                                <Text style={ss.emptySub}>No hemos encontrado anuncios ni versiones nuevas todavía.</Text>
+                            </View>
+                        )}
                     </View>
                 )}
             </ScrollView>
@@ -256,9 +262,12 @@ const ss = StyleSheet.create({
     itemRow: { flexDirection: 'row', alignItems: 'flex-start' },
     itemBulletWrapper: { width: 18, alignItems: 'flex-start', paddingTop: 8 },
     itemBulletDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary.DEFAULT },
-    itemText: { color: Colors.iron[600], flex: 1, fontSize: 14, lineHeight: 22 },
-    itemBold: { color: Colors.iron[900], fontWeight: '800' },
+    itemText: { color: Colors.iron[700], flex: 1, fontSize: 14, lineHeight: 22 },
+    itemBold: { color: Colors.black, fontWeight: '900' },
     releaseFooter: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.iron[100], alignItems: 'flex-end' },
+    sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16, marginTop: 8, paddingHorizontal: 4 },
+    sectionTitle: { color: Colors.iron[400], fontSize: 11, fontWeight: '900', letterSpacing: 1.2 },
+    sectionLine: { flex: 1, height: 1, backgroundColor: Colors.iron[200], opacity: 0.5 },
     kudosBtn: { backgroundColor: Colors.iron[50], paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[200] },
     kudosContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     kudosCount: { color: Colors.iron[950], fontWeight: '900', fontSize: 16 },

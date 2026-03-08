@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     const version = searchParams.get('version');
     const platform = searchParams.get('platform');
     const queryUserId = searchParams.get('userId');
+    const isFeed = searchParams.get('feed') === 'true';
 
     try {
         const authedUserId = await verifyAuth(request);
@@ -78,8 +79,8 @@ export async function GET(request: NextRequest) {
             const isInactiveUser = lastWorkout ? (lastWorkout.date < fourteenDaysAgo) : true;
 
             filteredData = data.filter(n => {
-                // Apply Capping for system/modal types
-                if (hasReceivedRecentSystem && (n.type === 'system' || n.type === 'modal')) {
+                // Apply Capping for system/modal types - bypass if loading for the news feed
+                if (!isFeed && hasReceivedRecentSystem && (n.type === 'system' || n.type === 'modal')) {
                     return false;
                 }
 
