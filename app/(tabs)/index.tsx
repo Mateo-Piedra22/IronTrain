@@ -309,45 +309,40 @@ export default function DailyLogScreen() {
                   onPress={() => {
                     const tests = [
                       {
-                        id: 'test-chg',
-                        kind: 'changelog',
-                        title: 'Nueva Versión v1.5.0',
-                        body: '**Modo Oscuro** Mejorado\n**Sincronización** 2x más rápida\nCorrección de errores menores',
-                        targeting: { version: '1.5.0' },
-                        uiType: 'modal',
-                        displayMode: 'once',
-                        priority: 3,
-                        engagement: { reactionCount: 15, userReacted: false }
-                      },
-                      {
-                        id: 'test-ann-modal',
+                        id: 'test-toast',
                         kind: 'announcement',
-                        title: 'Mantenimiento Programado',
-                        body: 'Estaremos fuera de línea este **Domingo** para mejorar los servidores.',
-                        uiType: 'modal',
-                        displayMode: 'always',
-                        priority: 2,
-                        engagement: { reactionCount: 5, userReacted: false }
-                      },
-                      {
-                        id: 'test-ann-toast',
-                        kind: 'announcement',
-                        title: '¡Oferta Especial!',
-                        body: 'Descuento del 50% en IronTrain Pro.',
+                        title: 'Test: Fast Toast ⚡',
+                        body: 'This is a toast notification using the new hub system.',
                         uiType: 'toast',
                         displayMode: 'once',
                         priority: 1,
-                        engagement: { reactionCount: 120, userReacted: true }
+                      },
+                      {
+                        id: 'test-modal',
+                        kind: 'announcement',
+                        title: 'Test: Standard Modal 🔔',
+                        body: 'This is a standard modal announcement for important messages.',
+                        uiType: 'modal',
+                        displayMode: 'once',
+                        priority: 2,
+                      },
+                      {
+                        id: 'test-changelog',
+                        kind: 'changelog',
+                        title: 'Test: What\'s New 🛠️',
+                        body: 'v2.0.1\n- New design system\n- Improved performance\n- Bug fixes',
+                        targeting: { version: '2.0.1' },
+                        createdAt: new Date().toISOString()
                       },
                       {
                         id: 'test-event',
                         kind: 'global_event',
-                        title: 'Iron Games 2026',
-                        body: 'Participa en el evento global y gana medallas exclusivas.',
+                        title: 'Test: Global Event 🌍',
+                        body: 'Iron Games 2026: Join the summer challenge now!',
                         uiType: 'modal',
                         displayMode: 'always',
-                        priority: 2,
-                        engagement: { reactionCount: 300, userReacted: false }
+                        priority: 3,
+                        engagement: { reactionCount: 150, userReacted: false }
                       }
                     ];
                     const nextIndex = (global as any).__lastTestBroadcastIndex === undefined ? 0 : ((global as any).__lastTestBroadcastIndex + 1) % tests.length;

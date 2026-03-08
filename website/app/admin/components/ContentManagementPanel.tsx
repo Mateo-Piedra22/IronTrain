@@ -1,3 +1,5 @@
+'use client';
+
 import {
     Bell,
     History,
@@ -20,20 +22,19 @@ type GlobalEventRow = {
     id: string;
     name: string;
     multiplier: number;
-    startDate: Date;
-    endDate: Date;
+    startDate: string;
+    endDate: string;
     isActive: number;
 };
 
 interface ContentManagementPanelProps {
     changelogs: any[];
-    notifications: any[];
+    notifications: (any & { stats: { seen: number; clicked: number } })[];
     globalEvents: GlobalEventRow[];
     editingChangelog: any | null;
     editingNotification: any | null;
-    getNotifStats: (id: string) => { seen: number; clicked: number };
     syncStatus: {
-        lastSyncAt: Date | null;
+        lastSyncAt: string | null;
         totalInDb: number;
         syncStatus: string | null;
         upsertedCount: string | null;
@@ -48,7 +49,6 @@ export default function ContentManagementPanel({
     globalEvents,
     editingChangelog,
     editingNotification,
-    getNotifStats,
     syncStatus
 }: ContentManagementPanelProps) {
     const [activeSection, setActiveSection] = React.useState<'broadcast' | 'changelog' | 'events'>('broadcast');
@@ -194,15 +194,15 @@ export default function ContentManagementPanel({
                             <div className="text-[10px] font-black uppercase opacity-60">SHOWING_{notifications.length}_SENT</div>
                         </div>
                         {notifications.map(n => {
-                            const stats = getNotifStats(n.id);
+                            const stats = n.stats;
                             return (
                                 <div key={n.id} className={`border-2 border-[#1a1a2e] bg-white hover:shadow-[4px_4px_0px_0px_rgba(26,26,46,0.1)] transition-all ${n.isActive ? 'border-l-8 border-l-green-500' : 'opacity-60 border-l-8 border-l-red-500'}`}>
                                     <div className="p-4 flex flex-col md:flex-row gap-4">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <span className={`text-[8px] font-black uppercase px-1 py-0.5 ${n.priority === 'critical' ? 'bg-red-600 text-white' :
-                                                        n.priority === 'high' ? 'bg-orange-600 text-white' :
-                                                            'bg-[#1a1a2e] text-[#f5f1e8]'
+                                                    n.priority === 'high' ? 'bg-orange-600 text-white' :
+                                                        'bg-[#1a1a2e] text-[#f5f1e8]'
                                                     }`}>
                                                     {n.type}_{n.priority}
                                                 </span>

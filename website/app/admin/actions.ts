@@ -1,3 +1,4 @@
+'use server';
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -24,7 +25,6 @@ export async function getAuthenticatedAdmin(): Promise<string | null> {
 }
 
 export async function markFeedbackStatus(formData: FormData) {
-    'use server';
     const adminId = await getAuthenticatedAdmin();
     if (!adminId) throw new Error('Unauthorized');
     const id = formData.get('id') as string;
@@ -35,7 +35,6 @@ export async function markFeedbackStatus(formData: FormData) {
 }
 
 export async function handleGlobalEventDeriveAnnouncementAction(formData: FormData) {
-    'use server';
     const adminId = await getAuthenticatedAdmin();
     if (!adminId) throw new Error('Unauthorized');
 
@@ -89,7 +88,6 @@ export async function handleGlobalEventDeriveAnnouncementAction(formData: FormDa
 }
 
 export async function handleChangelogPublishAction(formData: FormData) {
-    'use server';
     const adminId = await getAuthenticatedAdmin();
     if (!adminId) throw new Error('Unauthorized');
 
@@ -123,7 +121,6 @@ export async function handleChangelogPublishAction(formData: FormData) {
 }
 
 export async function handleRoutineAction(formData: FormData) {
-    'use server';
     const adminId = await getAuthenticatedAdmin();
     if (!adminId) throw new Error('Unauthorized');
 
@@ -157,7 +154,6 @@ export async function handleRoutineAction(formData: FormData) {
 }
 
 export async function handleChangelogAction(formData: FormData) {
-    'use server';
     const adminId = await getAuthenticatedAdmin();
     if (!adminId) throw new Error('Unauthorized');
 
@@ -206,7 +202,6 @@ export async function handleChangelogAction(formData: FormData) {
 }
 
 export async function handleChangelogSyncAction() {
-    'use server';
     const adminId = await getAuthenticatedAdmin();
     if (!adminId) throw new Error('Unauthorized');
 
@@ -222,7 +217,6 @@ export async function handleChangelogSyncAction() {
 }
 
 export async function handleNotificationAction(formData: FormData) {
-    'use server';
     const adminId = await getAuthenticatedAdmin();
     if (!adminId) throw new Error('Unauthorized');
 
@@ -289,7 +283,6 @@ export async function handleNotificationAction(formData: FormData) {
 }
 
 export async function handleScoringConfigAction(formData: FormData) {
-    'use server';
     const adminId = await getAuthenticatedAdmin();
     if (!adminId) throw new Error('Unauthorized');
 
@@ -348,7 +341,6 @@ export async function handleScoringConfigAction(formData: FormData) {
 }
 
 export async function handleGlobalEventAction(formData: FormData) {
-    'use server';
     const adminId = await getAuthenticatedAdmin();
     if (!adminId) throw new Error('Unauthorized');
 

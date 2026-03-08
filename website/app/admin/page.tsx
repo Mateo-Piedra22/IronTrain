@@ -205,6 +205,62 @@ export default async function AdminPage({
         hour: '2-digit', minute: '2-digit'
     });
 
+    // Convert all dates to strings for safe serialization to client components
+    const sanitizedChangelogs = changelogs.map(c => ({
+        ...c,
+        date: c.date.toISOString(),
+        createdAt: c.createdAt.toISOString(),
+        updatedAt: c.updatedAt.toISOString(),
+    }));
+
+    const sanitizedNotifications = adminNotificationsData.map(n => ({
+        ...n,
+        scheduledAt: n.scheduledAt.toISOString(),
+        createdAt: n.createdAt.toISOString(),
+        updatedAt: n.updatedAt.toISOString(),
+        expiresAt: n.expiresAt?.toISOString() || null,
+        stats: getNotifStats(n.id)
+    }));
+
+    const sanitizedGlobalEvents = globalEventsData.map(e => ({
+        ...e,
+        startDate: e.startDate.toISOString(),
+        endDate: e.endDate.toISOString(),
+        createdAt: e.createdAt.toISOString(),
+        updatedAt: e.updatedAt.toISOString(),
+    }));
+
+    const sanitizedRoutines = routinesData.map(r => ({
+        ...r,
+        updatedAt: r.updatedAt.toISOString(),
+    }));
+
+    const sanitizedFeedback = feedbackRows.map(f => ({
+        ...f,
+        createdAt: f.createdAt.toISOString(),
+        updatedAt: f.updatedAt.toISOString(),
+    }));
+
+    const sanitizedLeaderboard = leaderboardData.map(p => ({
+        ...p,
+        updatedAt: p.updatedAt.toISOString(),
+    }));
+
+    const sanitizedBreakdown = Object.fromEntries(
+        Object.entries(breakdownByUser).map(([uid, items]) => [uid, items])
+    );
+
+    const sanitizedRecent = Object.fromEntries(
+        Object.entries(recentEventsByUser).map(([uid, events]) => [
+            uid,
+            events.map(e => ({
+                ...e,
+                createdAt: e.createdAt.toISOString(),
+                updatedAt: e.updatedAt.toISOString(),
+            }))
+        ])
+    );
+
     return (
         <div className="min-h-screen bg-[#f5f1e8] text-[#1a1a2e] font-mono p-4 md:p-8 selection:bg-[#1a1a2e] selection:text-[#f5f1e8]">
             <header className="mb-12 border-b-2 border-[#1a1a2e] pb-8">
@@ -235,23 +291,22 @@ export default async function AdminPage({
                 socialPanel={
                     <IronSocialPanel
                         scoreConfig={scoreConfig}
-                        globalEvents={globalEventsData}
-                        leaderboard={leaderboardData}
-                        breakdownByUser={breakdownByUser}
-                        recentEventsByUser={recentEventsByUser}
+                        globalEvents={sanitizedGlobalEvents}
+                        leaderboard={sanitizedLeaderboard}
+                        breakdownByUser={sanitizedBreakdown}
+                        recentEventsByUser={sanitizedRecent}
                     />
                 }
                 contentPanel={
                     <ContentManagementPanel
-                        changelogs={changelogs}
-                        notifications={adminNotificationsData}
-                        globalEvents={globalEventsData}
-                        getNotifStats={getNotifStats}
-                        editingChangelog={editChangelogId ? changelogs.find(c => c.id === editChangelogId) : null}
-                        editingNotification={editNotifId ? adminNotificationsData.find(n => n.id === editNotifId) : null}
+                        changelogs={sanitizedChangelogs}
+                        notifications={sanitizedNotifications}
+                        globalEvents={sanitizedGlobalEvents}
+                        editingChangelog={editChangelogId ? sanitizedChangelogs.find(c => c.id === editChangelogId) : null}
+                        editingNotification={editNotifId ? sanitizedNotifications.find(n => n.id === editNotifId) : null}
                         syncStatus={{
-                            lastSyncAt: lastChangelogSync,
-                            totalInDb: changelogs.length,
+                            lastSyncAt: lastChangelogSync instanceof Date ? lastChangelogSync.toISOString() : lastChangelogSync,
+                            totalInDb: sanitizedChangelogs.length,
                             syncStatus: changelogSyncStatus || null,
                             upsertedCount: changelogUpserted || null,
                             sourceCount: changelogSource || null,
@@ -261,8 +316,8 @@ export default async function AdminPage({
                 }
                 moderationPanel={
                     <CommunityModerationPanel
-                        routines={routinesData}
-                        feedback={feedbackRows}
+                        routines={sanitizedRoutines}
+                        feedback={sanitizedFeedback}
                     />
                 }
             />
