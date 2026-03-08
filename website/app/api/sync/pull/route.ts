@@ -1,36 +1,11 @@
-import { and, eq, gt, inArray, or } from 'drizzle-orm';
+import { and, eq, gt } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { SYNC_TABLES } from '../../../../src/constants/sync';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
 
 export const runtime = 'nodejs';
-
-export const SYNC_TABLES: ReadonlyArray<string> = [
-    'categories',
-    'exercises',
-    'workouts',
-    'workout_sets',
-    'routines',
-    'routine_days',
-    'routine_exercises',
-    'measurements',
-    'goals',
-    'body_metrics',
-    'plate_inventory',
-    'settings',
-    'badges',
-    'exercise_badges',
-    'user_profiles',
-    'changelogs',
-    'changelog_reactions',
-    'notification_reactions',
-    'kudos',
-    'activity_feed',
-    'score_events',
-    'user_exercise_prs',
-    'friendships',
-];
 
 const toSnakeCase = (camelObj: Record<string, unknown>): Record<string, unknown> => {
     if (!camelObj || typeof camelObj !== 'object') return camelObj;
@@ -58,129 +33,74 @@ export async function GET(req: NextRequest) {
 
     try {
         const tableMap: Record<string, any> = {
-            'categories': schema.categories,
-            'exercises': schema.exercises,
-            'workouts': schema.workouts,
-            'workout_sets': schema.workoutSets,
-            'routines': schema.routines,
-            'routine_days': schema.routineDays,
-            'routine_exercises': schema.routineExercises,
-            'measurements': schema.measurements,
-            'goals': schema.goals,
-            'body_metrics': schema.bodyMetrics,
-            'plate_inventory': schema.plateInventory,
-            'settings': schema.settings,
-            'badges': schema.badges,
-            'exercise_badges': schema.exerciseBadges,
-            'user_profiles': schema.userProfiles,
-            'changelogs': schema.changelogs,
-            'changelog_reactions': schema.changelogReactions,
-            'notification_reactions': schema.notificationReactions,
-            'kudos': schema.kudos,
-            'activity_feed': schema.activityFeed,
-            'score_events': schema.scoreEvents,
-            'user_exercise_prs': schema.userExercisePrs,
-            'friendships': schema.friendships,
+            categories: schema.categories,
+            exercises: schema.exercises,
+            workouts: schema.workouts,
+            workout_sets: schema.workoutSets,
+            routines: schema.routines,
+            routine_days: schema.routineDays,
+            routine_exercises: schema.routineExercises,
+            measurements: schema.measurements,
+            goals: schema.goals,
+            body_metrics: schema.bodyMetrics,
+            plate_inventory: schema.plateInventory,
+            settings: schema.settings,
+            badges: schema.badges,
+            exercise_badges: schema.exerciseBadges,
+            user_profiles: schema.userProfiles,
+            changelogs: schema.changelogs,
+            changelog_reactions: schema.changelogReactions,
+            notification_reactions: schema.notificationReactions,
+            kudos: schema.kudos,
+            activity_feed: schema.activityFeed,
+            score_events: schema.scoreEvents,
+            user_exercise_prs: schema.userExercisePrs,
+            friendships: schema.friendships,
         };
 
-        // Get friend IDs for the activity feed pull
-        const friendsA = await db.select({ id: schema.friendships.friendId }).from(schema.friendships).where(and(eq(schema.friendships.userId, userId), eq(schema.friendships.status, 'accepted')));
-        const friendsB = await db.select({ id: schema.friendships.userId }).from(schema.friendships).where(and(eq(schema.friendships.friendId, userId), eq(schema.friendships.status, 'accepted')));
-        const friendIds = [...new Set([...friendsA.map(f => f.id), ...friendsB.map(f => f.id)])];
-        const allRelevantUserIdsForFeed = [userId, ...friendIds];
+        const result: Record<string, any[]> = {};
 
-        const changes: Array<{ table: string; operation: string; payload: Record<string, unknown> }> = [];
+        // Fetch data for each table in shared list
+        await Promise.all(SYNC_TABLES.map(async (tableName) => {
+            const tableSchema = tableMap[tableName];
+            if (!tableSchema) return;
 
-        for (const [tableName, table] of Object.entries(tableMap)) {
-            try {
-                let queryResult: any[] = [];
-                if (tableName === 'activity_feed') {
-                    if (allRelevantUserIdsForFeed.length === 0) {
-                        queryResult = [];
-                    } else {
-                        queryResult = await db.select()
-                            .from(table)
-                            .where(and(
-                                inArray(table.userId, allRelevantUserIdsForFeed),
-                                gt(table.updatedAt, sinceDate)
-                            ));
-                    }
-                } else if (tableName === 'changelogs') {
-                    // Fully global tables (no owner)
-                    queryResult = await db.select()
-                        .from(table)
-                        .where(gt(table.updatedAt, sinceDate));
-                } else {
-                    // Pull records based on ownership and system flags
-                    let conditions = [gt(table.updatedAt, sinceDate)];
+            // Base query filters by userId (if restricted) and updatedAt
+            let query = db.select().from(tableSchema);
 
-                    if (tableName === 'friendships') {
-                        conditions.push(or(eq(table.userId, userId), eq(table.friendId, userId)) as any);
-                    } else if (tableName === 'activity_feed') {
-                        if (allRelevantUserIdsForFeed.length === 0) {
-                            queryResult = [];
-                            continue;
-                        }
-                        conditions.push(inArray(table.userId, allRelevantUserIdsForFeed));
-                    } else if (tableName === 'kudos') {
-                        conditions.push(eq(table.giverId, userId));
-                    } else if (tableName === 'changelog_reactions' || tableName === 'notification_reactions' || tableName === 'user_profiles') {
-                        const idCol = tableName === 'user_profiles' ? table.id : table.userId;
-                        conditions.push(eq(idCol, userId));
-                    } else {
-                        // Standard ownership check
-                        const ownerCondition = eq(table.userId, userId);
+            const conditions = [];
 
-                        // Check if table has isSystem property specifically as a column
-                        const hasIsSystem = !!(table as any).isSystem;
+            // Add since condition
+            conditions.push(gt(tableSchema.updatedAt, sinceDate));
 
-                        if (hasIsSystem) {
-                            conditions.push(or(eq((table as any).isSystem, 1), ownerCondition) as any);
-                        } else {
-                            conditions.push(ownerCondition);
-                        }
-                    }
+            // Policy: Only pull rows belonging to the user for most tables
+            // EXCEPT for global/shared tables
+            const GLOBAL_TABLES = ['categories', 'badges', 'exercise_badges', 'exercises', 'changelogs', 'changelog_reactions', 'notification_reactions', 'kudos', 'activity_feed', 'score_events', 'user_exercise_prs', 'user_profiles', 'friendships'];
 
-                    queryResult = await db.select()
-                        .from(table)
-                        .where(and(...conditions));
+            if (!GLOBAL_TABLES.includes(tableName)) {
+                if ('userId' in tableSchema) {
+                    conditions.push(eq(tableSchema.userId, userId));
                 }
-
-                for (const record of queryResult) {
-                    const operation = (record.deletedAt && record.deletedAt > sinceDate) ? 'DELETE' : (record.createdAt > sinceDate ? 'INSERT' : 'UPDATE');
-
-                    let payload = toSnakeCase(record as Record<string, unknown>);
-
-                    // UN-PREFIX settings keys for the client
-                    if (tableName === 'settings' && payload.key && typeof payload.key === 'string') {
-                        const prefix = `${userId}:`;
-                        if (payload.key.startsWith(prefix)) {
-                            payload.key = payload.key.substring(prefix.length);
-                        }
-                    }
-
-                    changes.push({
-                        table: tableName,
-                        operation,
-                        payload
-                    });
-                }
-            } catch (tableError: any) {
-                console.error(`[Sync Pull] Error pulling table ${tableName}:`, tableError.message);
-                // We keep going for other tables but this might indicate a schema mismatch
             }
-        }
+
+            // Special case for friend-related data or feed
+            // (Handled by global tables for now but could be refined)
+
+            const rows = await query.where(and(...conditions));
+            result[tableName] = rows.map(toSnakeCase);
+        }));
 
         return NextResponse.json({
-            timestamp: Date.now(),
-            changes
+            success: true,
+            timestamp: new Date().getTime(),
+            changes: result
         });
 
-    } catch (error: any) {
-        console.error('[Sync Pull] Error:', error);
+    } catch (e: any) {
+        console.error(`[Sync/Pull] Error pulling for user ${userId}:`, e);
         return NextResponse.json({
-            error: 'Internal server error',
-            message: error.message
+            error: e.message || 'Internal Server Error',
+            details: e.toString()
         }, { status: 500 });
     }
 }

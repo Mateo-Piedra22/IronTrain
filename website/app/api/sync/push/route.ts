@@ -11,31 +11,6 @@ export const runtime = 'nodejs';
 const MAX_OPERATIONS_PER_REQUEST = 500;
 const SUPPORTED_OPERATIONS = new Set(['INSERT', 'UPDATE', 'DELETE']);
 
-export const SYNC_TABLES: ReadonlyArray<string> = [
-    'categories',
-    'badges',
-    'exercise_badges',
-    'exercises',
-    'workouts',
-    'workout_sets',
-    'routines',
-    'routine_days',
-    'routine_exercises',
-    'measurements',
-    'goals',
-    'body_metrics',
-    'plate_inventory',
-    'settings',
-    'user_profiles',
-    'changelogs',
-    'changelog_reactions',
-    'notification_reactions',
-    'kudos',
-    'activity_feed',
-    'score_events',
-    'user_exercise_prs',
-    'friendships',
-];
 
 export async function POST(req: NextRequest) {
     try {
