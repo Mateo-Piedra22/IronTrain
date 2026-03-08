@@ -2,13 +2,13 @@ import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { useDataReload } from '@/src/hooks/useDataReload';
 import { locationPermissionsService } from '@/src/services/LocationPermissionsService';
 import { routineService } from '@/src/services/RoutineService';
-import { SocialComparisonEntry, SocialFriend, SocialInboxItem, SocialLeaderboardEntry, SocialProfile, SocialSearchUser, SocialService } from '@/src/services/SocialService';
+import { SocialComparisonEntry, SocialFriend, SocialInboxItem, SocialLeaderboardEntry, SocialProfile, SocialSearchUser, SocialService, WeatherInfo } from '@/src/services/SocialService';
 import { useAuthStore } from '@/src/store/authStore';
 import { confirm } from '@/src/store/confirmStore';
 import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import * as Clipboard from 'expo-clipboard';
-import { useRouter } from 'expo-router';
-import { Award, CalendarDays, CheckCircle, ChevronDown, ChevronUp, CloudRain, Copy, Dumbbell, Flame, Globe, Info, Lock as LockIcon, MapPin, RefreshCcw, Scale, Settings, Shield as ShieldIcon, TrendingUp, Trophy, UserCheck, UserMinus as UserMinusIcon, XCircle, X as XIcon, Zap } from 'lucide-react-native';
+import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
+import { Award, CalendarDays, CheckCircle, ChevronDown, ChevronUp, CloudRain, Copy, Dumbbell, Flame, Globe, Info, Lock as LockIcon, MapPin, MapPinOff, RefreshCcw, Scale, Settings, Shield as ShieldIcon, TrendingUp, Trophy, UserCheck, UserMinus as UserMinusIcon, XCircle, X as XIcon, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -60,8 +60,10 @@ export default function SocialTab() {
     const [isEventModalVisible, setIsEventModalVisible] = useState(false);
     const [isWeatherModalVisible, setIsWeatherModalVisible] = useState(false);
     const [refreshingLocation, setRefreshingLocation] = useState(false);
+    const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
 
     const authState = useAuthStore();
+    const navigation = useNavigation();
 
     const loadData = useCallback(async () => {
         if (!authState.token) return;
@@ -73,7 +75,10 @@ export default function SocialTab() {
                 SocialService.getInbox(),
                 SocialService.getAnalytics(),
             ]);
-            setProfile(prof);
+            setProfile(prev => ({
+                ...prof,
+                weatherBonus: prev?.weatherBonus || null
+            }));
             setFriends(fr);
             setInbox(inb);
             setLeaderboard(lb);
@@ -98,12 +103,14 @@ export default function SocialTab() {
         loadTrainingDays();
     }, ['SETTINGS_UPDATED']);
 
-    useEffect(() => {
-        loadData();
-        loadTrainingDays();
-        // Comprobar ubicación al inicio de manera silenciosa
-        handleRefreshLocation(true);
-    }, [loadData, loadTrainingDays]);
+    useFocusEffect(
+        useCallback(() => {
+            loadData();
+            loadTrainingDays();
+            // Comprobar ubicación al entrar de manera silenciosa
+            handleRefreshLocation(true);
+        }, [loadData, loadTrainingDays])
+    );
 
     const handleCopyId = async () => {
         if (profile?.id) {
@@ -117,48 +124,62 @@ export default function SocialTab() {
             if (!silent) setRefreshingLocation(true);
             const location = await locationPermissionsService.getCurrentLocation();
             if (location) {
-                const updatedBonus = await SocialService.updateWeatherBonus(
-                    location.lat,
-                    location.lon,
-                    location.city
-                ).catch(err => {
-                    console.error('[SocialService] Weather update failed:', err);
-                    return null;
-                });
+                // Pre-set some location data immediately so the badge appears
+                setProfile(prev => prev ? ({
+                    ...prev,
+                    weatherBonus: prev.weatherBonus || {
+                        location: location.city || 'Tu ubicación',
+                        condition: 'Cargando...',
+                        temperature: 20,
+                        multiplier: 1.0,
+                        isActive: false
+                    }
+                }) : null);
 
-                if (updatedBonus) {
-                    if (profile) {
-                        setProfile({
-                            ...profile,
-                            weatherBonus: updatedBonus
-                        });
+                try {
+                    const updatedBonus = await SocialService.updateWeatherBonus(
+                        location.lat,
+                        location.lon,
+                        location.city
+                    );
+
+                    if (updatedBonus) {
+                        setProfile(prev => prev ? ({
+                            ...prev,
+                            weatherBonus: updatedBadgeWithPersistence(prev.weatherBonus, updatedBonus)
+                        }) : null);
+                        if (!silent) confirm.success('Ubicación Actualizada', `Se detectó: ${location.city || 'Tu ubicación'}`);
                     }
-                    if (!silent) confirm.success('Ubicación Actualizada', `Se detectó: ${location.city || 'Tu ciudad'}`);
-                } else {
-                    // Si falló la API, aplicamos fallback pero informamos al usuario
-                    if (profile) {
-                        setProfile({
-                            ...profile,
-                            weatherBonus: {
-                                location: location.city || 'Desconocida',
-                                condition: 'Cielo Despejado',
-                                temperature: 20,
-                                multiplier: 1.0,
-                                isActive: false
-                            }
-                        });
-                    }
-                    if (!silent) confirm.error('Error de Sincronización', 'No se pudo obtener el clima del servidor. Se usará clima despejado por defecto.');
+                } catch (err) {
+                    console.warn('[SocialTab] Weather API failed, keeping local location:', err);
+                    // Fallback local description if API fails
+                    setProfile(prev => prev ? ({
+                        ...prev,
+                        weatherBonus: {
+                            location: location.city || 'Tu ubicación',
+                            condition: 'Cielo Despejado',
+                            temperature: 20,
+                            multiplier: 1.0,
+                            isActive: false
+                        }
+                    }) : null);
+                    if (!silent) confirm.error('Servicio de Clima', 'No pudimos verificar bonificaciones climáticas, pero detectamos tu ubicación.');
                 }
             } else {
-                if (!silent) confirm.error('Error de GPS', 'No pudimos obtener tu ubicación exacta.');
+                setLocationPermissionDenied(true);
+                if (!silent) confirm.error('Error de GPS', 'No pudimos obtener tu ubicación exacta. Verificá los permisos.');
             }
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : 'Error al obtener ubicación';
+            setLocationPermissionDenied(true);
             if (!silent) confirm.error('Error de GPS', msg);
         } finally {
             if (!silent) setRefreshingLocation(false);
         }
+    };
+
+    const updatedBadgeWithPersistence = (old: WeatherInfo | null | undefined, updated: WeatherInfo): WeatherInfo => {
+        return updated;
     };
 
     const handleSearch = async () => {
@@ -441,6 +462,13 @@ export default function SocialTab() {
 
     const pendingInboxCount = inbox.filter(i => i.status === 'pending').length;
 
+    // Sincronizar badge de la pestaña
+    useEffect(() => {
+        navigation.setOptions({
+            tabBarBadge: pendingInboxCount > 0 ? pendingInboxCount : undefined
+        });
+    }, [pendingInboxCount, navigation]);
+
     return (
         <SafeAreaWrapper style={styles.container}>
             <View style={styles.header}>
@@ -478,7 +506,7 @@ export default function SocialTab() {
                                 )}
                             </View>
 
-                            {(profile.activeEvent || profile.weatherBonus) && (
+                            {(profile.activeEvent || profile.weatherBonus || refreshingLocation || locationPermissionDenied || !profile.weatherBonus) && (
                                 <View style={styles.bonusColumn}>
                                     {profile.activeEvent && (
                                         <TouchableOpacity
@@ -490,22 +518,28 @@ export default function SocialTab() {
                                             <Text style={styles.eventBadgeText}>Evento {profile.activeEvent.multiplier}x</Text>
                                         </TouchableOpacity>
                                     )}
-                                    {profile.weatherBonus && (
-                                        <TouchableOpacity
-                                            style={profile.weatherBonus.isActive ? styles.weatherBadge : styles.locationBadge}
-                                            onPress={() => setIsWeatherModalVisible(true)}
-                                            activeOpacity={0.7}
-                                        >
-                                            {profile.weatherBonus.isActive ? (
-                                                <CloudRain size={10} color={Colors.white} />
-                                            ) : (
-                                                <MapPin size={10} color={Colors.iron[500]} />
-                                            )}
-                                            <Text style={profile.weatherBonus.isActive ? styles.weatherBadgeText : styles.locationBadgeText}>
-                                                {profile.weatherBonus.isActive ? 'Voluntad de Hierro' : (profile.weatherBonus.location || 'Ubicación')}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    )}
+                                    <TouchableOpacity
+                                        style={profile.weatherBonus?.isActive ? styles.weatherBadge : styles.locationBadge}
+                                        onPress={() => refreshingLocation ? null : handleRefreshLocation(false)}
+                                        activeOpacity={0.7}
+                                        disabled={refreshingLocation}
+                                    >
+                                        {refreshingLocation ? (
+                                            <ActivityIndicator size={10} color={Colors.iron[500]} />
+                                        ) : profile.weatherBonus?.isActive ? (
+                                            <CloudRain size={10} color={Colors.white} />
+                                        ) : locationPermissionDenied ? (
+                                            <MapPinOff size={10} color={Colors.iron[500]} />
+                                        ) : (
+                                            <MapPin size={10} color={Colors.iron[500]} />
+                                        )}
+                                        <Text style={profile.weatherBonus?.isActive ? styles.weatherBadgeText : styles.locationBadgeText}>
+                                            {refreshingLocation ? 'Localizando...' :
+                                                profile.weatherBonus?.isActive ? 'Voluntad de Hierro' :
+                                                    locationPermissionDenied ? 'Ubicación desactivada' :
+                                                        (profile.weatherBonus?.location || 'Activar ubicación')}
+                                        </Text>
+                                    </TouchableOpacity>
                                 </View>
                             )}
                         </View>

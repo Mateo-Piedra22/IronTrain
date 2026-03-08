@@ -6,7 +6,7 @@ import { Colors } from '@/src/theme';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { Bell, ChevronLeft, Info } from 'lucide-react-native';
+import { Bell, ChevronDown, ChevronLeft, ChevronUp } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -28,7 +28,11 @@ const renderFormattedText = (text: string, style: any, boldStyle: any) => {
     );
 };
 
+import { useAuthStore } from '@/src/store/authStore';
+import { Alert } from 'react-native';
+
 const KudosButton = ({ id, type, initialCount }: { id: string; type: 'version' | 'news'; initialCount?: number }) => {
+    const { user } = useAuthStore();
     const [count, setCount] = useState<number | null>(initialCount ?? null);
     const [isReacting, setIsReacting] = useState(false);
 
@@ -43,6 +47,15 @@ const KudosButton = ({ id, type, initialCount }: { id: string; type: 'version' |
     }, [id, type]);
 
     const handlePress = async () => {
+        if (!user?.id) {
+            Alert.alert(
+                '¡Únete a la IronSocial!',
+                'Para dar Kudos a nuestras novedades y versiones, primero debes iniciar sesión con tu cuenta de IronTrain.',
+                [{ text: 'Entendido', style: 'default' }]
+            );
+            return;
+        }
+
         if (isReacting) return;
         setIsReacting(true);
         const result = type === 'version'
@@ -63,6 +76,7 @@ const KudosButton = ({ id, type, initialCount }: { id: string; type: 'version' |
     return (
         <TouchableOpacity
             onPress={handlePress}
+            activeOpacity={0.7}
             disabled={isReacting}
             style={[ss.kudosBtn, isReacting && { opacity: 0.7 }]}
         >
@@ -154,8 +168,20 @@ export default function UpdatesScreen() {
                             )}
                         </View>
                         <Text style={ss.releaseDate}>{r.date ?? '—'}</Text>
+
+                        {!isExpanded && r.items.length > 0 && (
+                            <Text style={ss.releaseSummary} numberOfLines={1}>
+                                {r.items[0].replace(/\*\*/g, '')}
+                            </Text>
+                        )}
                     </View>
-                    <Info size={18} color={isExpanded ? Colors.primary.DEFAULT : Colors.iron[400]} />
+                    <View style={ss.expandIconWrapper}>
+                        {isExpanded ? (
+                            <ChevronUp size={20} color={Colors.primary.DEFAULT} />
+                        ) : (
+                            <ChevronDown size={20} color={Colors.iron[400]} />
+                        )}
+                    </View>
                 </TouchableOpacity>
 
                 {isExpanded && (
@@ -262,8 +288,10 @@ const ss = StyleSheet.create({
     itemRow: { flexDirection: 'row', alignItems: 'flex-start' },
     itemBulletWrapper: { width: 18, alignItems: 'flex-start', paddingTop: 8 },
     itemBulletDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary.DEFAULT },
-    itemText: { color: Colors.iron[700], flex: 1, fontSize: 14, lineHeight: 22 },
-    itemBold: { color: Colors.black, fontWeight: '900' },
+    itemText: { color: Colors.iron[500], flex: 1, fontSize: 14, lineHeight: 22 },
+    itemBold: { color: Colors.iron[950], fontWeight: '900' },
+    releaseSummary: { color: Colors.iron[400], fontSize: 13, marginTop: 6, fontWeight: '500', fontStyle: 'italic' },
+    expandIconWrapper: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.iron[100] + '40', alignItems: 'center', justifyContent: 'center' },
     releaseFooter: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.iron[100], alignItems: 'flex-end' },
     sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16, marginTop: 8, paddingHorizontal: 4 },
     sectionTitle: { color: Colors.iron[400], fontSize: 11, fontWeight: '900', letterSpacing: 1.2 },

@@ -127,8 +127,15 @@ export async function POST(req: NextRequest) {
                         }
                     }
 
+                    const pkPropName = tableName === 'settings' ? 'key' : 'id';
+                    let pkValue = filteredData[pkPropName];
+
+                    if (!pkValue && op.recordId) {
+                        pkValue = op.recordId;
+                        filteredData[pkPropName] = pkValue;
+                    }
+
                     const pkCol = tableName === 'settings' ? tableSchema.key : tableSchema.id;
-                    const pkValue = filteredData[tableName === 'settings' ? 'key' : 'id'];
 
                     if (!pkValue) {
                         throw new Error('Missing primary key (id/key)');

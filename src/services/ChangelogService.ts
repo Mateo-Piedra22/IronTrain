@@ -179,7 +179,7 @@ export class ChangelogService {
                         'UPDATE changelog_reactions SET deleted_at = NULL, updated_at = ? WHERE id = ?',
                         [now, id]
                     );
-                    await dbService.queueSyncMutation('changelog_reactions', id, 'UPDATE', { deleted_at: null, updated_at: now });
+                    await dbService.queueSyncMutation('changelog_reactions', id, 'UPDATE', { id, deleted_at: null, updated_at: now });
                 } else {
                     await dbService.run(
                         'INSERT INTO changelog_reactions (id, changelog_id, user_id, type, updated_at) VALUES (?, ?, ?, ?, ?)',

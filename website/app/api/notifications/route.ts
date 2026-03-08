@@ -36,9 +36,6 @@ export async function GET(request: NextRequest) {
                     ),
                     or(
                         isNull(schema.adminNotifications.targetPlatform),
-                        platform ? eq(schema.adminNotifications.targetPlatform, platform) : undefined
-                    ),
-                    or(
                         eq(schema.adminNotifications.targetPlatform, 'all'),
                         platform ? eq(schema.adminNotifications.targetPlatform, platform) : undefined
                     )
