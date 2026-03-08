@@ -8,7 +8,8 @@ import {
     Trash2,
     Zap
 } from 'lucide-react';
-import React from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
     handleChangelogAction,
     handleChangelogPublishAction,
@@ -33,6 +34,7 @@ interface ContentManagementPanelProps {
     globalEvents: GlobalEventRow[];
     editingChangelog: any | null;
     editingNotification: any | null;
+    editingGlobalEvent: GlobalEventRow | null;
     syncStatus: {
         lastSyncAt: string | null;
         totalInDb: number;
@@ -49,9 +51,18 @@ export default function ContentManagementPanel({
     globalEvents,
     editingChangelog,
     editingNotification,
+    editingGlobalEvent,
     syncStatus
 }: ContentManagementPanelProps) {
-    const [activeSection, setActiveSection] = React.useState<'broadcast' | 'changelog' | 'events'>('broadcast');
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const activeSection = (searchParams.get('section') as 'broadcast' | 'changelog' | 'events') || 'broadcast';
+
+    const setActiveSection = (section: string) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('section', section);
+        router.push(`?${params.toString()}`, { scroll: false });
+    };
 
     return (
         <div className="space-y-12">
@@ -183,7 +194,12 @@ export default function ContentManagementPanel({
                                 {editingNotification ? 'COMMIT_CHANGES' : 'PUBLISH_ANNOUNCEMENT'}
                             </button>
                             {editingNotification && (
-                                <a href="/admin" className="block text-center text-[9px] font-black uppercase opacity-40 hover:opacity-100 mt-2 underline">CANCEL_OVERRIDE</a>
+                                <Link
+                                    href={`?tab=${searchParams.get('tab') || 'content'}&section=broadcast`}
+                                    className="block text-center text-[9px] font-black uppercase opacity-40 hover:opacity-100 mt-2 underline"
+                                >
+                                    CANCEL_OVERRIDE
+                                </Link>
                             )}
                         </form>
                     </div>
@@ -236,9 +252,16 @@ export default function ContentManagementPanel({
                                                 </div>
                                             </div>
                                             <div className="flex items-center justify-end gap-3 pt-2">
-                                                <a href={`?editNotifId=${n.id}`} className="text-[10px] font-black uppercase hover:underline">EDIT</a>
+                                                <Link
+                                                    href={`?tab=${searchParams.get('tab') || 'content'}&section=broadcast&editNotifId=${n.id}`}
+                                                    className="text-[10px] font-black uppercase hover:underline"
+                                                >
+                                                    EDIT
+                                                </Link>
                                                 <form action={handleNotificationAction}>
                                                     <input type="hidden" name="id" value={n.id} />
+                                                    <input type="hidden" name="origin_tab" value={searchParams.get('tab') || 'content'} />
+                                                    <input type="hidden" name="origin_section" value="broadcast" />
                                                     <button type="submit" name="action" value="delete" className="text-red-500">
                                                         <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
@@ -277,7 +300,12 @@ export default function ContentManagementPanel({
                                 {editingChangelog ? 'UPDATE_RELEASE' : 'DEPLOY_VERSION_DATA'}
                             </button>
                             {editingChangelog && (
-                                <a href="/admin" className="block text-center text-[9px] font-black uppercase opacity-40 hover:opacity-100 mt-2 underline">DISCARD_EDIT</a>
+                                <Link
+                                    href={`?tab=${searchParams.get('tab') || 'content'}&section=changelog`}
+                                    className="block text-center text-[9px] font-black uppercase opacity-40 hover:opacity-100 mt-2 underline"
+                                >
+                                    CANCEL_OVERRIDE
+                                </Link>
                             )}
                         </form>
                     </div>
@@ -304,9 +332,16 @@ export default function ContentManagementPanel({
                                                     </button>
                                                 </form>
                                             )}
-                                            <a href={`?editChangelogId=${c.id}`} className="text-[9px] font-black uppercase opacity-40 hover:opacity-100">EDIT</a>
+                                            <Link
+                                                href={`?tab=${searchParams.get('tab') || 'content'}&section=changelog&editChangelogId=${c.id}`}
+                                                className="text-[10px] font-black uppercase hover:underline"
+                                            >
+                                                EDIT
+                                            </Link>
                                             <form action={handleChangelogAction}>
                                                 <input type="hidden" name="id" value={c.id} />
+                                                <input type="hidden" name="origin_tab" value={searchParams.get('tab') || 'content'} />
+                                                <input type="hidden" name="origin_section" value="changelog" />
                                                 <button type="submit" name="action" value="delete" className="text-red-500">
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
@@ -335,30 +370,32 @@ export default function ContentManagementPanel({
                     <div className="border-2 border-[#1a1a2e] p-6 bg-[#f5f1e8] lg:sticky lg:top-8 h-fit">
                         <div className="flex items-center gap-3 mb-6 border-b border-[#1a1a2e]/10 pb-2">
                             <Zap className="w-4 h-4" />
-                            <h3 className="font-black text-xs uppercase">NEW_GLOBAL_EVENT</h3>
+                            <h3 className="font-black text-xs uppercase">{editingGlobalEvent ? 'EDIT_GLOBAL_EVENT' : 'NEW_GLOBAL_EVENT'}</h3>
                         </div>
                         <form action={handleGlobalEventAction} className="space-y-4">
-                            <input type="hidden" name="id" value="" />
+                            <input type="hidden" name="id" value={editingGlobalEvent?.id || ''} />
+                            <input type="hidden" name="origin_tab" value={searchParams.get('tab') || 'content'} />
+                            <input type="hidden" name="origin_section" value="events" />
                             <div>
                                 <label className="text-[9px] font-black opacity-40 uppercase block mb-1">Name</label>
-                                <input name="name" placeholder="IRON_WEEK" className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none" required />
+                                <input name="name" defaultValue={editingGlobalEvent?.name || ''} placeholder="IRON_WEEK" className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none" required />
                             </div>
                             <div>
                                 <label className="text-[9px] font-black opacity-40 uppercase block mb-1">Multiplier</label>
-                                <input name="multiplier" defaultValue={1} type="number" step="0.01" min="0.01" className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none" required />
+                                <input name="multiplier" defaultValue={editingGlobalEvent?.multiplier || 1} type="number" step="0.01" min="0.01" className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none" required />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-[9px] font-black opacity-40 uppercase block mb-1">Start</label>
-                                    <input name="startDate" type="datetime-local" className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none" required />
+                                    <input name="startDate" defaultValue={editingGlobalEvent?.startDate ? new Date(editingGlobalEvent.startDate).toISOString().slice(0, 16) : ''} type="datetime-local" className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none" required />
                                 </div>
                                 <div>
                                     <label className="text-[9px] font-black opacity-40 uppercase block mb-1">End</label>
-                                    <input name="endDate" type="datetime-local" className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none" required />
+                                    <input name="endDate" defaultValue={editingGlobalEvent?.endDate ? new Date(editingGlobalEvent.endDate).toISOString().slice(0, 16) : ''} type="datetime-local" className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none" required />
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 bg-[#1a1a2e]/5 p-2 border border-[#1a1a2e]/10">
-                                <input type="checkbox" name="isActive" value="true" id="event_active" defaultChecked className="w-4 h-4 accent-[#1a1a2e]" />
+                                <input type="checkbox" name="isActive" value="true" id="event_active" defaultChecked={editingGlobalEvent ? editingGlobalEvent.isActive !== 0 : true} className="w-4 h-4 accent-[#1a1a2e]" />
                                 <label htmlFor="event_active" className="text-[10px] font-black uppercase">ACTIVE</label>
                             </div>
                             <div className="flex items-center gap-2 bg-[#1a1a2e]/5 p-2 border border-[#1a1a2e]/10">
@@ -366,8 +403,16 @@ export default function ContentManagementPanel({
                                 <label htmlFor="event_push" className="text-[10px] font-black uppercase">SEND_PUSH_ON_ACTIVATE</label>
                             </div>
                             <button type="submit" className="w-full bg-[#1a1a2e] text-[#f5f1e8] py-3 font-black uppercase text-[10px] tracking-widest hover:bg-orange-500 transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
-                                SAVE_EVENT
+                                {editingGlobalEvent ? 'UPDATE_EVENT' : 'SAVE_EVENT'}
                             </button>
+                            {editingGlobalEvent && (
+                                <Link
+                                    href={`?tab=${searchParams.get('tab') || 'content'}&section=events`}
+                                    className="block text-center text-[9px] font-black uppercase opacity-40 hover:opacity-100 mt-2 underline"
+                                >
+                                    CANCEL_OVERRIDE
+                                </Link>
+                            )}
                         </form>
                     </div>
 
@@ -400,8 +445,16 @@ export default function ContentManagementPanel({
                                             </button>
                                         </form>
                                         <div className="flex items-center justify-end gap-3 pt-2">
+                                            <Link
+                                                href={`?tab=${searchParams.get('tab') || 'content'}&section=events&editEventId=${e.id}`}
+                                                className="text-[10px] font-black uppercase hover:underline"
+                                            >
+                                                EDIT
+                                            </Link>
                                             <form action={handleGlobalEventAction}>
                                                 <input type="hidden" name="id" value={e.id} />
+                                                <input type="hidden" name="origin_tab" value={searchParams.get('tab') || 'content'} />
+                                                <input type="hidden" name="origin_section" value="events" />
                                                 <button type="submit" name="action" value="delete" className="text-red-500">
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>

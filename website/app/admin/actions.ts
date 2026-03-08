@@ -24,6 +24,14 @@ export async function getAuthenticatedAdmin(): Promise<string | null> {
     }
 }
 
+function getRedirectPath(formData: FormData, defaultSection?: string) {
+    const tab = (formData.get('origin_tab') as string) || 'content';
+    const section = (formData.get('origin_section') as string) || defaultSection || '';
+    let path = `/admin?tab=${tab}`;
+    if (section) path += `&section=${section}`;
+    return path;
+}
+
 export async function markFeedbackStatus(formData: FormData) {
     const adminId = await getAuthenticatedAdmin();
     if (!adminId) throw new Error('Unauthorized');
@@ -199,6 +207,7 @@ export async function handleChangelogAction(formData: FormData) {
         await db.delete(schema.changelogs).where(eq(schema.changelogs.id, id));
     }
     revalidatePath('/admin');
+    redirect(getRedirectPath(formData, 'changelog'));
 }
 
 export async function handleChangelogSyncAction() {
@@ -280,6 +289,7 @@ export async function handleNotificationAction(formData: FormData) {
         await db.delete(schema.adminNotifications).where(eq(schema.adminNotifications.id, id));
     }
     revalidatePath('/admin');
+    redirect(getRedirectPath(formData, 'broadcast'));
 }
 
 export async function handleScoringConfigAction(formData: FormData) {
@@ -350,7 +360,7 @@ export async function handleGlobalEventAction(formData: FormData) {
     if (action === 'delete') {
         await db.delete(schema.globalEvents).where(eq(schema.globalEvents.id, id));
         revalidatePath('/admin');
-        return;
+        redirect(getRedirectPath(formData, 'events'));
     }
 
     const name = String(formData.get('name') || '').trim();

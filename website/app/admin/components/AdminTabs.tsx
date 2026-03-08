@@ -6,7 +6,8 @@ import {
     Share2,
     ShieldAlert
 } from 'lucide-react';
-import React, { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import React from 'react';
 
 interface AdminTabsProps {
     statusPanel: React.ReactNode;
@@ -21,7 +22,15 @@ export default function AdminTabs({
     contentPanel,
     moderationPanel
 }: AdminTabsProps) {
-    const [activeTab, setActiveTab] = useState<'status' | 'social' | 'content' | 'moderation'>('status');
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const activeTab = (searchParams.get('tab') as 'status' | 'social' | 'content' | 'moderation') || 'status';
+
+    const setActiveTab = (tab: string) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('tab', tab);
+        router.push(`?${params.toString()}`, { scroll: false });
+    };
 
     const tabs = [
         { id: 'status', label: 'ESTADO_SISTEMA', icon: LayoutDashboard },
@@ -42,8 +51,8 @@ export default function AdminTabs({
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`flex items-center gap-2 px-6 py-3 font-black text-xs uppercase transition-all ${isActive
-                                    ? 'bg-[#f5f1e8] text-[#1a1a2e]'
-                                    : 'text-[#f5f1e8]/60 hover:text-[#f5f1e8] hover:bg-white/5'
+                                ? 'bg-[#f5f1e8] text-[#1a1a2e]'
+                                : 'text-[#f5f1e8]/60 hover:text-[#f5f1e8] hover:bg-white/5'
                                 }`}
                         >
                             <Icon className="w-4 h-4" />

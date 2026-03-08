@@ -200,7 +200,7 @@ export const GlobalNoticeHandler: React.FC = () => {
             if (part === '\n') {
                 return '\n';
             }
-            return part; part;
+            return part;
         });
     };
 
@@ -221,13 +221,18 @@ export const GlobalNoticeHandler: React.FC = () => {
                         <Pressable style={ss.modalBackdropPressable} onPress={handleCloseNotification} />
                         <View style={ss.modalContainer}>
                             <View style={ss.modalHeader}>
+                                <TouchableOpacity
+                                    onPress={handleCloseNotification}
+                                    style={{ position: 'absolute', right: 0, top: 0, padding: 8, zIndex: 10 }}
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Cerrar notificación"
+                                >
+                                    <X size={20} color={Colors.iron[500]} />
+                                </TouchableOpacity>
                                 <View style={ss.iconCircle}>
                                     <Bell size={20} color={Colors.primary.DEFAULT} />
                                 </View>
                                 <Text style={ss.modalTitle}>{activeAnnouncement.title}</Text>
-                                <TouchableOpacity onPress={handleCloseNotification} accessibilityRole="button" accessibilityLabel="Cerrar notificación">
-                                    <X size={20} color={Colors.iron[500]} />
-                                </TouchableOpacity>
                             </View>
                             <View style={ss.modalBody}>
                                 <ScrollView
@@ -299,7 +304,7 @@ const ss = StyleSheet.create({
     },
     modalContainer: {
         width: '100%',
-        maxWidth: 360,
+        maxWidth: 420,
         minHeight: 260,
         maxHeight: '86%',
         backgroundColor: Colors.surface,
@@ -315,25 +320,25 @@ const ss = StyleSheet.create({
         overflow: 'hidden',
     },
     modalHeader: {
-        flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        marginBottom: 12,
+        marginBottom: 20,
     },
     iconCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
+        width: 52,
+        height: 52,
+        borderRadius: 26,
         backgroundColor: withAlpha(Colors.primary.DEFAULT, '14'),
         justifyContent: 'center',
         alignItems: 'center',
+        marginBottom: 8,
     },
     modalTitle: {
-        flex: 1,
-        fontSize: 18,
+        fontSize: 19,
         fontWeight: '900',
         color: Colors.iron[950],
         letterSpacing: -0.3,
+        textAlign: 'center',
     },
     modalBody: {
         flexShrink: 1,
@@ -363,6 +368,7 @@ const ss = StyleSheet.create({
         color: Colors.iron[950],
         lineHeight: 22,
         fontWeight: '500',
+        textAlign: 'left',
     },
     richBold: {
         fontWeight: '900',

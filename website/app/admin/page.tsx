@@ -20,6 +20,7 @@ interface AdminPageProps {
     searchParams: Promise<{
         editNotifId?: string;
         editChangelogId?: string;
+        editEventId?: string;
         changelogSyncStatus?: string;
         changelogUpserted?: string;
         changelogSource?: string;
@@ -52,6 +53,7 @@ export default async function AdminPage({
     const {
         editNotifId,
         editChangelogId,
+        editEventId,
         changelogSyncStatus,
         changelogUpserted,
         changelogSource,
@@ -302,8 +304,9 @@ export default async function AdminPage({
                         changelogs={sanitizedChangelogs}
                         notifications={sanitizedNotifications}
                         globalEvents={sanitizedGlobalEvents}
-                        editingChangelog={editChangelogId ? sanitizedChangelogs.find(c => c.id === editChangelogId) : null}
-                        editingNotification={editNotifId ? sanitizedNotifications.find(n => n.id === editNotifId) : null}
+                        editingChangelog={editChangelogId ? (sanitizedChangelogs.find(c => c.id === editChangelogId) ?? null) : null}
+                        editingNotification={editNotifId ? (sanitizedNotifications.find(n => n.id === editNotifId) ?? null) : null}
+                        editingGlobalEvent={editEventId ? (sanitizedGlobalEvents.find(e => e.id === editEventId) ?? null) : null}
                         syncStatus={{
                             lastSyncAt: lastChangelogSync instanceof Date ? lastChangelogSync.toISOString() : lastChangelogSync,
                             totalInDb: sanitizedChangelogs.length,

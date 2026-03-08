@@ -228,23 +228,12 @@ export async function buildBroadcastFeed(params: {
     let items = sortBroadcastItems([...announcementItems, ...changelogItems, ...globalEventItems]);
 
     if (params.userId) {
-        const announcementIds = announcementItems.map((i) => i.id);
-        const changelogIds = changelogItems.map((i) => i.id);
+        const changelogIds = changelogItems.map(i => i.id);
+        const notificationIds = announcementItems.map(i => i.id);
 
-        const [notificationReactRows, changelogReactRows] = await Promise.all([
-            announcementIds.length > 0
-                ? params.db.select({ notificationId: schema.notificationReactions.notificationId })
-                    .from(schema.notificationReactions)
-                    .where(
-                        and(
-                            eq(schema.notificationReactions.userId, params.userId),
-                            isNull(schema.notificationReactions.deletedAt),
-                            inArray(schema.notificationReactions.notificationId, announcementIds)
-                        )
-                    )
-                : Promise.resolve([]),
+        const [changelogReactionRows, notificationReactionRows] = await Promise.all([
             changelogIds.length > 0
-                ? params.db.select({ changelogId: schema.changelogReactions.changelogId })
+                ? params.db.select()
                     .from(schema.changelogReactions)
                     .where(
                         and(
@@ -254,10 +243,25 @@ export async function buildBroadcastFeed(params: {
                         )
                     )
                 : Promise.resolve([]),
+            notificationIds.length > 0
+                ? params.db.select()
+                    .from(schema.notificationReactions)
+                    .where(
+                        and(
+                            eq(schema.notificationReactions.userId, params.userId),
+                            isNull(schema.notificationReactions.deletedAt),
+                            inArray(schema.notificationReactions.notificationId, notificationIds)
+                        )
+                    )
+                : Promise.resolve([]),
         ]);
 
-        const reactedAnnouncementIds = new Set(notificationReactRows.map((r) => r.notificationId));
-        const reactedChangelogIds = new Set(changelogReactRows.map((r) => r.changelogId));
+        const reactedChangelogIds = new Set<string>(
+            changelogReactionRows.map((r: any) => r.changelogId as string)
+        );
+        const reactedAnnouncementIds = new Set<string>(
+            notificationReactionRows.map((r: any) => r.notificationId as string)
+        );
 
         items = applyUserReactions(items, {
             reactedAnnouncementIds,
