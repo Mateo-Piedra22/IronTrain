@@ -1,8 +1,10 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
+import { runDbTransaction } from '../../../../src/lib/db-transaction';
+import { buildNotificationReactionId, parseNotificationReactPayload } from '../../../../src/lib/notifications-react';
 
 export async function POST(request: NextRequest) {
     try {
@@ -11,63 +13,72 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const body = await request.json();
-        const { notificationId } = body;
-
-        if (!notificationId) {
-            return NextResponse.json({ error: 'Notification ID is required' }, { status: 400 });
+        let body: unknown;
+        try {
+            body = await request.json();
+        } catch {
+            return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
         }
 
-        // 1. Check if reaction exists
-        const [existing] = await db.select()
-            .from(schema.notificationReactions)
-            .where(
-                and(
-                    eq(schema.notificationReactions.notificationId, notificationId),
-                    eq(schema.notificationReactions.userId, userId)
-                )
-            );
+        const parsed = parseNotificationReactPayload(body);
+        if (!parsed.ok) {
+            return NextResponse.json({ error: parsed.error }, { status: 400 });
+        }
 
-        let action: 'added' | 'removed';
+        const notificationId = parsed.value.notificationId;
+        const reactionId = buildNotificationReactionId(notificationId, userId);
+        const now = new Date();
 
-        if (existing) {
-            // Already liked, remove it (toggle)
-            await db.delete(schema.notificationReactions)
-                .where(
-                    and(
-                        eq(schema.notificationReactions.notificationId, notificationId),
-                        eq(schema.notificationReactions.userId, userId)
-                    )
-                );
+        let action: 'added' | 'removed' = 'added';
 
-            // Decrement counter
-            await db.update(schema.adminNotifications)
-                .set({
-                    reactionCount: sql`${schema.adminNotifications.reactionCount} - 1`,
-                    updatedAt: new Date()
-                })
-                .where(eq(schema.adminNotifications.id, notificationId));
+        await runDbTransaction(async (trx) => {
+            const [existing] = await trx.select()
+                .from(schema.notificationReactions)
+                .where(eq(schema.notificationReactions.id, reactionId))
+                .limit(1);
 
-            action = 'removed';
-        } else {
-            // Not liked, add it
-            await db.insert(schema.notificationReactions).values({
-                id: crypto.randomUUID(),
-                notificationId,
-                userId,
-                type: 'kudos'
-            });
+            if (existing && existing.deletedAt === null) {
+                await trx.update(schema.notificationReactions)
+                    .set({ deletedAt: now, updatedAt: now })
+                    .where(eq(schema.notificationReactions.id, reactionId));
 
-            // Increment counter
-            await db.update(schema.adminNotifications)
+                await trx.update(schema.adminNotifications)
+                    .set({
+                        reactionCount: sql`GREATEST(0, ${schema.adminNotifications.reactionCount} - 1)`,
+                        updatedAt: now,
+                    })
+                    .where(eq(schema.adminNotifications.id, notificationId));
+
+                action = 'removed';
+                return;
+            }
+
+            if (existing) {
+                await trx.update(schema.notificationReactions)
+                    .set({ deletedAt: null, updatedAt: now, type: 'kudos' })
+                    .where(eq(schema.notificationReactions.id, reactionId));
+            } else {
+                await trx.insert(schema.notificationReactions)
+                    .values({
+                        id: reactionId,
+                        notificationId,
+                        userId,
+                        type: 'kudos',
+                        createdAt: now,
+                        updatedAt: now,
+                        deletedAt: null,
+                    });
+            }
+
+            await trx.update(schema.adminNotifications)
                 .set({
                     reactionCount: sql`${schema.adminNotifications.reactionCount} + 1`,
-                    updatedAt: new Date()
+                    updatedAt: now,
                 })
                 .where(eq(schema.adminNotifications.id, notificationId));
 
             action = 'added';
-        }
+        });
 
         // Fetch updated count
         const [notification] = await db.select({ count: schema.adminNotifications.reactionCount })

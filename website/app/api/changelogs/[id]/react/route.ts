@@ -8,11 +8,7 @@ import { runDbTransaction } from '../../../../../src/lib/db-transaction';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
-        const { searchParams } = new URL(request.url);
-        const queryUserId = searchParams.get('userId');
-
-        const authedUserId = await verifyAuth(request);
-        const userId = authedUserId || queryUserId;
+        const userId = await verifyAuth(request);
 
         const totalResult = await db.select({ value: count() })
             .from(schema.changelogReactions)

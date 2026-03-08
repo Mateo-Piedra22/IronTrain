@@ -3,6 +3,7 @@ import { configService } from '../services/ConfigService';
 import { dbService } from '../services/DatabaseService';
 import { workoutService } from '../services/WorkoutService';
 import { Exercise, Workout, WorkoutSet } from '../types/db';
+import { logger } from '../utils/logger';
 import { useTimerStore } from './timerStore';
 
 // Types for the active workout state
@@ -49,7 +50,7 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
             exercises.forEach(e => map[e.id] = e.name);
             set({ exerciseNames: map });
         } catch (e) {
-            console.error('Failed to load exercises', e);
+            logger.captureException(e, { scope: 'workoutStore.loadExercises' });
         }
     },
 
@@ -204,7 +205,7 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
                 useTimerStore.getState().startTimer(configService.get('defaultRestTimer'));
             }
         } catch (e) {
-            console.error('Failed to update set:', e);
+            logger.captureException(e, { scope: 'workoutStore.updateSet' });
             // Revert on failure (could implement fetching fresh state)
             if (activeWorkout) await get().loadSetsForWorkout(activeWorkout.id);
         }

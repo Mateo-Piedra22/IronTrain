@@ -6,6 +6,32 @@ import { verifyAuth } from '../../../../src/lib/auth';
 
 export const runtime = 'nodejs';
 
+export const SYNC_TABLES: ReadonlyArray<string> = [
+    'categories',
+    'exercises',
+    'workouts',
+    'workout_sets',
+    'routines',
+    'routine_days',
+    'routine_exercises',
+    'measurements',
+    'goals',
+    'body_metrics',
+    'plate_inventory',
+    'settings',
+    'badges',
+    'exercise_badges',
+    'user_profiles',
+    'changelogs',
+    'changelog_reactions',
+    'notification_reactions',
+    'kudos',
+    'activity_feed',
+    'score_events',
+    'user_exercise_prs',
+    'friendships',
+];
+
 const toSnakeCase = (camelObj: Record<string, unknown>): Record<string, unknown> => {
     if (!camelObj || typeof camelObj !== 'object') return camelObj;
     const snakeObj: Record<string, unknown> = {};
@@ -49,6 +75,7 @@ export async function GET(req: NextRequest) {
             'user_profiles': schema.userProfiles,
             'changelogs': schema.changelogs,
             'changelog_reactions': schema.changelogReactions,
+            'notification_reactions': schema.notificationReactions,
             'kudos': schema.kudos,
             'activity_feed': schema.activityFeed,
             'score_events': schema.scoreEvents,
@@ -97,7 +124,7 @@ export async function GET(req: NextRequest) {
                         conditions.push(inArray(table.userId, allRelevantUserIdsForFeed));
                     } else if (tableName === 'kudos') {
                         conditions.push(eq(table.giverId, userId));
-                    } else if (tableName === 'changelog_reactions' || tableName === 'user_profiles') {
+                    } else if (tableName === 'changelog_reactions' || tableName === 'notification_reactions' || tableName === 'user_profiles') {
                         const idCol = tableName === 'user_profiles' ? table.id : table.userId;
                         conditions.push(eq(idCol, userId));
                     } else {

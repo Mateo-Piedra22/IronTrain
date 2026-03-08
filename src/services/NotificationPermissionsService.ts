@@ -1,6 +1,7 @@
 import notifee, { AuthorizationStatus } from '@notifee/react-native';
 import { Linking, Platform } from 'react-native';
 import { confirm } from '../store/confirmStore';
+import { logger } from '../utils/logger';
 
 class NotificationPermissionsService {
     /**
@@ -37,7 +38,7 @@ class NotificationPermissionsService {
 
             return false;
         } catch (e) {
-            console.error('Error requesting notification permissions:', e);
+            logger.captureException(e, { scope: 'NotificationPermissionsService.requestPermission' });
             return false;
         }
     }

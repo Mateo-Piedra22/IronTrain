@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { db } from '../db';
 import * as schema from '../db/schema';
+import { logger } from './logger';
 
 type ScoreConfig = {
     workoutCompletePoints: number;
@@ -247,9 +248,9 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
 
     if (!workout) return { totalAwarded: 0 };
 
-    console.log(`[Scoring] Applying score for user=${userId} workout=${workoutId}`);
+    logger.info('[Scoring] Applying score', { userId, workoutId });
     const cfg = await getOrCreateScoreConfig(trx).catch(e => {
-        console.warn(`[Scoring] Failed to fetch config, using defaults: ${e.message}`);
+        logger.captureException(e, { scope: 'social-scoring.getOrCreateScoreConfig', message: '[Scoring] Failed to fetch config, using defaults' });
         return DEFAULT_SCORE_CONFIG;
     });
     const now = new Date();
@@ -257,7 +258,7 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
     try {
         streak = await ensureStreakState(trx, userId, Number(workout.date), cfg);
     } catch (e) {
-        console.error(`[Scoring] ensureStreakState fail for ${userId}:`, e);
+        logger.captureException(e, { scope: 'social-scoring.ensureStreakState', userId, workoutId });
         // Fallback to minimal streak state to avoid crashing
         streak = { multiplier: 1, currentStreak: 1, highestStreak: 1 };
     }
@@ -265,14 +266,14 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
     try {
         globalMultiplier = await getActiveGlobalMultiplier(trx, now);
     } catch (e) {
-        console.warn(`[Scoring] getActiveGlobalMultiplier fail for ${userId}: ${e instanceof Error ? e.message : String(e)}`);
+        logger.captureException(e, { scope: 'social-scoring.getActiveGlobalMultiplier', userId, workoutId });
     }
 
     let goalDays = 3;
     try {
         goalDays = await getWeeklyGoalDays(trx, userId);
     } catch (e) {
-        console.warn(`[Scoring] getWeeklyGoalDays fail for ${userId}: ${e instanceof Error ? e.message : String(e)}`);
+        logger.captureException(e, { scope: 'social-scoring.getWeeklyGoalDays', userId, workoutId });
     }
     let totalAwarded = 0;
 
@@ -429,7 +430,7 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
                 });
             }
         } catch (e) {
-            console.warn(`[Scoring] Weather check failed for workout=${workoutId}, skipping: ${e instanceof Error ? e.message : String(e)}`);
+            logger.captureException(e, { scope: 'social-scoring.weatherCheck', userId, workoutId, message: '[Scoring] Weather check failed for workout, skipping' });
         }
     }
 

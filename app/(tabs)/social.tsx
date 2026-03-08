@@ -506,42 +506,40 @@ export default function SocialTab() {
                                 )}
                             </View>
 
-                            {(profile.activeEvent || profile.weatherBonus || refreshingLocation || locationPermissionDenied || !profile.weatherBonus) && (
-                                <View style={styles.bonusColumn}>
-                                    {profile.activeEvent && (
-                                        <TouchableOpacity
-                                            style={styles.eventBadge}
-                                            onPress={() => setIsEventModalVisible(true)}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Zap size={10} color={Colors.iron[950]} fill={Colors.iron[950]} />
-                                            <Text style={styles.eventBadgeText}>Evento {profile.activeEvent.multiplier}x</Text>
-                                        </TouchableOpacity>
-                                    )}
+                            <View style={styles.bonusColumn}>
+                                {profile.activeEvent && (
                                     <TouchableOpacity
-                                        style={profile.weatherBonus?.isActive ? styles.weatherBadge : styles.locationBadge}
-                                        onPress={() => refreshingLocation ? null : handleRefreshLocation(false)}
+                                        style={styles.eventBadge}
+                                        onPress={() => setIsEventModalVisible(true)}
                                         activeOpacity={0.7}
-                                        disabled={refreshingLocation}
                                     >
-                                        {refreshingLocation ? (
-                                            <ActivityIndicator size={10} color={Colors.iron[500]} />
-                                        ) : profile.weatherBonus?.isActive ? (
-                                            <CloudRain size={10} color={Colors.white} />
-                                        ) : locationPermissionDenied ? (
-                                            <MapPinOff size={10} color={Colors.iron[500]} />
-                                        ) : (
-                                            <MapPin size={10} color={Colors.iron[500]} />
-                                        )}
-                                        <Text style={profile.weatherBonus?.isActive ? styles.weatherBadgeText : styles.locationBadgeText}>
-                                            {refreshingLocation ? 'Localizando...' :
-                                                profile.weatherBonus?.isActive ? 'Voluntad de Hierro' :
-                                                    locationPermissionDenied ? 'Ubicación desactivada' :
-                                                        (profile.weatherBonus?.location || 'Activar ubicación')}
-                                        </Text>
+                                        <Zap size={10} color={Colors.iron[950]} fill={Colors.iron[950]} />
+                                        <Text style={styles.eventBadgeText}>Evento {profile.activeEvent.multiplier}x</Text>
                                     </TouchableOpacity>
-                                </View>
-                            )}
+                                )}
+                                <TouchableOpacity
+                                    style={profile.weatherBonus?.isActive ? styles.weatherBadge : styles.locationBadge}
+                                    onPress={() => refreshingLocation ? null : handleRefreshLocation(false)}
+                                    activeOpacity={0.7}
+                                    disabled={refreshingLocation}
+                                >
+                                    {refreshingLocation ? (
+                                        <ActivityIndicator size={10} color={Colors.iron[500]} />
+                                    ) : profile.weatherBonus?.isActive ? (
+                                        <CloudRain size={10} color={Colors.white} />
+                                    ) : locationPermissionDenied ? (
+                                        <MapPinOff size={10} color={Colors.iron[500]} />
+                                    ) : (
+                                        <MapPin size={10} color={Colors.iron[500]} />
+                                    )}
+                                    <Text style={profile.weatherBonus?.isActive ? styles.weatherBadgeText : styles.locationBadgeText}>
+                                        {refreshingLocation ? 'Localizando...' :
+                                            profile.weatherBonus?.isActive ? 'Voluntad de Hierro' :
+                                                locationPermissionDenied ? 'Ubicación desactivada' :
+                                                    (profile.weatherBonus?.location || 'Activar ubicación')}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
                         <Text style={styles.profileStats}>Rutinas compartidas: {profile.shareStats || 0}</Text>
@@ -2367,16 +2365,17 @@ const styles = StyleSheet.create({
     locationBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: Colors.iron[900],
+        backgroundColor: Colors.iron[200], // Fondo un poco más oscuro para que se vea como un badge
         paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 20,
         gap: 6,
         borderWidth: 1,
-        borderColor: Colors.iron[700],
+        borderColor: Colors.iron[300], // Borde más marcado
+        minWidth: 80,
     },
     locationBadgeText: {
-        color: Colors.iron[600],
+        color: Colors.iron[950], // Texto más oscuro para lectura
         fontSize: 11,
         fontWeight: 'bold',
         textTransform: 'uppercase',

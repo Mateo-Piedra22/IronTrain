@@ -4,6 +4,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { Config } from '../constants/Config';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { logger } from '../utils/logger';
 import { configService } from './ConfigService';
 import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
@@ -118,7 +119,7 @@ export class SyncService {
                 const info = await dbService.getAll<{ name: string }>(`PRAGMA table_info('${table}')`);
                 schemas.set(table, new Set(info.map(c => c.name)));
             } catch (e) {
-                console.error(`[Sync] Failed to fetch schema for ${table}:`, e);
+                logger.captureException(e, { scope: 'SyncService.fetchAllTableSchemas', table });
             }
         }
         return schemas;
@@ -273,7 +274,7 @@ export class SyncService {
             await this.pushLocalChanges(token);
             await this.pullRemoteChanges(token, options?.forcePull, tableSchemas);
         } catch (error) {
-            console.error('[Sync] Bidirectional sync failed:', error);
+            logger.captureException(error, { scope: 'SyncService.syncBidirectional' });
             throw error;
         } finally {
             this.isSyncing = false;
@@ -387,7 +388,7 @@ export class SyncService {
 
                 hasMore = validOperations.length === MAX_BATCH_SIZE; // Continue if we processed a full batch
             } catch (error) {
-                console.error(`Sync push error:`, error);
+                logger.captureException(error, { scope: 'SyncService.pushLocalChanges' });
                 await dbService.run(`UPDATE sync_queue SET status = 'failed', retry_count = retry_count + 1 WHERE id IN (${ids.map(() => '?').join(',')})`, ids);
                 throw error; // Throw to abort sync chain if push fails fully
             }
@@ -447,7 +448,7 @@ export class SyncService {
                                 `SELECT ${columns.join(', ')} FROM ${table} WHERE ${pkField} IN (${ids.map(() => '?').join(', ')})`,
                                 ids
                             ).catch(e => {
-                                console.error(`[Sync] Failed to query existing rows for table ${table}. Columns: ${columns.join(', ')}`, e);
+                                logger.captureException(e, { scope: 'SyncService.pullRemoteChanges.queryExisting', table, columns });
                                 throw e;
                             })
                             : [];
@@ -597,11 +598,11 @@ export class SyncService {
 
             // --- Post-Sync Clean (Industrial Repair) ---
             // After downloading changes, fix any potential duplicates from the cloud
-            console.log('[Sync] Performing post-pull consistency check...');
+            logger.info('[Sync] Performing post-pull consistency check...');
             await dbService.repairDataConsistency();
 
         } catch (error) {
-            console.error('PULL sync failed:', error);
+            logger.captureException(error, { scope: 'SyncService.pullRemoteChanges' });
             throw error; // Throw so syncBidirectional fails loudly
         }
     }
@@ -731,7 +732,7 @@ export class SyncService {
                 throw new Error(`Snapshot restore integrity check failed (foreign_key_check). First issue: table=${first.table} rowid=${first.rowid} parent=${first.parent} fkid=${first.fkid}`);
             }
         } catch (error) {
-            console.error('Failed to restore snapshot:', error);
+            logger.captureException(error, { scope: 'SyncService.restoreDatabaseSnapshot' });
             throw error;
         }
     }

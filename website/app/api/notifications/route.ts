@@ -10,12 +10,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const version = searchParams.get('version');
     const platform = searchParams.get('platform');
-    const queryUserId = searchParams.get('userId');
     const isFeed = searchParams.get('feed') === 'true';
 
     try {
-        const authedUserId = await verifyAuth(request);
-        const userId = authedUserId || queryUserId;
+        const userId = await verifyAuth(request);
 
         const now = new Date();
         const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -43,7 +41,7 @@ export async function GET(request: NextRequest) {
             )
             .orderBy(desc(schema.adminNotifications.priority), desc(schema.adminNotifications.createdAt));
 
-        // 2. Filter by segment and capping if userId is provided
+        // 2. Filter by segment and capping only for authenticated users
         let filteredData = data;
 
         if (userId) {

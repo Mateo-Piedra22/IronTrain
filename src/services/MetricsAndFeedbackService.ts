@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { Config } from '../constants/Config';
+import { logger } from '../utils/logger';
 
 const API_URL = Config.API_URL;
 const INSTALL_TRACKED_KEY = 'irontrain_install_tracked';
@@ -47,7 +48,7 @@ export class MetricsAndFeedbackService {
                 await SecureStore.setItemAsync(INSTALL_TRACKED_KEY, 'true');
             }
         } catch (e) {
-            console.warn('[Metrics] Failed to track install (Offline or block)', e);
+            logger.captureException(e, { scope: 'MetricsAndFeedbackService.trackInstallIfNeeded', message: 'Failed to track install (Offline or block)' });
         }
     }
 
@@ -83,7 +84,7 @@ export class MetricsAndFeedbackService {
 
             return data.success;
         } catch (e) {
-            console.error('[Feedback] Submit error:', e);
+            logger.captureException(e, { scope: 'MetricsAndFeedbackService.submitFeedback' });
             throw e;
         }
     }

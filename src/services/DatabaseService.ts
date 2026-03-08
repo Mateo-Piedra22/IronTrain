@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
 import { Category, Exercise, ExerciseType, Workout, WorkoutSet } from '../types/db';
+import { logger } from '../utils/logger';
 import { uuidV4 } from '../utils/uuid';
 
 const DB_NAME = 'irontrain_v1.db';
@@ -38,7 +39,7 @@ export class DatabaseService {
 
                 this.isInitialized = true;
             } catch (error) {
-                console.error('[Error] Database initialization failed:', error);
+                logger.captureException(error, { scope: 'DatabaseService.init', message: 'Database initialization failed' });
                 throw error;
             } finally {
                 this.initPromise = null;
@@ -359,7 +360,7 @@ export class DatabaseService {
                  `);
             }
         } catch (e) {
-            console.error('Settings table check failed', e);
+            logger.captureException(e, { scope: 'DatabaseService.createTables', message: 'Settings table check failed' });
         }
 
         await this.runMigrations();
@@ -372,7 +373,7 @@ export class DatabaseService {
             const hasLegacy = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM categories WHERE length(id) < 15");
 
             if (hasLegacy && hasLegacy.count > 0) {
-                console.log('Running Critical Migration: Converting numeric IDs to UUIDs');
+                logger.info('Running Critical Migration: Converting numeric IDs to UUIDs');
                 await this.executeRaw('PRAGMA foreign_keys = OFF;');
                 await this.withTransaction(async () => {
                     await this.run('DELETE FROM categories WHERE length(id) < 15;');
@@ -383,28 +384,28 @@ export class DatabaseService {
                     await this.run('DELETE FROM goals WHERE length(id) < 15;');
                 });
                 await this.executeRaw('PRAGMA foreign_keys = ON;');
-                console.log('Legacy numeric data cleared for UUID consistency.');
+                logger.info('Legacy numeric data cleared for UUID consistency.');
             }
         } catch (e) {
-            console.error('Failed to migrate numeric IDs, rolling back', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Failed to migrate numeric IDs, rolling back' });
         }
 
         // Migration 1: Add superset_id to workout_sets if it doesn't exist
         try {
             const result = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('workout_sets') WHERE name='superset_id'");
             if (result && result.count === 0) {
-                console.log('Running Migration: Adding superset_id to workout_sets');
+                logger.info('Running Migration: Adding superset_id to workout_sets');
                 await this.executeRaw('ALTER TABLE workout_sets ADD COLUMN superset_id TEXT');
             }
         } catch (e) {
-            console.warn('Migration check failed (superset_id):', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration check failed (superset_id)' });
         }
 
         // Migration to fix goals table schema
         try {
             const result = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('goals') WHERE name='title'");
             if (result && result.count === 0) {
-                console.log('Running Migration: Fixing goals table schema');
+                logger.info('Running Migration: Fixing goals table schema');
                 await this.executeRaw('DROP TABLE IF EXISTS goals');
                 await this.executeRaw(`
                     CREATE TABLE IF NOT EXISTS goals (
@@ -423,18 +424,18 @@ export class DatabaseService {
                 `);
             }
         } catch (e) {
-            console.error('Migration check failed (goals schema):', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration check failed (goals schema)' });
         }
 
         // Migration 2: Add rpe to workout_sets if it doesn't exist (Legacy DB support)
         try {
             const result = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('workout_sets') WHERE name='rpe'");
             if (result && result.count === 0) {
-                console.log('Running Migration: Adding rpe to workout_sets');
+                logger.info('Running Migration: Adding rpe to workout_sets');
                 await this.executeRaw('ALTER TABLE workout_sets ADD COLUMN rpe REAL');
             }
         } catch (e) {
-            console.warn('Migration check failed (rpe):', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration check failed (rpe)' });
         }
 
         // Migration 3: Create goals table
@@ -452,7 +453,7 @@ export class DatabaseService {
                 )
             `);
         } catch (e) {
-            console.warn('Migration check failed (goals table):', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration check failed (goals table)' });
         }
 
         // Migration 4: Ensure "Sin categoría" exists for safe reassignment
@@ -474,31 +475,31 @@ export class DatabaseService {
 
             const systemCat = await this.getFirst<{ id: string }>('SELECT id FROM categories WHERE id = ?', [UNCATEGORIZED_ID]);
             if (!systemCat) {
-                console.log('Running Migration Check: Re-creating default category.');
+                logger.info('Running Migration Check: Re-creating default category.');
                 await this.run(
                     'INSERT OR IGNORE INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, 999, ?)',
                     [UNCATEGORIZED_ID, UNCATEGORIZED_NAME, '#64748b']
                 );
             }
         } catch (e) {
-            console.warn('Migration check failed (create system cat):', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration check failed (create system cat)' });
         }
 
         // Migration 5: Add origin_id to exercises and is_public to routines
         try {
             const resultEx = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('exercises') WHERE name='origin_id'");
             if (resultEx && resultEx.count === 0) {
-                console.log('Running Migration: Adding origin_id to exercises');
+                logger.info('Running Migration: Adding origin_id to exercises');
                 await this.executeRaw('ALTER TABLE exercises ADD COLUMN origin_id TEXT');
             }
 
             const resultRoutine = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('routines') WHERE name='is_public'");
             if (resultRoutine && resultRoutine.count === 0) {
-                console.log('Running Migration: Adding is_public to routines');
+                logger.info('Running Migration: Adding is_public to routines');
                 await this.executeRaw('ALTER TABLE routines ADD COLUMN is_public INTEGER DEFAULT 0');
             }
         } catch (e) {
-            console.warn('Migration check failed (Migration 5):', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration check failed (Migration 5)' });
         }
 
         // Migration 6: Fix plate_inventory PK to include unit (weight,type,unit)
@@ -537,7 +538,7 @@ export class DatabaseService {
                 });
             }
         } catch (e) {
-            console.warn('Migration check failed (plate_inventory pk/unit):', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration check failed (plate_inventory pk/unit)' });
         }
 
         // Migration 11: Repair plate_inventory if a legacy migration removed required columns (id/available)
@@ -591,7 +592,7 @@ export class DatabaseService {
                 });
             }
         } catch (e) {
-            console.warn('Migration 11 failed (plate_inventory repair):', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 11 failed (plate_inventory repair)' });
         }
 
         // Migration 6: Add color column to plate_inventory
@@ -599,11 +600,11 @@ export class DatabaseService {
             const info = await this.getAll<{ name: string }>("PRAGMA table_info('plate_inventory')");
             const columns = info.map(c => c.name);
             if (!columns.includes('color')) {
-                console.log('Running Migration: Adding color to plate_inventory');
+                logger.info('Running Migration: Adding color to plate_inventory');
                 await this.executeRaw('ALTER TABLE plate_inventory ADD COLUMN color TEXT');
             }
         } catch (e) {
-            console.warn('Migration check failed (plate_inventory color):', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration check failed (plate_inventory color)' });
         }
 
         // Migration 7: Add duration column to workouts (elapsed seconds for timer persistence)
@@ -613,7 +614,7 @@ export class DatabaseService {
                 await this.executeRaw('ALTER TABLE workouts ADD COLUMN duration INTEGER DEFAULT 0');
             }
         } catch (e) {
-            console.warn('Migration check failed (workouts duration):', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration check failed (workouts duration)' });
         }
 
         // Migration 9: Add updated_at and deleted_at to all syncable tables for cloud sync
@@ -634,23 +635,23 @@ export class DatabaseService {
             'user_exercise_prs', 'score_events'
         ];
 
-        console.log('Running Migration 9: Ensuring updated_at and deleted_at on all tables');
+        logger.info('Running Migration 9: Ensuring updated_at and deleted_at on all tables');
         for (const table of syncableTables) {
             try {
                 const info = await this.getAll<{ name: string }>(`PRAGMA table_info('${table}')`);
                 const columns = info.map(c => c.name);
 
                 if (!columns.includes('updated_at')) {
-                    console.log(`[Migration] Adding updated_at to ${table}`);
+                    logger.info(`[Migration] Adding updated_at to ${table}`);
                     await this.executeRaw(`ALTER TABLE ${table} ADD COLUMN updated_at INTEGER DEFAULT 0`);
                 }
 
                 if (!columns.includes('deleted_at') && softDeleteTables.includes(table)) {
-                    console.log(`[Migration] Adding deleted_at to ${table}`);
+                    logger.info(`[Migration] Adding deleted_at to ${table}`);
                     await this.executeRaw(`ALTER TABLE ${table} ADD COLUMN deleted_at INTEGER`);
                 }
             } catch (e) {
-                console.error(`[Migration] Migration 9 failed for ${table}:`, e);
+                logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: `[Migration] Migration 9 failed for ${table}`, table });
             }
         }
 
@@ -659,11 +660,11 @@ export class DatabaseService {
             const info = await this.getAll<{ name: string }>("PRAGMA table_info('sync_queue')");
             const columns = info.map(c => c.name);
             if (!columns.includes('synced_at')) {
-                console.log('Migration 10: Adding synced_at to sync_queue');
+                logger.info('Migration 10: Adding synced_at to sync_queue');
                 await this.executeRaw('ALTER TABLE sync_queue ADD COLUMN synced_at INTEGER');
             }
         } catch (e) {
-            console.warn('Migration 10 failed:', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 10 failed' });
         }
 
         // Migration 11: Add moderation columns to routines
@@ -671,26 +672,26 @@ export class DatabaseService {
             const info = await this.getAll<{ name: string }>("PRAGMA table_info('routines')");
             const columns = info.map(c => c.name);
             if (!columns.includes('is_moderated')) {
-                console.log('Migration 11: Adding moderation columns to routines');
+                logger.info('Migration 11: Adding moderation columns to routines');
                 await this.executeRaw('ALTER TABLE routines ADD COLUMN is_moderated INTEGER DEFAULT 0');
                 await this.executeRaw('ALTER TABLE routines ADD COLUMN moderation_message TEXT');
             }
         } catch (e) {
-            console.warn('Migration 11 failed:', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 11 failed' });
         }
 
         // Migration 12: Add unit column to measurements if it doesn't exist
         try {
             const result = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('measurements') WHERE name='unit'");
             if (result && result.count === 0) {
-                console.log('Running Migration 12: Adding unit to measurements');
+                logger.info('Running Migration 12: Adding unit to measurements');
                 await this.executeRaw("ALTER TABLE measurements ADD COLUMN unit TEXT DEFAULT 'cm'");
                 // Fix legacy weights/fat if any
                 await this.run("UPDATE measurements SET unit = 'kg' WHERE type = 'weight'");
                 await this.run("UPDATE measurements SET unit = '%' WHERE type = 'body_fat'");
             }
         } catch (e) {
-            console.warn('Migration 12 failed (measurements unit):', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 12 failed (measurements unit)' });
         }
 
         // Migration 13: Create changelog_reactions and kudos tables
@@ -733,7 +734,7 @@ export class DatabaseService {
                 await this.executeRaw("ALTER TABLE changelogs ADD COLUMN reaction_count INTEGER DEFAULT 0 NOT NULL");
             }
         } catch (e) {
-            console.error('Migration 13 failed (changelog_reactions/kudos/activity_feed):', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 13 failed (changelog_reactions/kudos/activity_feed)' });
         }
 
         try {
@@ -746,7 +747,7 @@ export class DatabaseService {
                 await this.executeRaw('ALTER TABLE workouts ADD COLUMN finish_lon REAL');
             }
         } catch (e) {
-            console.warn('Migration 14 failed (workouts finish location):', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 14 failed (workouts finish location)' });
         }
 
         // Migration 15: Social scoring columns and tables
@@ -762,7 +763,7 @@ export class DatabaseService {
 
             for (const [col, def] of Object.entries(scoringColumns)) {
                 if (!userProfileColumns.includes(col)) {
-                    console.log(`[Migration] Adding ${col} to user_profiles`);
+                    logger.info(`[Migration] Adding ${col} to user_profiles`);
                     await this.executeRaw(`ALTER TABLE user_profiles ADD COLUMN ${col} ${def}`);
                 }
             }
@@ -796,12 +797,12 @@ export class DatabaseService {
                 )
             `);
         } catch (e) {
-            console.error('[Migration] Migration 15 failed (social scoring):', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: '[Migration] Migration 15 failed (social scoring)' });
         }
 
         // Migration 16: Robust alignment of scoring tables with remote schema (Social 2.1.0)
         try {
-            console.log('[Migration] Running Migration 16: Scoring alignment');
+            logger.info('[Migration] Running Migration 16: Scoring alignment');
             const prInfo = await this.getAll<{ name: string }>("PRAGMA table_info('user_exercise_prs')");
             const prCols = prInfo.map(c => c.name);
             if (!prCols.includes('exercise_name')) {
@@ -835,31 +836,31 @@ export class DatabaseService {
                 await this.executeRaw('ALTER TABLE score_events ADD COLUMN workout_id TEXT');
             }
         } catch (e) {
-            console.warn('Migration 16 failed:', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 16 failed' });
         }
 
         // Migration 17: Generic Name-Based Deduplication (Repairing Sync Issues)
         try {
-            console.log('[Migration] Running Migration 17: Generic Deduplication Repair');
+            logger.info('[Migration] Running Migration 17: Generic Deduplication Repair');
             await this.repairDataConsistency();
         } catch (e) {
-            console.error('[Migration] Migration 17 failed:', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: '[Migration] Migration 17 failed' });
         }
 
         // Migration 18: Add updated_at to settings table
         try {
             const hasUpdatedAt = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('settings') WHERE name='updated_at'");
             if (!hasUpdatedAt || hasUpdatedAt.count === 0) {
-                console.log('[Migration] Migration 18: Adding updated_at to settings');
+                logger.info('[Migration] Migration 18: Adding updated_at to settings');
                 await this.executeRaw('ALTER TABLE settings ADD COLUMN updated_at INTEGER DEFAULT 0');
             }
         } catch (e) {
-            console.warn('Migration 18 failed:', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 18 failed' });
         }
 
         // Migration 19: Add notification_reactions table (Push Center Kudos)
         try {
-            console.log('[Migration] Running Migration 19: notification_reactions');
+            logger.info('[Migration] Running Migration 19: notification_reactions');
             await this.executeRaw(`
                 CREATE TABLE IF NOT EXISTS notification_reactions (
                     id TEXT PRIMARY KEY,
@@ -874,7 +875,7 @@ export class DatabaseService {
             await this.executeRaw(`CREATE INDEX IF NOT EXISTS idx_notif_reactions_notif ON notification_reactions (notification_id)`);
             await this.executeRaw(`CREATE INDEX IF NOT EXISTS idx_notif_reactions_user ON notification_reactions (user_id)`);
         } catch (e) {
-            console.warn('Migration 19 failed:', e);
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 19 failed' });
         }
     }
 
@@ -1362,7 +1363,7 @@ export class DatabaseService {
                 ]
             );
         } catch (e) {
-            console.error('[SyncQueue] Failed to enqueue mutation:', e);
+            logger.captureException(e, { scope: 'DatabaseService.queueSyncMutation', message: '[SyncQueue] Failed to enqueue mutation' });
         }
     }
 
@@ -1402,7 +1403,7 @@ export class DatabaseService {
                     || (msg.includes('finalizeAsync') && isUnique) // Retry on finalize UNIQUE race
                 );
                 if (isLocked) {
-                    console.warn(`[Database] Busy/Locked/Race (attempt ${i + 1}/${retries}). Retrying...`);
+                    logger.warn(`[Database] Busy/Locked/Race (attempt ${i + 1}/${retries}). Retrying...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                     continue;
                 }

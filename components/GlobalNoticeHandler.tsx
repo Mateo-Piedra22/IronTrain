@@ -1,70 +1,109 @@
 import { Config } from '@/src/constants/Config';
-import { AppNotification, AppNotificationService } from '@/src/services/AppNotificationService';
-import { ChangelogRelease, ChangelogService } from '@/src/services/ChangelogService';
+import { AppNotificationService } from '@/src/services/AppNotificationService';
+import type { BroadcastItem } from '@/src/services/BroadcastFeedService';
+import { BroadcastFeedService } from '@/src/services/BroadcastFeedService';
+import { decideGlobalInterruption } from '@/src/services/BroadcastInterruptionPolicy';
+import { ChangelogService, type ChangelogRelease } from '@/src/services/ChangelogService';
+import { configService } from '@/src/services/ConfigService';
 import { useAuthStore } from '@/src/store/authStore';
 import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { useRouter } from 'expo-router';
 import { Bell, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { DeviceEventEmitter, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { SlideInUp, SlideOutUp } from 'react-native-reanimated';
 import { PushRegistrationService } from '../src/services/PushRegistrationService';
 import { WhatsNewModal } from './WhatsNewModal';
 
 export const GlobalNoticeHandler: React.FC = () => {
     const [whatsNew, setWhatsNew] = useState<ChangelogRelease | null>(null);
-    const [activeNotification, setActiveNotification] = useState<AppNotification | null>(null);
+    const [activeAnnouncement, setActiveAnnouncement] = useState<BroadcastItem | null>(null);
     const [showToast, setShowToast] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
+        let cancelled = false;
+
         const fetchAll = async () => {
-            // 1. Sync remote data
-            await ChangelogService.sync();
+            try {
+                const feed = await BroadcastFeedService.getFeed({ isFeed: false, includeUnreleased: false });
+                if (cancelled) return;
 
-            // 2. Check for "What's New"
-            const release = await ChangelogService.checkShouldShowWhatsNew();
-            if (release) {
-                setWhatsNew(release);
-            } else {
-                // 3. If no changelog, check for general notifications
-                const notifications = await AppNotificationService.getActiveNotifications();
+                const decision = await decideGlobalInterruption({
+                    items: feed.items,
+                    currentVersion: ChangelogService.getAppVersion(),
+                    seen: {
+                        isSeen: async (id: string) => {
+                            if (id.startsWith('whats_new:')) {
+                                const key = id.slice('whats_new:'.length);
+                                const lastSeen = await configService.get('last_seen_changelog_version' as any);
+                                return String(lastSeen ?? '').trim() === String(key).trim();
+                            }
+                            return AppNotificationService.isSeen(id);
+                        }
+                    },
+                });
 
-                for (const n of notifications) {
-                    const seen = await AppNotificationService.isSeen(n.id);
-                    if (n.displayMode === 'always' || !seen) {
-                        displayNotification(n);
-                        break; // Show one at a time
-                    }
+                if (cancelled) return;
+
+                if (decision.kind === 'whats_new') {
+                    setWhatsNew({
+                        version: decision.release.version,
+                        date: null,
+                        items: decision.release.items,
+                    });
+                    setActiveAnnouncement(null);
+                    setShowToast(false);
+                    return;
                 }
-            }
-        };
 
-        const displayNotification = (n: AppNotification) => {
-            if (n.type === 'modal') {
-                setActiveNotification(n);
+                if (decision.kind === 'announcement') {
+                    const n = decision.announcement;
+                    setActiveAnnouncement(n);
+                    if (n.uiType === 'toast') {
+                        setShowToast(true);
+                        setTimeout(() => setShowToast(false), 6000);
+                    } else {
+                        setShowToast(false);
+                    }
+                    return;
+                }
+
+                setWhatsNew(null);
+                setActiveAnnouncement(null);
                 setShowToast(false);
-            } else if (n.type === 'toast') {
-                setActiveNotification(n);
-                setShowToast(true);
-                // Auto-hide toast after 6 seconds
-                setTimeout(() => setShowToast(false), 6000);
+            } catch (e) {
+                console.error('[GlobalNoticeHandler] Error fetching feed', e);
             }
         };
 
         fetchAll();
 
-        // Testing mechanism
-        const { DeviceEventEmitter } = require('react-native');
-        const testSub = DeviceEventEmitter.addListener('triggerTestNotification', (payload: AppNotification) => {
-            console.log('TEST: Triggering notification preview:', payload.type);
-            displayNotification(payload);
+        // DEV ONLY: Test listener for manual triggering of UI
+        const testSub = DeviceEventEmitter.addListener('triggerTestBroadcast', (item: BroadcastItem) => {
+            if (item.kind === 'changelog') {
+                setWhatsNew({
+                    version: item.targeting.version || '0.0.0',
+                    date: item.createdAt || null,
+                    items: String(item.body).split('\n').filter(s => s.trim().length > 0)
+                });
+                setActiveAnnouncement(null);
+                setShowToast(false);
+            } else if (item.kind === 'announcement' || item.kind === 'global_event') {
+                setActiveAnnouncement(item);
+                if (item.uiType === 'toast') {
+                    setShowToast(true);
+                    setTimeout(() => setShowToast(false), 6000);
+                } else {
+                    setShowToast(false);
+                }
+                setWhatsNew(null);
+            }
         });
 
         // Real-time listener: refresh when a push arrives in foreground
         const cleanup = PushRegistrationService.initListeners(
             () => {
-                console.log('Refreshing notices due to push event...');
                 fetchAll();
             },
             (response) => {
@@ -81,29 +120,37 @@ export const GlobalNoticeHandler: React.FC = () => {
         );
 
         return () => {
-            cleanup();
+            cancelled = true;
             testSub.remove();
+            cleanup();
         };
     }, []);
 
     const handleUrlAction = async (actionUrl: string) => {
         try {
-            if (actionUrl === 'changelog' || actionUrl === 'social' || actionUrl.startsWith('/') || actionUrl.startsWith('irontrain://')) {
-                const rawPath = actionUrl.replace('irontrain://', '');
-                const path =
-                    rawPath === 'social' ? '/(tabs)/social'
-                        : rawPath === 'changelog' ? '/changelog'
-                            : rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
-                // @ts-ignore
-                router.push(path as any);
-            } else {
-                const supported = await Linking.canOpenURL(actionUrl);
-                if (supported) {
-                    await Linking.openURL(actionUrl);
+            // Cierro el modal/toast antes para evitar bloqueos visuales
+            setActiveAnnouncement(null);
+            setShowToast(false);
+
+            // Pequeño timeout antes de navegar
+            setTimeout(async () => {
+                if (actionUrl === 'changelog' || actionUrl === 'social' || actionUrl.startsWith('/') || actionUrl.startsWith('irontrain://')) {
+                    const rawPath = actionUrl.replace('irontrain://', '');
+                    const path =
+                        rawPath === 'social' ? '/(tabs)/social'
+                            : rawPath === 'changelog' ? '/changelog'
+                                : rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+                    // @ts-ignore
+                    router.push(path as any);
+                } else {
+                    const supported = await Linking.canOpenURL(actionUrl);
+                    if (supported) {
+                        await Linking.openURL(actionUrl);
+                    }
                 }
-            }
-        } catch (e) {
-            console.warn('Failed to handle push URL action:', e);
+            }, 100);
+        } catch {
+            return;
         }
     };
 
@@ -113,36 +160,34 @@ export const GlobalNoticeHandler: React.FC = () => {
     };
 
     const handleCloseNotification = async () => {
-        if (activeNotification) {
-            await AppNotificationService.markAsSeen(activeNotification.id);
-            setActiveNotification(null);
+        if (activeAnnouncement) {
+            await AppNotificationService.markAsSeen(activeAnnouncement.id);
+            setActiveAnnouncement(null);
             setShowToast(false);
         }
     };
 
     const handleNotifPress = async () => {
-        if (!activeNotification) return;
+        if (!activeAnnouncement) return;
 
         // Log the click
-        try {
-            const { user, token } = useAuthStore.getState();
-            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-            if (token) headers.Authorization = `Bearer ${token}`;
+        const { token } = useAuthStore.getState();
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers.Authorization = `Bearer ${token}`;
 
-            fetch(`${Config.API_URL}/api/notifications/log`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ id: activeNotification.id, action: 'clicked', userId: user?.id })
-            });
-        } catch { }
+        void fetch(`${Config.API_URL}/api/notifications/log`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ id: activeAnnouncement.id, action: 'clicked' })
+        }).catch(() => undefined);
 
-        const actionUrl = activeNotification.metadata?.actionUrl;
-        if (actionUrl) {
+        const actionUrl = activeAnnouncement.actionUrl;
+        if (typeof actionUrl === 'string' && actionUrl.trim().length > 0) {
             handleUrlAction(actionUrl);
         }
 
         // Close it unless it's displayMode 'always'
-        if (activeNotification.displayMode !== 'always') {
+        if (activeAnnouncement.displayMode !== 'always') {
             await handleCloseNotification();
         }
     };
@@ -155,7 +200,7 @@ export const GlobalNoticeHandler: React.FC = () => {
             if (part === '\n') {
                 return '\n';
             }
-            return part;
+            return part; part;
         });
     };
 
@@ -170,7 +215,7 @@ export const GlobalNoticeHandler: React.FC = () => {
                 />
             )}
 
-            {activeNotification && activeNotification.type === 'modal' && (
+            {activeAnnouncement && activeAnnouncement.uiType === 'modal' && (
                 <Modal visible={true} transparent animationType="fade">
                     <View style={ss.modalOverlay}>
                         <Pressable style={ss.modalBackdropPressable} onPress={handleCloseNotification} />
@@ -179,7 +224,7 @@ export const GlobalNoticeHandler: React.FC = () => {
                                 <View style={ss.iconCircle}>
                                     <Bell size={20} color={Colors.primary.DEFAULT} />
                                 </View>
-                                <Text style={ss.modalTitle}>{activeNotification.title}</Text>
+                                <Text style={ss.modalTitle}>{activeAnnouncement.title}</Text>
                                 <TouchableOpacity onPress={handleCloseNotification} accessibilityRole="button" accessibilityLabel="Cerrar notificación">
                                     <X size={20} color={Colors.iron[500]} />
                                 </TouchableOpacity>
@@ -191,10 +236,10 @@ export const GlobalNoticeHandler: React.FC = () => {
                                     showsVerticalScrollIndicator={true}
                                 >
                                     <Text style={ss.modalMessage}>
-                                        {renderRichText(activeNotification.message)}
+                                        {renderRichText(activeAnnouncement.body)}
                                     </Text>
                                 </ScrollView>
-                                {activeNotification.metadata?.actionUrl && (
+                                {activeAnnouncement.actionUrl && (
                                     <TouchableOpacity style={ss.modalActionBtn} onPress={handleNotifPress} accessibilityRole="button" accessibilityLabel="Ver detalle de notificación">
                                         <Text style={ss.modalActionText}>Ver más</Text>
                                     </TouchableOpacity>
@@ -209,7 +254,7 @@ export const GlobalNoticeHandler: React.FC = () => {
             )}
 
             {/* 3. Custom BroadCast Toast */}
-            {activeNotification && activeNotification.type === 'toast' && showToast && (
+            {activeAnnouncement && activeAnnouncement.uiType === 'toast' && showToast && (
                 <Animated.View
                     entering={SlideInUp}
                     exiting={SlideOutUp}
@@ -224,8 +269,8 @@ export const GlobalNoticeHandler: React.FC = () => {
                         accessibilityRole="button"
                         accessibilityLabel="Abrir notificación rápida"
                     >
-                        <Text style={ss.toastTitle}>{activeNotification.title}</Text>
-                        <Text style={ss.toastMessage} numberOfLines={2}>{activeNotification.message}</Text>
+                        <Text style={ss.toastTitle}>{activeAnnouncement.title}</Text>
+                        <Text style={ss.toastMessage} numberOfLines={2}>{activeAnnouncement.body}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         onPress={handleCloseNotification}
@@ -321,7 +366,7 @@ const ss = StyleSheet.create({
     },
     richBold: {
         fontWeight: '900',
-        color: Colors.iron[950],
+        color: '#000000', // Forzamos negro para máximo contraste en las novedades
     },
     modalActionBtn: {
         alignSelf: 'flex-start',

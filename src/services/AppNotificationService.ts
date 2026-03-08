@@ -1,7 +1,7 @@
-import { Platform } from 'react-native';
 import { Config } from '../constants/Config';
 import { useAuthStore } from '../store/authStore';
-import { ChangelogService } from './ChangelogService';
+import { logger } from '../utils/logger';
+import { BroadcastFeedService } from './BroadcastFeedService';
 import { configService } from './ConfigService';
 
 export type AppNotification = {
@@ -13,38 +13,40 @@ export type AppNotification = {
     priority: number;
     metadata?: any;
     reactionCount?: number;
+    userReacted?: boolean | null;
     createdAt?: string | Date;
 };
 
 const BACKEND_URL = Config.API_URL;
-const API_URL = `${BACKEND_URL}/api/notifications`;
 
 export class AppNotificationService {
     static async getActiveNotifications(isFeed = false): Promise<AppNotification[]> {
         try {
-            const version = ChangelogService.getAppVersion();
-            const { user, token } = useAuthStore.getState();
-            const platform = Platform.OS;
+            // Usamos el nuevo servicio unificado que ya maneja caché, filtrado y autenticación
+            const response = await BroadcastFeedService.getFeed({ isFeed });
 
-            let url = `${API_URL}?version=${version}&platform=${platform}`;
-            if (user?.id) url += `&userId=${user.id}`;
-            if (isFeed) url += `&feed=true`;
+            // Filtramos solo los anuncios (announcements) para mantener compatibilidad con este servicio
+            const announcements = response.items.filter(i => i.kind === 'announcement');
 
-            const headers: Record<string, string> = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const response = await fetch(url, { headers });
-            if (!response.ok) return [];
-            const data = await response.json();
-            return data.notifications || [];
+            return announcements.map(i => ({
+                id: i.id,
+                title: i.title,
+                message: i.body,
+                type: (i.uiType as any) || 'toast',
+                displayMode: (i.displayMode as any) || 'once',
+                priority: i.priority,
+                metadata: { actionUrl: i.actionUrl },
+                reactionCount: i.engagement.reactionCount,
+                userReacted: i.engagement.userReacted,
+                createdAt: i.createdAt
+            }));
         } catch (e) {
-            console.warn('Failed to fetch notifications:', e);
+            logger.captureException(e, { scope: 'AppNotificationService.getActiveNotifications' });
             return [];
         }
     }
 
     static async markAsSeen(id: string): Promise<void> {
-        const userId = useAuthStore.getState().user?.id;
         const seenStr = await configService.get('seen_notifications' as any);
         const seen = seenStr ? JSON.parse(seenStr as string) : [];
         if (!seen.includes(id)) {
@@ -53,14 +55,14 @@ export class AppNotificationService {
 
             // Notify backend analytics
             try {
-                const { user, token } = useAuthStore.getState();
+                const { token } = useAuthStore.getState();
                 const headers: Record<string, string> = { 'Content-Type': 'application/json' };
                 if (token) headers['Authorization'] = `Bearer ${token}`;
 
                 fetch(`${BACKEND_URL}/api/notifications/log`, {
                     method: 'POST',
                     headers,
-                    body: JSON.stringify({ id, action: 'seen', userId: user?.id })
+                    body: JSON.stringify({ id, action: 'seen' })
                 });
             } catch { }
         }
@@ -83,25 +85,16 @@ export class AppNotificationService {
             await fetch(`${BACKEND_URL}/api/notifications/register-token`, {
                 method: 'POST',
                 headers,
-                body: JSON.stringify({ userId: user.id, pushToken, ...metadata })
+                body: JSON.stringify({ pushToken, ...metadata })
             });
         } catch (e) {
-            console.error('Failed to register push token:', e);
-        }
-    }
-
-    static async getReactionCount(notificationId: string): Promise<number> {
-        try {
-            const countStr = await configService.get(`notif_reaction_count_${notificationId}` as any);
-            return countStr ? parseInt(countStr as string, 10) : 0;
-        } catch (e) {
-            return 0;
+            logger.captureException(e, { scope: 'AppNotificationService.registerPushToken' });
         }
     }
 
     static async toggleReaction(notificationId: string): Promise<'added' | 'removed' | 'error'> {
-        const { user, token } = useAuthStore.getState();
-        if (!user?.id || !token) return 'error';
+        const { token } = useAuthStore.getState();
+        if (!token) return 'error';
 
         try {
             const response = await fetch(`${BACKEND_URL}/api/notifications/react`, {
@@ -110,18 +103,15 @@ export class AppNotificationService {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ notificationId, userId: user.id })
+                body: JSON.stringify({ notificationId })
             });
             if (response.ok) {
                 const data = await response.json();
-                if (typeof data.reactionCount === 'number') {
-                    await configService.set(`notif_reaction_count_${notificationId}` as any, data.reactionCount.toString());
-                }
                 return data.action; // 'added' or 'removed'
             }
             return 'error';
         } catch (e) {
-            console.error('Error toggling notification reaction:', e);
+            logger.captureException(e, { scope: 'AppNotificationService.toggleReaction' });
             return 'error';
         }
     }

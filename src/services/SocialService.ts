@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { Config } from '../constants/Config';
+import { logger } from '../utils/logger';
 import { dataEventService } from './DataEventService';
 
 const API_URL = Config.API_URL;
@@ -134,7 +135,11 @@ export class SocialService {
         try {
             data = JSON.parse(text);
         } catch (e) {
-            console.error(`[SocialService] Failed to parse JSON from ${url}. Status: ${res.status}. Body starts with: ${text.substring(0, 50)}`);
+            logger.error('[SocialService] Failed to parse JSON response', {
+                url,
+                status: res.status,
+                bodyPrefix: typeof text === 'string' ? text.substring(0, 50) : null,
+            });
             throw new Error(`Error del servidor (Código ${res.status}). La respuesta no es válida.`);
         }
 
@@ -275,7 +280,7 @@ export class SocialService {
             } catch { }
             return data.action === 'removed' ? 'removed' : 'added';
         } catch (e) {
-            console.error('[SocialService] Toggle Kudo failed:', e);
+            logger.captureException(e, { scope: 'SocialService.toggleKudo' });
             return 'error';
         }
     }

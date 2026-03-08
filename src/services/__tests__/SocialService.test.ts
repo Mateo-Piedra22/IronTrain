@@ -15,6 +15,7 @@ describe('SocialService', () => {
   it('should call backend kudo endpoint and return action', async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
+      text: async () => JSON.stringify({ success: true, action: 'added' }),
       json: async () => ({ success: true, action: 'added' }),
     });
 
@@ -35,6 +36,10 @@ describe('SocialService', () => {
   it('should encode friendId in compare endpoint', async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
+      text: async () => JSON.stringify({
+        success: true,
+        comparison: [{ exerciseName: 'Bench', user1RM: 100, friend1RM: 95, unit: 'kg' }],
+      }),
       json: async () => ({
         success: true,
         comparison: [{ exerciseName: 'Bench', user1RM: 100, friend1RM: 95, unit: 'kg' }],

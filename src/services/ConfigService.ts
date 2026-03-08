@@ -1,5 +1,6 @@
-import { dataEventService } from './DataEventService';
+import { logger } from '../utils/logger';
 import { dbService } from './DatabaseService';
+import { dataEventService } from './DataEventService';
 
 export interface NotificationPreferences {
     inApp: {
@@ -155,7 +156,7 @@ class ConfigService {
                     }
                     else loadedConfig[s.key] = s.value;
                 } catch (e) {
-                    console.warn(`Failed to parse setting ${s.key}`, e);
+                    logger.captureException(e, { scope: 'ConfigService.loadAll', message: `Failed to parse setting ${s.key}`, key: s.key });
                 }
             });
 
@@ -211,7 +212,7 @@ class ConfigService {
             this.cache = loadedConfig;
             return loadedConfig;
         } catch (e) {
-            console.error('Failed to load settings', e);
+            logger.captureException(e, { scope: 'ConfigService.loadAll', message: 'Failed to load settings' });
             return DEFAULT_CONFIG;
         }
     }

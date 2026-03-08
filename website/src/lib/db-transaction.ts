@@ -1,4 +1,5 @@
 import { db } from '../db';
+import { logger } from './logger';
 
 type TransactionRunner = <T>(fn: (trx: any) => Promise<T>) => Promise<T>;
 let transactionSupportCache: boolean | null = null;
@@ -88,7 +89,7 @@ export async function runDbTransaction<T>(fn: (trx: any) => Promise<T>): Promise
         // Fallback: Run without transaction if native support fails to bootstrap
         // This is safe for many operations as long as we handle atomicity at the caller level
         // and keep the individual operations idempotent.
-        console.warn('[DB Transaction] Native support unavailable, running in non-transactional fallback mode');
+        logger.warn('[DB Transaction] Native support unavailable, running in non-transactional fallback mode');
         return await fn(db);
     }
 

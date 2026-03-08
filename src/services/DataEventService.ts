@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 export type DataEventType = 'DATA_UPDATED' | 'SETTINGS_UPDATED' | 'SYNC_COMPLETED' | 'SOCIAL_UPDATED';
 
 type Listener = (payload?: any) => void;
@@ -12,7 +14,7 @@ class DataEventService {
                 try {
                     callback(payload);
                 } catch (e) {
-                    console.error(`Error in DataEvent listener for ${event}:`, e);
+                    logger.captureException(e, { scope: 'DataEventService.emit', event });
                 }
             });
         }

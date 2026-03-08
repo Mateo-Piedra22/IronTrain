@@ -308,13 +308,51 @@ export default function DailyLogScreen() {
                 <TouchableOpacity
                   onPress={() => {
                     const tests = [
-                      { id: 'test-1', title: 'Aviso de Mantenimiento', message: 'Estaremos realizando tareas de mantenimiento el próximo **domingo a las 04:00 AM**. \n\nNo se pierdan las nuevas funciones que vienen en camino.', type: 'modal', displayMode: 'always', priority: 1, createdAt: new Date().toISOString(), reactionCount: 12 },
-                      { id: 'test-2', title: '¡Nuevo Evento Global!', message: 'Se ha activado un multiplicador x2 de experiencia en todos los ejercicios de pierna.', type: 'toast', displayMode: 'always', priority: 2, createdAt: new Date().toISOString(), reactionCount: 45 },
-                      { id: 'test-3', title: 'Actualización Crítica', message: 'Hemos corregido el error de GPS que afectaba a algunos dispositivos. Por favor reinicia la app.', type: 'modal', displayMode: 'always', priority: 3, metadata: { actionUrl: 'changelog' }, createdAt: new Date().toISOString(), reactionCount: 8 }
+                      {
+                        id: 'test-chg',
+                        kind: 'changelog',
+                        title: 'Nueva Versión v1.5.0',
+                        body: '**Modo Oscuro** Mejorado\n**Sincronización** 2x más rápida\nCorrección de errores menores',
+                        targeting: { version: '1.5.0' },
+                        uiType: 'modal',
+                        displayMode: 'once',
+                        priority: 3,
+                        engagement: { reactionCount: 15, userReacted: false }
+                      },
+                      {
+                        id: 'test-ann-modal',
+                        kind: 'announcement',
+                        title: 'Mantenimiento Programado',
+                        body: 'Estaremos fuera de línea este **Domingo** para mejorar los servidores.',
+                        uiType: 'modal',
+                        displayMode: 'always',
+                        priority: 2,
+                        engagement: { reactionCount: 5, userReacted: false }
+                      },
+                      {
+                        id: 'test-ann-toast',
+                        kind: 'announcement',
+                        title: '¡Oferta Especial!',
+                        body: 'Descuento del 50% en IronTrain Pro.',
+                        uiType: 'toast',
+                        displayMode: 'once',
+                        priority: 1,
+                        engagement: { reactionCount: 120, userReacted: true }
+                      },
+                      {
+                        id: 'test-event',
+                        kind: 'global_event',
+                        title: 'Iron Games 2026',
+                        body: 'Participa en el evento global y gana medallas exclusivas.',
+                        uiType: 'modal',
+                        displayMode: 'always',
+                        priority: 2,
+                        engagement: { reactionCount: 300, userReacted: false }
+                      }
                     ];
-                    const nextIndex = (global as any).__lastTestIndex === undefined ? 0 : ((global as any).__lastTestIndex + 1) % tests.length;
-                    (global as any).__lastTestIndex = nextIndex;
-                    DeviceEventEmitter.emit('triggerTestNotification', tests[nextIndex]);
+                    const nextIndex = (global as any).__lastTestBroadcastIndex === undefined ? 0 : ((global as any).__lastTestBroadcastIndex + 1) % tests.length;
+                    (global as any).__lastTestBroadcastIndex = nextIndex;
+                    DeviceEventEmitter.emit('triggerTestBroadcast', tests[nextIndex]);
                   }}
                   style={{
                     width: 36, height: 36, borderRadius: 18,

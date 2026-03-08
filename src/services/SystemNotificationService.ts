@@ -5,6 +5,7 @@ import notifee, {
     TimestampTrigger,
     TriggerType
 } from '@notifee/react-native';
+import { logger } from '../utils/logger';
 import { configService, NotificationPreferences } from './ConfigService';
 import { notificationPermissionsService } from './NotificationPermissionsService';
 
@@ -118,7 +119,7 @@ class SystemNotificationServiceImpl {
             });
             this.channelsCreated = true;
         } catch (e) {
-            console.error('Failed to create notification channels:', e);
+            logger.captureException(e, { scope: 'SystemNotificationService.ensureChannels', message: 'Failed to create notification channels' });
         }
     }
 
@@ -186,7 +187,7 @@ class SystemNotificationServiceImpl {
                 },
             });
         } catch (e) {
-            console.error('Error showing persistent workout notification:', e);
+            logger.captureException(e, { scope: 'SystemNotificationService.showPersistentWorkout', message: 'Error showing persistent workout notification' });
         }
     }
 
@@ -336,7 +337,7 @@ class SystemNotificationServiceImpl {
                 },
             });
         } catch (e) {
-            console.error('Error showing interval timer notification:', e);
+            logger.captureException(e, { scope: 'SystemNotificationService.showIntervalTimerNotification', message: 'Error showing interval timer notification' });
         }
     }
 

@@ -117,6 +117,7 @@ export async function GET(req: NextRequest) {
         snapshot.badges = await db.select().from(schema.badges).where(eq(schema.badges.userId, userId));
         snapshot.exercise_badges = await db.select().from(schema.exerciseBadges).where(eq(schema.exerciseBadges.userId, userId));
         snapshot.changelog_reactions = await db.select().from(schema.changelogReactions).where(eq(schema.changelogReactions.userId, userId));
+        snapshot.notification_reactions = await db.select().from(schema.notificationReactions).where(eq(schema.notificationReactions.userId, userId));
         snapshot.kudos = await db.select().from(schema.kudos).where(eq(schema.kudos.giverId, userId));
 
         return NextResponse.json({ success: true, snapshot });
@@ -153,6 +154,7 @@ export async function POST(req: NextRequest) {
         type BadgeInsert = typeof schema.badges.$inferInsert;
         type ExerciseBadgeInsert = typeof schema.exerciseBadges.$inferInsert;
         type ChangelogReactionInsert = typeof schema.changelogReactions.$inferInsert;
+        type NotificationReactionInsert = typeof schema.notificationReactions.$inferInsert;
         type KudosInsert = typeof schema.kudos.$inferInsert;
 
         const categories = normalizeSnapshotArray<CategoryInsert>(snapshot.categories, userId, ['id', 'name', 'userId']);
@@ -172,6 +174,7 @@ export async function POST(req: NextRequest) {
         const badges = normalizeSnapshotArray<BadgeInsert>(snapshot.badges, userId, ['id', 'userId', 'name', 'color']);
         const exerciseBadges = normalizeSnapshotArray<ExerciseBadgeInsert>(snapshot.exercise_badges, userId, ['id', 'userId', 'exerciseId', 'badgeId']);
         const changelogReactions = normalizeSnapshotArray<ChangelogReactionInsert>(snapshot.changelog_reactions, userId, ['id', 'userId', 'changelogId']);
+        const notificationReactions = normalizeSnapshotArray<NotificationReactionInsert>(snapshot.notification_reactions, userId, ['id', 'userId', 'notificationId']);
         const kudos = normalizeSnapshotArray<KudosInsert>(snapshot.kudos, userId, ['id', 'giverId', 'feedId']);
 
         await runDbTransaction(async (trx) => {
@@ -191,6 +194,7 @@ export async function POST(req: NextRequest) {
             await trx.delete(schema.badges).where(eq(schema.badges.userId, userId));
             await trx.delete(schema.exerciseBadges).where(eq(schema.exerciseBadges.userId, userId));
             await trx.delete(schema.changelogReactions).where(eq(schema.changelogReactions.userId, userId));
+            await trx.delete(schema.notificationReactions).where(eq(schema.notificationReactions.userId, userId));
             await trx.delete(schema.kudos).where(eq(schema.kudos.giverId, userId));
 
             // Insert new data
@@ -209,6 +213,7 @@ export async function POST(req: NextRequest) {
             if (badges.length) await trx.insert(schema.badges).values(badges).onConflictDoNothing();
             if (exerciseBadges.length) await trx.insert(schema.exerciseBadges).values(exerciseBadges).onConflictDoNothing();
             if (changelogReactions.length) await trx.insert(schema.changelogReactions).values(changelogReactions).onConflictDoNothing();
+            if (notificationReactions.length) await trx.insert(schema.notificationReactions).values(notificationReactions).onConflictDoNothing();
             if (kudos.length) await trx.insert(schema.kudos).values(kudos).onConflictDoNothing();
         });
 

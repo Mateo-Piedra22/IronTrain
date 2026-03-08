@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { dbService } from './DatabaseService';
 
 export interface OneRepMax {
@@ -176,7 +177,7 @@ export class AnalysisService {
 
             return Object.values(maxes).sort((a, b) => b.estimated1RM - a.estimated1RM).slice(0, limit);
         } catch (error) {
-            console.error('Error calculating 1RMs:', error);
+            logger.captureException(error, { scope: 'AnalysisService.getTop1RMs', message: 'Error calculating 1RMs' });
             return [];
         }
     }

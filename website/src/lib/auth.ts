@@ -1,5 +1,6 @@
 import * as jose from 'jose';
 import { NextRequest } from 'next/server';
+import { logger } from './logger';
 
 /**
  * Verifies the JWT Bearer token from the Authorization header.
@@ -18,7 +19,7 @@ export async function verifyAuth(req: NextRequest): Promise<string | null> {
     try {
         const secretStr = process.env.NEON_AUTH_COOKIE_SECRET;
         if (!secretStr) {
-            console.error('FATAL: NEON_AUTH_COOKIE_SECRET is not configured');
+            logger.error('FATAL: NEON_AUTH_COOKIE_SECRET is not configured');
             return null;
         }
 

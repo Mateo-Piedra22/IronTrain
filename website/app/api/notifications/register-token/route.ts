@@ -1,4 +1,3 @@
-import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
@@ -20,14 +19,15 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { userId, pushToken, platform, tokenType } = await request.json();
-
-        // Zero Trust: Ensure the authenticated user is the one they claim to be
-        if (userId && userId !== authedUserId) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        let body: unknown;
+        try {
+            body = await request.json();
+        } catch {
+            return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
         }
 
-        const targetId = userId || authedUserId;
+        const { pushToken, platform, tokenType } = (body || {}) as { pushToken?: unknown; platform?: unknown; tokenType?: unknown };
+        const targetId = authedUserId;
 
         const normalizedToken = normalizeToken(pushToken);
         if (!normalizedToken) {

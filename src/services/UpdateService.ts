@@ -2,6 +2,7 @@ import { Config } from '@/src/constants/Config';
 import { configService } from '@/src/services/ConfigService';
 import { systemNotificationService } from '@/src/services/SystemNotificationService';
 import { useUpdateStore } from '@/src/store/updateStore';
+import { logger } from '@/src/utils/logger';
 import Constants from 'expo-constants';
 import { AppState, AppStateStatus } from 'react-native';
 
@@ -100,7 +101,7 @@ class UpdateServiceManager {
                 nextAppState === 'active'
             ) {
                 // App has come to the foreground!
-                console.log('App resumed: checking for updates...');
+                logger.info('App resumed: checking for updates...');
                 // Small delay to ensure network is ready after suspend
                 setTimeout(() => this.checkForUpdate(), 2000);
             }
@@ -111,7 +112,7 @@ class UpdateServiceManager {
     private async performCheck() {
         const feedUrl = Config.UPDATE_FEED_URL;
         if (!feedUrl) {
-            console.warn('UpdateService: No updateFeedUrl configured.');
+            logger.warn('UpdateService: No updateFeedUrl configured.');
             useUpdateStore.getState().setStatus('idle'); // Or 'disabled'
             return;
         }
@@ -142,7 +143,7 @@ class UpdateServiceManager {
 
         } catch (e) {
             const errorMsg = (e as any)?.message ? String((e as any).message) : 'Network error';
-            console.error(`Update check failed (Attempt ${this.retryCount + 1}/${this.MAX_RETRIES}):`, errorMsg);
+            logger.error(`Update check failed (Attempt ${this.retryCount + 1}/${this.MAX_RETRIES}):`, { error: errorMsg });
 
             if (this.retryCount < this.MAX_RETRIES) {
                 this.retryCount++;

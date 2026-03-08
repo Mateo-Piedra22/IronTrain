@@ -11,6 +11,32 @@ export const runtime = 'nodejs';
 const MAX_OPERATIONS_PER_REQUEST = 500;
 const SUPPORTED_OPERATIONS = new Set(['INSERT', 'UPDATE', 'DELETE']);
 
+export const SYNC_TABLES: ReadonlyArray<string> = [
+    'categories',
+    'badges',
+    'exercise_badges',
+    'exercises',
+    'workouts',
+    'workout_sets',
+    'routines',
+    'routine_days',
+    'routine_exercises',
+    'measurements',
+    'goals',
+    'body_metrics',
+    'plate_inventory',
+    'settings',
+    'user_profiles',
+    'changelogs',
+    'changelog_reactions',
+    'notification_reactions',
+    'kudos',
+    'activity_feed',
+    'score_events',
+    'user_exercise_prs',
+    'friendships',
+];
+
 export async function POST(req: NextRequest) {
     try {
         const userId = await verifyAuth(req);
@@ -53,6 +79,7 @@ export async function POST(req: NextRequest) {
             'user_profiles': schema.userProfiles,
             'changelogs': schema.changelogs,
             'changelog_reactions': schema.changelogReactions,
+            'notification_reactions': schema.notificationReactions,
             'kudos': schema.kudos,
             'activity_feed': schema.activityFeed,
             'score_events': schema.scoreEvents,
@@ -117,6 +144,17 @@ export async function POST(req: NextRequest) {
                             filteredData.key = `${userId}:${rawKey}`;
                         }
                         filteredData.userId = userId;
+                    } else if (tableName === 'changelogs') {
+                        // Industrial Rule: sanitize items to prevent client-side injection in system tables
+                        if (filteredData.items) {
+                            try {
+                                const parsed = typeof filteredData.items === 'string' ? JSON.parse(filteredData.items) : filteredData.items;
+                                filteredData.items = JSON.stringify(parsed);
+                            } catch {
+                                filteredData.items = '[]';
+                            }
+                        }
+                        // Changelogs don't have a userId, they are system-wide
                     } else if (columnsMap.userId && tableName !== 'friendships') {
                         // For everything except friendships/shared tables, enforce own userId
                         filteredData.userId = userId;
@@ -135,10 +173,24 @@ export async function POST(req: NextRequest) {
                         filteredData[pkPropName] = pkValue;
                     }
 
+                    // Special Rule: Auto-generate deterministic IDs for social reactions if missing
+                    if (!pkValue) {
+                        if (tableName === 'changelog_reactions' && filteredData.changelogId) {
+                            pkValue = `${filteredData.changelogId}-${userId}`;
+                            filteredData.id = pkValue;
+                        } else if (tableName === 'kudos' && filteredData.feedId) {
+                            pkValue = `${filteredData.feedId}-${userId}`;
+                            filteredData.id = pkValue;
+                        } else if (tableName === 'notification_reactions' && filteredData.notificationId) {
+                            pkValue = `${filteredData.notificationId}-${userId}`;
+                            filteredData.id = pkValue;
+                        }
+                    }
+
                     const pkCol = tableName === 'settings' ? tableSchema.key : tableSchema.id;
 
                     if (!pkValue) {
-                        throw new Error('Missing primary key (id/key)');
+                        throw new Error(`Missing primary key (id/key) for table ${tableName}`);
                     }
 
                     await db.transaction(async (tx) => {
@@ -151,7 +203,7 @@ export async function POST(req: NextRequest) {
                             const ownerId = existingRecord.userId || existingRecord.id;
                             const isSystemRecord = existingRecord.isSystem === 1 || existingRecord.is_system === 1;
 
-                            if (ownerId && ownerId !== userId && !['friendships', 'activity_feed', 'kudos', 'changelog_reactions'].includes(tableName)) {
+                            if (ownerId && ownerId !== userId && !['friendships', 'activity_feed', 'kudos', 'changelog_reactions', 'notification_reactions'].includes(tableName)) {
                                 // Industrial Rule: Allow "Public/System" records with deterministic IDs to be shared/merged
                                 if (!isSystemRecord) {
                                     throw new Error('Ownership mismatch');
@@ -174,14 +226,42 @@ export async function POST(req: NextRequest) {
                                 set: filteredData
                             });
 
-                        // Special side effects for counts
+                        // Special side effects for counts (handle active <-> deleted transitions)
                         if (operation !== 'DELETE') {
-                            const isNewActive = !existingRecord || (existingRecord.deletedAt && !filteredData.deletedAt);
-                            if (isNewActive) {
+                            const wasActive = !!existingRecord && !existingRecord.deletedAt;
+                            const willBeActive = !filteredData.deletedAt;
+                            const becameActive = (!existingRecord && willBeActive) || (!!existingRecord && !wasActive && willBeActive);
+                            const becameDeleted = !!existingRecord && wasActive && !willBeActive;
+
+                            if (becameActive) {
                                 if (tableName === 'kudos' && filteredData.feedId) {
-                                    await tx.update(schema.activityFeed).set({ kudoCount: sql`${schema.activityFeed.kudoCount} + 1`, updatedAt: new Date() }).where(eq(schema.activityFeed.id, filteredData.feedId));
+                                    await tx.update(schema.activityFeed)
+                                        .set({ kudoCount: sql`${schema.activityFeed.kudoCount} + 1`, updatedAt: new Date() })
+                                        .where(eq(schema.activityFeed.id, filteredData.feedId));
                                 } else if (tableName === 'changelog_reactions' && filteredData.changelogId) {
-                                    await tx.update(schema.changelogs).set({ reactionCount: sql`${schema.changelogs.reactionCount} + 1`, updatedAt: new Date() }).where(eq(schema.changelogs.id, filteredData.changelogId));
+                                    await tx.update(schema.changelogs)
+                                        .set({ reactionCount: sql`${schema.changelogs.reactionCount} + 1`, updatedAt: new Date() })
+                                        .where(eq(schema.changelogs.id, filteredData.changelogId));
+                                } else if (tableName === 'notification_reactions' && filteredData.notificationId) {
+                                    await tx.update(schema.adminNotifications)
+                                        .set({ reactionCount: sql`${schema.adminNotifications.reactionCount} + 1`, updatedAt: new Date() })
+                                        .where(eq(schema.adminNotifications.id, filteredData.notificationId));
+                                }
+                            }
+
+                            if (becameDeleted) {
+                                if (tableName === 'kudos' && existingRecord.feedId) {
+                                    await tx.update(schema.activityFeed)
+                                        .set({ kudoCount: sql`GREATEST(0, ${schema.activityFeed.kudoCount} - 1)`, updatedAt: new Date() })
+                                        .where(eq(schema.activityFeed.id, existingRecord.feedId));
+                                } else if (tableName === 'changelog_reactions' && existingRecord.changelogId) {
+                                    await tx.update(schema.changelogs)
+                                        .set({ reactionCount: sql`GREATEST(0, ${schema.changelogs.reactionCount} - 1)`, updatedAt: new Date() })
+                                        .where(eq(schema.changelogs.id, existingRecord.changelogId));
+                                } else if (tableName === 'notification_reactions' && existingRecord.notificationId) {
+                                    await tx.update(schema.adminNotifications)
+                                        .set({ reactionCount: sql`GREATEST(0, ${schema.adminNotifications.reactionCount} - 1)`, updatedAt: new Date() })
+                                        .where(eq(schema.adminNotifications.id, existingRecord.notificationId));
                                 }
                             }
                         }
@@ -208,7 +288,11 @@ export async function POST(req: NextRequest) {
                         const record = existing[0];
                         if (record) {
                             const ownerId: string | null = (record as any).userId || (record as any).id;
-                            if (ownerId === userId || ['friendships', 'changelog_reactions', 'kudos'].includes(tableName)) {
+                            const isSystemRecord = (record as any).isSystem === 1 || (record as any).is_system === 1;
+
+                            // Allow deletion if the user is the owner OR it's a shared interaction table they participated in
+                            // For system records, users cannot trigger deletes via sync (Zero Trust)
+                            if (!isSystemRecord && (ownerId === userId || ['friendships', 'changelog_reactions', 'notification_reactions', 'kudos'].includes(tableName))) {
                                 const alreadyDeleted = !!(record as any).deletedAt;
                                 await tx.update(tableSchema).set({ deletedAt: new Date(), updatedAt: new Date() } as any).where(eq(pkCol, finalId));
 
@@ -218,6 +302,10 @@ export async function POST(req: NextRequest) {
                                         await tx.update(schema.activityFeed).set({ kudoCount: sql`${schema.activityFeed.kudoCount} - 1`, updatedAt: new Date() }).where(eq(schema.activityFeed.id, record.feedId));
                                     } else if (tableName === 'changelog_reactions' && record.changelogId) {
                                         await tx.update(schema.changelogs).set({ reactionCount: sql`${schema.changelogs.reactionCount} - 1`, updatedAt: new Date() }).where(eq(schema.changelogs.id, record.changelogId));
+                                    } else if (tableName === 'notification_reactions' && record.notificationId) {
+                                        await tx.update(schema.adminNotifications)
+                                            .set({ reactionCount: sql`GREATEST(0, ${schema.adminNotifications.reactionCount} - 1)`, updatedAt: new Date() })
+                                            .where(eq(schema.adminNotifications.id, record.notificationId));
                                     }
                                 }
                             }

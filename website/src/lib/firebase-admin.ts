@@ -1,4 +1,5 @@
 import admin from 'firebase-admin';
+import { logger } from './logger';
 
 const serviceAccount = {
     "type": "service_account",
@@ -26,7 +27,7 @@ if (firebaseEnvReady && !admin.apps.length) {
             credential: admin.credential.cert(serviceAccount)
         });
     } catch (e) {
-        console.error('Firebase Admin init failed');
+        logger.captureException(e, { scope: 'firebase-admin.init', message: 'Firebase Admin init failed' });
     }
 }
 
@@ -65,7 +66,7 @@ export async function sendPushNotification(token: string, title: string, body: s
         });
         return { success: true };
     } catch (error) {
-        console.error('Error sending push notification');
+        logger.captureException(error, { scope: 'firebase-admin.sendPushNotification', message: 'Error sending push notification' });
         return { success: false, reason: 'send_failed' };
     }
 }
@@ -157,7 +158,7 @@ export async function sendSegmentedPush(segment: string, title: string, body: st
 
         return { success: true, sent: targetTokens.length };
     } catch (error) {
-        console.error('Error sending segmented push');
+        logger.captureException(error, { scope: 'firebase-admin.sendSegmentedPush', message: 'Error sending segmented push' });
         return { success: false, reason: 'send_failed' };
     }
 }

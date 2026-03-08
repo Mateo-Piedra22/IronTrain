@@ -3,6 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Linking from 'expo-linking';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
+import { logger } from '../utils/logger';
 import { dbService } from './DatabaseService';
 
 interface BackupData {
@@ -142,7 +143,7 @@ class BackupService {
             return { filePath, shared };
         } catch (e) {
             const message = (e as any)?.message ? String((e as any).message) : 'Error desconocido';
-            console.error('Export Failed:', message);
+            logger.error('Export Failed', { message });
             throw new Error('No se pudo exportar el backup');
         }
     }
@@ -165,7 +166,7 @@ class BackupService {
             return filePath;
         } catch (e) {
             const message = (e as any)?.message ? String((e as any).message) : 'Error desconocido';
-            console.error('Download Failed:', message);
+            logger.error('Download Failed', { message });
             throw new Error('No se pudo descargar el backup');
         }
     }
@@ -331,7 +332,7 @@ class BackupService {
             return true;
 
         } catch (e) {
-            console.error('Import Failed');
+            logger.captureException(e, { scope: 'BackupService.importData', message: 'Import Failed' });
             throw new Error('No se pudo restaurar el backup');
         }
     }

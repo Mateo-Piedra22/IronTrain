@@ -1,115 +1,68 @@
-import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
-import { AppNotification, AppNotificationService } from '@/src/services/AppNotificationService';
-import { ChangelogRelease, ChangelogService } from '@/src/services/ChangelogService';
-import { configService } from '@/src/services/ConfigService';
-import { Colors } from '@/src/theme';
+import { useFocusEffect } from '@react-navigation/native';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import Constants from 'expo-constants';
+import { Stack, useRouter } from 'expo-router';
 import { Bell, ChevronDown, ChevronLeft, ChevronUp } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import {
+    ActivityIndicator,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { KudosButton } from '../components/ui/KudosButton';
+import { SafeAreaWrapper } from '../components/ui/SafeAreaWrapper';
+import { BroadcastFeedService, type BroadcastItem } from '../src/services/BroadcastFeedService';
+import { configService } from '../src/services/ConfigService';
+import { Colors } from '../src/theme';
 
-function isSameVersion(a: string, b: string) {
-    return String(a).trim() === String(b).trim();
+function isSameVersion(v1: string, v2: string) {
+    return String(v1).trim() === String(v2).trim();
 }
 
-const renderFormattedText = (text: string, style: any, boldStyle: any) => {
+function renderFormattedText(text: string, textStyle: any, boldStyle: any) {
+    if (!text) return null;
     const parts = text.split(/(\*\*.*?\*\*)/g);
     return (
-        <Text style={style}>
+        <Text style={textStyle}>
             {parts.map((part, i) => {
                 if (part.startsWith('**') && part.endsWith('**')) {
-                    return <Text key={i} style={boldStyle}>{part.slice(2, -2)}</Text>;
+                    return (
+                        <Text key={i} style={boldStyle}>
+                            {part.slice(2, -2)}
+                        </Text>
+                    );
                 }
                 return part;
             })}
         </Text>
     );
-};
+}
 
-import { useAuthStore } from '@/src/store/authStore';
-import { Alert } from 'react-native';
-
-const KudosButton = ({ id, type, initialCount }: { id: string; type: 'version' | 'news'; initialCount?: number }) => {
-    const { user } = useAuthStore();
-    const [count, setCount] = useState<number | null>(initialCount ?? null);
-    const [isReacting, setIsReacting] = useState(false);
-
-    useEffect(() => {
-        if (count === null) {
-            if (type === 'version') {
-                ChangelogService.getReactionCount(id).then(setCount);
-            } else {
-                AppNotificationService.getReactionCount(id).then(setCount);
-            }
-        }
-    }, [id, type]);
-
-    const handlePress = async () => {
-        if (!user?.id) {
-            Alert.alert(
-                '¡Únete a la IronSocial!',
-                'Para dar Kudos a nuestras novedades y versiones, primero debes iniciar sesión con tu cuenta de IronTrain.',
-                [{ text: 'Entendido', style: 'default' }]
-            );
-            return;
-        }
-
-        if (isReacting) return;
-        setIsReacting(true);
-        const result = type === 'version'
-            ? await ChangelogService.toggleReaction(id)
-            : await AppNotificationService.toggleReaction(id);
-
-        if (result !== 'error') {
-            const newCount = type === 'version'
-                ? await ChangelogService.getReactionCount(id)
-                : await AppNotificationService.getReactionCount(id);
-            setCount(newCount);
-        }
-        setIsReacting(false);
-    };
-
-    if (count === null) return null;
-
-    return (
-        <TouchableOpacity
-            onPress={handlePress}
-            activeOpacity={0.7}
-            disabled={isReacting}
-            style={[ss.kudosBtn, isReacting && { opacity: 0.7 }]}
-        >
-            <View style={ss.kudosContent}>
-                <Text style={ss.kudosCount}>{count}</Text>
-                <Text style={ss.kudosText}>🔥 Kudos</Text>
-            </View>
-        </TouchableOpacity>
-    );
-};
-
-export default function UpdatesScreen() {
+export default function ChangelogScreen() {
     const router = useRouter();
-    const appVersion = ChangelogService.getAppVersion();
-    const [releases, setReleases] = useState<ChangelogRelease[]>([]);
-    const [news, setNews] = useState<AppNotification[]>([]);
+    const [items, setItems] = useState<BroadcastItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
+    const appVersion = Constants.expoConfig?.version ?? '0.0.0';
 
-    const loadData = useCallback(async () => {
+    const fetchItems = useCallback(async () => {
         setIsLoading(true);
         try {
-            await Promise.all([
-                ChangelogService.sync(),
-                AppNotificationService.getActiveNotifications(true).then(setNews)
-            ]);
-            const rels = await ChangelogService.getReleases();
-            setReleases(rels);
+            const res = await BroadcastFeedService.getFeed({ isFeed: true, includeUnreleased: false });
+            setItems(res.items);
 
-            if (rels.length > 0) {
-                setExpandedVersion(rels[0].version); // Expand the latest one by default
-                configService.set('lastViewedChangelogVersion', rels[0].version);
+            const latestChangelog = res.items.find((i) => i.kind === 'changelog' && i.targeting.version);
+            const latestVersion = latestChangelog?.targeting.version ?? null;
+            if (latestVersion) {
+                setExpandedVersion(latestVersion);
+                configService.set('lastViewedChangelogVersion' as any, latestVersion);
             }
+        } catch (e) {
+            console.error('Failed to fetch broadcast feed', e);
         } finally {
             setIsLoading(false);
         }
@@ -117,11 +70,25 @@ export default function UpdatesScreen() {
 
     useFocusEffect(
         useCallback(() => {
-            loadData();
-        }, [loadData])
+            fetchItems();
+        }, [fetchItems])
     );
 
-    const renderNews = (n: AppNotification) => {
+    const handleKudosUpdated = useCallback((payload: { id: string; reacted: boolean; count: number }) => {
+        setItems((prev) => prev.map((it) => {
+            if (it.id !== payload.id) return it;
+            return {
+                ...it,
+                engagement: {
+                    ...it.engagement,
+                    reactionCount: payload.count,
+                    userReacted: payload.reacted,
+                }
+            };
+        }));
+    }, []);
+
+    const renderAnnouncement = (n: BroadcastItem) => {
         return (
             <View key={n.id} style={[ss.releaseCard, ss.newsCard]}>
                 <View style={ss.newsHeader}>
@@ -129,7 +96,7 @@ export default function UpdatesScreen() {
                         <Bell size={18} color={Colors.primary.DEFAULT} />
                     </View>
                     <View style={{ flex: 1 }}>
-                        <Text style={ss.newsLabel}>ANUNCIO OFICIAL</Text>
+                        <Text style={ss.newsLabel}>NOTICIA OFICIAL</Text>
                         <Text style={ss.newsTitle}>{n.title}</Text>
                         {n.createdAt && (
                             <Text style={ss.releaseDate}>
@@ -139,39 +106,52 @@ export default function UpdatesScreen() {
                     </View>
                 </View>
                 <View style={ss.newsBody}>
-                    <Text style={ss.newsMessage}>{n.message}</Text>
+                    <Text style={ss.newsMessage}>{n.body}</Text>
                     <View style={ss.releaseFooter}>
-                        <KudosButton id={n.id} type="news" initialCount={n.reactionCount} />
+                        <KudosButton
+                            id={n.id}
+                            kind="announcement"
+                            initialCount={n.engagement.reactionCount}
+                            initialReacted={n.engagement.userReacted === true}
+                            onUpdated={(reacted: boolean, count: number) => handleKudosUpdated({ id: n.id, reacted, count })}
+                        />
                     </View>
                 </View>
             </View>
         );
     };
 
-    const renderRelease = (r: ChangelogRelease) => {
-        const isCurrent = isSameVersion(r.version, appVersion);
-        const isExpanded = expandedVersion === r.version;
+    const renderChangelog = (r: BroadcastItem) => {
+        const version = r.targeting.version ?? '0.0.0';
+        const isCurrent = isSameVersion(version, appVersion);
+        const isExpanded = expandedVersion === version;
+        const itemsList = String(r.body)
+            .split('\n')
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0);
         return (
-            <View key={r.version} style={ss.releaseCard}>
+            <View key={version} style={ss.releaseCard}>
                 <TouchableOpacity
                     activeOpacity={0.7}
-                    onPress={() => setExpandedVersion(isExpanded ? null : r.version)}
+                    onPress={() => setExpandedVersion(isExpanded ? null : version)}
                     style={ss.releaseHeader}
                 >
                     <View style={{ flex: 1, paddingRight: 12 }}>
                         <View style={ss.releaseTop}>
-                            <Text style={ss.releaseVersion}>v{r.version}</Text>
+                            <Text style={ss.releaseVersion}>v{version}</Text>
                             {isCurrent && (
                                 <View style={ss.currentBadge}>
                                     <Text style={ss.currentBadgeText}>INSTALADA</Text>
                                 </View>
                             )}
                         </View>
-                        <Text style={ss.releaseDate}>{r.date ?? '—'}</Text>
+                        <Text style={ss.releaseDate}>
+                            {r.createdAt ? format(new Date(r.createdAt), "d 'de' MMMM, yyyy", { locale: es }) : '—'}
+                        </Text>
 
-                        {!isExpanded && r.items.length > 0 && (
+                        {!isExpanded && itemsList.length > 0 && (
                             <Text style={ss.releaseSummary} numberOfLines={1}>
-                                {r.items[0].replace(/\*\*/g, '')}
+                                {itemsList[0].replace(/\*\*/g, '')}
                             </Text>
                         )}
                     </View>
@@ -187,8 +167,8 @@ export default function UpdatesScreen() {
                 {isExpanded && (
                     <View style={ss.releaseBody}>
                         <View style={{ gap: 10 }}>
-                            {r.items.map((it, idx) => (
-                                <View key={`${r.version}-${idx}`} style={ss.itemRow}>
+                            {itemsList.map((it, idx) => (
+                                <View key={`${version}-${idx}`} style={ss.itemRow}>
                                     <View style={ss.itemBulletWrapper}>
                                         <View style={ss.itemBulletDot} />
                                     </View>
@@ -200,10 +180,44 @@ export default function UpdatesScreen() {
                         </View>
 
                         <View style={ss.releaseFooter}>
-                            <KudosButton id={r.version} type="version" initialCount={r.reactionCount} />
+                            <KudosButton
+                                id={r.id}
+                                kind="changelog"
+                                initialCount={r.engagement.reactionCount}
+                                initialReacted={r.engagement.userReacted === true}
+                                onUpdated={(reacted: boolean, count: number) => handleKudosUpdated({ id: r.id, reacted, count })}
+                            />
                         </View>
                     </View>
                 )}
+            </View>
+        );
+    };
+
+    const announcements = items.filter((i) => i.kind === 'announcement');
+    const changelogs = items.filter((i) => i.kind === 'changelog');
+    const globalEvents = items.filter((i) => i.kind === 'global_event');
+
+    const renderGlobalEvent = (e: BroadcastItem) => {
+        return (
+            <View key={e.id} style={[ss.releaseCard, { borderColor: Colors.primary.DEFAULT + '20' }]}>
+                <View style={ss.newsHeader}>
+                    <View style={[ss.newsIconWrapper, { backgroundColor: Colors.primary.DEFAULT + '10' }]}>
+                        <Bell size={18} color={Colors.primary.DEFAULT} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={ss.newsLabel}>EVENTO GLOBAL</Text>
+                        <Text style={ss.newsTitle}>{e.title}</Text>
+                        {e.createdAt && (
+                            <Text style={ss.releaseDate}>
+                                {format(new Date(e.createdAt), "d 'de' MMMM, yyyy", { locale: es })}
+                            </Text>
+                        )}
+                    </View>
+                </View>
+                <View style={ss.newsBody}>
+                    <Text style={ss.newsMessage}>{e.body}</Text>
+                </View>
             </View>
         );
     };
@@ -229,29 +243,37 @@ export default function UpdatesScreen() {
                     </View>
                 ) : (
                     <View>
-                        {/* Section 1: Official News */}
-                        {news.length > 0 && (
+                        {announcements.length > 0 && (
                             <View style={{ marginBottom: 12 }}>
                                 <View style={ss.sectionHeader}>
                                     <Text style={ss.sectionTitle}>ANUNCIOS</Text>
                                     <View style={ss.sectionLine} />
                                 </View>
-                                {news.map(n => renderNews(n))}
+                                {announcements.map(n => renderAnnouncement(n))}
                             </View>
                         )}
 
-                        {/* Section 2: App Versions */}
-                        {releases.length > 0 && (
+                        {changelogs.length > 0 && (
                             <View>
                                 <View style={ss.sectionHeader}>
                                     <Text style={ss.sectionTitle}>HISTORIAL DE VERSIONES</Text>
                                     <View style={ss.sectionLine} />
                                 </View>
-                                {releases.map(r => renderRelease(r))}
+                                {changelogs.map(r => renderChangelog(r))}
                             </View>
                         )}
 
-                        {news.length === 0 && releases.length === 0 && (
+                        {globalEvents.length > 0 && (
+                            <View>
+                                <View style={ss.sectionHeader}>
+                                    <Text style={ss.sectionTitle}>EVENTOS GLOBALES</Text>
+                                    <View style={ss.sectionLine} />
+                                </View>
+                                {globalEvents.map(e => renderGlobalEvent(e))}
+                            </View>
+                        )}
+
+                        {announcements.length === 0 && changelogs.length === 0 && globalEvents.length === 0 && (
                             <View style={ss.emptyCard}>
                                 <Text style={ss.emptyTitle}>Sin novedades recientes</Text>
                                 <Text style={ss.emptySub}>No hemos encontrado anuncios ni versiones nuevas todavía.</Text>
@@ -289,17 +311,13 @@ const ss = StyleSheet.create({
     itemBulletWrapper: { width: 18, alignItems: 'flex-start', paddingTop: 8 },
     itemBulletDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary.DEFAULT },
     itemText: { color: Colors.iron[500], flex: 1, fontSize: 14, lineHeight: 22 },
-    itemBold: { color: Colors.iron[950], fontWeight: '900' },
+    itemBold: { color: '#000000', fontWeight: '900' },
     releaseSummary: { color: Colors.iron[400], fontSize: 13, marginTop: 6, fontWeight: '500', fontStyle: 'italic' },
     expandIconWrapper: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.iron[100] + '40', alignItems: 'center', justifyContent: 'center' },
     releaseFooter: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.iron[100], alignItems: 'flex-end' },
     sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16, marginTop: 8, paddingHorizontal: 4 },
     sectionTitle: { color: Colors.iron[400], fontSize: 11, fontWeight: '900', letterSpacing: 1.2 },
     sectionLine: { flex: 1, height: 1, backgroundColor: Colors.iron[200], opacity: 0.5 },
-    kudosBtn: { backgroundColor: Colors.iron[50], paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[200] },
-    kudosContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    kudosCount: { color: Colors.iron[950], fontWeight: '900', fontSize: 16 },
-    kudosText: { color: Colors.iron[600], fontWeight: '700', fontSize: 13 },
     emptyCard: { backgroundColor: Colors.surface, padding: 32, borderRadius: 24, borderWidth: 1, borderColor: Colors.iron[300], alignItems: 'center' },
     emptyTitle: { color: Colors.iron[950], fontWeight: '800', fontSize: 17, marginBottom: 8 },
     emptySub: { color: Colors.iron[500], fontSize: 14, textAlign: 'center', lineHeight: 20 },

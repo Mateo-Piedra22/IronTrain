@@ -19,6 +19,9 @@
     "preset": "jest-expo",
     "setupFiles": [
       "<rootDir>/jest.setup.js"
+    ],
+    "testPathIgnorePatterns": [
+      "<rootDir>/website/"
     ]
   },
   "dependencies": {

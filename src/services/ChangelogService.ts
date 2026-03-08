@@ -1,9 +1,9 @@
 import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Config } from '../constants/Config';
 import { useAuthStore } from '../store/authStore';
+import { logger } from '../utils/logger';
+import { BroadcastFeedService, type BroadcastItem } from './BroadcastFeedService';
 import { configService } from './ConfigService';
-import { dbService } from './DatabaseService';
 
 export type ChangelogRelease = {
     id?: string;
@@ -13,76 +13,15 @@ export type ChangelogRelease = {
     items: string[];
     metadata?: any;
     reactionCount?: number;
+    userReacted?: boolean | null;
 };
 
-type ChangelogPayload = {
-    generatedAt: string;
-    source: string;
-    releases: ChangelogRelease[];
-};
-
-const BACKEND_URL = Config.API_URL;
 const CACHE_FILE = `${FileSystem.cacheDirectory ?? ''}changelog_cache.json`;
-const API_URL = `${BACKEND_URL}/api/changelogs`;
-
-let cached: ChangelogPayload | null = null;
-
-async function loadRemote(): Promise<ChangelogPayload | null> {
-    try {
-        const response = await fetch(`${API_URL}?includeUnreleased=1`);
-        if (!response.ok) return null;
-        const data = await response.json() as ChangelogPayload;
-
-        // Save to local cache
-        if (FileSystem.cacheDirectory) {
-            await FileSystem.writeAsStringAsync(CACHE_FILE, JSON.stringify(data));
-        }
-        cached = data;
-        return data;
-    } catch (e) {
-        console.warn('Failed to fetch remote changelog:', e);
-        return null;
-    }
-}
-
-async function loadLocal(): Promise<ChangelogPayload> {
-    if (cached) return cached;
-
-    try {
-        // Try file cache first
-        if (FileSystem.cacheDirectory) {
-            const info = await FileSystem.getInfoAsync(CACHE_FILE);
-            if (info.exists) {
-                const content = await FileSystem.readAsStringAsync(CACHE_FILE);
-                cached = JSON.parse(content);
-                return cached!;
-            }
-        }
-    } catch (e) {
-        console.warn('Failed to load local changelog cache:', e);
-    }
-
-    // Fallback to bundled JSON
-    try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const data = require('../changelog.generated.json') as ChangelogPayload;
-        cached = data;
-        return data;
-    } catch (e) {
-        console.error('CRITICAL: No changelog source found', e);
-        return { generatedAt: '', source: 'none', releases: [] };
-    }
-}
 
 export class ChangelogService {
     static async sync(): Promise<void> {
-        await loadRemote();
-    }
-
-    private static isUnreleased(r: ChangelogRelease): boolean {
-        if (r.unreleased === true) return true;
-        const d = r.date;
-        return typeof d === 'string' && d.trim().toLowerCase() === 'unreleased';
+        // Al llamar a getFeed con includeUnreleased, ya estamos sincronizando changelogs
+        await BroadcastFeedService.getFeed({ includeUnreleased: true });
     }
 
     static getAppVersion(): string {
@@ -90,16 +29,31 @@ export class ChangelogService {
         return typeof v === 'string' && v.length > 0 ? v : '0.0.0';
     }
 
+    private static mapToRelease(i: BroadcastItem): ChangelogRelease {
+        return {
+            id: i.id,
+            version: i.targeting.version || '0.0.0',
+            date: i.createdAt,
+            unreleased: i.lifecycle.isActive === false, // Opcional: lógica de negocio
+            items: i.body.split('\n').map(s => s.trim()).filter(s => s.length > 0),
+            metadata: { actionUrl: i.actionUrl },
+            reactionCount: i.engagement.reactionCount,
+            userReacted: i.engagement.userReacted
+        };
+    }
+
     static async getAllReleases(): Promise<ChangelogRelease[]> {
-        const payload = await loadLocal();
-        return payload.releases || [];
+        const feed = await BroadcastFeedService.getFeed({ includeUnreleased: true });
+        return feed.items
+            .filter(i => i.kind === 'changelog')
+            .map(this.mapToRelease);
     }
 
     static async getReleases(options: { includeUnreleased?: boolean } = {}): Promise<ChangelogRelease[]> {
         const includeUnreleased = options.includeUnreleased === true;
         const all = await this.getAllReleases();
         if (includeUnreleased) return all;
-        return all.filter((r) => r.date !== null && !this.isUnreleased(r));
+        return all.filter((r) => r.date !== null && r.unreleased !== true);
     }
 
     static async getLatestRelease(): Promise<ChangelogRelease | null> {
@@ -113,9 +67,6 @@ export class ChangelogService {
         return all.find((r) => String(r.version).trim() === String(v).trim()) ?? null;
     }
 
-    /**
-     * Logic to detect if we should show the "What's New" modal.
-     */
     static async checkShouldShowWhatsNew(): Promise<ChangelogRelease | null> {
         try {
             const currentVersion = this.getAppVersion();
@@ -126,7 +77,7 @@ export class ChangelogService {
                 if (release) return release;
             }
         } catch (e) {
-            console.error('Error checking whats new:', e);
+            logger.captureException(e, { scope: 'ChangelogService.checkShouldShowWhatsNew' });
         }
         return null;
     }
@@ -135,66 +86,38 @@ export class ChangelogService {
         await configService.set('last_seen_changelog_version' as any, this.getAppVersion());
     }
 
-    static async getReactionCount(version: string): Promise<number> {
-        try {
-            // Get local count
-            const countRes = await dbService.getFirst<{ count: number }>(
-                'SELECT count(*) as count FROM changelog_reactions WHERE changelog_id = ? AND deleted_at IS NULL',
-                [version]
-            );
-            return countRes?.count || 0;
-        } catch (e) {
-            return 0;
-        }
-    }
-
     static async toggleReaction(version: string): Promise<'added' | 'removed' | 'error'> {
-        const { user } = useAuthStore.getState();
-        if (!user?.id) return 'error';
+        // Nota: El backend ahora maneja esto a través de /api/changelogs/[id]/react
+        // Pero para mantener compatibilidad con el código existente, llamamos al nuevo engagement service
+        // O lo implementamos aquí directamente si es necesario.
+        // Dado que ya tenemos BroadcastEngagementService en la web, pero en la app lo estamos unificando.
+
+        const { token } = useAuthStore.getState();
+        if (!token) return 'error';
 
         try {
-            const now = Date.now();
-            const existing = await dbService.getFirst<{ id: string }>(
-                'SELECT id FROM changelog_reactions WHERE changelog_id = ? AND user_id = ? AND deleted_at IS NULL',
-                [version, user.id]
-            );
+            // Buscamos el ID real del changelog para esa versión en el feed
+            const feed = await this.getAllReleases();
+            const rel = feed.find(r => r.version === version);
+            if (!rel?.id) return 'error';
 
-            if (existing) {
-                await dbService.run(
-                    'UPDATE changelog_reactions SET deleted_at = ?, updated_at = ? WHERE id = ?',
-                    [now, now, existing.id]
-                );
-                await dbService.queueSyncMutation('changelog_reactions', existing.id, 'DELETE');
-                return 'removed';
-            } else {
-                const id = `${version}-${user.id}`;
-                // Check if it existed as deleted
-                const wasDeleted = await dbService.getFirst<{ id: string }>(
-                    'SELECT id FROM changelog_reactions WHERE id = ?',
-                    [id]
-                );
-
-                if (wasDeleted) {
-                    await dbService.run(
-                        'UPDATE changelog_reactions SET deleted_at = NULL, updated_at = ? WHERE id = ?',
-                        [now, id]
-                    );
-                    await dbService.queueSyncMutation('changelog_reactions', id, 'UPDATE', { id, deleted_at: null, updated_at: now });
-                } else {
-                    await dbService.run(
-                        'INSERT INTO changelog_reactions (id, changelog_id, user_id, type, updated_at) VALUES (?, ?, ?, ?, ?)',
-                        [id, version, user.id, 'kudos', now]
-                    );
-                    await dbService.queueSyncMutation('changelog_reactions', id, 'INSERT', {
-                        id, changelog_id: version, user_id: user.id, type: 'kudos', updated_at: now
-                    });
+            const { Config } = require('../constants/Config');
+            const response = await fetch(`${Config.API_URL}/api/changelogs/${rel.id}/react`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 }
-                return 'added';
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                return data.action;
             }
+            return 'error';
         } catch (e) {
-            console.error('Error toggling changelog reaction:', e);
+            logger.captureException(e, { scope: 'ChangelogService.toggleReaction' });
             return 'error';
         }
     }
 }
-

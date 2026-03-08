@@ -1,4 +1,5 @@
 import { Badge, Routine, RoutineDay, RoutineExercise } from '../types/db';
+import { logger } from '../utils/logger';
 import { uuidV4 } from '../utils/uuid';
 import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
@@ -482,7 +483,7 @@ class RoutineService {
             try {
                 dataEventService.emit('DATA_UPDATED');
             } catch (e) {
-                console.error('Error emitting DATA_UPDATED after import:', e);
+                logger.captureException(e, { scope: 'RoutineService.importRoutine.emitDataUpdated' });
             }
 
             return newRoutineId;

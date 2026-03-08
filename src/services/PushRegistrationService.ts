@@ -1,6 +1,7 @@
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { logger } from '../utils/logger';
 import { AppNotificationService } from './AppNotificationService';
 
 export class PushRegistrationService {
@@ -10,7 +11,7 @@ export class PushRegistrationService {
 
     static async registerForPushNotifications(): Promise<string | null> {
         if (!Device.isDevice) {
-            console.log('Must use physical device for Push Notifications');
+            logger.info('Must use physical device for Push Notifications');
             return null;
         }
 
@@ -24,7 +25,7 @@ export class PushRegistrationService {
             }
 
             if (finalStatus !== 'granted') {
-                console.log('Failed to get push token for push notification!');
+                logger.warn('Failed to get push token for push notification!');
                 return null;
             }
 
@@ -37,7 +38,7 @@ export class PushRegistrationService {
             if (!token) return null;
 
             if (Platform.OS === 'ios' && this.looksLikeApnsToken(token)) {
-                console.warn('Native iOS push token detectado (APNs). FCM requiere token de registro Firebase en iOS.');
+                logger.warn('Native iOS push token detectado (APNs). FCM requiere token de registro Firebase en iOS.');
             }
 
             await AppNotificationService.registerPushToken(token, {
@@ -56,7 +57,7 @@ export class PushRegistrationService {
 
             return token;
         } catch (e) {
-            console.error('Error during push registration:', e);
+            logger.captureException(e, { scope: 'PushRegistrationService.registerForPushNotifications' });
             return null;
         }
     }

@@ -2,11 +2,12 @@ import notifee, { AndroidImportance } from '@notifee/react-native';
 import * as Haptics from 'expo-haptics';
 import { AppState } from 'react-native';
 import { BannerMessage, ToastType, useNotificationStore } from '../store/notificationStore';
+import { logger } from './logger';
 
 notifee.onBackgroundEvent(async ({ type, detail }) => {
     // For now, no background interactions logic like "Stop timer" handled here.
     // But this wrapper suppresses the "No background handler" warning in Notifee.
-    console.log('Notifee background event', type, detail);
+    logger.debug('Notifee background event', { type, detail });
 });
 
 const showOsNotification = async (title: string, message: string) => {
@@ -28,7 +29,7 @@ const showOsNotification = async (title: string, message: string) => {
             }
         });
     } catch (e) {
-        console.warn('Failed to display OS notification', e);
+        logger.captureException(e, { scope: 'notify.showOsNotification', message: 'Failed to display OS notification' });
     }
 };
 
