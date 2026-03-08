@@ -10,7 +10,7 @@ import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { useRouter } from 'expo-router';
 import { Bell, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { DeviceEventEmitter, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { SlideInUp, SlideOutUp } from 'react-native-reanimated';
 import { PushRegistrationService } from '../src/services/PushRegistrationService';
 import { WhatsNewModal } from './WhatsNewModal';
@@ -79,28 +79,6 @@ export const GlobalNoticeHandler: React.FC = () => {
 
         fetchAll();
 
-        // DEV ONLY: Test listener for manual triggering of UI
-        const testSub = DeviceEventEmitter.addListener('triggerTestBroadcast', (item: BroadcastItem) => {
-            if (item.kind === 'changelog') {
-                setWhatsNew({
-                    version: item.targeting.version || '0.0.0',
-                    date: item.createdAt || null,
-                    items: String(item.body).split('\n').filter(s => s.trim().length > 0)
-                });
-                setActiveAnnouncement(null);
-                setShowToast(false);
-            } else if (item.kind === 'announcement' || item.kind === 'global_event') {
-                setActiveAnnouncement(item);
-                if (item.uiType === 'toast') {
-                    setShowToast(true);
-                    setTimeout(() => setShowToast(false), 6000);
-                } else {
-                    setShowToast(false);
-                }
-                setWhatsNew(null);
-            }
-        });
-
         // Real-time listener: refresh when a push arrives in foreground
         const cleanup = PushRegistrationService.initListeners(
             () => {
@@ -121,7 +99,6 @@ export const GlobalNoticeHandler: React.FC = () => {
 
         return () => {
             cancelled = true;
-            testSub.remove();
             cleanup();
         };
     }, []);
@@ -320,7 +297,7 @@ const ss = StyleSheet.create({
         overflow: 'hidden',
     },
     modalHeader: {
-        alignItems: 'flex-start',
+        alignItems: 'center',
         marginBottom: 20,
         gap: 12,
     },
@@ -338,7 +315,7 @@ const ss = StyleSheet.create({
         fontWeight: '900',
         color: Colors.iron[950],
         letterSpacing: -0.3,
-        textAlign: 'left',
+        textAlign: 'center',
         flexShrink: 1,
     },
     modalBody: {

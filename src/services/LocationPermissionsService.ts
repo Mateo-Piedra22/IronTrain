@@ -48,10 +48,27 @@ class LocationPermissionsService {
         }
     }
 
-    async getCurrentLocation(): Promise<{ lat: number; lon: number; city: string | null } | null> {
+    async getCurrentLocation(silent = false): Promise<{ lat: number; lon: number; city: string | null } | null> {
         try {
-            const hasPermission = await this.requestWeatherBonusPermission(true);
-            if (!hasPermission) return null;
+            // If silent, we only want to get it if we already have permission, 
+            // OR if we haven't prompted the user even once yet.
+            if (silent) {
+                const current = await Location.getForegroundPermissionsAsync();
+                const prompted = await SecureStore.getItemAsync(WEATHER_PERMISSION_PROMPTED_KEY);
+
+                // If it's undetermined and we never prompted, we can prompt even if silent=true 
+                // because the user expects a better experience on the first load of the Social tab. 
+                // But once it's denied or prompted, we respect silence.
+                if (current.status === 'undetermined' && !prompted) {
+                    const granted = await this.requestWeatherBonusPermissionOnce();
+                    if (!granted) return null;
+                } else if (current.status !== 'granted') {
+                    return null;
+                }
+            } else {
+                const hasPermission = await this.requestWeatherBonusPermission(true);
+                if (!hasPermission) return null;
+            }
 
             const position = await Location.getCurrentPositionAsync({
                 accuracy: Location.Accuracy.High,

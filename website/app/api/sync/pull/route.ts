@@ -23,6 +23,12 @@ const toSnakeCase = (camelObj: Record<string, unknown>): Record<string, unknown>
     return snakeObj;
 };
 
+const unscopedSettingsKey = (userId: string, key: string): string => {
+    const prefix = `${userId}:`;
+    if (key.startsWith(prefix)) return key.slice(prefix.length);
+    return key;
+};
+
 export async function GET(req: NextRequest) {
     const userId = await verifyAuth(req);
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -87,7 +93,17 @@ export async function GET(req: NextRequest) {
             // (Handled by global tables for now but could be refined)
 
             const rows = await query.where(and(...conditions));
-            result[tableName] = rows.map(toSnakeCase);
+            let finalRows = rows.map(toSnakeCase);
+
+            // Industrial Rule: Unscope settings keys for the client
+            if (tableName === 'settings') {
+                finalRows = finalRows.map(row => ({
+                    ...row,
+                    key: unscopedSettingsKey(userId, String(row.key || ''))
+                }));
+            }
+
+            result[tableName] = finalRows;
         }));
 
         return NextResponse.json({

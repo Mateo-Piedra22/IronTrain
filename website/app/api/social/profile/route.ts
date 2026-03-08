@@ -121,17 +121,48 @@ export async function PUT(req: NextRequest) {
         }
 
         const profiles = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, userId));
+
+        if (sanitizedUsername !== undefined) {
+            const currentProfile = profiles[0];
+            const oldUsername = currentProfile?.username || null;
+
+            // Si el username es distinto al actual, aplicar restricciones
+            if (sanitizedUsername !== oldUsername) {
+                // Restricción de tiempo: 30 días
+                const cooldownDays = 30;
+                const lastChange = currentProfile?.lastUsernameChangeAt;
+
+                if (lastChange) {
+                    const diffMs = Date.now() - lastChange.getTime();
+                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+                    if (diffDays < cooldownDays) {
+                        return NextResponse.json({
+                            error: `Solo podés cambiar tu username una vez cada ${cooldownDays} días. Faltan ${cooldownDays - diffDays} días.`
+                        }, { status: 403 });
+                    }
+                }
+            }
+        }
+
         if (profiles.length === 0) {
             await db.insert(schema.userProfiles).values({
                 id: userId,
                 displayName: sanitizedDisplayName || 'Atleta',
                 username: sanitizedUsername === undefined ? null : sanitizedUsername,
                 isPublic: normalizedIsPublic ?? 1,
+                lastUsernameChangeAt: sanitizedUsername !== undefined ? new Date() : null,
             });
         } else {
             const updatePayload: Record<string, unknown> = { updatedAt: new Date() };
             if (sanitizedDisplayName !== undefined) updatePayload.displayName = sanitizedDisplayName;
-            if (sanitizedUsername !== undefined) updatePayload.username = sanitizedUsername;
+            if (sanitizedUsername !== undefined) {
+                const currentProfile = profiles[0];
+                if (sanitizedUsername !== currentProfile.username) {
+                    updatePayload.username = sanitizedUsername;
+                    updatePayload.lastUsernameChangeAt = new Date();
+                }
+            }
             if (normalizedIsPublic !== undefined) updatePayload.isPublic = normalizedIsPublic;
 
             await db.update(schema.userProfiles).set(updatePayload).where(eq(schema.userProfiles.id, userId));

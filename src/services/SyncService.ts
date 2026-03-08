@@ -434,12 +434,17 @@ export class SyncService {
 
                     const applyForTable = async (table: string, tableChanges: any[]): Promise<void> => {
                         const validColumns = tableSchemas?.get(table);
+                        const pkField = table === 'settings' ? 'key' : 'id';
                         const ids = tableChanges
-                            .map((c) => (c?.payload?.id ?? c?.payload?.recordId) as unknown)
+                            .map((c) => {
+                                const payload = c?.payload as any;
+                                if (!payload || typeof payload !== 'object') return null;
+                                if (pkField === 'key') return payload.key as unknown;
+                                return (payload.id ?? payload.recordId) as unknown;
+                            })
                             .filter((v): v is string => typeof v === 'string' && v.length > 0);
 
                         const hasSoftDelete = TABLES_WITH_SOFT_DELETE.has(table);
-                        const pkField = table === 'settings' ? 'key' : 'id';
                         const columns = [pkField, 'updated_at'];
                         if (hasSoftDelete) columns.push('deleted_at');
 
@@ -453,7 +458,13 @@ export class SyncService {
                             })
                             : [];
 
-                        const existingById = new Map(existingRows.map((r) => [r.id, r] as const));
+                        const existingById = new Map(existingRows
+                            .map((r) => {
+                                const pk = (r as any)?.[pkField];
+                                return [pk, r] as const;
+                            })
+                            .filter((pair) => typeof pair[0] === 'string' && pair[0].length > 0)
+                        );
 
                         for (const change of tableChanges) {
                             const operation = typeof change?.operation === 'string' ? change.operation : null;
@@ -463,7 +474,9 @@ export class SyncService {
                             const normalized = this.normalizeIncomingRecord(table, payload, validColumns);
                             if (!normalized) continue;
 
-                            const recordId = normalized.id || normalized.record_id || payload.recordId;
+                            const recordId = table === 'settings'
+                                ? (normalized.key || payload.key)
+                                : (normalized.id || normalized.record_id || payload.recordId);
                             if (typeof recordId !== 'string' || recordId.length === 0) continue;
 
                             const local = existingById.get(recordId);
@@ -510,7 +523,11 @@ export class SyncService {
                                         [deletedAt, updatedAt, recordId]
                                     );
                                 } else {
-                                    await dbService.run(`DELETE FROM ${table} WHERE id = ?`, [recordId]);
+                                    if (table === 'settings') {
+                                        await dbService.run(`DELETE FROM ${table} WHERE key = ?`, [recordId]);
+                                    } else {
+                                        await dbService.run(`DELETE FROM ${table} WHERE id = ?`, [recordId]);
+                                    }
                                 }
                             }
                         }
@@ -593,6 +610,10 @@ export class SyncService {
             await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', nextSyncTime]);
 
             if (byTable.size > 0) {
+                if (byTable.has('settings')) {
+                    await configService.reload();
+                    dataEventService.emit('SETTINGS_UPDATED');
+                }
                 dataEventService.emit('DATA_UPDATED');
             }
 
@@ -731,6 +752,10 @@ export class SyncService {
                 const first = fkIssues[0];
                 throw new Error(`Snapshot restore integrity check failed (foreign_key_check). First issue: table=${first.table} rowid=${first.rowid} parent=${first.parent} fkid=${first.fkid}`);
             }
+            // Trigger reload for settings and other critical data
+            await configService.reload();
+            dataEventService.emit('SETTINGS_UPDATED');
+            dataEventService.emit('DATA_UPDATED');
         } catch (error) {
             logger.captureException(error, { scope: 'SyncService.restoreDatabaseSnapshot' });
             throw error;
@@ -829,7 +854,8 @@ export class SyncService {
         const tables = [
             'exercises', 'categories', 'workouts', 'workout_sets',
             'routines', 'routine_days', 'routine_exercises',
-            'measurements', 'goals', 'plate_inventory', 'settings', 'body_metrics'
+            'measurements', 'goals', 'plate_inventory', 'settings',
+            'body_metrics', 'badges', 'exercise_badges'
         ];
 
         const snapshot: Record<string, any[]> = {};

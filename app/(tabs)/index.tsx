@@ -12,7 +12,7 @@ import { ChangelogService } from '@/src/services/ChangelogService';
 import { configService } from '@/src/services/ConfigService';
 import { RoutineDayWithExercises } from '@/src/services/RoutineService';
 import { useTimerStore } from '@/src/store/timerStore';
-import { Colors, withAlpha } from '@/src/theme';
+import { Colors } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { addDays, subDays } from 'date-fns';
@@ -20,7 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
 import { Info, Plus, Timer, X } from 'lucide-react-native';
 import React, { useCallback, useContext, useState } from 'react';
-import { ActivityIndicator, DeviceEventEmitter, Image, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -303,61 +303,6 @@ export default function DailyLogScreen() {
                     )}
                   </Pressable>
                 </Link>
-
-                {/* BOTÓN DE TEST: PUSH_CENTER_BROADCAST */}
-                <TouchableOpacity
-                  onPress={() => {
-                    const tests = [
-                      {
-                        id: 'test-toast',
-                        kind: 'announcement',
-                        title: 'Test: Fast Toast ⚡',
-                        body: 'This is a toast notification using the new hub system.',
-                        uiType: 'toast',
-                        displayMode: 'once',
-                        priority: 1,
-                      },
-                      {
-                        id: 'test-modal',
-                        kind: 'announcement',
-                        title: 'Test: Standard Modal 🔔',
-                        body: 'This is a standard modal announcement for important messages.',
-                        uiType: 'modal',
-                        displayMode: 'once',
-                        priority: 2,
-                      },
-                      {
-                        id: 'test-changelog',
-                        kind: 'changelog',
-                        title: 'Test: What\'s New 🛠️',
-                        body: 'v2.0.1\n- New design system\n- Improved performance\n- Bug fixes',
-                        targeting: { version: '2.0.1' },
-                        createdAt: new Date().toISOString()
-                      },
-                      {
-                        id: 'test-event',
-                        kind: 'global_event',
-                        title: 'Test: Global Event 🌍',
-                        body: 'Iron Games 2026: Join the summer challenge now!',
-                        uiType: 'modal',
-                        displayMode: 'always',
-                        priority: 3,
-                        engagement: { reactionCount: 150, userReacted: false }
-                      }
-                    ];
-                    const nextIndex = (global as any).__lastTestBroadcastIndex === undefined ? 0 : ((global as any).__lastTestBroadcastIndex + 1) % tests.length;
-                    (global as any).__lastTestBroadcastIndex = nextIndex;
-                    DeviceEventEmitter.emit('triggerTestBroadcast', tests[nextIndex]);
-                  }}
-                  style={{
-                    width: 36, height: 36, borderRadius: 18,
-                    backgroundColor: withAlpha(Colors.primary.DEFAULT, '20'),
-                    alignItems: 'center', justifyContent: 'center',
-                    borderWidth: 1, borderColor: withAlpha(Colors.primary.DEFAULT, '40'),
-                  }}
-                >
-                  <Text style={{ fontSize: 9, fontWeight: '900', color: Colors.primary.DEFAULT }}>TEST</Text>
-                </TouchableOpacity>
               </View>
             }
           />

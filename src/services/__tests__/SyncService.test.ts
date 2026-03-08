@@ -233,4 +233,65 @@ describe('SyncService', () => {
     expect(insertCall).toBeDefined();
     expect(insertCall?.[1]).toEqual(expect.arrayContaining(['last_pull_sync']));
   });
+
+  it('uses settings.key as PK during pull (does not require payload.id)', async () => {
+    (dbService.getFirst as jest.Mock).mockResolvedValue({ value: '0' });
+    (dbService.getAll as jest.Mock).mockResolvedValue([]);
+
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        changes: [
+          {
+            table: 'settings',
+            operation: 'UPDATE',
+            payload: {
+              key: 'training_days',
+              value: '[1,3,5]',
+              updated_at: 100,
+            },
+          },
+        ],
+        serverTime: 101,
+      }),
+    });
+
+    await (syncService as any).pullRemoteChanges('token-1');
+
+    const insertCall = (dbService.run as jest.Mock).mock.calls.find((c) => String(c[0]).includes('INSERT OR REPLACE INTO settings'));
+    expect(insertCall).toBeDefined();
+    expect(insertCall?.[1]).toEqual(expect.arrayContaining(['training_days']));
+  });
+
+  it('allows pulling badges and upserts them into local DB', async () => {
+    (dbService.getFirst as jest.Mock).mockResolvedValue({ value: '0' });
+    (dbService.getAll as jest.Mock).mockResolvedValue([]);
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        changes: [
+          {
+            table: 'badges',
+            operation: 'INSERT',
+            payload: {
+              id: 'badge-1',
+              name: 'Barra',
+              color: '#000000',
+              icon: null,
+              group_name: 'equipamiento',
+              is_system: 0,
+              updated_at: 10,
+              deleted_at: null,
+            },
+          },
+        ],
+        serverTime: 11,
+      }),
+    });
+
+    await (syncService as any).pullRemoteChanges('token-1');
+
+    const insertCall = (dbService.run as jest.Mock).mock.calls.find((c) => String(c[0]).includes('INSERT OR REPLACE INTO badges'));
+    expect(insertCall).toBeDefined();
+  });
 });

@@ -190,6 +190,7 @@ export const userProfiles = pgTable('user_profiles', {
     pushToken: text('push_token'), // For FCM
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    lastUsernameChangeAt: timestamp('last_username_change_at'),
 });
 
 export const friendships = pgTable('friendships', {

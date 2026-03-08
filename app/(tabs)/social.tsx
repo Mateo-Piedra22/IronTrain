@@ -2,11 +2,12 @@ import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { useDataReload } from '@/src/hooks/useDataReload';
 import { locationPermissionsService } from '@/src/services/LocationPermissionsService';
 import { routineService } from '@/src/services/RoutineService';
-import { SocialComparisonEntry, SocialFriend, SocialInboxItem, SocialLeaderboardEntry, SocialProfile, SocialSearchUser, SocialService, WeatherInfo } from '@/src/services/SocialService';
+import { SocialComparisonEntry, SocialFriend, SocialInboxItem, SocialLeaderboardEntry, SocialProfile, SocialSearchUser, SocialService } from '@/src/services/SocialService';
 import { useAuthStore } from '@/src/store/authStore';
 import { confirm } from '@/src/store/confirmStore';
 import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import * as Clipboard from 'expo-clipboard';
+import * as Location from 'expo-location';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import { Award, CalendarDays, CheckCircle, ChevronDown, ChevronUp, CloudRain, Copy, Dumbbell, Flame, Globe, Info, Lock as LockIcon, MapPin, MapPinOff, RefreshCcw, Scale, Settings, Shield as ShieldIcon, TrendingUp, Trophy, UserCheck, UserMinus as UserMinusIcon, XCircle, X as XIcon, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -77,7 +78,7 @@ export default function SocialTab() {
             ]);
             setProfile(prev => ({
                 ...prof,
-                weatherBonus: prev?.weatherBonus || null
+                weatherBonus: prof.weatherBonus || prev?.weatherBonus || null
             }));
             setFriends(fr);
             setInbox(inb);
@@ -119,20 +120,22 @@ export default function SocialTab() {
         }
     };
 
-    const handleRefreshLocation = async (silent = false) => {
+    const handleRefreshLocation = useCallback(async (silent = false) => {
         try {
-            if (!silent) setRefreshingLocation(true);
-            const location = await locationPermissionsService.getCurrentLocation();
+            setRefreshingLocation(true);
+            const location = await locationPermissionsService.getCurrentLocation(silent);
+
             if (location) {
-                // Pre-set some location data immediately so the badge appears
                 setProfile(prev => prev ? ({
                     ...prev,
-                    weatherBonus: prev.weatherBonus || {
+                    weatherBonus: {
+                        ...(prev.weatherBonus || {
+                            condition: 'Sincronizando...',
+                            temperature: 20,
+                            multiplier: 1.0,
+                            isActive: false
+                        }),
                         location: location.city || 'Tu ubicación',
-                        condition: 'Cargando...',
-                        temperature: 20,
-                        multiplier: 1.0,
-                        isActive: false
                     }
                 }) : null);
 
@@ -146,41 +149,27 @@ export default function SocialTab() {
                     if (updatedBonus) {
                         setProfile(prev => prev ? ({
                             ...prev,
-                            weatherBonus: updatedBadgeWithPersistence(prev.weatherBonus, updatedBonus)
+                            weatherBonus: updatedBonus
                         }) : null);
                         if (!silent) confirm.success('Ubicación Actualizada', `Se detectó: ${location.city || 'Tu ubicación'}`);
                     }
                 } catch (err) {
                     console.warn('[SocialTab] Weather API failed, keeping local location:', err);
-                    // Fallback local description if API fails
-                    setProfile(prev => prev ? ({
-                        ...prev,
-                        weatherBonus: {
-                            location: location.city || 'Tu ubicación',
-                            condition: 'Cielo Despejado',
-                            temperature: 20,
-                            multiplier: 1.0,
-                            isActive: false
-                        }
-                    }) : null);
                     if (!silent) confirm.error('Servicio de Clima', 'No pudimos verificar bonificaciones climáticas, pero detectamos tu ubicación.');
                 }
             } else {
-                setLocationPermissionDenied(true);
+                const status = await Location.getForegroundPermissionsAsync();
+                setLocationPermissionDenied(status.status === 'denied');
+                // Don't show error message in silent mode to avoid annoying the user on tab entry
                 if (!silent) confirm.error('Error de GPS', 'No pudimos obtener tu ubicación exacta. Verificá los permisos.');
             }
         } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : 'Error al obtener ubicación';
-            setLocationPermissionDenied(true);
-            if (!silent) confirm.error('Error de GPS', msg);
+            console.error('[SocialTab] Error refreshing location:', e);
+            if (!silent) confirm.error('Error de GPS', 'Ocurrió un error al intentar obtener tu ubicación.');
         } finally {
-            if (!silent) setRefreshingLocation(false);
+            setRefreshingLocation(false);
         }
-    };
-
-    const updatedBadgeWithPersistence = (old: WeatherInfo | null | undefined, updated: WeatherInfo): WeatherInfo => {
-        return updated;
-    };
+    }, [confirm]);
 
     const handleSearch = async () => {
         const trimmed = searchQuery.trim();
@@ -243,10 +232,12 @@ export default function SocialTab() {
             confirm.error('Error', 'El nombre visible es obligatorio.');
             return;
         }
+
         if (normalizedDisplayName.length < 2 || normalizedDisplayName.length > 64) {
             confirm.error('Error', 'El nombre visible debe tener entre 2 y 64 caracteres.');
             return;
         }
+
         if (normalizedUsername.length > 0) {
             if (normalizedUsername.length < 3 || normalizedUsername.length > 20) {
                 confirm.error('Error', 'El username debe tener entre 3 y 20 caracteres.');
@@ -258,6 +249,23 @@ export default function SocialTab() {
             }
         }
 
+        const isChangingUsername = normalizedUsername !== (profile?.username || '').toLowerCase();
+
+        if (isChangingUsername && profile?.lastUsernameChangeAt) {
+            const lastChange = new Date(profile.lastUsernameChangeAt);
+            const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
+            const diff = Date.now() - lastChange.getTime();
+
+            if (diff < thirtyDaysInMs) {
+                const nextChangeDate = new Date(lastChange.getTime() + thirtyDaysInMs);
+                confirm.error(
+                    'Espera un poco',
+                    `Solo podés cambiar tu username una vez cada 30 días. Próximo cambio: ${nextChangeDate.toLocaleDateString()}`
+                );
+                return;
+            }
+        }
+
         setProfileSaving(true);
         try {
             await SocialService.updateProfile(
@@ -265,12 +273,15 @@ export default function SocialTab() {
                 normalizedUsername.length > 0 ? normalizedUsername : null,
                 profileFormPublic ? 1 : 0
             );
+
             setProfile((prev) => prev ? ({
                 ...prev,
                 displayName: normalizedDisplayName,
                 username: normalizedUsername.length > 0 ? normalizedUsername : null,
                 isPublic: profileFormPublic ? 1 : 0,
+                lastUsernameChangeAt: isChangingUsername ? new Date().toISOString() : prev.lastUsernameChangeAt
             }) : prev);
+
             setIsProfileModalVisible(false);
             confirm.success('Perfil actualizado', 'Tu perfil social se actualizó correctamente.');
             await loadData();
@@ -922,7 +933,12 @@ export default function SocialTab() {
 
                             <Text style={styles.modalLabel}>Username</Text>
                             <TextInput
-                                style={styles.modalInput}
+                                style={[
+                                    styles.modalInput,
+                                    profile?.lastUsernameChangeAt &&
+                                    (Date.now() - new Date(profile.lastUsernameChangeAt).getTime() < 30 * 24 * 60 * 60 * 1000) &&
+                                    { backgroundColor: Colors.iron[100], color: Colors.iron[500] }
+                                ]}
                                 value={profileFormUsername}
                                 onChangeText={(value) => setProfileFormUsername(value.replace(/\s+/g, '').toLowerCase())}
                                 maxLength={32}
@@ -930,10 +946,17 @@ export default function SocialTab() {
                                 autoCorrect={false}
                                 placeholder="sin espacios"
                                 placeholderTextColor={Colors.iron[500]}
+                                editable={!profile?.lastUsernameChangeAt || (Date.now() - new Date(profile.lastUsernameChangeAt).getTime() >= 30 * 24 * 60 * 60 * 1000)}
                             />
-                            <Text style={styles.modalFieldHint}>
-                                Dejá vacío para quitar username. Permitido: a-z, 0-9 y _
-                            </Text>
+                            {profile?.lastUsernameChangeAt && (Date.now() - new Date(profile.lastUsernameChangeAt).getTime() < 30 * 24 * 60 * 60 * 1000) ? (
+                                <Text style={[styles.modalFieldHint, { color: Colors.primary.DEFAULT, fontWeight: '900' }]}>
+                                    Bloqueado hasta: {new Date(new Date(profile.lastUsernameChangeAt).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                                </Text>
+                            ) : (
+                                <Text style={styles.modalFieldHint}>
+                                    Dejá vacío para quitar username. Permitido: a-z, 0-9 y _ (1 vez cada 30 días)
+                                </Text>
+                            )}
 
                             <View style={styles.privacyRow}>
                                 <View style={{ flex: 1 }}>

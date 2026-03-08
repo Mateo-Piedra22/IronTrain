@@ -29,6 +29,7 @@ export interface SocialProfile {
     shareStats?: number | null;
     isPublic?: number | null;
     updatedAt?: string | number | Date | null;
+    lastUsernameChangeAt?: string | null;
     activeEvent?: GlobalEvent | null;
     weatherBonus?: WeatherInfo | null;
     scoreConfig?: ScoreConfig | null;

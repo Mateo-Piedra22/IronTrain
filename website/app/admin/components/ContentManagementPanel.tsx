@@ -237,6 +237,10 @@ export default function ContentManagementPanel({
                                                         VER: v{n.targetVersion}
                                                     </div>
                                                 )}
+                                                <div className="flex items-center gap-1 bg-orange-500/10 px-1.5 py-0.5 rounded-sm border border-orange-500/10 ml-auto">
+                                                    <span className="text-[8px] font-black text-orange-600 mr-0.5">KUDOS</span>
+                                                    <span className="text-[10px] font-black text-orange-700">{n.reactionCount || 0}</span>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -250,12 +254,6 @@ export default function ContentManagementPanel({
                                                     <div className="text-[8px] opacity-40 font-black">CLCK</div>
                                                     <div className="text-xs font-black">{stats.clicked}</div>
                                                 </div>
-                                                {n.reactionCount > 0 && (
-                                                    <div className="bg-orange-500/10 p-1 border border-orange-500/20 col-span-2">
-                                                        <div className="text-[8px] text-orange-600 font-black">REACTIONS (KUDOS)</div>
-                                                        <div className="text-xs font-black text-orange-700">{n.reactionCount}</div>
-                                                    </div>
-                                                )}
                                             </div>
                                             <div className="flex items-center justify-end gap-3 pt-2">
                                                 <Link
@@ -366,9 +364,6 @@ export default function ContentManagementPanel({
                                     </div>
                                     <div className="mt-4 flex items-center justify-between border-t border-[#1a1a2e]/5 pt-3">
                                         <div className="text-[8px] font-mono opacity-40 uppercase">COMMITTED: {new Date(c.updatedAt).toLocaleDateString()}</div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[9px] font-black">🔥 {c.kudos || 0}</span>
-                                        </div>
                                     </div>
                                 </div>
                             ))}
