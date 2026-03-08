@@ -1,4 +1,4 @@
-import { and, eq, ne } from 'drizzle-orm';
+﻿import { and, desc, eq, gte, lte, ne } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
@@ -22,7 +22,34 @@ export async function GET(req: NextRequest) {
 
         const profile = profiles[0];
 
-        return NextResponse.json({ success: true, profile });
+        // Fetch dynamic score configuration
+        const [scoreConfig] = await db.select().from(schema.socialScoringConfig).where(eq(schema.socialScoringConfig.id, 'default'));
+
+        // Fetch currently active global event
+        const now = new Date();
+        const [activeEvent] = await db.select()
+            .from(schema.globalEvents)
+            .where(and(
+                eq(schema.globalEvents.isActive, 1),
+                lte(schema.globalEvents.startDate, now),
+                gte(schema.globalEvents.endDate, now)
+            ))
+            .orderBy(desc(schema.globalEvents.multiplier))
+            .limit(1);
+
+        return NextResponse.json({
+            success: true,
+            profile: {
+                ...profile,
+                scoreConfig: scoreConfig || null,
+                activeEvent: activeEvent ? {
+                    id: activeEvent.id,
+                    title: activeEvent.name,
+                    multiplier: activeEvent.multiplier,
+                    endDate: activeEvent.endDate.toISOString(),
+                } : null
+            }
+        });
     } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Internal server error';
         return NextResponse.json({ error: message }, { status: 500 });

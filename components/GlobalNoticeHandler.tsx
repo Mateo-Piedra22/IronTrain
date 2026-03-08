@@ -33,21 +33,33 @@ export const GlobalNoticeHandler: React.FC = () => {
                 for (const n of notifications) {
                     const seen = await AppNotificationService.isSeen(n.id);
                     if (n.displayMode === 'always' || !seen) {
-                        if (n.type === 'modal') {
-                            setActiveNotification(n);
-                        } else if (n.type === 'toast') {
-                            setActiveNotification(n);
-                            setShowToast(true);
-                            // Auto-hide toast after 6 seconds
-                            setTimeout(() => setShowToast(false), 6000);
-                        }
+                        displayNotification(n);
                         break; // Show one at a time
                     }
                 }
             }
         };
 
+        const displayNotification = (n: AppNotification) => {
+            if (n.type === 'modal') {
+                setActiveNotification(n);
+                setShowToast(false);
+            } else if (n.type === 'toast') {
+                setActiveNotification(n);
+                setShowToast(true);
+                // Auto-hide toast after 6 seconds
+                setTimeout(() => setShowToast(false), 6000);
+            }
+        };
+
         fetchAll();
+
+        // Testing mechanism
+        const { DeviceEventEmitter } = require('react-native');
+        const testSub = DeviceEventEmitter.addListener('triggerTestNotification', (payload: AppNotification) => {
+            console.log('TEST: Triggering notification preview:', payload.type);
+            displayNotification(payload);
+        });
 
         // Real-time listener: refresh when a push arrives in foreground
         const cleanup = PushRegistrationService.initListeners(
@@ -68,12 +80,15 @@ export const GlobalNoticeHandler: React.FC = () => {
             }
         );
 
-        return cleanup;
+        return () => {
+            cleanup();
+            testSub.remove();
+        };
     }, []);
 
     const handleUrlAction = async (actionUrl: string) => {
         try {
-            if (actionUrl.startsWith('/') || actionUrl.startsWith('irontrain://')) {
+            if (actionUrl === 'changelog' || actionUrl === 'social' || actionUrl.startsWith('/') || actionUrl.startsWith('irontrain://')) {
                 const rawPath = actionUrl.replace('irontrain://', '');
                 const path =
                     rawPath === 'social' ? '/(tabs)/social'

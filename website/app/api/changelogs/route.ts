@@ -20,13 +20,14 @@ export async function GET(request: NextRequest) {
             .from(schema.changelogs)
             .orderBy(desc(schema.changelogs.date), desc(schema.changelogs.version));
 
-        const releases = data.map((c): ApiRelease => ({
+        const releases = data.map((c) => ({
             id: c.id,
             version: c.version,
             date: c.date.toISOString(),
             items: JSON.parse(c.items || '[]'),
             unreleased: c.isUnreleased === 1,
-            metadata: c.metadata ? JSON.parse(c.metadata) : null
+            metadata: c.metadata ? JSON.parse(c.metadata) : null,
+            reactionCount: c.reactionCount
         }))
             .filter((r) => includeUnreleased || r.unreleased !== true)
             .sort(compareSemverDesc);

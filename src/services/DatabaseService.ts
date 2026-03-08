@@ -856,6 +856,26 @@ export class DatabaseService {
         } catch (e) {
             console.warn('Migration 18 failed:', e);
         }
+
+        // Migration 19: Add notification_reactions table (Push Center Kudos)
+        try {
+            console.log('[Migration] Running Migration 19: notification_reactions');
+            await this.executeRaw(`
+                CREATE TABLE IF NOT EXISTS notification_reactions (
+                    id TEXT PRIMARY KEY,
+                    notification_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    type TEXT DEFAULT 'kudos',
+                    created_at INTEGER,
+                    updated_at INTEGER,
+                    deleted_at INTEGER
+                )
+            `);
+            await this.executeRaw(`CREATE INDEX IF NOT EXISTS idx_notif_reactions_notif ON notification_reactions (notification_id)`);
+            await this.executeRaw(`CREATE INDEX IF NOT EXISTS idx_notif_reactions_user ON notification_reactions (user_id)`);
+        } catch (e) {
+            console.warn('Migration 19 failed:', e);
+        }
     }
 
     /**

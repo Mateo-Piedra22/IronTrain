@@ -102,7 +102,9 @@ export async function GET(request: NextRequest) {
             type: n.type,
             priority: n.priority,
             displayMode: n.displayMode,
-            metadata: n.metadata ? JSON.parse(n.metadata) : null
+            metadata: n.metadata ? JSON.parse(n.metadata) : null,
+            reactionCount: n.reactionCount,
+            createdAt: n.createdAt
         }));
 
         return NextResponse.json({

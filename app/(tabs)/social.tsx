@@ -8,7 +8,7 @@ import { confirm } from '@/src/store/confirmStore';
 import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
-import { Award, CalendarDays, CheckCircle, ChevronDown, ChevronUp, CloudRain, Copy, Dumbbell, Flame, Globe, Info, Lock as LockIcon, RefreshCcw, Scale, Settings, Shield as ShieldIcon, TrendingUp, Trophy, UserCheck, UserMinus as UserMinusIcon, XCircle, X as XIcon, Zap } from 'lucide-react-native';
+import { Award, CalendarDays, CheckCircle, ChevronDown, ChevronUp, CloudRain, Copy, Dumbbell, Flame, Globe, Info, Lock as LockIcon, MapPin, RefreshCcw, Scale, Settings, Shield as ShieldIcon, TrendingUp, Trophy, UserCheck, UserMinus as UserMinusIcon, XCircle, X as XIcon, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -73,26 +73,7 @@ export default function SocialTab() {
                 SocialService.getInbox(),
                 SocialService.getAnalytics(),
             ]);
-            setProfile({
-                ...prof,
-                // Mock bonos para demostración inmediata del sistema visual
-                activeEvent: prof.activeEvent || {
-                    id: 'iron_weekend_xp',
-                    title: 'Iron Weekend XP',
-                    description: '¡Doble puntuación en todos tus entrenamientos este fin de semana! Escala puestos en el ranking más rápido que nunca.',
-                    multiplier: 2,
-                    startDate: new Date().toISOString(),
-                    endDate: new Date(Date.now() + 87400000).toISOString(),
-                    type: 'xp_boost'
-                },
-                weatherBonus: prof.weatherBonus || {
-                    location: 'Buenos Aires',
-                    condition: 'Lluvia Moderada',
-                    temperature: 14,
-                    multiplier: 1.5,
-                    isActive: true
-                }
-            });
+            setProfile(prof);
             setFriends(fr);
             setInbox(inb);
             setLeaderboard(lb);
@@ -120,6 +101,8 @@ export default function SocialTab() {
     useEffect(() => {
         loadData();
         loadTrainingDays();
+        // Comprobar ubicación al inicio de manera silenciosa
+        handleRefreshLocation(true);
     }, [loadData, loadTrainingDays]);
 
     const handleCopyId = async () => {
@@ -129,9 +112,9 @@ export default function SocialTab() {
         }
     };
 
-    const handleRefreshLocation = async () => {
+    const handleRefreshLocation = async (silent = false) => {
         try {
-            setRefreshingLocation(true);
+            if (!silent) setRefreshingLocation(true);
             const location = await locationPermissionsService.getCurrentLocation();
             if (location) {
                 const updatedBonus = await SocialService.updateWeatherBonus(
@@ -150,7 +133,7 @@ export default function SocialTab() {
                             weatherBonus: updatedBonus
                         });
                     }
-                    confirm.success('Ubicación Actualizada', `Se detectó: ${location.city || 'Tu ciudad'}`);
+                    if (!silent) confirm.success('Ubicación Actualizada', `Se detectó: ${location.city || 'Tu ciudad'}`);
                 } else {
                     // Si falló la API, aplicamos fallback pero informamos al usuario
                     if (profile) {
@@ -165,14 +148,16 @@ export default function SocialTab() {
                             }
                         });
                     }
-                    confirm.error('Error de Sincronización', 'No se pudo obtener el clima del servidor. Se usará clima despejado por defecto.');
+                    if (!silent) confirm.error('Error de Sincronización', 'No se pudo obtener el clima del servidor. Se usará clima despejado por defecto.');
                 }
+            } else {
+                if (!silent) confirm.error('Error de GPS', 'No pudimos obtener tu ubicación exacta.');
             }
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : 'Error al obtener ubicación';
-            confirm.error('Error de GPS', msg);
+            if (!silent) confirm.error('Error de GPS', msg);
         } finally {
-            setRefreshingLocation(false);
+            if (!silent) setRefreshingLocation(false);
         }
     };
 
@@ -493,7 +478,7 @@ export default function SocialTab() {
                                 )}
                             </View>
 
-                            {(profile.activeEvent || profile.weatherBonus?.isActive) && (
+                            {(profile.activeEvent || profile.weatherBonus) && (
                                 <View style={styles.bonusColumn}>
                                     {profile.activeEvent && (
                                         <TouchableOpacity
@@ -505,14 +490,20 @@ export default function SocialTab() {
                                             <Text style={styles.eventBadgeText}>Evento {profile.activeEvent.multiplier}x</Text>
                                         </TouchableOpacity>
                                     )}
-                                    {profile.weatherBonus?.isActive && (
+                                    {profile.weatherBonus && (
                                         <TouchableOpacity
-                                            style={styles.weatherBadge}
+                                            style={profile.weatherBonus.isActive ? styles.weatherBadge : styles.locationBadge}
                                             onPress={() => setIsWeatherModalVisible(true)}
                                             activeOpacity={0.7}
                                         >
-                                            <CloudRain size={10} color={Colors.white} />
-                                            <Text style={styles.weatherBadgeText}>Voluntad de Hierro</Text>
+                                            {profile.weatherBonus.isActive ? (
+                                                <CloudRain size={10} color={Colors.white} />
+                                            ) : (
+                                                <MapPin size={10} color={Colors.iron[500]} />
+                                            )}
+                                            <Text style={profile.weatherBonus.isActive ? styles.weatherBadgeText : styles.locationBadgeText}>
+                                                {profile.weatherBonus.isActive ? 'Voluntad de Hierro' : (profile.weatherBonus.location || 'Ubicación')}
+                                            </Text>
                                         </TouchableOpacity>
                                     )}
                                 </View>
@@ -1051,32 +1042,34 @@ export default function SocialTab() {
                             <View style={styles.infoPointRow}>
                                 <CheckCircle size={18} color={Colors.green} />
                                 <Text style={styles.infoPointText}>Completar Entrenamiento</Text>
-                                <Text style={styles.infoPointValue}>+20 pts</Text>
+                                <Text style={styles.infoPointValue}>+{profile?.scoreConfig?.workoutCompletePoints || 20} pts</Text>
                             </View>
 
                             <View style={styles.infoPointRow}>
                                 <TrendingUp size={18} color={Colors.primary.DEFAULT} />
-                                <Text style={styles.infoPointText}>Día Extra (Meta Semanal)</Text>
-                                <Text style={styles.infoPointValue}>+10 pts</Text>
+                                <Text style={styles.infoPointText}>Día Extra (Máx {profile?.scoreConfig?.extraDayWeeklyCap || 3}/sem)</Text>
+                                <Text style={styles.infoPointValue}>+{profile?.scoreConfig?.extraDayPoints || 10} pts</Text>
                             </View>
 
                             <View style={styles.infoPointRow}>
                                 <Trophy size={18} color={Colors.yellow} />
                                 <Text style={styles.infoPointText}>Romper PR (Normal)</Text>
-                                <Text style={styles.infoPointValue}>+10 pts</Text>
+                                <Text style={styles.infoPointValue}>+{profile?.scoreConfig?.prNormalPoints || 10} pts</Text>
                             </View>
 
                             <View style={styles.infoPointRow}>
                                 <Award size={18} color={Colors.yellow} />
                                 <Text style={styles.infoPointText}>Romper PR (Big 3)</Text>
-                                <Text style={styles.infoPointValue}>+25 pts</Text>
+                                <Text style={styles.infoPointValue}>+{profile?.scoreConfig?.prBig3Points || 25} pts</Text>
                             </View>
 
-                            <View style={styles.infoPointRow}>
-                                <CloudRain size={18} color={Colors.blue} />
-                                <Text style={styles.infoPointText}>Voluntad de Hierro (Clima)</Text>
-                                <Text style={styles.infoPointValue}>+15 pts</Text>
-                            </View>
+                            {profile?.scoreConfig?.weatherBonusEnabled !== 0 && (
+                                <View style={styles.infoPointRow}>
+                                    <CloudRain size={18} color={Colors.blue} />
+                                    <Text style={styles.infoPointText}>Voluntad de Hierro ({'<'}{profile?.scoreConfig?.coldThresholdC || 5}°C)</Text>
+                                    <Text style={styles.infoPointValue}>+{profile?.scoreConfig?.adverseWeatherPoints || 15} pts</Text>
+                                </View>
+                            )}
 
                             <View style={styles.infoDivider} />
 
@@ -1086,23 +1079,23 @@ export default function SocialTab() {
                             </Text>
 
                             <View style={styles.infoStreakRow}>
-                                <Text style={styles.infoStreakLabel}>Semanas 1-2</Text>
+                                <Text style={styles.infoStreakLabel}>Semanas 1-{(profile?.scoreConfig?.weekTier2Min || 3) - 1}</Text>
                                 <Text style={styles.infoStreakValue}>x1.00</Text>
                             </View>
                             <View style={styles.infoStreakRow}>
-                                <Text style={styles.infoStreakLabel}>Semanas 3-4</Text>
-                                <Text style={styles.infoStreakValue}>x1.10</Text>
+                                <Text style={styles.infoStreakLabel}>Semanas {profile?.scoreConfig?.weekTier2Min || 3}-{(profile?.scoreConfig?.weekTier3Min || 5) - 1}</Text>
+                                <Text style={styles.infoStreakValue}>x{(profile?.scoreConfig?.tier2Multiplier || 1.1).toFixed(2)}</Text>
                             </View>
                             <View style={styles.infoStreakRow}>
-                                <Text style={styles.infoStreakLabel}>Semanas 5-9</Text>
-                                <Text style={styles.infoStreakValue}>x1.25</Text>
+                                <Text style={styles.infoStreakLabel}>Semanas {profile?.scoreConfig?.weekTier3Min || 5}-{(profile?.scoreConfig?.weekTier4Min || 10) - 1}</Text>
+                                <Text style={styles.infoStreakValue}>x{(profile?.scoreConfig?.tier3Multiplier || 1.25).toFixed(2)}</Text>
                             </View>
                             <View style={[styles.infoStreakRow, styles.infoStreakBestia]}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                     <Flame size={14} color={Colors.red} />
-                                    <Text style={[styles.infoStreakLabel, { color: Colors.white }]}>Semanas 10+ (Modo Bestia)</Text>
+                                    <Text style={[styles.infoStreakLabel, { color: Colors.white }]}>Semanas {profile?.scoreConfig?.weekTier4Min || 10}+ (Bestia)</Text>
                                 </View>
-                                <Text style={[styles.infoStreakValue, { color: Colors.white }]}>x1.50</Text>
+                                <Text style={[styles.infoStreakValue, { color: Colors.white }]}>x{(profile?.scoreConfig?.tier4Multiplier || 1.5).toFixed(2)}</Text>
                             </View>
 
                             <View style={styles.infoDivider} />
@@ -1117,6 +1110,15 @@ export default function SocialTab() {
                                         Multiplicadores de experiencia activados por el administrador durante fechas especiales.
                                     </Text>
                                 </View>
+                            </View>
+
+                            <View style={styles.infoDivider} />
+
+                            <View style={styles.formulaBox}>
+                                <Text style={styles.formulaTitle}>Fórmula de Puntos</Text>
+                                <Text style={styles.formulaText}>
+                                    Puntos = (Base + Bonos) × Multiplicador Racha × Evento Global
+                                </Text>
                             </View>
 
                             <View style={styles.infoFooterBox}>
@@ -1145,18 +1147,26 @@ export default function SocialTab() {
                         <View style={[styles.detailIconCircle, { borderColor: Colors.yellow, backgroundColor: withAlpha(Colors.yellow, '15') }]}>
                             <Zap size={32} color={Colors.yellow} fill={Colors.yellow} />
                         </View>
+                        <View style={styles.activeEventBadge}>
+                            <Zap size={10} color={Colors.white} fill={Colors.white} />
+                            <Text style={styles.activeEventBadgeText}>Evento Global Activo</Text>
+                        </View>
                         <Text style={styles.detailTitle}>{profile?.activeEvent?.title || 'Evento Especial'}</Text>
-                        <Text style={styles.detailDesc}>{profile?.activeEvent?.description || '¡Multiplicador de experiencia activo por tiempo limitado!'}</Text>
+                        <Text style={styles.detailDesc}>¡Un multiplicador global está activo! Todas tus ganancias de IronScore se verán potenciadas automáticamente.</Text>
 
                         <View style={styles.detailInfoGrid}>
                             <View style={styles.detailInfoRow}>
                                 <Text style={styles.detailInfoLabel}>Multiplicador</Text>
-                                <Text style={[styles.detailInfoValue, { color: Colors.yellow }]}>{profile?.activeEvent?.multiplier}x</Text>
+                                <Text style={[styles.detailInfoValue, { color: Colors.yellow, fontSize: 18 }]}>x{profile?.activeEvent?.multiplier?.toFixed(1) || '1.0'}</Text>
+                            </View>
+                            <View style={styles.detailInfoRow}>
+                                <Text style={styles.detailInfoLabel}>Estado</Text>
+                                <Text style={[styles.detailInfoValue, { color: Colors.green }]}>Activo Ahora</Text>
                             </View>
                             <View style={styles.detailInfoRow}>
                                 <Text style={styles.detailInfoLabel}>Finaliza el</Text>
                                 <Text style={styles.detailInfoValue}>
-                                    {profile?.activeEvent ? new Date(profile.activeEvent.endDate).toLocaleDateString() : '--/--/--'}
+                                    {profile?.activeEvent ? new Date(profile.activeEvent.endDate).toLocaleDateString(undefined, { day: 'numeric', month: 'long' }) : '--/--/--'}
                                 </Text>
                             </View>
                         </View>
@@ -1178,15 +1188,27 @@ export default function SocialTab() {
                 <View style={styles.modalOverlay}>
                     <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsWeatherModalVisible(false)} />
                     <View style={styles.detailModalCard}>
-                        <View style={[styles.detailIconCircle, { borderColor: Colors.primary.DEFAULT, backgroundColor: withAlpha(Colors.primary.DEFAULT, '15') }]}>
-                            <CloudRain size={32} color={Colors.primary.DEFAULT} />
+                        <View style={[
+                            styles.detailIconCircle,
+                            {
+                                borderColor: profile?.weatherBonus?.isActive ? Colors.primary.DEFAULT : Colors.iron[400],
+                                backgroundColor: withAlpha(profile?.weatherBonus?.isActive ? Colors.primary.DEFAULT : Colors.iron[400], '15')
+                            }
+                        ]}>
+                            {profile?.weatherBonus?.isActive ? (
+                                <CloudRain size={32} color={Colors.primary.DEFAULT} />
+                            ) : (
+                                <MapPin size={32} color={Colors.iron[500]} />
+                            )}
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                            <Text style={styles.detailTitle}>Voluntad de Hierro</Text>
+                            <Text style={styles.detailTitle}>
+                                {profile?.weatherBonus?.isActive ? 'Voluntad de Hierro' : 'Ubicación y Clima'}
+                            </Text>
                         </View>
                         <TouchableOpacity
                             style={styles.refreshBadgeBtn}
-                            onPress={handleRefreshLocation}
+                            onPress={() => handleRefreshLocation()}
                             disabled={refreshingLocation}
                         >
                             {refreshingLocation ? (
@@ -1198,32 +1220,42 @@ export default function SocialTab() {
                                 </>
                             )}
                         </TouchableOpacity>
+
                         <Text style={styles.detailDesc}>
-                            ¡Has vencido a los elementos! Entrenar con clima adverso te otorga puntos extra por tu disciplina inquebrantable.
+                            {profile?.weatherBonus?.isActive
+                                ? '¡Has vencido a los elementos! Entrenar con clima adverso te otorga puntos extra por tu disciplina inquebrantable.'
+                                : 'El sistema detecta tu ubicación para validar bonus por clima adverso. Podrás obtener +15 pts extra si entrenas bajo lluvia, nieve o frío extremo.'}
                         </Text>
 
                         <View style={styles.detailInfoGrid}>
                             <View style={styles.detailInfoRow}>
                                 <Text style={styles.detailInfoLabel}>Ubicación</Text>
-                                <Text style={styles.detailInfoValue}>{profile?.weatherBonus?.location}</Text>
+                                <Text style={styles.detailInfoValue}>{profile?.weatherBonus?.location || 'Detectando...'}</Text>
                             </View>
                             <View style={styles.detailInfoRow}>
                                 <Text style={styles.detailInfoLabel}>Clima</Text>
-                                <Text style={styles.detailInfoValue}>{profile?.weatherBonus?.condition}</Text>
+                                <Text style={styles.detailInfoValue}>{profile?.weatherBonus?.condition || 'Despejado'}</Text>
                             </View>
                             <View style={styles.detailInfoRow}>
                                 <Text style={styles.detailInfoLabel}>Bonus</Text>
-                                <Text style={[styles.detailInfoValue, { color: Colors.primary.DEFAULT }]}>+15 pts</Text>
+                                <Text style={[
+                                    styles.detailInfoValue,
+                                    { color: profile?.weatherBonus?.isActive ? Colors.primary.DEFAULT : Colors.iron[500] }
+                                ]}>
+                                    {profile?.weatherBonus?.isActive ? '+15 pts' : 'Inactivo'}
+                                </Text>
                             </View>
                         </View>
 
                         <TouchableOpacity style={styles.detailCloseBtn} onPress={() => setIsWeatherModalVisible(false)}>
-                            <Text style={styles.detailCloseText}>¡A darle!</Text>
+                            <Text style={styles.detailCloseText}>
+                                {profile?.weatherBonus?.isActive ? '¡A darle!' : 'Entendido'}
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
-            </Modal>
-        </SafeAreaWrapper>
+            </Modal >
+        </SafeAreaWrapper >
     );
 }
 
@@ -2298,6 +2330,39 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         textTransform: 'uppercase',
     },
+    locationBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.iron[900],
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: Colors.iron[700],
+    },
+    locationBadgeText: {
+        color: Colors.iron[600],
+        fontSize: 11,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
+    activeEventBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.yellow,
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        borderRadius: 12,
+        marginBottom: 8,
+        gap: 6,
+    },
+    activeEventBadgeText: {
+        color: Colors.iron[950],
+        fontSize: 10,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+    },
     detailModalCard: {
         width: '88%',
         backgroundColor: Colors.surface,
@@ -2372,5 +2437,27 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '900',
         textTransform: 'uppercase',
+    },
+    formulaBox: {
+        backgroundColor: Colors.iron[950],
+        padding: 16,
+        borderRadius: 12,
+        marginVertical: 10,
+        borderWidth: 1,
+        borderColor: withAlpha(Colors.primary.DEFAULT, '30'),
+    },
+    formulaTitle: {
+        fontSize: 10,
+        color: Colors.iron[500],
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+        marginBottom: 4,
+        letterSpacing: 1,
+    },
+    formulaText: {
+        fontSize: 13,
+        color: Colors.primary.DEFAULT,
+        fontWeight: '900',
+        fontStyle: 'italic',
     },
 });

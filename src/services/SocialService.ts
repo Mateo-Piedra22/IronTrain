@@ -4,6 +4,23 @@ import { dataEventService } from './DataEventService';
 
 const API_URL = Config.API_URL;
 
+export interface ScoreConfig {
+    workoutCompletePoints: number;
+    extraDayPoints: number;
+    extraDayWeeklyCap: number;
+    prNormalPoints: number;
+    prBig3Points: number;
+    adverseWeatherPoints: number;
+    weekTier2Min: number;
+    weekTier3Min: number;
+    weekTier4Min: number;
+    tier2Multiplier: number;
+    tier3Multiplier: number;
+    tier4Multiplier: number;
+    coldThresholdC: number;
+    weatherBonusEnabled: number;
+}
+
 export interface SocialProfile {
     id: string;
     displayName: string | null;
@@ -13,16 +30,15 @@ export interface SocialProfile {
     updatedAt?: string | number | Date | null;
     activeEvent?: GlobalEvent | null;
     weatherBonus?: WeatherInfo | null;
+    scoreConfig?: ScoreConfig | null;
 }
 
 export interface GlobalEvent {
     id: string;
     title: string;
-    description: string;
     multiplier: number;
-    startDate: string;
+    startDate?: string;
     endDate: string;
-    type: 'xp_boost' | 'special_event';
 }
 
 export interface WeatherInfo {

@@ -12,7 +12,7 @@ import { ChangelogService } from '@/src/services/ChangelogService';
 import { configService } from '@/src/services/ConfigService';
 import { RoutineDayWithExercises } from '@/src/services/RoutineService';
 import { useTimerStore } from '@/src/store/timerStore';
-import { Colors } from '@/src/theme';
+import { Colors, withAlpha } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { addDays, subDays } from 'date-fns';
@@ -20,7 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
 import { Info, Plus, Timer, X } from 'lucide-react-native';
 import React, { useCallback, useContext, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, DeviceEventEmitter, Image, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -303,6 +303,28 @@ export default function DailyLogScreen() {
                     )}
                   </Pressable>
                 </Link>
+
+                {/* BOTÓN DE TEST: PUSH_CENTER_BROADCAST */}
+                <TouchableOpacity
+                  onPress={() => {
+                    const tests = [
+                      { id: 'test-1', title: 'Aviso de Mantenimiento', message: 'Estaremos realizando tareas de mantenimiento el próximo **domingo a las 04:00 AM**. \n\nNo se pierdan las nuevas funciones que vienen en camino.', type: 'modal', displayMode: 'always', priority: 1, createdAt: new Date().toISOString(), reactionCount: 12 },
+                      { id: 'test-2', title: '¡Nuevo Evento Global!', message: 'Se ha activado un multiplicador x2 de experiencia en todos los ejercicios de pierna.', type: 'toast', displayMode: 'always', priority: 2, createdAt: new Date().toISOString(), reactionCount: 45 },
+                      { id: 'test-3', title: 'Actualización Crítica', message: 'Hemos corregido el error de GPS que afectaba a algunos dispositivos. Por favor reinicia la app.', type: 'modal', displayMode: 'always', priority: 3, metadata: { actionUrl: 'changelog' }, createdAt: new Date().toISOString(), reactionCount: 8 }
+                    ];
+                    const nextIndex = (global as any).__lastTestIndex === undefined ? 0 : ((global as any).__lastTestIndex + 1) % tests.length;
+                    (global as any).__lastTestIndex = nextIndex;
+                    DeviceEventEmitter.emit('triggerTestNotification', tests[nextIndex]);
+                  }}
+                  style={{
+                    width: 36, height: 36, borderRadius: 18,
+                    backgroundColor: withAlpha(Colors.primary.DEFAULT, '20'),
+                    alignItems: 'center', justifyContent: 'center',
+                    borderWidth: 1, borderColor: withAlpha(Colors.primary.DEFAULT, '40'),
+                  }}
+                >
+                  <Text style={{ fontSize: 9, fontWeight: '900', color: Colors.primary.DEFAULT }}>TEST</Text>
+                </TouchableOpacity>
               </View>
             }
           />
@@ -427,6 +449,5 @@ export default function DailyLogScreen() {
         )
       }
     </SafeAreaWrapper >
-
   );
 }

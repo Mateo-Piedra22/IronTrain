@@ -12,6 +12,8 @@ export type AppNotification = {
     displayMode: 'once' | 'always' | 'until_closed';
     priority: number;
     metadata?: any;
+    reactionCount?: number;
+    createdAt?: string | Date;
 };
 
 const BACKEND_URL = Config.API_URL;
@@ -77,7 +79,7 @@ export class AppNotificationService {
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const response = await fetch(`${BACKEND_URL}/api/notifications/register-token`, {
+            await fetch(`${BACKEND_URL}/api/notifications/register-token`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ userId: user.id, pushToken, ...metadata })
@@ -86,5 +88,40 @@ export class AppNotificationService {
             console.error('Failed to register push token:', e);
         }
     }
-}
 
+    static async getReactionCount(notificationId: string): Promise<number> {
+        try {
+            const countStr = await configService.get(`notif_reaction_count_${notificationId}` as any);
+            return countStr ? parseInt(countStr as string, 10) : 0;
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    static async toggleReaction(notificationId: string): Promise<'added' | 'removed' | 'error'> {
+        const { user, token } = useAuthStore.getState();
+        if (!user?.id || !token) return 'error';
+
+        try {
+            const response = await fetch(`${BACKEND_URL}/api/notifications/react`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ notificationId, userId: user.id })
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (typeof data.reactionCount === 'number') {
+                    await configService.set(`notif_reaction_count_${notificationId}` as any, data.reactionCount.toString());
+                }
+                return data.action; // 'added' or 'removed'
+            }
+            return 'error';
+        } catch (e) {
+            console.error('Error toggling notification reaction:', e);
+            return 'error';
+        }
+    }
+}

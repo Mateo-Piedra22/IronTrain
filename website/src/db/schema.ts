@@ -283,6 +283,7 @@ export const adminNotifications = pgTable('admin_notifications', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     expiresAt: timestamp('expires_at'),
+    reactionCount: integer('reaction_count').default(0).notNull(),
 });
 
 export const notificationLogs = pgTable('notification_logs', {
@@ -297,6 +298,16 @@ export const notificationLogs = pgTable('notification_logs', {
 export const changelogReactions = pgTable('changelog_reactions', {
     id: text('id').primaryKey(),
     changelogId: text('changelog_id').notNull(),
+    userId: text('user_id').notNull(),
+    type: text('type').notNull().default('kudos'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+});
+
+export const notificationReactions = pgTable('notification_reactions', {
+    id: text('id').primaryKey(),
+    notificationId: text('notification_id').notNull(),
     userId: text('user_id').notNull(),
     type: text('type').notNull().default('kudos'),
     createdAt: timestamp('created_at').defaultNow().notNull(),

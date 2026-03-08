@@ -12,6 +12,7 @@ export type ChangelogRelease = {
     unreleased?: boolean;
     items: string[];
     metadata?: any;
+    reactionCount?: number;
 };
 
 type ChangelogPayload = {

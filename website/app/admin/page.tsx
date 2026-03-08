@@ -1008,53 +1008,55 @@ export default async function AdminPanel(props: {
                     </div>
 
                     {/* List */}
-                    <div className="lg:col-span-2 border-2 border-[#1a1a2e] overflow-hidden">
-                        <table className="w-full text-[11px] border-collapse">
-                            <thead>
-                                <tr className="bg-[#1a1a2e] text-[#f5f1e8]">
-                                    <th className="p-3 text-left font-black tracking-widest uppercase">MANIFEST</th>
-                                    <th className="p-3 text-left font-black tracking-widest uppercase">CHANGES</th>
-                                    <th className="p-3 text-right font-black tracking-widest uppercase">OPS</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[#1a1a2e]/10">
-                                {changelogs.map(c => (
-                                    <tr key={c.id} className="hover:bg-white transition-colors">
-                                        <td className="p-3 align-top">
-                                            <div className="font-black text-sm">v{c.version}</div>
-                                            <div className="flex flex-wrap gap-1 mt-1">
-                                                {c.isUnreleased ? (
-                                                    <span className="text-[8px] bg-amber-400 px-1 font-black underline decoration-2">DRAFT</span>
-                                                ) : (
-                                                    <span className="text-[8px] bg-green-400 px-1 font-black">LIVE</span>
-                                                )}
-                                                <span className="text-[8px] bg-white border border-[#1a1a2e] px-1 font-black">🔥 {c.kudos} KUDOS</span>
-                                            </div>
-                                        </td>
-                                        <td className="p-3">
-                                            <ul className="list-disc list-inside opacity-60">
-                                                {c.items.map((item, i) => (
-                                                    <li key={i}>{item}</li>
-                                                ))}
-                                            </ul>
-                                        </td>
-                                        <td className="p-3 text-right">
-                                            <div className="flex items-center justify-end gap-3">
-                                                <a href={`?editChangelogId=${c.id}`} className="text-[#1a1a2e] opacity-40 hover:opacity-100 transition-opacity">
-                                                    EDIT
-                                                </a>
-                                                <form action={handleChangelogAction}>
-                                                    <input type="hidden" name="id" value={c.id} />
-                                                    <button type="submit" name="action" value="delete" className="text-red-500 hover:text-red-700 block">
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        </td>
+                    <div className="lg:col-span-2 border-2 border-[#1a1a2e] overflow-hidden flex flex-col">
+                        <div className="max-h-[500px] overflow-y-auto">
+                            <table className="w-full text-[11px] border-collapse">
+                                <thead>
+                                    <tr className="bg-[#1a1a2e] text-[#f5f1e8]">
+                                        <th className="p-3 text-left font-black tracking-widest uppercase">MANIFEST</th>
+                                        <th className="p-3 text-left font-black tracking-widest uppercase">CHANGES</th>
+                                        <th className="p-3 text-right font-black tracking-widest uppercase">OPS</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-[#1a1a2e]/10">
+                                    {changelogs.map(c => (
+                                        <tr key={c.id} className="hover:bg-white transition-colors">
+                                            <td className="p-3 align-top">
+                                                <div className="font-black text-sm">v{c.version}</div>
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {c.isUnreleased ? (
+                                                        <span className="text-[8px] bg-amber-400 px-1 font-black underline decoration-2">DRAFT</span>
+                                                    ) : (
+                                                        <span className="text-[8px] bg-green-400 px-1 font-black">LIVE</span>
+                                                    )}
+                                                    <span className="text-[8px] bg-white border border-[#1a1a2e] px-1 font-black">🔥 {c.kudos} KUDOS</span>
+                                                </div>
+                                            </td>
+                                            <td className="p-3">
+                                                <ul className="list-disc list-inside opacity-60">
+                                                    {c.items.map((item, i) => (
+                                                        <li key={i}>{item}</li>
+                                                    ))}
+                                                </ul>
+                                            </td>
+                                            <td className="p-3 text-right">
+                                                <div className="flex items-center justify-end gap-3">
+                                                    <a href={`?editChangelogId=${c.id}`} className="text-[#1a1a2e] opacity-40 hover:opacity-100 transition-opacity">
+                                                        EDIT
+                                                    </a>
+                                                    <form action={handleChangelogAction}>
+                                                        <input type="hidden" name="id" value={c.id} />
+                                                        <button type="submit" name="action" value="delete" className="text-red-500 hover:text-red-700 block">
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1155,66 +1157,71 @@ export default async function AdminPanel(props: {
                     </div>
 
                     {/* Active Notifications */}
-                    <div className="lg:col-span-2 border-2 border-[#1a1a2e] overflow-hidden">
-                        <table className="w-full text-[11px] border-collapse">
-                            <thead>
-                                <tr className="bg-[#1a1a2e] text-[#f5f1e8]">
-                                    <th className="p-3 text-left font-black tracking-widest uppercase">BROADCAST</th>
-                                    <th className="p-3 text-left font-black tracking-widest uppercase">CONFIG</th>
-                                    <th className="p-3 text-right font-black tracking-widest uppercase">OPS</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[#1a1a2e]/10">
-                                {adminNotifications.map(n => (
-                                    <tr key={n.id} className="hover:bg-white transition-colors">
-                                        <td className="p-3 align-top">
-                                            <div className="font-black text-sm uppercase tracking-tighter">{n.title}</div>
-                                            <p className="opacity-60 text-[10px] mt-1">{n.message}</p>
-                                        </td>
-                                        <td className="p-3 align-top">
-                                            <div className="flex flex-wrap gap-1">
-                                                <span className={`text-[8px] px-1 font-black uppercase ${n.priority === 'critical' ? 'bg-red-600 text-white' : n.priority === 'high' ? 'bg-orange-600 text-white' : 'bg-[#1a1a2e] text-[#f5f1e8]'}`}>
-                                                    {n.type}_{n.priority}
-                                                </span>
-                                                <span className="text-[8px] border border-[#1a1a2e] px-1 font-black uppercase">{n.displayMode}</span>
-                                                {n.isActive ? (
-                                                    <span className="text-[8px] bg-green-400 px-1 font-black">ACTIVE</span>
-                                                ) : (
-                                                    <span className="text-[8px] bg-red-400 px-1 font-black">INACTIVE</span>
-                                                )}
-                                                <span className="text-[8px] bg-blue-100 text-blue-700 px-1 font-black border border-blue-200">
-                                                    {n.targetPlatform || 'all'}
-                                                </span>
-                                                <span className="text-[8px] bg-purple-100 text-purple-700 px-1 font-black border border-purple-200">
-                                                    SEG: {n.targetSegment || 'all'}
-                                                </span>
-                                            </div>
-                                            <div className="mt-2 grid grid-cols-2 gap-2 border-t border-[#1a1a2e]/5 pt-2">
-                                                <div className="text-[10px] font-black">
-                                                    <span className="opacity-40">SEEN_</span>{getNotifStats(n.id).seen}
-                                                </div>
-                                                <div className="text-[10px] font-black">
-                                                    <span className="opacity-40">CLCK_</span>{getNotifStats(n.id).clicked}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="p-3 text-right">
-                                            <div className="flex items-center justify-end gap-3">
-                                                <a href={`?editNotifId=${n.id}`} className="text-[#1a1a2e] opacity-40 hover:opacity-100 transition-opacity">
-                                                    EDIT
-                                                </a>
-                                                <form action={handleNotificationAction}>
-                                                    <input type="hidden" name="id" value={n.id} />
-                                                    <button type="submit" name="action" value="delete" className="text-red-500 hover:text-red-700 block">
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        </td>
+                    <div className="lg:col-span-2 border-2 border-[#1a1a2e] overflow-hidden flex flex-col">
+                        <div className="max-h-[500px] overflow-y-auto">
+                            <table className="w-full text-[11px] border-collapse">
+                                <thead>
+                                    <tr className="bg-[#1a1a2e] text-[#f5f1e8]">
+                                        <th className="p-3 text-left font-black tracking-widest uppercase">BROADCAST</th>
+                                        <th className="p-3 text-left font-black tracking-widest uppercase">CONFIG</th>
+                                        <th className="p-3 text-right font-black tracking-widest uppercase">OPS</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-[#1a1a2e]/10">
+                                    {adminNotifications.map(n => (
+                                        <tr key={n.id} className="hover:bg-white transition-colors">
+                                            <td className="p-3 align-top">
+                                                <div className="font-black text-sm uppercase tracking-tighter">{n.title}</div>
+                                                <p className="opacity-60 text-[10px] mt-1">{n.message}</p>
+                                            </td>
+                                            <td className="p-3 align-top">
+                                                <div className="flex flex-wrap gap-1">
+                                                    <span className={`text-[8px] px-1 font-black uppercase ${n.priority === 'critical' ? 'bg-red-600 text-white' : n.priority === 'high' ? 'bg-orange-600 text-white' : 'bg-[#1a1a2e] text-[#f5f1e8]'}`}>
+                                                        {n.type}_{n.priority}
+                                                    </span>
+                                                    <span className="text-[8px] border border-[#1a1a2e] px-1 font-black uppercase">{n.displayMode}</span>
+                                                    {n.isActive ? (
+                                                        <span className="text-[8px] bg-green-400 px-1 font-black">ACTIVE</span>
+                                                    ) : (
+                                                        <span className="text-[8px] bg-red-400 px-1 font-black">INACTIVE</span>
+                                                    )}
+                                                    <span className="text-[8px] bg-blue-100 text-blue-700 px-1 font-black border border-blue-200">
+                                                        {n.targetPlatform || 'all'}
+                                                    </span>
+                                                    <span className="text-[8px] bg-purple-100 text-purple-700 px-1 font-black border border-purple-200">
+                                                        SEG: {n.targetSegment || 'all'}
+                                                    </span>
+                                                    <span className="text-[8px] bg-white border border-[#1a1a2e] px-1 font-black shadow-[1px_1px_0px_0px_rgba(26,26,46,1)]">
+                                                        🔥 {n.reactionCount || 0} KUDOS
+                                                    </span>
+                                                </div>
+                                                <div className="mt-2 grid grid-cols-2 gap-2 border-t border-[#1a1a2e]/5 pt-2">
+                                                    <div className="text-[10px] font-black">
+                                                        <span className="opacity-40">SEEN_</span>{getNotifStats(n.id).seen}
+                                                    </div>
+                                                    <div className="text-[10px] font-black">
+                                                        <span className="opacity-40">CLCK_</span>{getNotifStats(n.id).clicked}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="p-3 text-right">
+                                                <div className="flex items-center justify-end gap-3">
+                                                    <a href={`?editNotifId=${n.id}`} className="text-[#1a1a2e] opacity-40 hover:opacity-100 transition-opacity">
+                                                        EDIT
+                                                    </a>
+                                                    <form action={handleNotificationAction}>
+                                                        <input type="hidden" name="id" value={n.id} />
+                                                        <button type="submit" name="action" value="delete" className="text-red-500 hover:text-red-700 block">
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
