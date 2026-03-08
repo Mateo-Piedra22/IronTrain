@@ -15,19 +15,23 @@ import SystemStatusPanel from './components/SystemStatusPanel';
 export const revalidate = 0;
 export const runtime = 'nodejs';
 
-export default async function AdminPage({
-    searchParams,
-}: {
-    searchParams: {
+interface AdminPageProps {
+    params: Promise<any>;
+    searchParams: Promise<{
         editNotifId?: string;
         editChangelogId?: string;
         changelogSyncStatus?: string;
         changelogUpserted?: string;
         changelogSource?: string;
         changelogSyncedAt?: string;
-    };
-}) {
+    }>;
+}
+
+export default async function AdminPage({
+    searchParams,
+}: AdminPageProps) {
     const adminId = await getAuthenticatedAdmin();
+
     if (!adminId) {
         // Simple unauthorized view or redirect
         return (
@@ -44,6 +48,7 @@ export default async function AdminPage({
         );
     }
 
+    const params = await searchParams;
     const {
         editNotifId,
         editChangelogId,
@@ -51,7 +56,7 @@ export default async function AdminPage({
         changelogUpserted,
         changelogSource,
         changelogSyncedAt
-    } = searchParams;
+    } = params;
 
     // Parallel Data Fetching
     const [
