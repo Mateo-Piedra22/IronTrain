@@ -2,7 +2,7 @@ import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { workoutService } from '@/src/services/WorkoutService';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx } from '@/src/theme';
 import { Workout } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { FlashList } from '@shopify/flash-list';
@@ -151,7 +151,7 @@ const ss = StyleSheet.create({
     deleteBtn: { width: 40, height: 40, backgroundColor: Colors.iron[200], borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
     emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80 },
     emptyText: { color: Colors.iron[400], textAlign: 'center', marginBottom: 16, fontWeight: '600' },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 },
+    modalOverlay: { flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center', padding: 16 },
     modalSheet: { backgroundColor: Colors.surface, width: '100%', maxWidth: 380, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.iron[700], elevation: 2 },
     modalTitle: { fontSize: 18, fontWeight: '900', color: Colors.iron[950], marginBottom: 20 },
     modalActions: { flexDirection: 'row', gap: 12, marginTop: 16 },

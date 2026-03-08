@@ -1,3 +1,4 @@
+import { Colors } from '@/src/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as LucideIcons from 'lucide-react-native';
 import React from 'react';
@@ -25,7 +26,7 @@ export function BadgePill({ name, color, icon, size = 'sm', variant = 'default' 
         ? [color, color + 'cc']
         : [color + baseOpacity, color + baseOpacity];
 
-    const textColor = variant === 'vibrant' ? '#fff' : color;
+    const textColor = variant === 'vibrant' ? Colors.white : color;
     const iconSize = isXs ? 8 : isSm ? 10 : isMd ? 12 : 14;
 
     return (
@@ -121,7 +122,7 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
     },
     shadow: {
-        shadowColor: 'black',
+        shadowColor: Colors.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 4,

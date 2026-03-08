@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     toastShadow: {
-        shadowColor: '#000',
+        shadowColor: Colors.black,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.15,
         shadowRadius: 12,

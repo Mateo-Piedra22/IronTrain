@@ -12,6 +12,7 @@ export const categories = pgTable('categories', {
     isSystem: integer('is_system').default(0),
     sortOrder: integer('sort_order').default(0),
     color: text('color'),
+    originId: text('origin_id'), // Official Marketplace Category ID
     ...commonFields,
 });
 
@@ -22,6 +23,7 @@ export const badges = pgTable('badges', {
     icon: text('icon'),
     groupName: text('group_name'),
     isSystem: integer('is_system').default(0),
+    originId: text('origin_id'), // Official Marketplace Badge ID
     ...commonFields,
 });
 
@@ -29,6 +31,7 @@ export const exerciseBadges = pgTable('exercise_badges', {
     id: text('id').primaryKey(),
     exerciseId: text('exercise_id').notNull(),
     badgeId: text('badge_id').notNull(),
+    isSystem: integer('is_system').default(0),
     ...commonFields,
 });
 

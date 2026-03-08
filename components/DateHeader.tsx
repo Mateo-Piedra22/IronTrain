@@ -1,4 +1,4 @@
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { addDays, format, subDays } from 'date-fns';
 import { useState } from 'react';
@@ -80,7 +80,7 @@ const ss = StyleSheet.create({
     arrowBtn: { padding: 8 },
     dateText: { color: Colors.iron[950], fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },
     yearText: { color: Colors.iron[400], fontSize: 11, fontWeight: '600', marginTop: 2 },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', paddingHorizontal: 16 },
+    modalOverlay: { flex: 1, backgroundColor: ThemeFx.backdropStrong, justifyContent: 'center', paddingHorizontal: 16 },
     modalSheet: { backgroundColor: Colors.surface, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: Colors.iron[700] },
     closeBtn: { backgroundColor: Colors.surface, padding: 14, paddingTop: 10, alignItems: 'center', borderTopWidth: 1, borderTopColor: Colors.iron[200] },
     closeBtnText: { color: Colors.primary.DEFAULT, fontWeight: '800', fontSize: 14 },

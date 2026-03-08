@@ -1,7 +1,7 @@
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
 import { routineService } from '@/src/services/RoutineService';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import { BookOpen } from 'lucide-react-native';
 import React, { useState } from 'react';
@@ -129,7 +129,7 @@ export function CreateRoutineModal({ visible, onClose, onCreated, editRoutine }:
 const st = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: ThemeFx.backdrop,
         justifyContent: 'center',
         alignItems: 'center',
         padding: 16,
@@ -147,7 +147,7 @@ const st = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.iron[700],
         elevation: 8,
-        shadowColor: '#000',
+        shadowColor: Colors.black,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.2,
         shadowRadius: 24,

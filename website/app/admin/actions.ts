@@ -416,3 +416,101 @@ export async function handleGlobalEventAction(formData: FormData) {
 
     revalidatePath('/admin');
 }
+
+export async function handleMarketplaceEntityAction(formData: FormData) {
+    const adminId = await getAuthenticatedAdmin();
+    if (!adminId) throw new Error('Unauthorized');
+
+    const table = formData.get('table') as 'exercises' | 'categories' | 'badges';
+    const action = formData.get('action') as string;
+    const id = formData.get('id') as string || crypto.randomUUID();
+
+    if (action === 'delete') {
+        if (table === 'exercises') await db.delete(schema.exercises).where(eq(schema.exercises.id, id));
+        if (table === 'categories') await db.delete(schema.categories).where(eq(schema.categories.id, id));
+        if (table === 'badges') await db.delete(schema.badges).where(eq(schema.badges.id, id));
+        revalidatePath('/admin');
+        redirect(getRedirectPath(formData, 'marketplace'));
+    }
+
+    if (action === 'save') {
+        if (table === 'categories') {
+            const name = formData.get('name') as string;
+            const color = formData.get('color') as string;
+            const sortOrder = Number(formData.get('sortOrder') || 0);
+
+            await db.insert(schema.categories).values({
+                id,
+                name,
+                color,
+                sortOrder,
+                isSystem: 1,
+                userId: adminId,
+                updatedAt: new Date()
+            }).onConflictDoUpdate({
+                target: schema.categories.id,
+                set: { name, color, sortOrder, isSystem: 1, updatedAt: new Date() }
+            });
+        } else if (table === 'badges') {
+            const name = formData.get('name') as string;
+            const color = formData.get('color') as string;
+            const icon = formData.get('icon') as string;
+            const groupName = formData.get('groupName') as string;
+
+            await db.insert(schema.badges).values({
+                id,
+                name,
+                color,
+                icon,
+                groupName,
+                isSystem: 1,
+                userId: adminId,
+                updatedAt: new Date()
+            }).onConflictDoUpdate({
+                target: schema.badges.id,
+                set: { name, color, icon, groupName, isSystem: 1, updatedAt: new Date() }
+            });
+        } else if (table === 'exercises') {
+            const name = formData.get('name') as string;
+            const type = formData.get('type') as string;
+            const categoryId = formData.get('categoryId') as string;
+            const notes = formData.get('notes') as string;
+            const defaultIncrement = Number(formData.get('defaultIncrement') || 2.5);
+            const badgeIds = formData.getAll('badgeIds') as string[];
+
+            await db.transaction(async (tx) => {
+                await tx.insert(schema.exercises).values({
+                    id,
+                    name,
+                    type,
+                    categoryId,
+                    notes,
+                    defaultIncrement,
+                    isSystem: 1,
+                    userId: adminId,
+                    updatedAt: new Date()
+                }).onConflictDoUpdate({
+                    target: schema.exercises.id,
+                    set: { name, type, categoryId, notes, defaultIncrement, isSystem: 1, updatedAt: new Date() }
+                });
+
+                // Update Badges
+                await tx.delete(schema.exerciseBadges).where(eq(schema.exerciseBadges.exerciseId, id));
+                for (const bId of badgeIds) {
+                    await tx.insert(schema.exerciseBadges).values({
+                        id: `eb_${crypto.randomUUID()}`,
+                        exerciseId: id,
+                        badgeId: bId,
+                        isSystem: 1,
+                        userId: adminId,
+                        updatedAt: new Date()
+                    });
+                }
+            });
+        }
+    }
+
+    revalidatePath('/admin');
+    revalidatePath('/feed');
+    redirect(getRedirectPath(formData, 'marketplace'));
+}

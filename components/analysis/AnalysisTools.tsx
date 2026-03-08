@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
         borderColor: Colors.iron[700],
         overflow: 'hidden',
         elevation: 2,
-        shadowColor: '#000',
+        shadowColor: Colors.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,

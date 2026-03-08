@@ -187,8 +187,8 @@ export default function RootLayout() {
             }}
             style={{ backgroundColor: Colors.primary.DEFAULT, width: '100%', paddingVertical: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
-            <Download size={20} color="white" />
-            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>Descargar Actualización</Text>
+            <Download size={20} color={Colors.white} />
+            <Text style={{ color: Colors.white, fontWeight: '900', fontSize: 16 }}>Descargar Actualización</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaProvider>

@@ -10,6 +10,7 @@ import AdminTabs from './components/AdminTabs';
 import CommunityModerationPanel from './components/CommunityModerationPanel';
 import ContentManagementPanel from './components/ContentManagementPanel';
 import IronSocialPanel from './components/IronSocialPanel';
+import MarketplaceManagementPanel from './components/MarketplaceManagementPanel';
 import SystemStatusPanel from './components/SystemStatusPanel';
 
 export const revalidate = 0;
@@ -25,6 +26,8 @@ interface AdminPageProps {
         changelogUpserted?: string;
         changelogSource?: string;
         changelogSyncedAt?: string;
+        editId?: string;
+        editType?: 'exercises' | 'categories' | 'badges';
     }>;
 }
 
@@ -57,7 +60,9 @@ export default async function AdminPage({
         changelogSyncStatus,
         changelogUpserted,
         changelogSource,
-        changelogSyncedAt
+        changelogSyncedAt,
+        editId,
+        editType
     } = params;
 
     // Parallel Data Fetching
@@ -75,7 +80,10 @@ export default async function AdminPage({
         leaderboardData,
         scoreBreakdownRows,
         recentScoreEvents,
-        syncHealth
+        syncHealth,
+        officialExercisesRaw,
+        officialCategoriesRaw,
+        officialBadgesRaw
     ] = await Promise.all([
         db.select({
             id: schema.routines.id,
@@ -148,6 +156,12 @@ export default async function AdminPage({
             createdAt: schema.scoreEvents.createdAt,
         }).from(schema.scoreEvents).orderBy(desc(schema.scoreEvents.createdAt)).limit(300),
         getSyncHealthReport(),
+        db.query.exercises.findMany({
+            where: eq(schema.exercises.isSystem, 1),
+            with: { badges: true }
+        }),
+        db.select().from(schema.categories).where(eq(schema.categories.isSystem, 1)),
+        db.select().from(schema.badges).where(eq(schema.badges.isSystem, 1)),
     ]);
 
     // Data Transformation
@@ -263,6 +277,21 @@ export default async function AdminPage({
         ])
     );
 
+    const sanitizedOfficialExercises = (officialExercisesRaw || []).map(e => ({
+        ...e,
+        updatedAt: e.updatedAt.toISOString(),
+    }));
+
+    const sanitizedOfficialCategories = (officialCategoriesRaw || []).map(c => ({
+        ...c,
+        updatedAt: c.updatedAt.toISOString(),
+    }));
+
+    const sanitizedOfficialBadges = (officialBadgesRaw || []).map(b => ({
+        ...b,
+        updatedAt: b.updatedAt.toISOString(),
+    }));
+
     return (
         <div className="min-h-screen bg-[#f5f1e8] text-[#1a1a2e] font-mono p-4 md:p-8 selection:bg-[#1a1a2e] selection:text-[#f5f1e8]">
             <header className="mb-12 border-b-2 border-[#1a1a2e] pb-8">
@@ -321,6 +350,15 @@ export default async function AdminPage({
                     <CommunityModerationPanel
                         routines={sanitizedRoutines}
                         feedback={sanitizedFeedback}
+                    />
+                }
+                marketplacePanel={
+                    <MarketplaceManagementPanel
+                        officialExercises={sanitizedOfficialExercises}
+                        officialCategories={sanitizedOfficialCategories}
+                        officialBadges={sanitizedOfficialBadges}
+                        editingId={editId}
+                        editingType={editType}
                     />
                 }
             />

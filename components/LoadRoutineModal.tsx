@@ -1,4 +1,4 @@
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import { BookOpen, ChevronDown, ChevronRight, Dumbbell, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
@@ -55,7 +55,7 @@ export function LoadRoutineModal({ visible, onClose, onLoadDay }: LoadRoutineMod
                             <Text style={st.headerSub}>Seleccioná un día para cargarlo</Text>
                         </View>
                         <TouchableOpacity onPress={onClose} style={st.closeBtn}>
-                            <X size={18} color="#fff" />
+                            <X size={18} color={Colors.white} />
                         </TouchableOpacity>
                     </View>
 
@@ -147,7 +147,7 @@ const st = StyleSheet.create({
     // Same overlay/sheet pattern as CopyWorkoutModal
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.7)',
+        backgroundColor: ThemeFx.backdropStrong,
         justifyContent: 'center',
         paddingHorizontal: 16,
         paddingVertical: 48,
@@ -202,7 +202,7 @@ const st = StyleSheet.create({
         borderColor: Colors.iron[300],
         overflow: 'hidden',
         elevation: 2,
-        shadowColor: '#000',
+        shadowColor: Colors.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 6,
@@ -261,7 +261,7 @@ const st = StyleSheet.create({
         shadowRadius: 4,
         elevation: 2,
     },
-    loadPillText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+    loadPillText: { color: Colors.white, fontSize: 13, fontWeight: '800' },
 
     // Empty state
     emptyBlock: {

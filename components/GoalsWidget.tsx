@@ -1,5 +1,5 @@
 import { GoalsService } from '@/src/services/GoalsService';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx } from '@/src/theme';
 import { Goal } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import * as Haptics from 'expo-haptics';
@@ -265,11 +265,11 @@ export function GoalsWidget() {
 
             {/* Add Goal Modal */}
             <Modal visible={modalVisible} transparent animationType="fade">
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+                <View style={{ flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
                     <View style={{
                         backgroundColor: Colors.surface, width: '100%', maxWidth: 360,
                         borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.iron[700],
-                        elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24,
+                        elevation: 8, shadowColor: Colors.black, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24,
                     }}>
                         <Text style={{ fontSize: 20, fontWeight: '900', color: Colors.iron[950], marginBottom: 20, letterSpacing: -0.3 }}>
                             Nueva meta
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
         borderColor: Colors.iron[700],
         padding: 20,
         elevation: 2,
-        shadowColor: '#000',
+        shadowColor: Colors.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,

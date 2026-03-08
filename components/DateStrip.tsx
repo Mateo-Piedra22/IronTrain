@@ -1,4 +1,4 @@
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx, withAlpha } from '@/src/theme';
 import { FlashList, ViewToken } from '@shopify/flash-list';
 import { addDays, differenceInDays, format, isSameDay, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     wrapper: {
         backgroundColor: Colors.iron[800],
         zIndex: 10,
-        shadowColor: '#000',
+        shadowColor: Colors.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.3,
         shadowRadius: 3,
@@ -328,11 +328,11 @@ const styles = StyleSheet.create({
     },
     stripItemCompleted: {
         backgroundColor: Colors.iron[900],
-        borderColor: 'rgba(34, 197, 94, 0.5)', // green-600/50
+        borderColor: withAlpha(Colors.green, '80'),
     },
     stripItemDefault: {
         backgroundColor: Colors.iron[900],
-        borderColor: 'rgba(156, 110, 100, 0.4)', // marroncito/bordó clarito
+        borderColor: withAlpha(Colors.primary.light, '66'),
     },
     textWhite: { color: Colors.white },
     textMuted: { color: Colors.iron[500] },
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 4,
         right: 4,
-        backgroundColor: 'rgba(34, 197, 94, 0.2)',
+        backgroundColor: ThemeFx.successBg,
         borderRadius: 999,
         padding: 2,
     },
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
     bgIron800Completed: {
         backgroundColor: Colors.iron[800],
         borderWidth: 1,
-        borderColor: 'rgba(34, 197, 94, 0.3)'
+        borderColor: ThemeFx.successBorder,
     },
     calendarDayText: {
         fontSize: 16,

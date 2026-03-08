@@ -2,7 +2,7 @@ import { SetRowInput } from '@/components/SetRowInput';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { configService } from '@/src/services/ConfigService';
 import { useWorkoutStore } from '@/src/store/workoutStore';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx } from '@/src/theme';
 import { WorkoutSet } from '@/src/types/db';
 import { FlashList } from '@shopify/flash-list';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -115,7 +115,7 @@ export default function ActiveWorkoutScreen() {
 
                         {!isTemplate && activeWorkout && (
                             <View style={[ss.statusChip, isFinished ? ss.statusFinished : ss.statusActive]}>
-                                <Text style={[ss.statusText, isFinished ? { color: '#15803d' } : { color: Colors.iron[950] }]}>
+                                <Text style={[ss.statusText, isFinished ? { color: Colors.green } : { color: Colors.iron[950] }]}>
                                     {isFinished ? 'Finalizado' : 'Activo'}
                                 </Text>
                                 <Switch value={!isFinished} onValueChange={(v) => requestToggleStatus(v)} />
@@ -187,7 +187,7 @@ const ss = StyleSheet.create({
     timerChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: Colors.iron[700] },
     timerText: { color: Colors.primary.DEFAULT, marginLeft: 6, fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
     statusChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, flexDirection: 'row', alignItems: 'center', borderWidth: 1 },
-    statusFinished: { backgroundColor: '#dcfce7', borderColor: '#22c55e' },
+    statusFinished: { backgroundColor: ThemeFx.successBg, borderColor: ThemeFx.successBorder },
     statusActive: { backgroundColor: Colors.surface, borderColor: Colors.iron[700] },
     statusText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 6 },
     exerciseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },

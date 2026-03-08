@@ -107,7 +107,7 @@ export default function CategoryDetailScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={isAdding ? 'Cerrar formulario' : 'Crear ejercicio'}
                 >
-                    <Plus size={20} color={isAdding ? '#fff' : Colors.primary.DEFAULT} />
+                    <Plus size={20} color={isAdding ? Colors.white : Colors.primary.DEFAULT} />
                 </Pressable>
             </View>
 
@@ -225,7 +225,7 @@ const ss = StyleSheet.create({
     filterChipActive: { backgroundColor: Colors.primary.DEFAULT + '15', borderColor: Colors.primary.DEFAULT },
     filterChipText: { fontWeight: '700', fontSize: 11, color: Colors.iron[500] },
     filterChipTextActive: { color: Colors.primary.DEFAULT },
-    createForm: { backgroundColor: Colors.surface, marginHorizontal: 16, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], marginBottom: 12, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12 },
+    createForm: { backgroundColor: Colors.surface, marginHorizontal: 16, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], marginBottom: 12, elevation: 3, shadowColor: Colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12 },
     createFormHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
     createFormAccent: { width: 3, height: 18, borderRadius: 2, backgroundColor: Colors.primary.DEFAULT },
     createFormTitle: { fontSize: 16, fontWeight: '900', color: Colors.iron[950] },
@@ -233,7 +233,7 @@ const ss = StyleSheet.create({
     typeChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: Colors.iron[300], backgroundColor: Colors.iron[200] },
     typeChipActive: { backgroundColor: Colors.primary.DEFAULT, borderColor: Colors.primary.DEFAULT },
     typeChipText: { fontWeight: '700', fontSize: 12, color: Colors.iron[500] },
-    typeChipTextActive: { color: '#fff' },
+    typeChipTextActive: { color: Colors.white },
     exerciseCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.surface, padding: 14, borderRadius: 14, marginBottom: 8, borderWidth: 1, borderColor: Colors.iron[700], elevation: 1 },
     exerciseCardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12, paddingRight: 8 },
     exerciseIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.iron[200], borderWidth: 1, borderColor: Colors.iron[300], justifyContent: 'center', alignItems: 'center' },

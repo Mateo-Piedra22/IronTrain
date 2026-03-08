@@ -115,7 +115,7 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
         <View style={{ flex: 1, backgroundColor: inModal ? Colors.iron[100] : Colors.iron[900] }}>
             {/* Search Header */}
             <View style={{ padding: 16 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, gap: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], elevation: 1, shadowColor: Colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, gap: 10 }}>
                     <Search size={20} color={Colors.iron[400]} />
                     <TextInput
                         style={{ flex: 1, fontSize: 16, color: Colors.iron[950], padding: 0, fontWeight: '500' }}
@@ -138,17 +138,20 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
                             <TouchableOpacity
                                 onPress={() => setSelectedCategory(item.id)}
                                 style={{
-                                    marginRight: 8, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100,
+                                    paddingHorizontal: 14,
+                                    paddingVertical: 10,
+                                    borderRadius: 999,
+                                    marginRight: 10,
                                     borderWidth: 1,
                                     backgroundColor: selectedCategory === item.id ? Colors.primary.DEFAULT : Colors.surface,
                                     borderColor: selectedCategory === item.id ? Colors.primary.DEFAULT : Colors.iron[300],
                                     elevation: selectedCategory === item.id ? 2 : 1,
-                                    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2,
+                                    shadowColor: Colors.black, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2,
                                 }}
                             >
                                 <Text style={{
                                     fontSize: 13, fontWeight: '800',
-                                    color: selectedCategory === item.id ? '#fff' : Colors.iron[500]
+                                    color: selectedCategory === item.id ? Colors.white : Colors.iron[500]
                                 }}>
                                     {item.name}
                                 </Text>
@@ -176,7 +179,7 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
                                 flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                                 padding: 16, marginBottom: 12, backgroundColor: Colors.surface,
                                 borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], elevation: 2,
-                                shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6,
+                                shadowColor: Colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6,
                             }}
                             accessibilityRole="button"
                             accessibilityLabel={`Abrir ejercicio ${item.name}`}
@@ -237,11 +240,11 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
                                     {!item.is_system && (
                                         <TouchableOpacity
                                             onPress={() => handleDelete(item)}
-                                            style={{ padding: 8, backgroundColor: '#ef444412', borderRadius: 10, borderWidth: 1, borderColor: '#ef444425' }}
+                                            style={{ padding: 8, backgroundColor: Colors.red + '12', borderRadius: 10, borderWidth: 1, borderColor: Colors.red + '25' }}
                                             accessibilityRole="button"
                                             accessibilityLabel={`Eliminar ejercicio ${item.name}`}
                                         >
-                                            <Trash2 size={14} color="#ef4444" />
+                                            <Trash2 size={14} color={Colors.red} />
                                         </TouchableOpacity>
                                     )}
                                 </View>
@@ -264,7 +267,7 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
                     accessibilityRole="button"
                     accessibilityLabel="Crear ejercicio"
                 >
-                    <Plus color="white" size={24} />
+                    <Plus color={Colors.white} size={24} />
                 </TouchableOpacity>
             )}
 

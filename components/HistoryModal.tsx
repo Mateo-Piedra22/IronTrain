@@ -1,7 +1,7 @@
 import { EmptyChartPlaceholder } from '@/components/EmptyChartPlaceholder';
 import { configService } from '@/src/services/ConfigService';
 import { UnitService } from '@/src/services/UnitService';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx } from '@/src/theme';
 import { formatTimeSeconds } from '@/src/utils/time';
 import { format } from 'date-fns';
 import { X } from 'lucide-react-native';
@@ -61,7 +61,7 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
                             <Text style={ss.headerSub}>Historial de progreso</Text>
                         </View>
                         <TouchableOpacity onPress={onClose} style={ss.closeBtn} accessibilityRole="button" accessibilityLabel="Cerrar historial">
-                            <X size={18} color="#fff" />
+                            <X size={18} color={Colors.white} />
                         </TouchableOpacity>
                     </View>
 
@@ -169,7 +169,7 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
 }
 
 const ss = StyleSheet.create({
-    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 48 },
+    overlay: { flex: 1, backgroundColor: ThemeFx.backdropStrong, justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 48 },
     sheet: { backgroundColor: Colors.iron[900], borderWidth: 1, borderColor: Colors.iron[700], borderRadius: 20, flex: 1, maxHeight: '90%', width: '100%', overflow: 'hidden' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.iron[200], backgroundColor: Colors.surface },
     headerTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
@@ -182,7 +182,7 @@ const ss = StyleSheet.create({
     setRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 6 },
     setRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.iron[200] },
     setIndex: { color: Colors.iron[400], fontSize: 11, fontWeight: '700', width: 24 },
-    prBadge: { fontSize: 9, color: '#f59e0b', fontWeight: '900', marginLeft: 4 },
+    prBadge: { fontSize: 9, color: Colors.yellow, fontWeight: '900', marginLeft: 4 },
     setValue: { color: Colors.iron[950], fontWeight: '800', fontSize: 13, flex: 1, textAlign: 'center' },
     setMeta: { color: Colors.iron[400], fontSize: 11, width: 88, textAlign: 'right', fontWeight: '600' },
     emptyText: { color: Colors.iron[400], textAlign: 'center', paddingVertical: 32, fontSize: 14 },

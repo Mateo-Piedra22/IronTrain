@@ -78,7 +78,8 @@ export class DatabaseService {
         sort_order INTEGER DEFAULT 0,
         color TEXT,
         updated_at INTEGER DEFAULT 0,
-        deleted_at INTEGER
+        deleted_at INTEGER,
+        origin_id TEXT
       );
 
       CREATE TABLE IF NOT EXISTS exercises (
@@ -214,13 +215,16 @@ export class DatabaseService {
         group_name TEXT,
         is_system INTEGER DEFAULT 0,
         updated_at INTEGER DEFAULT 0,
-        deleted_at INTEGER
+        deleted_at INTEGER,
+        origin_id TEXT
       );
 
       CREATE TABLE IF NOT EXISTS exercise_badges (
         id TEXT PRIMARY KEY NOT NULL,
         exercise_id TEXT NOT NULL,
         badge_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        is_system INTEGER DEFAULT 0,
         updated_at INTEGER DEFAULT 0,
         deleted_at INTEGER,
         FOREIGN KEY (exercise_id) REFERENCES exercises (id) ON DELETE CASCADE,
@@ -493,13 +497,61 @@ export class DatabaseService {
                 await this.executeRaw('ALTER TABLE exercises ADD COLUMN origin_id TEXT');
             }
 
+            const resultCat = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('categories') WHERE name='origin_id'");
+            if (resultCat && resultCat.count === 0) {
+                logger.info('Running Migration: Adding origin_id to categories');
+                await this.executeRaw('ALTER TABLE categories ADD COLUMN origin_id TEXT');
+            }
+
+            const resultCatSys = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('categories') WHERE name='is_system'");
+            if (resultCatSys && resultCatSys.count === 0) {
+                logger.info('Running Migration: Adding is_system to categories');
+                await this.executeRaw('ALTER TABLE categories ADD COLUMN is_system INTEGER DEFAULT 0');
+            }
+
+            const resultExSys = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('exercises') WHERE name='is_system'");
+            if (resultExSys && resultExSys.count === 0) {
+                logger.info('Running Migration: Adding is_system to exercises');
+                await this.executeRaw('ALTER TABLE exercises ADD COLUMN is_system INTEGER DEFAULT 0');
+            }
+
+            const resultExOr = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('exercises') WHERE name='origin_id'");
+            if (resultExOr && resultExOr.count === 0) {
+                logger.info('Running Migration: Adding origin_id to exercises');
+                await this.executeRaw('ALTER TABLE exercises ADD COLUMN origin_id TEXT');
+            }
+
+            const resultEB = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('exercise_badges') WHERE name='user_id'");
+            if (resultEB && resultEB.count === 0) {
+                logger.info('Running Migration: Adding user_id to exercise_badges');
+                await this.executeRaw('ALTER TABLE exercise_badges ADD COLUMN user_id TEXT');
+            }
+
+            const resultEB_IS = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('exercise_badges') WHERE name='is_system'");
+            if (resultEB_IS && resultEB_IS.count === 0) {
+                logger.info('Running Migration: Adding is_system to exercise_badges');
+                await this.executeRaw('ALTER TABLE exercise_badges ADD COLUMN is_system INTEGER DEFAULT 0');
+            }
+
+            const resultBadgeOr = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('badges') WHERE name='origin_id'");
+            if (resultBadgeOr && resultBadgeOr.count === 0) {
+                logger.info('Running Migration: Adding origin_id to badges');
+                await this.executeRaw('ALTER TABLE badges ADD COLUMN origin_id TEXT');
+            }
+
+            const resultBadgeSys = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('badges') WHERE name='is_system'");
+            if (resultBadgeSys && resultBadgeSys.count === 0) {
+                logger.info('Running Migration: Adding is_system to badges');
+                await this.executeRaw('ALTER TABLE badges ADD COLUMN is_system INTEGER DEFAULT 0');
+            }
+
             const resultRoutine = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('routines') WHERE name='is_public'");
             if (resultRoutine && resultRoutine.count === 0) {
                 logger.info('Running Migration: Adding is_public to routines');
                 await this.executeRaw('ALTER TABLE routines ADD COLUMN is_public INTEGER DEFAULT 0');
             }
         } catch (e) {
-            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration check failed (Migration 5)' });
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration check failed (Migration 5/origin_id overhaul)' });
         }
 
         // Migration 6: Fix plate_inventory PK to include unit (weight,type,unit)
@@ -877,6 +929,41 @@ export class DatabaseService {
         } catch (e) {
             logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 19 failed' });
         }
+
+        // Migration 20: Add Marketplace Infrastructure Columns (Existing User Support)
+        try {
+            logger.info('[Migration] Running Migration 20: Adding Marketplace columns to categories/exercises/badges');
+            const catInfo = await this.getAll<{ name: string }>("PRAGMA table_info('categories')");
+            const catCols = catInfo.map(c => c.name);
+            if (!catCols.includes('origin_id')) {
+                await this.executeRaw('ALTER TABLE categories ADD COLUMN origin_id TEXT');
+                await this.executeRaw('ALTER TABLE categories ADD COLUMN is_system INTEGER DEFAULT 0');
+            }
+
+            const exInfo = await this.getAll<{ name: string }>("PRAGMA table_info('exercises')");
+            const exCols = exInfo.map(c => c.name);
+            if (!exCols.includes('origin_id')) {
+                await this.executeRaw('ALTER TABLE exercises ADD COLUMN origin_id TEXT');
+                await this.executeRaw('ALTER TABLE exercises ADD COLUMN is_system INTEGER DEFAULT 0');
+            }
+
+            const badgeInfo = await this.getAll<{ name: string }>("PRAGMA table_info('badges')");
+            const badgeCols = badgeInfo.map(c => c.name);
+            if (!badgeCols.includes('origin_id')) {
+                await this.executeRaw('ALTER TABLE badges ADD COLUMN origin_id TEXT');
+                await this.executeRaw('ALTER TABLE badges ADD COLUMN is_system INTEGER DEFAULT 0');
+            }
+
+            const ebInfo = await this.getAll<{ name: string }>("PRAGMA table_info('exercise_badges')");
+            const ebCols = ebInfo.map(c => c.name);
+            if (!ebCols.includes('user_id')) {
+                await this.executeRaw('ALTER TABLE exercise_badges ADD COLUMN user_id TEXT');
+                await this.executeRaw('ALTER TABLE exercise_badges ADD COLUMN is_system INTEGER DEFAULT 0');
+                // Backfill user_id from an existing session if possible or leave for first sync
+            }
+        } catch (e) {
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 20 failed' });
+        }
     }
 
     /**
@@ -912,26 +999,34 @@ export class DatabaseService {
                     );
                 }
 
-                // 2. Generic Category Deduplication (by Name)
+                // 2. Generic Category Deduplication (Marketplace Aware)
+                // Priority: origin_id > is_system > id
                 const duplicateCats = await this.getAll<{ name: string }>(
                     "SELECT name FROM categories WHERE name != ? GROUP BY name HAVING COUNT(*) > 1",
                     [UNCATEGORIZED_NAME]
                 );
                 for (const cat of duplicateCats) {
-                    const instances = await this.getAll<{ id: string }>("SELECT id FROM categories WHERE name = ? ORDER BY is_system DESC, id ASC", [cat.name]);
-                    const masterId = instances[0].id;
+                    const instances = await this.getAll<{ id: string, origin_id: string, is_system: number }>(
+                        "SELECT id, origin_id, is_system FROM categories WHERE name = ? ORDER BY origin_id DESC, is_system DESC, id ASC",
+                        [cat.name]
+                    );
+                    const master = instances[0];
                     const duplicates = instances.slice(1);
                     for (const dupe of duplicates) {
-                        await this.run('UPDATE exercises SET category_id = ? WHERE category_id = ?', [masterId, dupe.id]);
+                        // Level 3: Auto-Link if dupe has NO origin_id but master DOES
+                        await this.run('UPDATE exercises SET category_id = ? WHERE category_id = ?', [master.id, dupe.id]);
                         await this.run('DELETE FROM categories WHERE id = ?', [dupe.id]);
                         await queueDelete('categories', dupe.id);
                     }
                 }
 
-                // 3. Generic Badge Deduplication (by Name)
+                // 3. Generic Badge Deduplication (Marketplace Aware)
                 const duplicateBadges = await this.getAll<{ name: string }>("SELECT name FROM badges GROUP BY name HAVING COUNT(*) > 1");
                 for (const b of duplicateBadges) {
-                    const instances = await this.getAll<{ id: string }>("SELECT id FROM badges WHERE name = ? ORDER BY id ASC", [b.name]);
+                    const instances = await this.getAll<{ id: string, origin_id: string }>(
+                        "SELECT id, origin_id FROM badges WHERE name = ? ORDER BY origin_id DESC, id ASC",
+                        [b.name]
+                    );
                     const masterId = instances[0].id;
                     const duplicates = instances.slice(1);
                     for (const dupe of duplicates) {
@@ -941,12 +1036,13 @@ export class DatabaseService {
                     }
                 }
 
-                // 4. Badge-Aware Exercise Deduplication (Name + Category + Badges)
-                const allExs = await this.getAll<{ id: string, name: string, category_id: string }>(
-                    "SELECT id, name, category_id FROM exercises"
+                // 4. Badge-Aware Exercise Deduplication (Marketplace Aware)
+                // Signature includes category_id, name (lowercased), and sorted badges
+                const allExs = await this.getAll<{ id: string, name: string, category_id: string, origin_id: string }>(
+                    "SELECT id, name, category_id, origin_id FROM exercises"
                 );
 
-                const exerciseMap = new Map<string, string[]>();
+                const exerciseMap = new Map<string, Array<{ id: string, origin_id: string }>>();
 
                 for (const ex of allExs) {
                     const badgeRows = await this.getAll<{ badge_id: string }>(
@@ -954,25 +1050,39 @@ export class DatabaseService {
                         [ex.id]
                     );
                     const badgeSig = badgeRows.map(b => b.badge_id).join('|');
-                    const signature = `${ex.category_id}#${ex.name.toLowerCase()}#${badgeSig}`;
+                    const signature = `${ex.category_id}#${ex.name.toLowerCase().trim()}#${badgeSig}`;
 
                     if (!exerciseMap.has(signature)) {
                         exerciseMap.set(signature, []);
                     }
-                    exerciseMap.get(signature)!.push(ex.id);
+                    exerciseMap.get(signature)!.push({ id: ex.id, origin_id: ex.origin_id || '' });
                 }
 
-                for (const [signature, ids] of exerciseMap.entries()) {
-                    if (ids.length > 1) {
-                        const masterId = ids[0];
-                        const duplicates = ids.slice(1);
-                        for (const dupeId of duplicates) {
-                            await this.run('UPDATE workout_sets SET exercise_id = ? WHERE exercise_id = ?', [masterId, dupeId]);
-                            await this.run('UPDATE routine_exercises SET exercise_id = ? WHERE exercise_id = ?', [masterId, dupeId]);
-                            await this.run('UPDATE exercise_badges SET exercise_id = ? WHERE exercise_id = ?', [masterId, dupeId]);
-                            await this.run('UPDATE user_exercise_prs SET exercise_id = ? WHERE exercise_id = ?', [masterId, dupeId]);
-                            await this.run('DELETE FROM exercises WHERE id = ?', [dupeId]);
-                            await queueDelete('exercises', dupeId);
+                for (const [signature, records] of exerciseMap.entries()) {
+                    if (records.length > 1) {
+                        // Priority: record with origin_id
+                        const sorted = [...records].sort((a, b) => b.origin_id.localeCompare(a.origin_id) || a.id.localeCompare(b.id));
+                        const master = sorted[0];
+                        const duplicates = sorted.slice(1);
+
+                        for (const dupe of duplicates) {
+                            await this.run('UPDATE workout_sets SET exercise_id = ? WHERE exercise_id = ?', [master.id, dupe.id]);
+                            await this.run('UPDATE routine_exercises SET exercise_id = ? WHERE exercise_id = ?', [master.id, dupe.id]);
+                            await this.run('UPDATE user_exercise_prs SET exercise_id = ? WHERE exercise_id = ?', [master.id, dupe.id]);
+
+                            // Deduplicate badges before moving to avoid PK/Unique issues on the master
+                            const masterBadges = await this.getAll<{ badge_id: string }>('SELECT badge_id FROM exercise_badges WHERE exercise_id = ?', [master.id]);
+                            const masterBadgeIds = masterBadges.map(b => b.badge_id);
+
+                            if (masterBadgeIds.length > 0) {
+                                // Delete badges from the duplicate that already exist on the master
+                                const placeHolders = masterBadgeIds.map(() => '?').join(',');
+                                await this.run(`DELETE FROM exercise_badges WHERE exercise_id = ? AND badge_id IN (${placeHolders})`, [dupe.id, ...masterBadgeIds]);
+                            }
+
+                            await this.run('UPDATE exercise_badges SET exercise_id = ? WHERE exercise_id = ?', [master.id, dupe.id]);
+                            await this.run('DELETE FROM exercises WHERE id = ?', [dupe.id]);
+                            await queueDelete('exercises', dupe.id);
                         }
                     }
                 }

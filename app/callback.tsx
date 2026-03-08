@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
         borderColor: Colors.iron[300],
         alignItems: 'center',
         width: '100%',
-        shadowColor: '#000',
+        shadowColor: Colors.black,
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.1,
         shadowRadius: 20,

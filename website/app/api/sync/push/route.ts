@@ -130,14 +130,25 @@ export async function POST(req: NextRequest) {
                             }
                         }
                         // Changelogs don't have a userId, they are system-wide
-                    } else if (columnsMap.userId && tableName !== 'friendships') {
-                        // For everything except friendships/shared tables, enforce own userId
+                    } else if (tableName === 'kudos') {
+                        filteredData.giverId = userId;
+                    } else if (tableName === 'shares_inbox') {
+                        filteredData.senderId = userId;
+                    } else if (tableName === 'activity_feed') {
                         filteredData.userId = userId;
                     } else if (tableName === 'friendships') {
-                        // Enforce participant identity
+                        // Enforce participant identity: one side MUST be the current user
                         if (filteredData.userId !== userId && filteredData.friendId !== userId) {
-                            throw new Error('Forbidden friendship party');
+                            throw new Error('Forbidden friendship party: Current user must be a participant');
                         }
+                    } else if (columnsMap.userId) {
+                        // General Rule: Enforce user context for all user-owned rows
+                        filteredData.userId = userId;
+                    }
+
+                    // Zero Trust: Users cannot push system status
+                    if (columnsMap.isSystem) {
+                        filteredData.isSystem = 0;
                     }
 
                     const pkPropName = tableName === 'settings' ? 'key' : 'id';
@@ -175,14 +186,26 @@ export async function POST(req: NextRequest) {
 
                         if (existingRecord) {
                             // Check ownership if available
-                            const ownerId = existingRecord.userId || existingRecord.id;
+                            // Check ownership if available across different possible owner columns
+                            const ownerId = existingRecord.userId ||
+                                existingRecord.giverId ||
+                                existingRecord.senderId ||
+                                (tableName === 'user_profiles' ? existingRecord.id : undefined);
                             const isSystemRecord = existingRecord.isSystem === 1 || existingRecord.is_system === 1;
 
                             if (ownerId && ownerId !== userId && !['friendships', 'activity_feed', 'kudos', 'changelog_reactions', 'notification_reactions'].includes(tableName)) {
-                                // Industrial Rule: Allow "Public/System" records with deterministic IDs to be shared/merged
-                                if (!isSystemRecord) {
-                                    throw new Error('Ownership mismatch');
+                                if (isSystemRecord) {
+                                    // Zero Trust: Ignore sync attempts to modify official system records
+                                    return;
                                 }
+                                throw new Error('Ownership mismatch');
+                            }
+
+                            if (isSystemRecord && tableName !== 'user_profiles') {
+                                // Double protection: even if the user IS the owner (e.g. an admin syncing), 
+                                // we block system record modification through standard client sync 
+                                // to force use of the Admin Panel or specific tools.
+                                return;
                             }
 
                             // Stale check

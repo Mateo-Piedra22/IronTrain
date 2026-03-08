@@ -8,8 +8,8 @@ import React, { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const FEEDBACK_TYPES = [
-    { id: 'bug', label: 'Reportar Bug', icon: ShieldAlert, color: '#ef4444' },
-    { id: 'feature_request', label: 'Sugerir Mejora', icon: Lightbulb, color: '#f59e0b' },
+    { id: 'bug', label: 'Reportar Bug', icon: ShieldAlert, color: Colors.red },
+    { id: 'feature_request', label: 'Sugerir Mejora', icon: Lightbulb, color: Colors.yellow },
     { id: 'review', label: 'Opinión General', icon: MessageSquareQuote, color: Colors.primary.DEFAULT },
 ] as const;
 
@@ -361,7 +361,7 @@ const s = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 40,
-        backgroundColor: Colors.green[500],
+        backgroundColor: Colors.green,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 24,

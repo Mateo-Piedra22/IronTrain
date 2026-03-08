@@ -33,7 +33,7 @@ export const GlobalBanner = () => {
             className="absolute left-4 right-4 z-[100] bg-iron-900 rounded-2xl flex-row items-center p-4 border-[1.5px] border-iron-950 shadow-xl"
             style={{
                 top: Math.max(insets.top, 10) + 10,
-                shadowColor: '#000',
+                shadowColor: Colors.black,
                 shadowOffset: { width: 0, height: 6 },
                 shadowOpacity: 0.4,
                 shadowRadius: 8,

@@ -1,5 +1,5 @@
 import { workoutService } from '@/src/services/WorkoutService';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx } from '@/src/theme';
 import { ExerciseType, Workout, WorkoutSet } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { format, isSameDay } from 'date-fns';
@@ -43,7 +43,7 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
                 setSourceSets([]);
             }
         } catch (e) {
-            console.log('No se encontró entrenamiento para esa fecha', e);
+            notify.warning('Sin entrenamiento', 'No se encontró un entrenamiento para esa fecha.');
             setSourceWorkout(null);
             setSourceSets([]);
         } finally {
@@ -241,7 +241,7 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
                             <Text style={styles.headerSub}>Buscar desde historial</Text>
                         </View>
                         <TouchableOpacity onPress={onClose} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Cerrar ventana">
-                            <X size={18} color="#fff" />
+                            <X size={18} color={Colors.white} />
                         </TouchableOpacity>
                     </View>
 
@@ -297,8 +297,8 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
                                         style={{ backgroundColor: Colors.primary.DEFAULT, paddingVertical: 14, borderRadius: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 8, shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
                                         disabled={sourceSets.length === 0}
                                     >
-                                        <Copy color="white" size={18} />
-                                        <Text style={{ color: '#fff', fontWeight: '900', marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 14 }}>Copiar rutina</Text>
+                                        <Copy color={Colors.white} size={18} />
+                                        <Text style={{ color: Colors.white, fontWeight: '900', marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 14 }}>Copiar rutina</Text>
                                     </TouchableOpacity>
                                 </View>
                             ) : selectedDateStr ? (
@@ -318,7 +318,7 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
 }
 
 const styles = StyleSheet.create({
-    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 48 },
+    overlay: { flex: 1, backgroundColor: ThemeFx.backdropStrong, justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 48 },
     sheet: { backgroundColor: Colors.iron[900], borderWidth: 1, borderColor: Colors.iron[700], borderRadius: 20, flex: 1, maxHeight: '95%', width: '100%', overflow: 'hidden' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.iron[200], backgroundColor: Colors.surface },
     headerTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     bgIron800Completed: {
         backgroundColor: Colors.white,
         borderWidth: 2,
-        borderColor: 'rgba(34, 197, 94, 0.4)'
+        borderColor: ThemeFx.successBorder
     },
     calendarDayText: {
         fontSize: 16,

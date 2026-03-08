@@ -1,6 +1,6 @@
 import { CalculatorService } from '@/src/services/CalculatorService';
 import { configService } from '@/src/services/ConfigService';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx } from '@/src/theme';
 import { WorkoutSet } from '@/src/types/db';
 import React, { useState } from 'react';
 import { Modal, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -33,11 +33,11 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
 
     return (
         <Modal visible={visible} transparent animationType="fade">
-            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+            <View style={{ flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
                 <View style={{
                     backgroundColor: Colors.surface, width: '100%', maxWidth: 360,
                     borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.iron[700],
-                    elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24,
+                    elevation: 8, shadowColor: Colors.black, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24,
                 }}>
                     <Text style={{ fontSize: 20, fontWeight: '900', color: Colors.iron[950], marginBottom: 8, letterSpacing: -0.3 }}>
                         Calculadora de Calentamiento

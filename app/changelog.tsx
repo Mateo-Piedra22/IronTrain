@@ -287,13 +287,13 @@ export default function ChangelogScreen() {
 }
 
 const ss = StyleSheet.create({
-    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
+    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: Colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
     pageTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 28, letterSpacing: -1.2 },
     pageSub: { color: Colors.primary.DEFAULT, fontSize: 13, fontWeight: '700', marginTop: 0, letterSpacing: 0.2 },
     loadingWrapper: { padding: 40, alignItems: 'center', justifyContent: 'center', gap: 16 },
     loadingText: { color: Colors.iron[500], fontWeight: '600', fontSize: 14 },
-    releaseCard: { backgroundColor: Colors.surface, borderRadius: 24, borderWidth: 1, borderColor: Colors.iron[300], marginBottom: 20, overflow: 'hidden', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16 },
-    newsCard: { borderColor: Colors.primary.DEFAULT + '30', backgroundColor: '#fff' },
+    releaseCard: { backgroundColor: Colors.surface, borderRadius: 24, borderWidth: 1, borderColor: Colors.iron[300], marginBottom: 20, overflow: 'hidden', elevation: 3, shadowColor: Colors.black, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16 },
+    newsCard: { borderColor: Colors.primary.DEFAULT + '30', backgroundColor: Colors.white },
     newsHeader: { padding: 20, paddingBottom: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
     newsIconWrapper: { width: 40, height: 40, borderRadius: 14, backgroundColor: Colors.primary.DEFAULT + '15', alignItems: 'center', justifyContent: 'center' },
     newsLabel: { color: Colors.primary.DEFAULT, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 4 },
@@ -311,7 +311,7 @@ const ss = StyleSheet.create({
     itemBulletWrapper: { width: 18, alignItems: 'flex-start', paddingTop: 8 },
     itemBulletDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary.DEFAULT },
     itemText: { color: Colors.iron[500], flex: 1, fontSize: 14, lineHeight: 22 },
-    itemBold: { color: '#000000', fontWeight: '900' },
+    itemBold: { color: Colors.black, fontWeight: '900' },
     releaseSummary: { color: Colors.iron[400], fontSize: 13, marginTop: 6, fontWeight: '500', fontStyle: 'italic' },
     expandIconWrapper: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.iron[100] + '40', alignItems: 'center', justifyContent: 'center' },
     releaseFooter: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.iron[100], alignItems: 'flex-end' },

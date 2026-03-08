@@ -18,7 +18,7 @@ export default function TabLayout() {
             backgroundColor: Colors.iron[900],
             borderTopColor: Colors.iron[700],
             elevation: 8,
-            shadowColor: '#000',
+            shadowColor: Colors.black,
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.1,
             shadowRadius: 4,

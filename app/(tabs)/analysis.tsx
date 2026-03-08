@@ -196,7 +196,7 @@ export default function AnalysisScreen() {
                 flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
                 paddingHorizontal: 16, height: 60,
                 backgroundColor: Colors.iron[900],
-                zIndex: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 4
+                zIndex: 10, shadowColor: Colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 4
             }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
                     <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 20, letterSpacing: -0.5 }}>Análisis</Text>

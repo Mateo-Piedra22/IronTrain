@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
         borderColor: Colors.iron[700],
         padding: 16,
         borderRadius: 16,
-        shadowColor: '#000',
+        shadowColor: Colors.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
         shadowRadius: 8,

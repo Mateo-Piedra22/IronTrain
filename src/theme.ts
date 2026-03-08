@@ -1,3 +1,5 @@
+import { DarkTheme as NavDarkTheme, DefaultTheme as NavLightTheme, Theme as NavTheme } from '@react-navigation/native';
+
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type ThemeVariant = 'core' | 'custom';
 
@@ -158,8 +160,56 @@ export function withAlpha(hexColor: string, alphaHex: string): string {
 
 export const ThemeFx = {
     backdrop: 'rgba(0,0,0,0.5)',
+    backdropStrong: 'rgba(0,0,0,0.7)',
+    backdropSoft: 'rgba(0,0,0,0.35)',
     shadowColor: '#000000',
     shadowOpacityStrong: 0.2,
+    successBg: withAlpha('#22c55e', '1A'),
+    successBorder: withAlpha('#22c55e', '66'),
 } as const;
 
-export const Colors = createLegacyColorsFromTokens(LightThemeTokens);
+// --- DYNAMIC INFRASTRUCTURE (PHASE B) ---
+
+let activeColors = LightThemeTokens.colors;
+
+/**
+ * Global Colors proxy. Redirects to activeColors.
+ * Note: Components should ideally use useColors() hook to ensure 
+ * they re-render on theme change, but this proxy allows some 
+ * level of consistency for legacy/static usage.
+ */
+export const Colors = new Proxy({} as ThemeColors, {
+    get(_, prop) {
+        return activeColors[prop as keyof ThemeColors];
+    }
+});
+
+/**
+ * Updates the global activeColors. Should only be called by ThemeProvider.
+ */
+export function _setGlobalActiveColors(newColors: ThemeColors) {
+    activeColors = newColors;
+}
+
+/**
+ * Resolves properties for React Navigation ThemeProvider
+ */
+export function resolveNavigationTheme(tokens: ThemeTokens): NavTheme {
+    const isDark = tokens.mode === 'dark';
+    const base = isDark ? NavDarkTheme : NavLightTheme;
+
+    return {
+        ...base,
+        dark: isDark,
+        colors: {
+            ...base.colors,
+            primary: tokens.colors.primary.DEFAULT,
+            background: tokens.colors.background,
+            card: tokens.colors.surface,
+            text: tokens.colors.text,
+            border: tokens.colors.border,
+            notification: tokens.colors.primary.DEFAULT,
+        },
+    };
+}
+

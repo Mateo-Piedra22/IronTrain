@@ -1,4 +1,4 @@
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx } from '@/src/theme';
 import { WorkoutSet } from '@/src/types/db';
 import { LucideCheck } from 'lucide-react-native';
 import React, { memo } from 'react';
@@ -23,7 +23,7 @@ export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disab
         <View style={[ss.row, isCompleted ? ss.rowCompleted : ss.rowDefault]}>
             {/* Index */}
             <View style={ss.indexCol}>
-                <Text style={[ss.indexText, isCompleted && { color: '#166534' }]}>{index + 1}</Text>
+                <Text style={[ss.indexText, isCompleted && { color: Colors.green }]}>{index + 1}</Text>
             </View>
 
             {/* Weight */}
@@ -108,14 +108,14 @@ export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disab
 const ss = StyleSheet.create({
     row: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, padding: 8, borderRadius: 14, borderWidth: 1 },
     rowDefault: { backgroundColor: Colors.surface, borderColor: Colors.iron[700], elevation: 1 },
-    rowCompleted: { backgroundColor: '#dcfce7', borderColor: '#bbf7d0' },
+    rowCompleted: { backgroundColor: ThemeFx.successBg, borderColor: ThemeFx.successBorder },
     indexCol: { width: 32, alignItems: 'center', justifyContent: 'center' },
     indexText: { fontWeight: '800', fontSize: 16, color: Colors.iron[400] },
     inputCol: { flex: 1, paddingHorizontal: 6 },
     input: { backgroundColor: Colors.iron[200], color: Colors.iron[950], padding: 10, borderRadius: 10, textAlign: 'center', fontWeight: '800', fontSize: 16 },
     unitLabel: { fontSize: 9, color: Colors.iron[400], fontWeight: '800', marginTop: 3, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 },
     checkBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
-    checkActive: { backgroundColor: '#22c55e', shadowColor: '#22c55e', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2 },
+    checkActive: { backgroundColor: Colors.green, shadowColor: Colors.green, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2 },
     checkInactive: { backgroundColor: Colors.iron[200], borderWidth: 1, borderColor: Colors.iron[300] },
     checkDisabled: { backgroundColor: Colors.iron[300] },
 });

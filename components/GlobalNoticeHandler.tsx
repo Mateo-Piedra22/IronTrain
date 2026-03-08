@@ -350,7 +350,7 @@ const ss = StyleSheet.create({
     },
     richBold: {
         fontWeight: '900',
-        color: '#000000', // Forzamos negro para máximo contraste en las novedades
+        color: Colors.black, // Forzamos negro para máximo contraste en las novedades
     },
     modalActionBtn: {
         alignSelf: 'flex-start',

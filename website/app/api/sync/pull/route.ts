@@ -1,4 +1,4 @@
-import { and, eq, gt } from 'drizzle-orm';
+import { and, eq, gt, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { SYNC_TABLES } from '../../../../src/constants/sync';
 import { db } from '../../../../src/db';
@@ -64,52 +64,85 @@ export async function GET(req: NextRequest) {
             friendships: schema.friendships,
         };
 
-        const result: Record<string, any[]> = {};
+        const MAX_PULL_RECORDS = 1000;
+        const changes: any[] = [];
+        let totalCount = 0;
 
         // Fetch data for each table in shared list
-        await Promise.all(SYNC_TABLES.map(async (tableName) => {
-            const tableSchema = tableMap[tableName];
-            if (!tableSchema) return;
+        for (const tableName of SYNC_TABLES) {
+            if (totalCount >= MAX_PULL_RECORDS) break;
 
-            // Base query filters by userId (if restricted) and updatedAt
-            let query = db.select().from(tableSchema);
+            const tableSchema = tableMap[tableName];
+            if (!tableSchema) continue;
 
             const conditions = [];
-
-            // Add since condition
             conditions.push(gt(tableSchema.updatedAt, sinceDate));
 
-            // Policy: Only pull rows belonging to the user for most tables
-            // EXCEPT for global/shared tables
-            const GLOBAL_TABLES = ['categories', 'badges', 'exercise_badges', 'exercises', 'changelogs', 'changelog_reactions', 'notification_reactions', 'kudos', 'activity_feed', 'score_events', 'user_exercise_prs', 'user_profiles', 'friendships'];
+            const SYSTEM_ASSET_TABLES = ['categories', 'badges', 'exercises', 'exercise_badges'];
+            const PURE_GLOBAL_TABLES = ['changelogs'];
+            const PRIVACY_SENSITIVE_GLOBAL = ['user_profiles', 'social_scoring_config', 'global_events'];
 
-            if (!GLOBAL_TABLES.includes(tableName)) {
-                if ('userId' in tableSchema) {
+            if (SYSTEM_ASSET_TABLES.includes(tableName)) {
+                if ('userId' in tableSchema && 'isSystem' in tableSchema) {
+                    conditions.push(sql`(${tableSchema.isSystem} = 1 OR ${tableSchema.userId} = ${userId})`);
+                } else if ('isSystem' in tableSchema) {
+                    conditions.push(eq(tableSchema.isSystem, 1));
+                } else if ('userId' in tableSchema) {
+                    conditions.push(eq(tableSchema.userId, userId));
+                }
+            } else if (tableName === 'user_profiles') {
+                // EXCEPTION: Users need other people's Display Names/Usernames for Social Feed & Ranking
+                // We pull our own profile OR any profile that is public AND has changed.
+                // Strict PII removal below ensures no sensitive data leaks.
+                conditions.push(sql`(${tableSchema.id} = ${userId} OR ${tableSchema.isPublic} = 1)`);
+            } else if (!PURE_GLOBAL_TABLES.includes(tableName)) {
+                // USER-SPECIFIC DATA (Workouts, PRs, Friends, Activity, etc.)
+                if (tableName === 'activity_feed' || tableName === 'kudos') {
+                    // Global/Social Tables: Allow visibility for public activities
+                    // The app filters what the user sees, but sync provides the data pool
+                    conditions.push(sql`(${tableSchema.userId} = ${userId} OR EXISTS (SELECT 1 FROM friendships WHERE ((user_id = ${userId} AND friend_id = ${tableSchema.userId}) OR (user_id = ${tableSchema.userId} AND friend_id = ${userId})) AND status = 'accepted'))`);
+                } else if (tableName === 'friendships') {
+                    conditions.push(sql`(${tableSchema.userId} = ${userId} OR ${tableSchema.friendId} = ${userId})`);
+                } else if (tableName === 'shares_inbox') {
+                    conditions.push(sql`(${tableSchema.senderId} = ${userId} OR ${tableSchema.receiverId} = ${userId})`);
+                } else if ('userId' in tableSchema) {
                     conditions.push(eq(tableSchema.userId, userId));
                 }
             }
 
-            // Special case for friend-related data or feed
-            // (Handled by global tables for now but could be refined)
+            const rows = await db.select().from(tableSchema)
+                .where(and(...conditions))
+                .limit(MAX_PULL_RECORDS - totalCount);
 
-            const rows = await query.where(and(...conditions));
-            let finalRows = rows.map(toSnakeCase);
+            const SENSITIVE_FIELDS = ['push_token', 'password', 'token', 'secret', 'ip_hash'];
 
-            // Industrial Rule: Unscope settings keys for the client
-            if (tableName === 'settings') {
-                finalRows = finalRows.map(row => ({
-                    ...row,
-                    key: unscopedSettingsKey(userId, String(row.key || ''))
-                }));
+            for (const row of rows) {
+                const snakeRow = toSnakeCase(row as Record<string, unknown>);
+
+                // Sanitization
+                for (const field of SENSITIVE_FIELDS) {
+                    if (field in snakeRow) delete snakeRow[field];
+                }
+
+                // Settings unscoping
+                if (tableName === 'settings') {
+                    snakeRow.key = unscopedSettingsKey(userId, String(snakeRow.key || ''));
+                }
+
+                changes.push({
+                    table: tableName,
+                    operation: snakeRow.deleted_at ? 'DELETE' : 'UPDATE', // Standard sync protocol
+                    payload: snakeRow
+                });
+                totalCount++;
             }
-
-            result[tableName] = finalRows;
-        }));
+        }
 
         return NextResponse.json({
             success: true,
-            timestamp: new Date().getTime(),
-            changes: result
+            serverTime: new Date().getTime(),
+            changes,
+            hasMore: totalCount >= MAX_PULL_RECORDS
         });
 
     } catch (e: any) {

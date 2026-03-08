@@ -1,5 +1,5 @@
 import { UnitService } from '@/src/services/UnitService';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx } from '@/src/theme';
 import { ExerciseType, WorkoutSet } from '@/src/types/db';
 import { formatTimeSeconds, parseFlexibleTimeToSeconds } from '@/src/utils/time';
 import { Ionicons } from '@expo/vector-icons';
@@ -277,7 +277,7 @@ const ss = StyleSheet.create({
     inputCell: { flex: 1, paddingHorizontal: 4 },
     actionsCell: { width: 64, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
     noteText: { color: Colors.iron[400], fontSize: 11, paddingHorizontal: 10, paddingBottom: 6, fontStyle: 'italic', borderBottomWidth: 1, borderBottomColor: Colors.iron[200] },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', paddingHorizontal: 24 },
+    modalOverlay: { flex: 1, backgroundColor: ThemeFx.backdropStrong, justifyContent: 'center', paddingHorizontal: 24 },
     modalSheet: { backgroundColor: Colors.surface, padding: 20, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700] },
     modalTitle: { color: Colors.iron[950], fontWeight: '900', marginBottom: 12, fontSize: 15 },
     modalInput: { backgroundColor: Colors.iron[100], color: Colors.iron[950], padding: 12, borderRadius: 12, borderWidth: 1, borderColor: Colors.iron[200], marginBottom: 16, height: 96 },

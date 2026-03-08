@@ -12,7 +12,7 @@ import { ChangelogService } from '@/src/services/ChangelogService';
 import { configService } from '@/src/services/ConfigService';
 import { RoutineDayWithExercises } from '@/src/services/RoutineService';
 import { useTimerStore } from '@/src/store/timerStore';
-import { Colors } from '@/src/theme';
+import { Colors, ThemeFx } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { addDays, subDays } from 'date-fns';
@@ -299,7 +299,7 @@ export default function DailyLogScreen() {
                   >
                     <Info size={20} color={markedDates['changelog'] ? Colors.primary.DEFAULT : Colors.iron[400]} />
                     {hasNewChangelog && (
-                      <View style={{ position: 'absolute', top: -1, right: -1, width: 10, height: 10, borderRadius: 5, backgroundColor: '#ef4444', borderWidth: 2, borderColor: Colors.iron[900] }} />
+                      <View style={{ position: 'absolute', top: -1, right: -1, width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.red, borderWidth: 2, borderColor: Colors.iron[900] }} />
                     )}
                   </Pressable>
                 </Link>
@@ -351,14 +351,14 @@ export default function DailyLogScreen() {
             onPress={handleAddButton}
             style={{ position: 'absolute', bottom: bottomOffset, right: 24, zIndex: 20, width: 56, height: 56, backgroundColor: Colors.primary.DEFAULT, borderRadius: 28, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
           >
-            <Plus color="white" size={28} />
+            <Plus color={Colors.white} size={28} />
           </TouchableOpacity>
         )
       }
 
       {/* ... Pickers ... */}
       <Modal visible={isPickerVisible} transparent animationType="fade" onRequestClose={() => setIsPickerVisible(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 48 }}>
+        <View style={{ flex: 1, backgroundColor: ThemeFx.backdropStrong, justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 48 }}>
           <View style={{
             backgroundColor: Colors.iron[900], borderWidth: 1, borderColor: Colors.iron[700],
             borderRadius: 20, flex: 1, maxHeight: '95%', width: '100%', overflow: 'hidden',
@@ -371,11 +371,11 @@ export default function DailyLogScreen() {
               </View>
               <TouchableOpacity
                 onPress={() => setIsPickerVisible(false)}
-                style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: Colors.primary.DEFAULT, justifyContent: 'center', alignItems: 'center' }}
+                style={{ padding: 12 }}
                 accessibilityRole="button"
                 accessibilityLabel="Cerrar selector de ejercicios"
               >
-                <X color="#fff" size={18} />
+                <X color={Colors.white} size={18} />
               </TouchableOpacity>
             </View>
 
@@ -420,7 +420,7 @@ export default function DailyLogScreen() {
         !loading && (
           <TouchableOpacity
             onPress={() => setTimerVisible(true)}
-            style={{ position: 'absolute', bottom: bottomOffset, left: 24, zIndex: 20, width: 48, height: 48, backgroundColor: Colors.iron[800], borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[700], elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6 }}
+            style={{ position: 'absolute', bottom: bottomOffset, left: 24, zIndex: 20, width: 48, height: 48, backgroundColor: Colors.iron[800], borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[700], elevation: 6, shadowColor: Colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6 }}
           >
             <Timer color="#94a3b8" size={22} />
           </TouchableOpacity>

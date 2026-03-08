@@ -4,7 +4,8 @@ import {
     Bell,
     LayoutDashboard,
     Share2,
-    ShieldAlert
+    ShieldAlert,
+    ShoppingBag
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React from 'react';
@@ -14,17 +15,19 @@ interface AdminTabsProps {
     socialPanel: React.ReactNode;
     contentPanel: React.ReactNode;
     moderationPanel: React.ReactNode;
+    marketplacePanel: React.ReactNode;
 }
 
 export default function AdminTabs({
     statusPanel,
     socialPanel,
     contentPanel,
-    moderationPanel
+    moderationPanel,
+    marketplacePanel
 }: AdminTabsProps) {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const activeTab = (searchParams.get('tab') as 'status' | 'social' | 'content' | 'moderation') || 'status';
+    const activeTab = (searchParams.get('tab') as 'status' | 'social' | 'content' | 'moderation' | 'marketplace') || 'status';
 
     const setActiveTab = (tab: string) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -34,6 +37,7 @@ export default function AdminTabs({
 
     const tabs = [
         { id: 'status', label: 'ESTADO_SISTEMA', icon: LayoutDashboard },
+        { id: 'marketplace', label: 'MARKETPLACE_CATALOG', icon: ShoppingBag },
         { id: 'social', label: 'IRONSOCIAL_MGMT', icon: Share2 },
         { id: 'content', label: 'PUBLICADOR_UNIFICADO', icon: Bell },
         { id: 'moderation', label: 'MODERACION_COMUNIDAD', icon: ShieldAlert },
@@ -68,6 +72,7 @@ export default function AdminTabs({
                 {activeTab === 'social' && socialPanel}
                 {activeTab === 'content' && contentPanel}
                 {activeTab === 'moderation' && moderationPanel}
+                {activeTab === 'marketplace' && marketplacePanel}
             </div>
         </div>
     );

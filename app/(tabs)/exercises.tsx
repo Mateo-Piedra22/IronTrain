@@ -98,8 +98,8 @@ export default function LibraryScreen() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Text style={s.cardName} numberOfLines={1}>{item.name}</Text>
                         {item.is_moderated === 1 && (
-                            <View style={{ backgroundColor: '#f59e0b20', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, borderWidth: 1, borderColor: '#f59e0b40' }}>
-                                <Text style={{ color: '#b45309', fontSize: 8, fontWeight: '900' }}>OCULTA</Text>
+                            <View style={{ backgroundColor: Colors.yellow + '20', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, borderWidth: 1, borderColor: Colors.yellow + '40' }}>
+                                <Text style={{ color: Colors.yellow, fontSize: 8, fontWeight: '900' }}>OCULTA</Text>
                             </View>
                         )}
                     </View>
@@ -125,7 +125,7 @@ export default function LibraryScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`Eliminar rutina ${item.name}`}
                 >
-                    <Trash2 size={14} color="#ef4444" />
+                    <Trash2 size={14} color={Colors.red} />
                 </TouchableOpacity>
             </View>
         </TouchableOpacity>
@@ -264,7 +264,7 @@ const s = StyleSheet.create({
         height: 60,
         backgroundColor: Colors.iron[900],
         zIndex: 10,
-        shadowColor: '#000',
+        shadowColor: Colors.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.3,
         shadowRadius: 3,
@@ -296,7 +296,7 @@ const s = StyleSheet.create({
     },
     segmentTabActive: {
         backgroundColor: Colors.surface,
-        shadowColor: '#000',
+        shadowColor: Colors.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
@@ -323,7 +323,7 @@ const s = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.iron[300],
         elevation: 2,
-        shadowColor: '#000',
+        shadowColor: Colors.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 6,
@@ -361,10 +361,10 @@ const s = StyleSheet.create({
     },
     deleteBtn: {
         padding: 8,
-        backgroundColor: '#ef444412',
+        backgroundColor: Colors.red + '12',
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#ef444425',
+        borderColor: Colors.red + '25',
     },
     fab: {
         position: 'absolute',
