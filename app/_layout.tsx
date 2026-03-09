@@ -28,7 +28,6 @@ import { useAuthStore } from '../src/store/authStore';
 import { useConfirmStore } from '../src/store/confirmStore';
 import { useUpdateStore } from '../src/store/updateStore';
 import { notify } from '../src/utils/notify';
-import './components/TimerOverlay';
 
 SplashScreen.preventAutoHideAsync();
 

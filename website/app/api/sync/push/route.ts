@@ -283,10 +283,10 @@ export async function POST(req: NextRequest) {
                     await db.transaction(async (tx) => {
                         // Verify ownership
                         const existing: any[] = await tx.select().from(tableSchema).where(eq(pkCol, finalId)).limit(1);
-                        const record = existing[0];
+                        const record = existing[0] as any;
                         if (record) {
-                            const ownerId: string | null = (record as any).userId || (record as any).id;
-                            const isSystemRecord = (record as any).isSystem === 1 || (record as any).is_system === 1;
+                            const ownerId = record.userId || record.giverId || record.senderId || (tableName === 'user_profiles' ? record.id : undefined);
+                            const isSystemRecord = record.isSystem === 1 || record.is_system === 1;
 
                             // Allow deletion if the user is the owner OR it's a shared interaction table they participated in
                             // For system records, users cannot trigger deletes via sync (Zero Trust)
