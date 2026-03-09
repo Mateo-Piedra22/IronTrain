@@ -38,6 +38,35 @@ export default async function DownloadsPage() {
         </p>
       </header>
 
+      {/* Warning Banner - Play Store Not Available */}
+      <section className="border-2 border-amber-500/50 p-5 bg-amber-50/80 mt-6">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start gap-3">
+            <span className="text-amber-600 text-xl">⚠️</span>
+            <div>
+              <h3 className="font-bold text-amber-900">No disponible en Google Play Store</h3>
+              <p className="text-sm opacity-80 mt-1">
+                Actualmente IronTrain no está publicado en Play Store debido a los costos de suscripción ($25 USD/año). 
+                Sin embargo, puedes descargar el APK directamente aquí.
+              </p>
+            </div>
+          </div>
+          <div className="pt-2 border-t border-amber-500/30">
+            <p className="text-sm">
+              <span className="font-bold">¿Querés ayudar a que esté pronto en Play Store?</span>{' '}
+              <a 
+                href="https://cafecito.app/motiona" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="underline hover:text-amber-700 font-bold"
+              >
+                Apoyá donando acá →
+              </a>
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section className="border border-current/20 p-6 bg-[#f5f1e8]">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>

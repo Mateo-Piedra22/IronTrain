@@ -31,14 +31,14 @@ function HeroSection() {
 
                     <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6">
                         <Link
-                            href="https://play.google.com/store/apps/details?id=com.irontrain"
+                            href="/downloads"
                             className="group bg-[#1a1a2e] text-[#f5f1e8] px-8 py-4 font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                         >
                             DESCARGAR EN ANDROID
                             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </Link>
                         <Link
-                            href="https://apps.apple.com/app/irontrain"
+                            href="/ios"
                             className="border-2 border-[#1a1a2e] px-8 py-4 font-bold hover:bg-[#1a1a2e]/5 transition-colors"
                         >
                             DESCARGAR EN iOS
@@ -155,7 +155,7 @@ function PricingSection() {
                         </div>
                     </div>
                     <Link
-                        href="https://play.google.com/store"
+                        href="/downloads"
                         className="block bg-[#1a1a2e] text-[#f5f1e8] py-4 font-bold hover:opacity-90 transition-opacity"
                     >
                         DESCARGAR AHORA
@@ -222,14 +222,14 @@ function CTASection() {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <Link
-                        href="https://play.google.com/store"
+                        href="/downloads"
                         className="inline-flex items-center gap-3 bg-[#1a1a2e] text-[#f5f1e8] px-10 py-5 font-bold text-lg hover:opacity-90 transition-opacity"
                     >
                         ANDROID
                         <ArrowRight className="w-5 h-5" />
                     </Link>
                     <Link
-                        href="https://apps.apple.com"
+                        href="/ios"
                         className="inline-flex items-center gap-3 bg-[#1a1a2e] text-[#f5f1e8] px-10 py-5 font-bold text-lg hover:opacity-90 transition-opacity"
                     >
                         iOS
