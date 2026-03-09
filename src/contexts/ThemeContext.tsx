@@ -1,6 +1,7 @@
 import { Theme as NavTheme } from '@react-navigation/native';
+import { StatusBarStyle } from 'expo-status-bar';
 import React, { createContext, useEffect, useMemo, useState } from 'react';
-import { Appearance, StatusBarStyle, useColorScheme } from 'react-native';
+import { Appearance, useColorScheme } from 'react-native';
 import { configService } from '../services/ConfigService';
 import { dataEventService } from '../services/DataEventService';
 import { _setGlobalActiveColors, resolveNavigationTheme, resolveThemeTokens, ThemeMode, ThemeTokens } from '../theme';
@@ -19,7 +20,9 @@ export const ThemeContext = createContext<ThemeContextType | undefined>(undefine
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const deviceScheme = useColorScheme() || 'light';
-    const [systemScheme, setSystemScheme] = useState<'light' | 'dark'>(deviceScheme as 'light' | 'dark');
+    const [systemScheme, setSystemScheme] = useState<'light' | 'dark'>(
+        (Appearance.getColorScheme() as 'light' | 'dark') || 'light'
+    );
     const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
 
     // Load initial mode from config
@@ -80,8 +83,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const statusBarStyle = useMemo((): StatusBarStyle => {
-        // 'light-content' for dark background, 'dark-content' for light background
-        return activeTheme.mode === 'dark' ? 'light-content' : 'dark-content';
+        // 'light' for dark background, 'dark' for light background (Expo Status Bar)
+        return activeTheme.mode === 'dark' ? 'light' : 'dark';
     }, [activeTheme.mode]);
 
     const value = useMemo(() => ({

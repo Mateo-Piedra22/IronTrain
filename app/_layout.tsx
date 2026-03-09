@@ -1,9 +1,8 @@
-import { Colors } from '@/src/theme';
 import NetInfo from '@react-native-community/netinfo';
-import { DarkTheme, ThemeProvider } from '@react-navigation/native';
+import { ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
-import { Stack, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { AlertTriangle, Download } from 'lucide-react-native';
@@ -13,12 +12,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GlobalNoticeHandler } from '../components/GlobalNoticeHandler';
-import '../components/TimerOverlay';
 import { TimerOverlay } from '../components/TimerOverlay';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { GlobalBanner } from '../components/ui/GlobalBanner';
 import { ToastContainer } from '../components/ui/ToastContainer';
 import '../global.css';
+import { ThemeProvider as AppThemeProvider } from '../src/contexts/ThemeContext';
+import { useTheme } from '../src/hooks/useTheme';
 import { configService } from '../src/services/ConfigService';
 import { dbService } from '../src/services/DatabaseService';
 import { MetricsAndFeedbackService } from '../src/services/MetricsAndFeedbackService';
@@ -28,21 +28,9 @@ import { useAuthStore } from '../src/store/authStore';
 import { useConfirmStore } from '../src/store/confirmStore';
 import { useUpdateStore } from '../src/store/updateStore';
 import { notify } from '../src/utils/notify';
+import './components/TimerOverlay';
 
 SplashScreen.preventAutoHideAsync();
-
-const IronTrainTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    primary: Colors.primary.DEFAULT,
-    background: Colors.iron[900],
-    card: Colors.iron[900],
-    text: Colors.iron[950],
-    border: Colors.iron[300],
-    notification: Colors.primary.DEFAULT,
-  },
-};
 
 function GlobalConfirmModal() {
   const { visible, config, hide } = useConfirmStore();
@@ -61,13 +49,87 @@ function GlobalConfirmModal() {
   );
 }
 
+/**
+ * Main application content that has access to the ThemeContext
+ */
+function MainAppContent({ dbInitialized, fontsLoaded, fontError, installedVersion, latestVersion, downloadUrl, notesUrl }: any) {
+  const { activeTheme, currentNavTheme, statusBarStyle } = useTheme();
+  const updateStatus = useUpdateStore((state) => state.status);
+
+  if ((!fontsLoaded && !fontError) || !dbInitialized) {
+    return null;
+  }
+
+  if (updateStatus === 'deprecated') {
+    return (
+      <View style={{ flex: 1, backgroundColor: activeTheme.colors.background, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <StatusBar style={statusBarStyle} />
+        <View style={{ alignItems: 'center', marginBottom: 32 }}>
+          <AlertTriangle size={64} color={activeTheme.colors.primary.DEFAULT} />
+          <Text style={{ color: activeTheme.colors.text, fontSize: 22, fontWeight: '900', marginTop: 16, textAlign: 'center' }}>
+            Actualización Requerida
+          </Text>
+          <Text style={{ color: activeTheme.colors.iron[500], textAlign: 'center', marginTop: 8, paddingHorizontal: 16, lineHeight: 20 }}>
+            Tu versión de IronTrain es demasiado antigua y ya no es compatible. Por favor, actualiza para continuar.
+          </Text>
+          <Text style={{ color: activeTheme.colors.iron[400], fontSize: 11, marginTop: 16, fontVariant: ['tabular-nums'], fontWeight: '600' }}>
+            v{installedVersion} {'->'}  v{latestVersion}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => {
+            const url = downloadUrl ?? notesUrl;
+            if (url) Linking.openURL(url);
+          }}
+          style={{ backgroundColor: activeTheme.colors.primary.DEFAULT, width: '100%', paddingVertical: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+        >
+          <Download size={20} color={activeTheme.colors.white} />
+          <Text style={{ color: activeTheme.colors.white, fontWeight: '900', fontSize: 16 }}>Descargar Actualización</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <NavigationThemeProvider value={currentNavTheme}>
+        <StatusBar style={statusBarStyle} backgroundColor={activeTheme.colors.background} />
+        <GlobalBanner />
+        <GlobalNoticeHandler />
+        <TimerOverlay />
+        <GlobalConfirmModal />
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: activeTheme.colors.background },
+            headerTintColor: activeTheme.colors.primary.DEFAULT,
+            headerTitleStyle: { fontWeight: 'bold', color: activeTheme.colors.text },
+            contentStyle: { backgroundColor: activeTheme.colors.background },
+            animation: 'slide_from_right'
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'IronTrain' }} />
+          <Stack.Screen name="changelog" options={{ presentation: 'modal', title: 'Novedades' }} />
+          <Stack.Screen name="workout/[id]" options={{ title: 'Sesión', headerBackTitle: 'Atrás' }} />
+          <Stack.Screen name="share/routine/[id]" options={{ presentation: 'modal', headerShown: false }} />
+        </Stack>
+        <ToastContainer />
+      </NavigationThemeProvider>
+    </GestureHandlerRootView>
+  );
+}
+
 export default function RootLayout() {
-  const router = useRouter();
   const [dbInitialized, setDbInitialized] = useState(false);
   const updatePromptShown = useRef(false);
   const authToken = useAuthStore((s) => s.token);
   const lastSyncedTokenRef = useRef<string | null>(null);
   const [fontsLoaded, fontError] = useFonts({});
+
+  const updateStatus = useUpdateStore((state) => state.status);
+  const installedVersion = useUpdateStore((state) => state.installedVersion);
+  const latestVersion = useUpdateStore((state) => state.latestVersion);
+  const downloadUrl = useUpdateStore((state) => state.downloadUrl);
+  const notesUrl = useUpdateStore((state) => state.notesUrl);
 
   useEffect(() => {
     async function initInfo() {
@@ -138,12 +200,6 @@ export default function RootLayout() {
     }
   }, [dbInitialized]);
 
-  const updateStatus = useUpdateStore((state) => state.status);
-  const installedVersion = useUpdateStore((state) => state.installedVersion);
-  const latestVersion = useUpdateStore((state) => state.latestVersion);
-  const downloadUrl = useUpdateStore((state) => state.downloadUrl);
-  const notesUrl = useUpdateStore((state) => state.notesUrl);
-
   useEffect(() => {
     if (updateStatus === 'update_available' && !updatePromptShown.current) {
       updatePromptShown.current = true;
@@ -159,69 +215,19 @@ export default function RootLayout() {
     }
   }, [updateStatus, latestVersion, downloadUrl, notesUrl]);
 
-  if ((!fontsLoaded && !fontError) || !dbInitialized) {
-    return null;
-  }
-
-  if (updateStatus === 'deprecated') {
-    return (
-      <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: Colors.iron[900], alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <StatusBar style="light" />
-          <View style={{ alignItems: 'center', marginBottom: 32 }}>
-            <AlertTriangle size={64} color={Colors.primary.DEFAULT} />
-            <Text style={{ color: Colors.iron[950], fontSize: 22, fontWeight: '900', marginTop: 16, textAlign: 'center' }}>
-              Actualización Requerida
-            </Text>
-            <Text style={{ color: Colors.iron[500], textAlign: 'center', marginTop: 8, paddingHorizontal: 16, lineHeight: 20 }}>
-              Tu versión de IronTrain es demasiado antigua y ya no es compatible. Por favor, actualiza para continuar.
-            </Text>
-            <Text style={{ color: Colors.iron[400], fontSize: 11, marginTop: 16, fontVariant: ['tabular-nums'], fontWeight: '600' }}>
-              v{installedVersion} {'->'}  v{latestVersion}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => {
-              const url = downloadUrl ?? notesUrl;
-              if (url) Linking.openURL(url);
-            }}
-            style={{ backgroundColor: Colors.primary.DEFAULT, width: '100%', paddingVertical: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-          >
-            <Download size={20} color={Colors.white} />
-            <Text style={{ color: Colors.white, fontWeight: '900', fontSize: 16 }}>Descargar Actualización</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaProvider>
-    );
-  }
-
   return (
     <SafeAreaProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <ThemeProvider value={IronTrainTheme}>
-          <StatusBar style="dark" backgroundColor={Colors.iron[900]} />
-          <GlobalBanner />
-          <GlobalNoticeHandler />
-          <TimerOverlay />
-          <GlobalConfirmModal />
-          <Stack
-            screenOptions={{
-              headerStyle: { backgroundColor: Colors.iron[900] },
-              headerTintColor: Colors.primary.DEFAULT,
-              headerTitleStyle: { fontWeight: 'bold', color: Colors.iron[950] },
-              contentStyle: { backgroundColor: Colors.iron[900] },
-              animation: 'slide_from_right'
-            }}
-          >
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'IronTrain' }} />
-            <Stack.Screen name="changelog" options={{ presentation: 'modal', title: 'Novedades' }} />
-            <Stack.Screen name="workout/[id]" options={{ title: 'Sesión', headerBackTitle: 'Atrás' }} />
-            <Stack.Screen name="share/routine/[id]" options={{ presentation: 'modal', headerShown: false }} />
-          </Stack>
-          <ToastContainer />
-        </ThemeProvider>
-      </GestureHandlerRootView>
+      <AppThemeProvider>
+        <MainAppContent
+          dbInitialized={dbInitialized}
+          fontsLoaded={fontsLoaded}
+          fontError={fontError}
+          installedVersion={installedVersion}
+          latestVersion={latestVersion}
+          downloadUrl={downloadUrl}
+          notesUrl={notesUrl}
+        />
+      </AppThemeProvider>
     </SafeAreaProvider>
   );
 }

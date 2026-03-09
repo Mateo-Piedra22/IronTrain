@@ -1,6 +1,6 @@
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
-import { useColorScheme } from '@/components/useColorScheme';
 import { useDataReload } from '@/src/hooks/useDataReload';
+import { useTheme } from '@/src/hooks/useTheme';
 import { backupService } from '@/src/services/BackupService';
 import { ChangelogService } from '@/src/services/ChangelogService';
 import { AppConfig, configService, NotificationPreferences } from '@/src/services/ConfigService';
@@ -22,7 +22,7 @@ import { confirm } from '../src/store/confirmStore';
 export default function SettingsScreen() {
     const auth = useAuthStore();
     const router = useRouter();
-    const colorScheme = useColorScheme();
+    const { themeMode, setThemeMode } = useTheme();
     const installedVersion = ChangelogService.getAppVersion();
     const [footerDate, setFooterDate] = useState<string | null>(null);
     const [units, setUnits] = useState('kg');
@@ -527,6 +527,17 @@ export default function SettingsScreen() {
                             options={[{ id: 'kg', label: 'KG' }, { id: 'lbs', label: 'LBS' }]}
                             selected={units}
                             onSelect={(id) => saveSetting('weightUnit', id as any)}
+                        />
+                    </SettingRow>
+                    <SettingRow icon={Smartphone} title="Apariencia" subtitle="Tema de la aplicación.">
+                        <ChipGroup
+                            options={[
+                                { id: 'light', label: 'Claro' },
+                                { id: 'dark', label: 'Oscuro' },
+                                { id: 'system', label: 'Auto' }
+                            ]}
+                            selected={themeMode}
+                            onSelect={(id) => setThemeMode(id as any)}
                         />
                     </SettingRow>
                     <SettingRow icon={Timer} title="Descanso por defecto">

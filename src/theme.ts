@@ -153,7 +153,13 @@ export function createColorsForMode(mode: ThemeMode, systemScheme: 'light' | 'da
 }
 
 export function withAlpha(hexColor: string, alphaHex: string): string {
-    const normalized = hexColor.startsWith('#') ? hexColor.slice(1) : hexColor;
+    let normalized = hexColor.startsWith('#') ? hexColor.slice(1) : hexColor;
+
+    // Expand 3-digit hex to 6-digit (e.g., fff -> ffffff)
+    if (normalized.length === 3) {
+        normalized = normalized.split('').map(c => c + c).join('');
+    }
+
     const base = normalized.length === 8 ? normalized.slice(0, 6) : normalized;
     return `#${base}${alphaHex}`;
 }

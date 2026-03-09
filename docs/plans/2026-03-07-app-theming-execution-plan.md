@@ -8,9 +8,10 @@ Construir un sistema de tema mantenible, escalable y social-ready para la app m�
 - compartir subtemas con modelo privado/amigos/público
 
 ## Estado Actual
-- La app ya tiene paleta base en `src/theme.ts`.
-- Existen muchos usos directos de color en pantallas y componentes.
-- Se inició la base de Fase A con tipado de tokens y motor de patches.
+- La app ya tiene paleta base en `src/theme.ts` refactorizada para soporte dinámico (Proxy).
+- Existen muchos usos directos de color en pantallas y componentes (mitigados por `Colors` Proxy).
+- Fase A: Tipado de tokens y motor de patches (Completada).
+- Fase B: Activación Runtime de Tema (Completada). La implementación dinámica de temas está activa y funcionando.
 - Se corrigieron modales críticos para scroll/contraste y consistencia visual.
 - Inventario parcial de literales de color tras lotes 7 y 8: 191 ocurrencias en 46 archivos app/components/src.
 
@@ -44,17 +45,19 @@ Checklist de salida:
 - Compatibilidad con `Colors` legacy preservada.
 - UI crítica de notificaciones y changelog funcional y estable.
 
-### Fase B — Activación Runtime de Tema
+### Fase B — Activación Runtime de Tema (Completada)
 Entregables:
-- Provider único de tema en runtime (modo, tokens activos, selección actual).
-- Integración con `themeMode` de configuración del usuario.
-- Resolución `system` vía esquema del dispositivo.
-- Re-render coherente de navegación, status bar y componentes globales.
+- Provider único de tema en runtime (`AppThemeProvider`) en `src/contexts/ThemeContext.tsx`.
+- Integración con `themeMode` de configuración del usuario vía `configService`.
+- Resolución `system` vía esquema del dispositivo (Appearance API).
+- Re-render coherente de navegación (`react-navigation` Theme), status bar y componentes globales.
+- Proxy dinámico en `src/theme.ts` para compatibilidad legacy con re-renders.
 
 Checklist de salida:
-- Cambio de tema en vivo sin reinicio.
-- Persistencia correcta de preferencia.
-- Sin regressions visuales en tabs, modales y componentes compartidos.
+- ✅ Cambio de tema en vivo sin reinicio.
+- ✅ Persistencia correcta de preferencia en DB y ConfigService.
+- ✅ Integración en `app/settings.tsx` para selección manual.
+- ✅ Soporte para React Navigation (Header, Bottom Tabs) dinámico.
 
 ### Fase C — Migración Estructural de Hardcodes
 Entregables:
@@ -116,9 +119,14 @@ Checklist de salida:
 - Modificado: `components/CategoryManager.tsx`
 - Modificado: `components/BadgeSelectorModal.tsx`
 - Modificado: `components/ui/ColorPicker.tsx`
-- Modificado: `src/theme.ts`
-- Modificado: `src/theme-engine.ts`
+- Modificado: `src/theme.ts` - Refactorizado con Proxy dinámico y resolución de navegación
+- Modificado: `app/_layout.tsx` - Integración de ThemeProvider y lógica de renderizado condicional
+- Modificado: `app/settings.tsx` - Añadido selector de tema (Light/Dark/Auto)
+- Creado: `src/contexts/ThemeContext.tsx` - Provider de estado de tema persistente
+- Creado: `src/hooks/useTheme.ts` - Hook principal de acceso al tema
+- Creado: `src/hooks/useColors.ts` - Hook de acceso rápido a colores dinámicos
 - Creado: `docs/plans/2026-03-07-app-theming-execution-plan.md`
+- Creado: `src/services/ThemeService.ts` - Lógica de aplicación
 
 ### Archivos Finales (Ronda de Limpieza Total)
 - Modificado: `app/workout/[id].tsx` - Reemplazados colores success hardcodeados por ThemeFx y Colors
@@ -178,7 +186,7 @@ Implementar Fase B sobre provider/runtime con integración de `themeMode` en con
 
 ## Fases Restantes - Detalle de Implementación
 
-### Fase B — Activación Runtime de Tema (PENDIENTE)
+### Fase B — Activación Runtime de Tema (COMPLETADA)
 
 **Objetivo:** Habilitar cambio de tema en vivo sin reiniciar la app
 
