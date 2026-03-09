@@ -1,9 +1,9 @@
-import { Colors } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useColors } from '../src/hooks/useColors';
 import { confirm } from '../src/store/confirmStore';
 import { IronButton } from './IronButton';
 
@@ -15,8 +15,48 @@ interface ReorderModalProps {
 }
 
 export function ReorderModal({ visible, onClose, items, onSave }: ReorderModalProps) {
+    const colors = useColors();
     const [data, setData] = useState(items);
     const [loading, setLoading] = useState(false);
+
+    const ss = useMemo(() => StyleSheet.create({
+        container: { flex: 1, backgroundColor: colors.background },
+        content: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
+        header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+        headerTitle: { fontSize: 20, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.5 },
+        closeBtn: {
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            borderRadius: 12,
+            backgroundColor: colors.iron[100],
+            borderWidth: 1.5,
+            borderColor: colors.iron[200]
+        },
+        closeBtnText: { fontSize: 13, fontWeight: '800', color: colors.iron[500] },
+        hint: { color: colors.iron[400], fontSize: 13, marginBottom: 20, fontWeight: '500' },
+        item: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            padding: 16,
+            marginBottom: 10,
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            backgroundColor: colors.surface,
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.05,
+            shadowRadius: 10,
+            elevation: 2,
+        },
+        itemActive: {
+            backgroundColor: colors.primary.DEFAULT + '15',
+            borderColor: colors.primary.DEFAULT + '40'
+        },
+        itemText: { color: colors.iron[950], fontSize: 15, fontWeight: '700' },
+        dragHandle: { marginRight: 12 },
+        footer: { paddingVertical: 24 },
+    }), [colors]);
 
     useEffect(() => {
         setData(items);
@@ -42,7 +82,7 @@ export function ReorderModal({ visible, onClose, items, onSave }: ReorderModalPr
                     disabled={isActive}
                     style={[ss.item, isActive && ss.itemActive]}
                 >
-                    <Ionicons name="menu" size={22} color={Colors.iron[400]} style={{ marginRight: 12 }} />
+                    <Ionicons name="menu" size={22} color={colors.iron[400]} style={ss.dragHandle} />
                     <Text style={ss.itemText}>{item.exerciseName}</Text>
                 </TouchableOpacity>
             </ScaleDecorator>
@@ -70,7 +110,7 @@ export function ReorderModal({ visible, onClose, items, onSave }: ReorderModalPr
                         containerStyle={{ flex: 1 }}
                     />
 
-                    <View style={{ paddingVertical: 24 }}>
+                    <View style={ss.footer}>
                         <IronButton label="Guardar orden" onPress={handleSave} loading={loading} />
                     </View>
                 </View>
@@ -79,15 +119,3 @@ export function ReorderModal({ visible, onClose, items, onSave }: ReorderModalPr
     );
 }
 
-const ss = StyleSheet.create({
-    container: { flex: 1, backgroundColor: Colors.iron[900] },
-    content: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-    headerTitle: { fontSize: 20, fontWeight: '900', color: Colors.iron[950], letterSpacing: -0.5 },
-    closeBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.iron[200], borderWidth: 1, borderColor: Colors.iron[300] },
-    closeBtnText: { fontSize: 13, fontWeight: '700', color: Colors.iron[500] },
-    hint: { color: Colors.iron[400], fontSize: 13, marginBottom: 16 },
-    item: { flexDirection: 'row', alignItems: 'center', padding: 16, marginBottom: 8, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[700], backgroundColor: Colors.surface },
-    itemActive: { backgroundColor: Colors.primary.DEFAULT + '15', borderColor: Colors.primary.DEFAULT + '40' },
-    itemText: { color: Colors.iron[950], fontSize: 15, fontWeight: '700' },
-});

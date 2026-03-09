@@ -1,7 +1,8 @@
-import { Colors, ThemeFx, withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, Modal, PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useColors } from '../../src/hooks/useColors';
 
 interface ColorPickerProps {
     visible: boolean;
@@ -43,49 +44,68 @@ function hexToHSL(hex: string): { h: number, s: number, l: number } {
     return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
 }
 
-/** Draggable slider track that responds to both taps and pan gestures */
-function SliderTrack({ value, max, onChange, children }: {
-    value: number; max: number; onChange: (v: number) => void; children: React.ReactNode;
-}) {
-    const widthRef = useRef(0);
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: () => true,
-            onPanResponderGrant: (evt) => {
-                const x = evt.nativeEvent.locationX;
-                if (widthRef.current > 0) onChange(Math.max(0, Math.min(max, (x / widthRef.current) * max)));
-            },
-            onPanResponderMove: (evt) => {
-                const x = evt.nativeEvent.locationX;
-                if (widthRef.current > 0) onChange(Math.max(0, Math.min(max, (x / widthRef.current) * max)));
-            },
-        })
-    ).current;
-
-    const onLayout = (e: LayoutChangeEvent) => { widthRef.current = e.nativeEvent.layout.width; };
-
-    return (
-        <View style={ss.trackOuter} onLayout={onLayout} {...panResponder.panHandlers}>
-            {children}
-            <View pointerEvents="none" style={[ss.thumb, { left: `${(value / max) * 100}%` }]} />
-        </View>
-    );
-}
-
 const HUE_GRADIENT = [0, 60, 120, 180, 240, 300, 360].map((h) => hslToHex(h, 100, 50)) as [string, string, ...string[]];
 const SATURATION_BASE = hslToHex(0, 0, 50);
 const LIGHTNESS_START = hslToHex(0, 0, 0);
 const LIGHTNESS_END = hslToHex(0, 0, 100);
 
-export function ColorPicker({ visible, initialColor = Colors.blue, onClose, onSelect }: ColorPickerProps) {
+export function ColorPicker({ visible, initialColor, onClose, onSelect }: ColorPickerProps) {
+    const colors = useColors();
     const [hue, setHue] = useState(0);
     const [sat, setSat] = useState(100);
     const [lig, setLig] = useState(50);
-    const [hex, setHex] = useState(initialColor);
+    const [hex, setHex] = useState(initialColor || colors.blue);
+
+    const ss = useMemo(() => StyleSheet.create({
+        overlay: { flex: 1, backgroundColor: withAlpha(colors.black, '99'), justifyContent: 'center', alignItems: 'center', padding: 24 },
+        sheet: { backgroundColor: colors.surface, width: '100%', maxWidth: 380, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: colors.iron[300], elevation: 12, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 20 },
+        title: { fontSize: 18, fontWeight: '900', color: colors.iron[950], marginBottom: 20, letterSpacing: -0.3 },
+        preview: { height: 80, borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: colors.iron[300], alignItems: 'center', justifyContent: 'center' },
+        previewBadge: { backgroundColor: withAlpha(colors.black, '4D'), paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8 },
+        previewText: { color: colors.white, fontWeight: '900', fontSize: 15, letterSpacing: 1 },
+        sliderLabel: { color: colors.iron[400], fontSize: 10, fontWeight: '800', textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.8 },
+        trackOuter: { height: 40, borderRadius: 20, overflow: 'hidden', position: 'relative', justifyContent: 'center', marginBottom: 20 },
+        gradient: { flex: 1, borderRadius: 20 },
+        thumb: { position: 'absolute', width: 22, height: '100%', backgroundColor: colors.white, borderWidth: 2.5, borderColor: colors.black, borderRadius: 11, transform: [{ translateX: -11 }], shadowColor: colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4 },
+        actions: { flexDirection: 'row', gap: 12, marginTop: 4 },
+        cancelBtn: { flex: 1, paddingVertical: 14, backgroundColor: colors.iron[100], borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.iron[300] },
+        cancelText: { color: colors.iron[500], fontWeight: '800', fontSize: 14 },
+        selectBtn: { flex: 1, paddingVertical: 14, backgroundColor: colors.primary.DEFAULT, borderRadius: 14, alignItems: 'center' },
+        selectText: { color: colors.white, fontWeight: '800', fontSize: 14 },
+    }), [colors]);
+
+    /** Draggable slider track that responds to both taps and pan gestures */
+    const SliderTrack = useCallback(({ value, max, onChange, children }: {
+        value: number; max: number; onChange: (v: number) => void; children: React.ReactNode;
+    }) => {
+        const widthRef = useRef(0);
+        const panResponder = useRef(
+            PanResponder.create({
+                onStartShouldSetPanResponder: () => true,
+                onMoveShouldSetPanResponder: () => true,
+                onPanResponderGrant: (evt) => {
+                    const x = evt.nativeEvent.locationX;
+                    if (widthRef.current > 0) onChange(Math.max(0, Math.min(max, (x / widthRef.current) * max)));
+                },
+                onPanResponderMove: (evt) => {
+                    const x = evt.nativeEvent.locationX;
+                    if (widthRef.current > 0) onChange(Math.max(0, Math.min(max, (x / widthRef.current) * max)));
+                },
+            })
+        ).current;
+
+        const onLayout = (e: LayoutChangeEvent) => { widthRef.current = e.nativeEvent.layout.width; };
+
+        return (
+            <View style={ss.trackOuter} onLayout={onLayout} {...panResponder.panHandlers}>
+                {children}
+                <View pointerEvents="none" style={[ss.thumb, { left: `${(value / max) * 100}%` }]} />
+            </View>
+        );
+    }, [ss]);
 
     useEffect(() => {
-        if (visible) {
+        if (visible && initialColor) {
             const hsl = hexToHSL(initialColor);
             setHue(hsl.h); setSat(hsl.s); setLig(hsl.l); setHex(initialColor);
         }
@@ -153,20 +173,3 @@ export function ColorPicker({ visible, initialColor = Colors.blue, onClose, onSe
     );
 }
 
-const ss = StyleSheet.create({
-    overlay: { flex: 1, backgroundColor: withAlpha(Colors.black, '99'), justifyContent: 'center', alignItems: 'center', padding: 24 },
-    sheet: { backgroundColor: Colors.iron[900], width: '100%', maxWidth: 380, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.iron[700] },
-    title: { fontSize: 18, fontWeight: '900', color: Colors.iron[950], marginBottom: 20, letterSpacing: -0.3 },
-    preview: { height: 80, borderRadius: 14, marginBottom: 24, borderWidth: 1, borderColor: Colors.iron[700], alignItems: 'center', justifyContent: 'center' },
-    previewBadge: { backgroundColor: withAlpha(Colors.black, '4D'), paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8 },
-    previewText: { color: Colors.white, fontWeight: '900', fontSize: 15, letterSpacing: 1 },
-    sliderLabel: { color: Colors.iron[400], fontSize: 10, fontWeight: '800', textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.8 },
-    trackOuter: { height: 40, borderRadius: 20, overflow: 'hidden', position: 'relative', justifyContent: 'center', marginBottom: 20 },
-    gradient: { flex: 1, borderRadius: 20 },
-    thumb: { position: 'absolute', width: 20, height: '100%', backgroundColor: Colors.white, borderWidth: 2, borderColor: Colors.black, borderRadius: 10, transform: [{ translateX: -10 }], shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4 },
-    actions: { flexDirection: 'row', gap: 12, marginTop: 4 },
-    cancelBtn: { flex: 1, paddingVertical: 14, backgroundColor: Colors.iron[800], borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: Colors.iron[700] },
-    cancelText: { color: Colors.iron[400], fontWeight: '800', fontSize: 14 },
-    selectBtn: { flex: 1, paddingVertical: 14, backgroundColor: Colors.primary.DEFAULT, borderRadius: 14, alignItems: 'center' },
-    selectText: { color: Colors.white, fontWeight: '800', fontSize: 14 },
-});

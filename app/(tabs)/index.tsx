@@ -12,7 +12,6 @@ import { ChangelogService } from '@/src/services/ChangelogService';
 import { configService } from '@/src/services/ConfigService';
 import { RoutineDayWithExercises } from '@/src/services/RoutineService';
 import { useTimerStore } from '@/src/store/timerStore';
-import { Colors, ThemeFx } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { addDays, subDays } from 'date-fns';
@@ -24,11 +23,14 @@ import { ActivityIndicator, Image, Modal, Pressable, Text, TouchableOpacity, Vie
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useColors } from '../../src/hooks/useColors';
 import { workoutService } from '../../src/services/WorkoutService';
+import { ThemeFx } from '../../src/theme';
 import { ExerciseType, Workout, WorkoutSet } from '../../src/types/db';
 
 export default function DailyLogScreen() {
   const router = useRouter();
+  const colors = useColors();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [sets, setSets] = useState<(WorkoutSet & { exercise_name: string; category_color: string; exercise_type: ExerciseType })[]>([]);
@@ -271,7 +273,7 @@ export default function DailyLogScreen() {
     });
 
   return (
-    <SafeAreaWrapper edges={['top', 'left', 'right']} className="bg-iron-900">
+    <SafeAreaWrapper edges={['top', 'left', 'right']} style={{ backgroundColor: colors.background }}>
       <GestureDetector gesture={panGesture}>
         <View>
           <DateStrip
@@ -292,14 +294,14 @@ export default function DailyLogScreen() {
                     style={({ pressed }) => ({
                       opacity: pressed ? 0.7 : 1,
                       width: 36, height: 36, borderRadius: 18,
-                      backgroundColor: Colors.iron[800],
+                      backgroundColor: colors.iron[800],
                       alignItems: 'center', justifyContent: 'center',
-                      borderWidth: 1, borderColor: Colors.iron[700],
+                      borderWidth: 1, borderColor: colors.iron[700],
                     })}
                   >
-                    <Info size={20} color={markedDates['changelog'] ? Colors.primary.DEFAULT : Colors.iron[400]} />
+                    <Info size={20} color={markedDates['changelog'] ? colors.primary.DEFAULT : colors.iron[400]} />
                     {hasNewChangelog && (
-                      <View style={{ position: 'absolute', top: -1, right: -1, width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.red, borderWidth: 2, borderColor: Colors.iron[900] }} />
+                      <View style={{ position: 'absolute', top: -1, right: -1, width: 10, height: 10, borderRadius: 5, backgroundColor: colors.red, borderWidth: 2, borderColor: colors.iron[900] }} />
                     )}
                   </Pressable>
                 </Link>
@@ -323,7 +325,7 @@ export default function DailyLogScreen() {
       {
         loading ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
+            <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
           </View>
         ) : (
           <>
@@ -349,9 +351,9 @@ export default function DailyLogScreen() {
         !loading && (
           <TouchableOpacity
             onPress={handleAddButton}
-            style={{ position: 'absolute', bottom: bottomOffset, right: 24, zIndex: 20, width: 56, height: 56, backgroundColor: Colors.primary.DEFAULT, borderRadius: 28, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
+            style={{ position: 'absolute', bottom: bottomOffset, right: 24, zIndex: 20, width: 56, height: 56, backgroundColor: colors.primary.DEFAULT, borderRadius: 28, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
           >
-            <Plus color={Colors.white} size={28} />
+            <Plus color={colors.white} size={28} />
           </TouchableOpacity>
         )
       }
@@ -360,14 +362,14 @@ export default function DailyLogScreen() {
       <Modal visible={isPickerVisible} transparent animationType="fade" onRequestClose={() => setIsPickerVisible(false)}>
         <View style={{ flex: 1, backgroundColor: ThemeFx.backdropStrong, justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 48 }}>
           <View style={{
-            backgroundColor: Colors.iron[900], borderWidth: 1, borderColor: Colors.iron[700],
+            backgroundColor: colors.iron[900], borderWidth: 1, borderColor: colors.iron[700],
             borderRadius: 20, flex: 1, maxHeight: '95%', width: '100%', overflow: 'hidden',
           }}>
             {/* Modal Header — CopyWorkoutModal pattern */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.iron[200] }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.iron[200] }}>
               <View>
-                <Text style={{ fontSize: 16, fontWeight: '900', color: Colors.iron[950], letterSpacing: -0.3 }}>Seleccionar ejercicio</Text>
-                <Text style={{ fontSize: 11, color: Colors.iron[400], marginTop: 2 }}>Tocá uno para agregarlo al entrenamiento</Text>
+                <Text style={{ fontSize: 16, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.3 }}>Seleccionar ejercicio</Text>
+                <Text style={{ fontSize: 11, color: colors.iron[400], marginTop: 2 }}>Tocá uno para agregarlo al entrenamiento</Text>
               </View>
               <TouchableOpacity
                 onPress={() => setIsPickerVisible(false)}
@@ -375,7 +377,7 @@ export default function DailyLogScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Cerrar selector de ejercicios"
               >
-                <X color={Colors.white} size={18} />
+                <X color={colors.white} size={18} />
               </TouchableOpacity>
             </View>
 
@@ -420,7 +422,7 @@ export default function DailyLogScreen() {
         !loading && (
           <TouchableOpacity
             onPress={() => setTimerVisible(true)}
-            style={{ position: 'absolute', bottom: bottomOffset, left: 24, zIndex: 20, width: 48, height: 48, backgroundColor: Colors.iron[800], borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[700], elevation: 6, shadowColor: Colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6 }}
+            style={{ position: 'absolute', bottom: bottomOffset, left: 24, zIndex: 20, width: 48, height: 48, backgroundColor: colors.iron[800], borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.iron[700], elevation: 6, shadowColor: colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6 }}
           >
             <Timer color="#94a3b8" size={22} />
           </TouchableOpacity>

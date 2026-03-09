@@ -1,40 +1,39 @@
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
-import { useColorScheme } from '@/components/useColorScheme';
-import { Colors } from '@/src/theme';
+import { useColors } from '@/src/hooks/useColors';
 import { Tabs } from 'expo-router';
 import { BarChart2, Calendar, Dumbbell, Users } from 'lucide-react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const colors = useColors();
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Tabs
         screenOptions={{
-          tabBarActiveTintColor: Colors.primary.DEFAULT,
-          tabBarInactiveTintColor: Colors.iron[400],
+          tabBarActiveTintColor: colors.primary.DEFAULT,
+          tabBarInactiveTintColor: colors.iron[400],
           tabBarStyle: {
-            backgroundColor: Colors.iron[900],
-            borderTopColor: Colors.iron[700],
+            backgroundColor: colors.iron[900],
+            borderTopColor: colors.iron[700],
             elevation: 8,
-            shadowColor: Colors.black,
+            shadowColor: colors.black,
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.1,
             shadowRadius: 4,
           },
           headerShown: useClientOnlyValue(false, true),
           headerStyle: {
-            backgroundColor: Colors.iron[900],
+            backgroundColor: colors.iron[900],
             elevation: 0,
             shadowOpacity: 0,
             borderBottomWidth: 1,
-            borderBottomColor: Colors.iron[700],
+            borderBottomColor: colors.iron[700],
           },
-          headerTintColor: Colors.iron[950],
+          headerTintColor: colors.iron[950],
           headerTitleStyle: {
             fontWeight: '900',
-            color: Colors.iron[950],
+            color: colors.iron[950],
             fontSize: 18,
           },
           tabBarLabelStyle: { fontWeight: 'bold' },

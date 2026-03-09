@@ -1,11 +1,12 @@
 import { EmptyChartPlaceholder } from '@/components/EmptyChartPlaceholder';
 import { PRCenter } from '@/components/PRCenter';
 import { BadgePill } from '@/components/ui/BadgePill';
+import { useColors } from '@/src/hooks/useColors';
 import { OneRMProgressRow, OneRepMax } from '@/src/services/AnalysisService';
-import { Colors, ThemeFx, withAlpha } from '@/src/theme';
+import { withAlpha } from '@/src/theme';
 import { useRouter } from 'expo-router';
 import { ChevronRight, TrendingUp, Trophy } from 'lucide-react-native';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 interface AnalysisRecordsProps {
@@ -15,18 +16,160 @@ interface AnalysisRecordsProps {
 }
 
 export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: AnalysisRecordsProps) {
+    const colors = useColors();
+    const styles = useMemo(() => StyleSheet.create({
+        container: {
+            paddingBottom: 32
+        },
+        sectionSpacing: {
+            marginTop: 24
+        },
+        sectionSpacingLarge: {
+            marginTop: 32
+        },
+        sectionHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16,
+            paddingHorizontal: 4,
+        },
+        sectionTitleContainer: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10
+        },
+        sectionAccent: {
+            width: 4,
+            height: 20,
+            borderRadius: 2,
+            backgroundColor: colors.primary.DEFAULT,
+        },
+        sectionTitle: {
+            fontSize: 18,
+            fontWeight: '900',
+            color: colors.iron[950],
+            letterSpacing: -0.3,
+        },
+        rangeBadge: {
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '15'),
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 10,
+            borderWidth: 1.5,
+            borderColor: withAlpha(colors.primary.DEFAULT, '20'),
+        },
+        rangeBadgeText: {
+            fontSize: 12,
+            fontWeight: '900',
+            color: colors.primary.DEFAULT,
+        },
+        ormCard: {
+            backgroundColor: colors.surface,
+            padding: 16,
+            borderRadius: 20,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.05,
+            shadowRadius: 15,
+            elevation: 4,
+            marginBottom: 12,
+        },
+        cardContent: {
+            flexDirection: 'row',
+            alignItems: 'center'
+        },
+        rankBadge: {
+            width: 36,
+            height: 36,
+            borderRadius: 12,
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '15'),
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        rankText: {
+            fontSize: 15,
+            fontWeight: '900',
+            color: colors.primary.DEFAULT,
+        },
+        cardInfo: {
+            flex: 1,
+            marginLeft: 14
+        },
+        ormName: {
+            fontSize: 16,
+            fontWeight: '900',
+            color: colors.iron[950],
+        },
+        badgesContainer: {
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 6,
+            marginTop: 6
+        },
+        ormBasis: {
+            fontSize: 12,
+            fontWeight: '800',
+            color: colors.iron[500],
+            marginTop: 6,
+        },
+        ormValueContainer: {
+            alignItems: 'flex-end',
+            minWidth: 55,
+        },
+        valueWithUnit: {
+            flexDirection: 'row',
+            alignItems: 'baseline',
+            gap: 2
+        },
+        ormValue: {
+            fontSize: 22,
+            fontWeight: '900',
+            color: colors.primary.DEFAULT,
+            letterSpacing: -0.5,
+        },
+        ormUnit: {
+            fontSize: 11,
+            fontWeight: '900',
+            color: colors.iron[400],
+            textTransform: 'uppercase',
+        },
+        chevron: {
+            marginLeft: 8
+        },
+        progBadge: {
+            backgroundColor: withAlpha(colors.green, '15'),
+        },
+        progText: {
+            color: colors.green,
+        },
+        deltaValue: {
+            fontSize: 22,
+            fontWeight: '900',
+            color: colors.green,
+            letterSpacing: -0.5,
+        },
+        deltaUnit: {
+            fontSize: 11,
+            fontWeight: '900',
+            color: colors.green,
+            textTransform: 'uppercase',
+        }
+    }), [colors]);
     const router = useRouter();
 
     return (
-        <View style={{ paddingBottom: 32 }}>
+        <View style={styles.container}>
             <PRCenter />
 
             {/* TOP 1RMs */}
-            <View style={{ marginTop: 24 }}>
+            <View style={styles.sectionSpacing}>
                 <View style={styles.sectionHeader}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={styles.sectionTitleContainer}>
                         <View style={styles.sectionAccent} />
-                        <Trophy size={16} color={Colors.iron[950]} />
+                        <Trophy size={18} color={colors.iron[950]} />
                         <Text style={styles.sectionTitle}>Ranking de Fuerza (1RM Est.)</Text>
                     </View>
                     <View style={styles.rangeBadge}>
@@ -44,17 +187,17 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
                     oneRepMaxes.slice(0, 5).map((orm, idx) => (
                         <Pressable
                             key={orm.exerciseId}
-                            style={[styles.ormCard, idx < 4 && { marginBottom: 10 }]}
+                            style={styles.ormCard}
                             onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: orm.exerciseId, exerciseId: orm.exerciseId, exerciseName: orm.exerciseName } } as any)}
                         >
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={styles.cardContent}>
                                 <View style={styles.rankBadge}>
                                     <Text style={styles.rankText}>{idx + 1}</Text>
                                 </View>
 
-                                <View style={{ flex: 1, marginLeft: 12 }}>
+                                <View style={styles.cardInfo}>
                                     <Text style={styles.ormName} numberOfLines={1}>{orm.exerciseName}</Text>
-                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                                    <View style={styles.badgesContainer}>
                                         {orm.badges?.map((b, i) => (
                                             <BadgePill key={i} name={b.name} color={b.color} icon={b.icon} size="xs" />
                                         ))}
@@ -65,12 +208,12 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
                                 </View>
 
                                 <View style={styles.ormValueContainer}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
+                                    <View style={styles.valueWithUnit}>
                                         <Text style={styles.ormValue}>{Math.round(orm.estimated1RM)}</Text>
                                         <Text style={styles.ormUnit}>kg</Text>
                                     </View>
                                 </View>
-                                <ChevronRight size={14} color={Colors.iron[400]} style={{ marginLeft: 6 }} />
+                                <ChevronRight size={16} color={colors.iron[400]} style={styles.chevron} />
                             </View>
                         </Pressable>
                     ))
@@ -78,11 +221,11 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
             </View>
 
             {/* TOP PROGRESS */}
-            <View style={{ marginTop: 32 }}>
+            <View style={styles.sectionSpacingLarge}>
                 <View style={styles.sectionHeader}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={[styles.sectionAccent, { backgroundColor: Colors.green }]} />
-                        <TrendingUp size={16} color={Colors.iron[950]} />
+                    <View style={styles.sectionTitleContainer}>
+                        <View style={[styles.sectionAccent, { backgroundColor: colors.green }]} />
+                        <TrendingUp size={18} color={colors.iron[950]} />
                         <Text style={styles.sectionTitle}>Mayores Progresos</Text>
                     </View>
                 </View>
@@ -97,17 +240,17 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
                     top1RMProgress.slice(0, 4).map((prog, idx) => (
                         <Pressable
                             key={prog.exerciseId}
-                            style={[styles.ormCard, idx < 3 && { marginBottom: 10 }]}
+                            style={styles.ormCard}
                             onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: prog.exerciseId, exerciseId: prog.exerciseId, exerciseName: prog.exerciseName } } as any)}
                         >
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <View style={[styles.rankBadge, { backgroundColor: withAlpha(Colors.green, '15') }]}>
-                                    <TrendingUp size={14} color={Colors.green} />
+                            <View style={styles.cardContent}>
+                                <View style={[styles.rankBadge, styles.progBadge]}>
+                                    <TrendingUp size={16} color={colors.green} />
                                 </View>
 
-                                <View style={{ flex: 1, marginLeft: 12 }}>
+                                <View style={styles.cardInfo}>
                                     <Text style={styles.ormName} numberOfLines={1}>{prog.exerciseName}</Text>
-                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                                    <View style={styles.badgesContainer}>
                                         {prog.badges?.map((b, i) => (
                                             <BadgePill key={i} name={b.name} color={b.color} icon={b.icon} size="xs" />
                                         ))}
@@ -118,12 +261,12 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
                                 </View>
 
                                 <View style={styles.ormValueContainer}>
-                                    <Text style={[styles.ormValue, { color: Colors.green }]}>+{Math.round(prog.delta)}</Text>
-                                    <Text style={[styles.ormUnit, { color: Colors.green }]}>
+                                    <Text style={styles.deltaValue}>+{Math.round(prog.delta)}</Text>
+                                    <Text style={styles.deltaUnit}>
                                         {prog.deltaPct ? `${prog.deltaPct}%` : 'kg'}
                                     </Text>
                                 </View>
-                                <ChevronRight size={14} color={Colors.iron[400]} style={{ marginLeft: 6 }} />
+                                <ChevronRight size={16} color={colors.iron[400]} style={styles.chevron} />
                             </View>
                         </Pressable>
                     ))
@@ -133,87 +276,4 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
     );
 }
 
-const styles = StyleSheet.create({
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 14,
-        paddingHorizontal: 4,
-    },
-    sectionAccent: {
-        width: 3,
-        height: 18,
-        borderRadius: 2,
-        backgroundColor: Colors.primary.DEFAULT,
-    },
-    sectionTitle: {
-        fontSize: 16,
-        fontWeight: '900',
-        color: Colors.iron[950],
-        letterSpacing: -0.3,
-    },
-    rangeBadge: {
-        backgroundColor: withAlpha(Colors.primary.DEFAULT, '15'),
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 10,
-    },
-    rangeBadgeText: {
-        fontSize: 11,
-        fontWeight: '800',
-        color: Colors.primary.DEFAULT,
-    },
-    ormCard: {
-        backgroundColor: Colors.surface,
-        padding: 12,
-        borderRadius: 14,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        elevation: 1,
-        shadowColor: ThemeFx.shadowColor,
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 4,
-    },
-    rankBadge: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: withAlpha(Colors.primary.DEFAULT, '15'),
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    rankText: {
-        fontSize: 13,
-        fontWeight: '900',
-        color: Colors.primary.DEFAULT,
-    },
-    ormName: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: Colors.iron[950],
-    },
-    ormBasis: {
-        fontSize: 10,
-        fontWeight: '600',
-        color: Colors.iron[400],
-        marginTop: 2,
-    },
-    ormValueContainer: {
-        alignItems: 'flex-end',
-        minWidth: 50,
-    },
-    ormValue: {
-        fontSize: 18,
-        fontWeight: '900',
-        color: Colors.primary.DEFAULT,
-        letterSpacing: -0.5,
-    },
-    ormUnit: {
-        fontSize: 9,
-        fontWeight: '800',
-        color: Colors.iron[400],
-        textTransform: 'uppercase',
-    },
-});
+

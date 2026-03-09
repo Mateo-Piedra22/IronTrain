@@ -1,7 +1,8 @@
-import { Colors, ThemeFx, withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { Plus } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useColors } from '../src/hooks/useColors';
 import { badgeService } from '../src/services/BadgeService';
 import { CategoryService } from '../src/services/CategoryService';
 import { ExerciseService } from '../src/services/ExerciseService';
@@ -18,6 +19,94 @@ interface ExerciseFormModalProps {
 }
 
 export function ExerciseFormModal({ visible, onClose, onSave, initialData }: ExerciseFormModalProps) {
+    const colors = useColors();
+    const ss = useMemo(() => StyleSheet.create({
+        overlay: { flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center', padding: 16 },
+        modalContent: {
+            backgroundColor: colors.surface,
+            width: '100%',
+            maxWidth: 380,
+            borderRadius: 20,
+            padding: 24,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            elevation: 8,
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 12 },
+            shadowOpacity: 0.1,
+            shadowRadius: 24,
+        },
+        title: { fontSize: 22, fontWeight: '900', color: colors.iron[950], marginBottom: 20, letterSpacing: -0.8 },
+        label: { color: colors.iron[500], fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1.2, marginLeft: 4 },
+        input: {
+            backgroundColor: colors.iron[100],
+            borderRadius: 16,
+            padding: 16,
+            fontSize: 16,
+            color: colors.iron[950],
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            marginBottom: 24,
+            fontWeight: '700'
+        },
+        section: { marginBottom: 24 },
+        chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+        catChip: {
+            paddingHorizontal: 12, paddingVertical: 10,
+            borderRadius: 14,
+            backgroundColor: colors.iron[100],
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            flexDirection: 'row',
+            alignItems: 'center'
+        },
+        catDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
+        catText: { fontSize: 13, fontWeight: '800', color: colors.iron[600] },
+
+        badgePicker: {
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 6,
+            minHeight: 52,
+            backgroundColor: colors.iron[100],
+            borderRadius: 16,
+            padding: 10,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            alignItems: 'center'
+        },
+        badgePlaceholder: { flexDirection: 'row', alignItems: 'center', opacity: 0.6, gap: 6 },
+        badgePlaceholderText: { fontSize: 13, color: colors.iron[500], fontWeight: '800' },
+        addBadgeIcon: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.iron[200], justifyContent: 'center', alignItems: 'center' },
+
+        typeContainer: { gap: 10 },
+        typeCard: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            padding: 16,
+            borderRadius: 16,
+            backgroundColor: colors.iron[100],
+            borderWidth: 1.5,
+            borderColor: colors.border
+        },
+        typeCardActive: {
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '08'),
+            borderColor: colors.primary.DEFAULT
+        },
+        typeLabel: { fontSize: 14, fontWeight: '900', color: colors.iron[950] },
+        typeLabelActive: { color: colors.primary.DEFAULT },
+        typeDesc: { fontSize: 11, color: colors.iron[500], marginTop: 2, fontWeight: '600' },
+        typeIndicator: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary.DEFAULT },
+
+        footer: { flexDirection: 'row', gap: 12, marginTop: 12 },
+        cancelBtn: { flex: 1, padding: 16, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', backgroundColor: colors.iron[100] },
+        cancelText: { color: colors.iron[600], fontWeight: '800', fontSize: 15 },
+        saveBtn: {
+            flex: 1, backgroundColor: colors.primary.DEFAULT, padding: 16, borderRadius: 16, alignItems: 'center',
+            shadowColor: colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4
+        },
+        saveText: { color: colors.white, fontWeight: '900', fontSize: 15 }
+    }), [colors]);
     const [name, setName] = useState('');
     const [categoryId, setCategoryId] = useState('');
     const [type, setType] = useState<ExerciseType>('weight_reps');
@@ -97,80 +186,61 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
     ];
 
     return (
-        <Modal visible={visible} animationType="fade" transparent>
+        <Modal visible={visible} animationType="fade" transparent statusBarTranslucent>
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                style={{ flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center', padding: 16 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={ss.overlay}
             >
-                <View style={{
-                    backgroundColor: Colors.surface, width: '100%', maxWidth: 360,
-                    borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.iron[700],
-                    elevation: 8, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24,
-                }}>
-                    <Text style={{ fontSize: 20, fontWeight: '900', color: Colors.iron[950], marginBottom: 20, letterSpacing: -0.3 }}>
+                <View style={ss.modalContent}>
+                    <Text style={ss.title}>
                         {initialData ? 'Editar ejercicio' : 'Nuevo ejercicio'}
                     </Text>
 
                     {/* Name */}
-                    <Text style={{ color: Colors.iron[500], fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Nombre</Text>
+                    <Text style={ss.label}>Nombre</Text>
                     <TextInput
                         value={name}
                         onChangeText={setName}
                         placeholder="Ej: Press de banca"
-                        placeholderTextColor={Colors.iron[400]}
-                        style={{
-                            backgroundColor: Colors.iron[200], borderRadius: 12, padding: 14,
-                            fontSize: 16, color: Colors.iron[950], borderWidth: 1, borderColor: Colors.iron[300],
-                            marginBottom: 20
-                        }}
+                        placeholderTextColor={colors.iron[400]}
+                        style={ss.input}
                         accessibilityLabel="Nombre del ejercicio"
                     />
 
                     {/* Category */}
-                    <Text style={{ color: Colors.iron[500], fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Categoría</Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+                    <Text style={ss.label}>Categoría</Text>
+                    <View style={[ss.chipRow, ss.section]}>
                         {categories.map(cat => {
                             const isActive = categoryId === cat.id;
-                            const catColor = (cat as any).color || Colors.primary.DEFAULT;
+                            const catColor = (cat as any).color || colors.primary.DEFAULT;
                             return (
                                 <TouchableOpacity
                                     key={cat.id}
                                     onPress={() => setCategoryId(cat.id)}
                                     style={[
-                                        { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.iron[200], borderWidth: 1, borderColor: Colors.iron[300], flexDirection: 'row', alignItems: 'center' },
-                                        isActive && { backgroundColor: withAlpha(catColor, '18'), borderColor: catColor }
+                                        ss.catChip,
+                                        isActive && { backgroundColor: withAlpha(catColor, '14'), borderColor: catColor }
                                     ]}
                                     accessibilityRole="button"
                                 >
-                                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: catColor, marginRight: 6 }} />
-                                    <Text style={[{ fontSize: 13, fontWeight: '600', color: Colors.iron[600] }, isActive && { color: catColor, fontWeight: '700' }]}>{cat.name}</Text>
+                                    <View style={[ss.catDot, { backgroundColor: catColor }]} />
+                                    <Text style={[ss.catText, isActive && { color: catColor, fontWeight: '900' }]}>{cat.name}</Text>
                                 </TouchableOpacity>
                             );
                         })}
                     </View>
 
                     {/* Badges Selection */}
-                    <Text style={{ color: Colors.iron[500], fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Badges / Etiquetas</Text>
-                    <View style={{ marginBottom: 20 }}>
+                    <Text style={ss.label}>Badges / Etiquetas</Text>
+                    <View style={ss.section}>
                         <TouchableOpacity
                             onPress={() => setShowBadgeSelector(true)}
-                            style={{
-                                flexDirection: 'row',
-                                flexWrap: 'wrap',
-                                gap: 6,
-                                minHeight: 48,
-                                backgroundColor: Colors.iron[200],
-                                borderRadius: 12,
-                                padding: 10,
-                                borderWidth: 1,
-                                borderColor: Colors.iron[300],
-                                alignItems: 'center'
-                            }}
+                            style={ss.badgePicker}
                         >
                             {selectedBadgeIds.length === 0 ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', opacity: 0.5 }}>
-                                    <Plus size={14} color={Colors.iron[400]} />
-                                    <Text style={{ fontSize: 13, color: Colors.iron[400], marginLeft: 4, fontWeight: '600' }}>Añadir badges...</Text>
+                                <View style={ss.badgePlaceholder}>
+                                    <Plus size={16} color={colors.iron[400]} />
+                                    <Text style={ss.badgePlaceholderText}>Añadir badges...</Text>
                                 </View>
                             ) : (
                                 <>
@@ -187,8 +257,8 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
                                             />
                                         );
                                     })}
-                                    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.iron[300], justifyContent: 'center', alignItems: 'center', marginLeft: 4 }}>
-                                        <Plus size={12} color={Colors.iron[600]} />
+                                    <View style={ss.addBadgeIcon}>
+                                        <Plus size={14} color={colors.iron[600]} />
                                     </View>
                                 </>
                             )}
@@ -196,46 +266,37 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
                     </View>
 
                     {/* Type/Registro Selection */}
-                    <Text style={{ color: Colors.iron[500], fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Registro</Text>
-
-                    <View style={{ gap: 8, marginBottom: 24 }}>
+                    <Text style={ss.label}>Registro</Text>
+                    <View style={[ss.typeContainer, ss.section]}>
                         {EXERCISE_TYPES.map(t => {
                             const isActive = type === t.id;
                             return (
                                 <TouchableOpacity
                                     key={t.id}
                                     onPress={() => setType(t.id)}
-                                    style={[
-                                        { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, backgroundColor: Colors.iron[200], borderWidth: 1, borderColor: Colors.iron[300] },
-                                        isActive && { backgroundColor: withAlpha(Colors.primary.DEFAULT, '12'), borderColor: Colors.primary.DEFAULT }
-                                    ]}
+                                    style={[ss.typeCard, isActive && ss.typeCardActive]}
                                     accessibilityRole="button"
                                 >
                                     <View style={{ flex: 1 }}>
-                                        <Text style={[{ fontSize: 14, fontWeight: '700', color: Colors.iron[950] }, isActive && { color: Colors.primary.DEFAULT }]}>{t.label}</Text>
-                                        <Text style={{ fontSize: 11, color: Colors.iron[400], marginTop: 2 }}>{t.desc}</Text>
+                                        <Text style={[ss.typeLabel, isActive && ss.typeLabelActive]}>{t.label}</Text>
+                                        <Text style={ss.typeDesc}>{t.desc}</Text>
                                     </View>
-                                    {isActive && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.primary.DEFAULT }} />}
+                                    {isActive && <View style={ss.typeIndicator} />}
                                 </TouchableOpacity>
                             );
                         })}
                     </View>
 
-                    <View style={{ flexDirection: 'row', gap: 12 }}>
-                        <View style={{ flex: 1 }}>
-                            <TouchableOpacity onPress={onClose} style={{ padding: 14, borderRadius: 12, borderWidth: 1, borderColor: Colors.iron[300], alignItems: 'center' }}>
-                                <Text style={{ color: Colors.iron[600], fontWeight: '700', fontSize: 14 }}>Cancelar</Text>
-                            </TouchableOpacity>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <TouchableOpacity onPress={handleSave} style={{ backgroundColor: Colors.primary.DEFAULT, padding: 14, borderRadius: 12, alignItems: 'center' }}>
-                                <Text style={{ color: Colors.surface, fontWeight: '800', fontSize: 14 }}>Guardar</Text>
-                            </TouchableOpacity>
-                        </View>
+                    <View style={ss.footer}>
+                        <TouchableOpacity onPress={onClose} style={ss.cancelBtn}>
+                            <Text style={ss.cancelText}>Cancelar</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={handleSave} style={ss.saveBtn}>
+                            <Text style={ss.saveText}>Guardar</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* Badge Picker Sub-Modal */}
                 <BadgeSelectorModal
                     visible={showBadgeSelector}
                     onClose={() => setShowBadgeSelector(false)}
@@ -248,23 +309,4 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
     );
 }
 
-const ss = StyleSheet.create({
-    overlay: { flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'flex-end' },
-    sheet: { backgroundColor: Colors.iron[900], borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '85%', borderTopWidth: 1, borderTopColor: Colors.iron[700] },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.iron[200] },
-    headerBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: Colors.iron[200], borderWidth: 1, borderColor: Colors.iron[300], justifyContent: 'center', alignItems: 'center' },
-    headerTitle: { color: Colors.iron[950], fontSize: 16, fontWeight: '900', letterSpacing: -0.3 },
-    label: { fontSize: 10, fontWeight: '800', color: Colors.iron[400], textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
-    input: { backgroundColor: Colors.surface, color: Colors.iron[950], padding: 16, borderRadius: 14, fontSize: 16, marginBottom: 24, borderWidth: 1, borderColor: Colors.iron[700], fontWeight: '600' },
-    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
-    catChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: Colors.iron[700], backgroundColor: 'transparent' },
-    catChipText: { fontSize: 13, fontWeight: '700', color: Colors.iron[500] },
-    typeCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderRadius: 14, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.iron[700] },
-    typeCardActive: { borderColor: Colors.primary.DEFAULT, backgroundColor: withAlpha(Colors.primary.DEFAULT, '08') },
-    typeLabel: { fontSize: 14, fontWeight: '800', color: Colors.iron[950] },
-    typeDesc: { fontSize: 11, color: Colors.iron[400], marginTop: 2 },
-    activeIndicator: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary.DEFAULT },
-    bottomBar: { padding: 16, backgroundColor: Colors.iron[900], borderTopWidth: 1, borderTopColor: Colors.iron[200], marginBottom: 16 },
-    saveBtn: { backgroundColor: Colors.primary.DEFAULT, paddingVertical: 16, borderRadius: 14, alignItems: 'center', shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 },
-    saveBtnText: { color: Colors.white, fontWeight: '900', fontSize: 16, letterSpacing: 0.3 },
-});
+

@@ -1,6 +1,6 @@
 import { dbService } from '@/src/services/DatabaseService';
 import { workoutService } from '@/src/services/WorkoutService';
-import { Colors, ThemeFx } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,6 +9,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { Swipeable } from 'react-native-gesture-handler';
+import { useColors } from '../src/hooks/useColors';
 import { confirm } from '../src/store/confirmStore';
 import type { ExerciseType } from '../src/types/db';
 import { WorkoutSet } from '../src/types/db';
@@ -35,6 +36,38 @@ interface GroupedExercise {
 
 
 export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopyPress, onLoadRoutinePress }: WorkoutLogProps) {
+    const colors = useColors();
+    const ss = useMemo(() => StyleSheet.create({
+        container: { flex: 1, paddingHorizontal: 16, paddingTop: 8, position: 'relative' },
+        empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+        emptyTitle: { color: colors.iron[400], textAlign: 'center', fontSize: 16, marginTop: 16, fontWeight: '700' },
+        emptySub: { color: colors.iron[400], textAlign: 'center', marginTop: 8, fontSize: 13 },
+        emptySeparator: { width: 40, marginVertical: 16, borderBottomWidth: 1, borderStyle: 'dashed', borderBottomColor: colors.iron[300] },
+        emptyActions: { flexDirection: 'row', gap: 12 },
+
+        swipeRight: { justifyContent: 'center', alignItems: 'flex-end', borderTopRightRadius: 14, borderBottomRightRadius: 14, marginVertical: 1, marginLeft: -20, width: 96, backgroundColor: colors.red, shadowColor: ThemeFx.shadowColor, shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+        swipeLeft: { justifyContent: 'center', alignItems: 'flex-start', width: 96, borderTopLeftRadius: 14, borderBottomLeftRadius: 14, marginVertical: 1, marginRight: -20, backgroundColor: colors.primary.dark, shadowColor: ThemeFx.shadowColor, shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+        swipeLabel: { color: colors.white, fontSize: 9, fontWeight: '900', marginTop: 4, letterSpacing: 0.5 },
+
+        actionBtn: {
+            flexDirection: 'row', alignItems: 'center', gap: 6,
+            paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100,
+            backgroundColor: colors.surface, borderWidth: 1,
+            borderColor: colors.iron[300], borderStyle: 'dashed',
+        },
+        actionBtnText: { fontSize: 11, fontWeight: '700', color: colors.iron[500], textTransform: 'uppercase' },
+
+        reorderItem: { marginBottom: 10 },
+        listContent: { paddingBottom: 100 },
+
+        footerWrapper: { paddingTop: 4 },
+        footerSeparator: { marginHorizontal: 24, marginBottom: 16, borderBottomWidth: 1, borderStyle: 'dashed', borderBottomColor: colors.iron[300] },
+        footerActions: { alignItems: 'center', paddingBottom: 96, flexDirection: 'row', justifyContent: 'center', gap: 12 },
+
+        topGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 16, zIndex: 1 },
+        bottomGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 80, zIndex: 1 }
+    }), [colors]);
+
     const [localGroups, setLocalGroups] = useState<GroupedExercise[]>([]);
 
     const grouped = useMemo(() => {
@@ -95,25 +128,20 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
     if (localGroups.length === 0) {
         return (
             <View style={ss.empty}>
-                <Dumbbell size={48} color={Colors.iron[300]} />
+                <Dumbbell size={48} color={colors.iron[300]} />
                 <Text style={ss.emptyTitle}>Todavía no registraste ejercicios.</Text>
                 <Text style={ss.emptySub}>Tocá "+" para agregar uno.</Text>
                 {(onCopyPress || onLoadRoutinePress) && (
                     <>
-                        <View style={{ width: 40, marginVertical: 16, borderBottomWidth: 1, borderStyle: 'dashed', borderBottomColor: Colors.iron[300] }} />
-                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                        <View style={ss.emptySeparator} />
+                        <View style={ss.emptyActions}>
                             {onLoadRoutinePress && (
                                 <TouchableOpacity
                                     onPress={onLoadRoutinePress}
-                                    style={{
-                                        flexDirection: 'row', alignItems: 'center', gap: 6,
-                                        paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100,
-                                        backgroundColor: Colors.surface, borderWidth: 1,
-                                        borderColor: Colors.iron[300], borderStyle: 'dashed',
-                                    }}
+                                    style={ss.actionBtn}
                                 >
-                                    <BookOpen size={12} color={Colors.iron[400]} />
-                                    <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.iron[500], textTransform: 'uppercase' }}>
+                                    <BookOpen size={12} color={colors.iron[400]} />
+                                    <Text style={ss.actionBtnText}>
                                         Cargar Rutina
                                     </Text>
                                 </TouchableOpacity>
@@ -122,15 +150,10 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
                             {onCopyPress && (
                                 <TouchableOpacity
                                     onPress={onCopyPress}
-                                    style={{
-                                        flexDirection: 'row', alignItems: 'center', gap: 6,
-                                        paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100,
-                                        backgroundColor: Colors.surface, borderWidth: 1,
-                                        borderColor: Colors.iron[300], borderStyle: 'dashed',
-                                    }}
+                                    style={ss.actionBtn}
                                 >
-                                    <Copy size={12} color={Colors.iron[400]} />
-                                    <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.iron[500], textTransform: 'uppercase' }}>
+                                    <Copy size={12} color={colors.iron[400]} />
+                                    <Text style={ss.actionBtnText}>
                                         Copiar historial
                                     </Text>
                                 </TouchableOpacity>
@@ -153,7 +176,7 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
                             style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
                             accessibilityRole="button" accessibilityLabel={`Eliminar ${group.exercise_name}`}
                         >
-                            <Trash2 size={22} color={Colors.white} />
+                            <Trash2 size={22} color={colors.white} />
                             <Text style={ss.swipeLabel}>ELIMINAR</Text>
                         </TouchableOpacity>
                     </Animated.View>
@@ -172,7 +195,7 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
                             style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
                             accessibilityRole="button" accessibilityLabel={`Mantener para reordenar ${group.exercise_name}`}
                         >
-                            <GripVertical size={20} color={Colors.white} />
+                            <GripVertical size={20} color={colors.white} />
                             <Text style={ss.swipeLabel}>ORDENAR</Text>
                         </TouchableOpacity>
                     </Animated.View>
@@ -182,7 +205,7 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
 
         return (
             <ScaleDecorator>
-                <View style={{ marginBottom: 10 }}>
+                <View style={ss.reorderItem}>
                     <Swipeable
                         renderRightActions={renderRightActions}
                         renderLeftActions={renderLeftActions}
@@ -208,32 +231,25 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
 
     return (
         <View style={ss.container}>
-            <LinearGradient colors={[Colors.iron[900], 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 16, zIndex: 1 }} pointerEvents="none" />
+            <LinearGradient colors={[colors.background, withAlpha(colors.background, '00')]} style={ss.topGradient} pointerEvents="none" />
             <DraggableFlatList
                 data={localGroups}
                 onDragEnd={({ data }) => handleReorder(data)}
                 keyExtractor={(item) => item.exercise_id}
                 renderItem={renderItem}
-                contentContainerStyle={{ paddingBottom: 100 }}
+                contentContainerStyle={ss.listContent}
                 ListFooterComponent={
-                    <View style={{ paddingTop: 4 }}>
-                        {/* Dotted separator */}
-                        <View style={{ marginHorizontal: 24, marginBottom: 16, borderBottomWidth: 1, borderStyle: 'dashed', borderBottomColor: Colors.iron[300] }} />
-                        {/* Action buttons (Copy/Load) */}
+                    <View style={ss.footerWrapper}>
+                        <View style={ss.footerSeparator} />
                         {(onCopyPress || onLoadRoutinePress) && (
-                            <View style={{ alignItems: 'center', paddingBottom: 96, flexDirection: 'row', justifyContent: 'center', gap: 12 }}>
+                            <View style={ss.footerActions}>
                                 {onLoadRoutinePress && (
                                     <TouchableOpacity
                                         onPress={onLoadRoutinePress}
-                                        style={{
-                                            flexDirection: 'row', alignItems: 'center', gap: 6,
-                                            paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100,
-                                            backgroundColor: Colors.surface, borderWidth: 1,
-                                            borderColor: Colors.iron[300], borderStyle: 'dashed',
-                                        }}
+                                        style={ss.actionBtn}
                                     >
-                                        <BookOpen size={12} color={Colors.iron[400]} />
-                                        <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.iron[500], textTransform: 'uppercase' }}>
+                                        <BookOpen size={12} color={colors.iron[400]} />
+                                        <Text style={ss.actionBtnText}>
                                             Cargar Rutina
                                         </Text>
                                     </TouchableOpacity>
@@ -242,17 +258,12 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
                                 {onCopyPress && (
                                     <TouchableOpacity
                                         onPress={onCopyPress}
-                                        style={{
-                                            flexDirection: 'row', alignItems: 'center', gap: 6,
-                                            paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100,
-                                            backgroundColor: Colors.surface, borderWidth: 1,
-                                            borderColor: Colors.iron[300], borderStyle: 'dashed',
-                                        }}
+                                        style={ss.actionBtn}
                                         accessibilityRole="button"
                                         accessibilityLabel="Copiar ejercicios desde otro día"
                                     >
-                                        <Copy size={12} color={Colors.iron[400]} />
-                                        <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.iron[500], textTransform: 'uppercase' }}>
+                                        <Copy size={12} color={colors.iron[400]} />
+                                        <Text style={ss.actionBtnText}>
                                             Copiar historial
                                         </Text>
                                     </TouchableOpacity>
@@ -263,17 +274,9 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
                 }
                 activationDistance={20}
             />
-            <LinearGradient colors={['transparent', Colors.iron[900]]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 80, zIndex: 1 }} pointerEvents="none" />
+            <LinearGradient colors={[withAlpha(colors.background, '00'), colors.background]} style={ss.bottomGradient} pointerEvents="none" />
         </View>
     );
 }
 
-const ss = StyleSheet.create({
-    container: { flex: 1, paddingHorizontal: 16, paddingTop: 8, position: 'relative' },
-    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-    emptyTitle: { color: Colors.iron[400], textAlign: 'center', fontSize: 16, marginTop: 16, fontWeight: '700' },
-    emptySub: { color: Colors.iron[400], textAlign: 'center', marginTop: 8, fontSize: 13 },
-    swipeRight: { justifyContent: 'center', alignItems: 'flex-end', borderTopRightRadius: 14, borderBottomRightRadius: 14, marginVertical: 1, marginLeft: -20, width: 96, backgroundColor: Colors.red, shadowColor: ThemeFx.shadowColor, shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
-    swipeLeft: { justifyContent: 'center', alignItems: 'flex-start', width: 96, borderTopLeftRadius: 14, borderBottomLeftRadius: 14, marginVertical: 1, marginRight: -20, backgroundColor: Colors.primary.dark, shadowColor: ThemeFx.shadowColor, shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
-    swipeLabel: { color: Colors.white, fontSize: 9, fontWeight: '900', marginTop: 4, letterSpacing: 0.5 },
-});
+

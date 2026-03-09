@@ -1,9 +1,9 @@
-import { Colors } from '@/src/theme';
 import { eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, startOfMonth, startOfWeek, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as Haptics from 'expo-haptics';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useColors } from '../src/hooks/useColors';
 
 interface ConsistencyHeatmapProps {
     timestamps: number[];
@@ -12,10 +12,210 @@ interface ConsistencyHeatmapProps {
 const CELL_SIZE = 12;
 const GAP = 2;
 const MONTH_GAP = 10;
+const MONTH_CARD_PADDING = 6;
 
 export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
+    const colors = useColors();
     const [selectedDate, setSelectedDate] = useState<{ date: Date; count: number } | null>(null);
     const scrollViewRef = useRef<ScrollView>(null);
+
+    const ss = useMemo(() => StyleSheet.create({
+        container: {
+            backgroundColor: colors.surface,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            padding: 20,
+            borderRadius: 20,
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.05,
+            shadowRadius: 15,
+            elevation: 4,
+        },
+        header: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: 20,
+        },
+        headerInfo: {
+            flex: 1
+        },
+        titleRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+        },
+        title: {
+            color: colors.primary.DEFAULT,
+            fontWeight: '900',
+            fontSize: 18,
+            letterSpacing: -0.3,
+        },
+        yearBadge: {
+            backgroundColor: colors.primary.DEFAULT,
+            paddingHorizontal: 10,
+            paddingVertical: 3,
+            borderRadius: 10,
+            shadowColor: colors.primary.DEFAULT,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.2,
+            shadowRadius: 4,
+            elevation: 2,
+        },
+        yearText: {
+            color: colors.surface,
+            fontSize: 11,
+            fontWeight: '900',
+            letterSpacing: 0.5,
+        },
+        subtitle: {
+            color: colors.iron[500],
+            fontSize: 12,
+            marginTop: 4,
+            fontWeight: '700',
+        },
+        tooltip: {
+            alignItems: 'flex-end',
+            backgroundColor: colors.iron[100],
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 12,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+        },
+        tooltipDate: {
+            color: colors.iron[950],
+            fontSize: 11,
+            fontWeight: '900',
+            textTransform: 'uppercase',
+        },
+        tooltipCount: {
+            color: colors.primary.DEFAULT,
+            fontSize: 12,
+            fontWeight: '800',
+            marginTop: 2,
+        },
+        scrollContent: {
+            paddingRight: 4,
+        },
+        gridWrapper: {
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+        },
+        dayLabelsColumn: {
+            marginRight: 6,
+            marginTop: 26, // Offset for month label row
+        },
+        dayLabelContainer: {
+            height: CELL_SIZE + GAP,
+            justifyContent: 'center'
+        },
+        dayLabel: {
+            fontSize: 9,
+            color: colors.iron[400],
+            fontWeight: '900',
+            textAlign: 'center',
+            width: 12,
+        },
+
+        // Year divider between year changes
+        yearDivider: {
+            width: 24,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 6,
+            marginTop: 26, // Align with cells
+        },
+        yearDividerLine: {
+            width: 1.5,
+            flex: 1,
+            backgroundColor: colors.iron[200],
+            minHeight: 12,
+        },
+        yearDividerText: {
+            fontSize: 10,
+            color: colors.iron[500],
+            fontWeight: '900',
+            transform: [{ rotate: '-90deg' }],
+            width: 40,
+            textAlign: 'center',
+            marginVertical: 4,
+        },
+
+        // Month card encapsulation
+        monthContainer: {
+            flexDirection: 'row'
+        },
+        monthCard: {
+            flexDirection: 'column',
+        },
+        marginRight: {
+            marginRight: MONTH_GAP
+        },
+        monthLabelRow: {
+            height: 20,
+            marginBottom: 6,
+            alignItems: 'center',
+        },
+        monthLabel: {
+            fontSize: 11,
+            color: colors.iron[950],
+            fontWeight: '900',
+            letterSpacing: 0.3,
+        },
+        monthGridContainer: {
+            backgroundColor: colors.iron[50],
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: colors.iron[100],
+            padding: MONTH_CARD_PADDING + 2,
+        },
+        weeksRow: {
+            flexDirection: 'row',
+            gap: GAP,
+        },
+        weekColumn: {
+            gap: GAP,
+        },
+        cell: {
+            width: CELL_SIZE,
+            height: CELL_SIZE,
+            borderRadius: 4,
+        },
+        cellToday: {
+            borderWidth: 2,
+            borderColor: colors.iron[950],
+        },
+        cellEmpty: {
+            width: CELL_SIZE,
+            height: CELL_SIZE,
+            borderRadius: 4,
+            backgroundColor: 'transparent',
+        },
+        legend: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            marginTop: 20,
+            gap: 6,
+            paddingTop: 12,
+            borderTopWidth: 1.5,
+            borderTopColor: colors.iron[100],
+        },
+        legendLabel: {
+            color: colors.iron[400],
+            fontSize: 11,
+            fontWeight: '900',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+        },
+        legendCell: {
+            width: CELL_SIZE,
+            height: CELL_SIZE,
+            borderRadius: 4,
+        },
+    }), [colors]);
 
     /** Build month-by-month grid covering exactly the last 12 calendar months */
     const months = useMemo(() => {
@@ -75,11 +275,11 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
     }, [timestamps]);
 
     const getCellColor = (count: number, isSelected: boolean): string => {
-        if (isSelected) return Colors.iron[950];
-        if (count === 0) return Colors.iron[300];
-        if (count === 1) return Colors.primary.light;
-        if (count === 2) return Colors.primary.DEFAULT;
-        return Colors.primary.dark;
+        if (isSelected) return colors.iron[950];
+        if (count === 0) return colors.iron[200];
+        if (count === 1) return colors.primary.light;
+        if (count === 2) return colors.primary.DEFAULT;
+        return colors.primary.dark;
     };
 
     // Auto-scroll to the right (today's position)
@@ -94,26 +294,26 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
     const currentYear = new Date().getFullYear();
 
     return (
-        <View style={styles.container}>
+        <View style={ss.container}>
             {/* Header */}
-            <View style={styles.header}>
-                <View style={{ flex: 1 }}>
-                    <View style={styles.titleRow}>
-                        <Text style={styles.title}>Consistencia</Text>
-                        <View style={styles.yearBadge}>
-                            <Text style={styles.yearText}>{currentYear}</Text>
+            <View style={ss.header}>
+                <View style={ss.headerInfo}>
+                    <View style={ss.titleRow}>
+                        <Text style={ss.title}>Consistencia</Text>
+                        <View style={ss.yearBadge}>
+                            <Text style={ss.yearText}>{currentYear}</Text>
                         </View>
                     </View>
-                    <Text style={styles.subtitle}>
+                    <Text style={ss.subtitle}>
                         {totalSessions} entrenamientos · {totalActiveDays} días activos
                     </Text>
                 </View>
                 {selectedDate && (
-                    <View style={styles.tooltip}>
-                        <Text style={styles.tooltipDate}>
+                    <View style={ss.tooltip}>
+                        <Text style={ss.tooltipDate}>
                             {format(selectedDate.date, 'd MMM yyyy', { locale: es })}
                         </Text>
-                        <Text style={styles.tooltipCount}>
+                        <Text style={ss.tooltipCount}>
                             {selectedDate.count === 0
                                 ? 'Descanso'
                                 : selectedDate.count === 1
@@ -129,15 +329,15 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
                 ref={scrollViewRef}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={ss.scrollContent}
             >
-                <View style={styles.gridWrapper}>
+                <View style={ss.gridWrapper}>
                     {/* Day labels column */}
-                    <View style={styles.dayLabelsColumn}>
+                    <View style={ss.dayLabelsColumn}>
                         {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((label, idx) => (
-                            <View key={idx} style={{ height: CELL_SIZE + GAP, justifyContent: 'center' }}>
+                            <View key={idx} style={ss.dayLabelContainer}>
                                 {(idx === 0 || idx === 2 || idx === 4 || idx === 6) ? (
-                                    <Text style={styles.dayLabel}>{label}</Text>
+                                    <Text style={ss.dayLabel}>{label}</Text>
                                 ) : null}
                             </View>
                         ))}
@@ -150,34 +350,34 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
                         const showYearDivider = mIdx > 0 && month.year !== prevYear;
 
                         return (
-                            <View key={mIdx} style={{ flexDirection: 'row' }}>
+                            <View key={mIdx} style={ss.monthContainer}>
                                 {/* Year divider line */}
                                 {showYearDivider && (
-                                    <View style={styles.yearDivider}>
-                                        <View style={styles.yearDividerLine} />
-                                        <Text style={styles.yearDividerText}>{month.year}</Text>
-                                        <View style={styles.yearDividerLine} />
+                                    <View style={ss.yearDivider}>
+                                        <View style={ss.yearDividerLine} />
+                                        <Text style={ss.yearDividerText}>{month.year}</Text>
+                                        <View style={ss.yearDividerLine} />
                                     </View>
                                 )}
 
                                 {/* Month card */}
                                 <View style={[
-                                    styles.monthCard,
-                                    mIdx < months.length - 1 && { marginRight: MONTH_GAP }
+                                    ss.monthCard,
+                                    mIdx < months.length - 1 && ss.marginRight
                                 ]}>
                                     {/* Month label centered above the grid */}
-                                    <View style={styles.monthLabelRow}>
-                                        <Text style={styles.monthLabel}>{month.label}</Text>
+                                    <View style={ss.monthLabelRow}>
+                                        <Text style={ss.monthLabel}>{month.label}</Text>
                                     </View>
 
                                     {/* Weeks (columns) inside the card */}
-                                    <View style={styles.monthGridContainer}>
-                                        <View style={styles.weeksRow}>
+                                    <View style={ss.monthGridContainer}>
+                                        <View style={ss.weeksRow}>
                                             {month.weeks.map((week, wIdx) => (
-                                                <View key={wIdx} style={styles.weekColumn}>
+                                                <View key={wIdx} style={ss.weekColumn}>
                                                     {week.map((day, dIdx) => {
                                                         if (!day) {
-                                                            return <View key={dIdx} style={styles.cellEmpty} />;
+                                                            return <View key={dIdx} style={ss.cellEmpty} />;
                                                         }
 
                                                         const key = format(day, 'yyyy-MM-dd');
@@ -193,9 +393,9 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
                                                                     setSelectedDate({ date: day, count });
                                                                 }}
                                                                 style={[
-                                                                    styles.cell,
+                                                                    ss.cell,
                                                                     { backgroundColor: getCellColor(count, isSelected) },
-                                                                    isToday && !isSelected && styles.cellToday,
+                                                                    isToday && !isSelected && ss.cellToday,
                                                                 ]}
                                                             />
                                                         );
@@ -212,190 +412,15 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
             </ScrollView>
 
             {/* Legend */}
-            <View style={styles.legend}>
-                <Text style={styles.legendLabel}>Menos</Text>
-                <View style={[styles.legendCell, { backgroundColor: Colors.iron[300] }]} />
-                <View style={[styles.legendCell, { backgroundColor: Colors.primary.light }]} />
-                <View style={[styles.legendCell, { backgroundColor: Colors.primary.DEFAULT }]} />
-                <View style={[styles.legendCell, { backgroundColor: Colors.primary.dark }]} />
-                <Text style={styles.legendLabel}>Más</Text>
+            <View style={ss.legend}>
+                <Text style={ss.legendLabel}>Menos</Text>
+                <View style={[ss.legendCell, { backgroundColor: colors.iron[200] }]} />
+                <View style={[ss.legendCell, { backgroundColor: colors.primary.light }]} />
+                <View style={[ss.legendCell, { backgroundColor: colors.primary.DEFAULT }]} />
+                <View style={[ss.legendCell, { backgroundColor: colors.primary.dark }]} />
+                <Text style={ss.legendLabel}>Más</Text>
             </View>
         </View>
     );
 }
 
-const MONTH_CARD_PADDING = 6;
-
-const styles = StyleSheet.create({
-    container: {
-        backgroundColor: Colors.surface,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        padding: 16,
-        borderRadius: 16,
-        shadowColor: Colors.black,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 14,
-    },
-    titleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    title: {
-        color: Colors.primary.DEFAULT,
-        fontWeight: '900',
-        fontSize: 18,
-        letterSpacing: -0.3,
-    },
-    yearBadge: {
-        backgroundColor: Colors.primary.dark,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 6,
-    },
-    yearText: {
-        color: Colors.surface,
-        fontSize: 11,
-        fontWeight: '800',
-        letterSpacing: 0.5,
-    },
-    subtitle: {
-        color: Colors.iron[500],
-        fontSize: 11,
-        marginTop: 3,
-        fontWeight: '600',
-    },
-    tooltip: {
-        alignItems: 'flex-end',
-        backgroundColor: Colors.iron[200],
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: Colors.iron[300],
-    },
-    tooltipDate: {
-        color: Colors.iron[950],
-        fontSize: 11,
-        fontWeight: '800',
-        textTransform: 'uppercase',
-    },
-    tooltipCount: {
-        color: Colors.primary.DEFAULT,
-        fontSize: 12,
-        fontWeight: '700',
-    },
-    scrollContent: {
-        paddingRight: 4,
-    },
-    gridWrapper: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-    },
-    dayLabelsColumn: {
-        marginRight: 4,
-        marginTop: 22, // Offset for month label row
-    },
-    dayLabel: {
-        fontSize: 8,
-        color: Colors.iron[400],
-        fontWeight: '700',
-        textAlign: 'center',
-        width: 10,
-    },
-
-    // Year divider between year changes
-    yearDivider: {
-        width: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 4,
-        marginTop: 22, // Align with cells
-    },
-    yearDividerLine: {
-        width: 1,
-        flex: 1,
-        backgroundColor: Colors.iron[300],
-        minHeight: 12,
-    },
-    yearDividerText: {
-        fontSize: 8,
-        color: Colors.iron[400],
-        fontWeight: '800',
-        transform: [{ rotate: '-90deg' }],
-        width: 30,
-        textAlign: 'center',
-        marginVertical: 2,
-    },
-
-    // Month card encapsulation
-    monthCard: {
-        flexDirection: 'column',
-    },
-    monthLabelRow: {
-        height: 16,
-        marginBottom: 4,
-        alignItems: 'center',
-    },
-    monthLabel: {
-        fontSize: 10,
-        color: Colors.iron[950],
-        fontWeight: '800',
-        letterSpacing: 0.3,
-    },
-    monthGridContainer: {
-        backgroundColor: Colors.iron[200],
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: Colors.iron[300],
-        padding: MONTH_CARD_PADDING,
-    },
-    weeksRow: {
-        flexDirection: 'row',
-        gap: GAP,
-    },
-    weekColumn: {
-        gap: GAP,
-    },
-    cell: {
-        width: CELL_SIZE,
-        height: CELL_SIZE,
-        borderRadius: 3,
-    },
-    cellEmpty: {
-        width: CELL_SIZE,
-        height: CELL_SIZE,
-        borderRadius: 3,
-        backgroundColor: 'transparent',
-    },
-    cellToday: {
-        borderWidth: 1.5,
-        borderColor: Colors.iron[950],
-    },
-    legend: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        marginTop: 14,
-        gap: 5,
-    },
-    legendLabel: {
-        color: Colors.iron[400],
-        fontSize: 10,
-        fontWeight: '700',
-    },
-    legendCell: {
-        width: CELL_SIZE,
-        height: CELL_SIZE,
-        borderRadius: 3,
-    },
-});

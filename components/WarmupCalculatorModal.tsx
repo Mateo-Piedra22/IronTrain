@@ -1,9 +1,10 @@
 import { CalculatorService } from '@/src/services/CalculatorService';
 import { configService } from '@/src/services/ConfigService';
-import { Colors, ThemeFx } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { WorkoutSet } from '@/src/types/db';
-import React, { useState } from 'react';
-import { Modal, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useColors } from '../src/hooks/useColors';
 
 interface WarmupCalculatorModalProps {
     visible: boolean;
@@ -13,6 +14,7 @@ interface WarmupCalculatorModalProps {
 }
 
 export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeight = 0 }: WarmupCalculatorModalProps) {
+    const colors = useColors();
     const unit = configService.get('weightUnit');
     const rounding = unit === 'kg' ? configService.get('calculatorsRoundingKg') : configService.get('calculatorsRoundingLbs');
     const defaultBar = unit === 'kg'
@@ -20,6 +22,139 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
         : configService.get('plateCalculatorDefaultBarWeightLbs');
 
     const [targetWeight, setTargetWeight] = useState(defaultWeight > 0 ? defaultWeight.toString() : '');
+
+    const st = useMemo(() => StyleSheet.create({
+        overlay: {
+            flex: 1,
+            backgroundColor: ThemeFx.backdrop,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 16
+        },
+        container: {
+            backgroundColor: colors.surface,
+            width: '100%',
+            maxWidth: 380,
+            borderRadius: 20,
+            padding: 24,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            elevation: 12,
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 12 },
+            shadowOpacity: 0.15,
+            shadowRadius: 24,
+        },
+        title: {
+            fontSize: 22,
+            fontWeight: '900',
+            color: colors.iron[950],
+            marginBottom: 8,
+            letterSpacing: -0.6
+        },
+        description: {
+            fontSize: 14,
+            color: colors.iron[500],
+            marginBottom: 24,
+            lineHeight: 20,
+            fontWeight: '500'
+        },
+        label: {
+            color: colors.iron[500],
+            fontSize: 10,
+            fontWeight: '800',
+            marginBottom: 10,
+            textTransform: 'uppercase',
+            letterSpacing: 1.2,
+            marginLeft: 2
+        },
+        input: {
+            backgroundColor: colors.iron[100],
+            borderRadius: 14,
+            padding: 16,
+            fontSize: 17,
+            color: colors.iron[950],
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            fontWeight: '700',
+            marginBottom: 24
+        },
+        progressionCard: {
+            backgroundColor: colors.iron[100],
+            borderRadius: 16,
+            padding: 8,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            marginBottom: 24
+        },
+        row: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingVertical: 12,
+            paddingHorizontal: 12,
+        },
+        rowBorder: {
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.border
+        },
+        badge: {
+            width: 28,
+            height: 28,
+            borderRadius: 10,
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '12'),
+            justifyContent: 'center',
+            alignItems: 'center'
+        },
+        badgeText: {
+            color: colors.primary.DEFAULT,
+            fontSize: 12,
+            fontWeight: '900'
+        },
+        weightText: {
+            color: colors.iron[950],
+            fontWeight: '800',
+            fontSize: 15
+        },
+        repsText: {
+            color: colors.iron[500],
+            fontWeight: '700',
+            fontSize: 14
+        },
+        footer: {
+            flexDirection: 'row',
+            gap: 12
+        },
+        cancelBtn: {
+            flex: 1,
+            height: 52,
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: colors.surface
+        },
+        cancelBtnText: {
+            color: colors.iron[600],
+            fontWeight: '800',
+            fontSize: 15
+        },
+        addBtn: {
+            flex: 1.4,
+            height: 52,
+            borderRadius: 16,
+            justifyContent: 'center',
+            alignItems: 'center'
+        },
+        addBtnText: {
+            color: colors.white,
+            fontWeight: '900',
+            fontSize: 15,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5
+        }
+    }), [colors]);
 
     const calculateSets = () => {
         const weight = parseFloat(targetWeight);
@@ -32,75 +167,63 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
     const calculatedSets = calculateSets();
 
     return (
-        <Modal visible={visible} transparent animationType="fade">
-            <View style={{ flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-                <View style={{
-                    backgroundColor: Colors.surface, width: '100%', maxWidth: 360,
-                    borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.iron[700],
-                    elevation: 8, shadowColor: Colors.black, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24,
-                }}>
-                    <Text style={{ fontSize: 20, fontWeight: '900', color: Colors.iron[950], marginBottom: 8, letterSpacing: -0.3 }}>
-                        Calculadora de Calentamiento
-                    </Text>
-                    <Text style={{ fontSize: 13, color: Colors.iron[500], marginBottom: 20, lineHeight: 18 }}>
-                        Ingresa el peso objetivo de tu serie principal y generaremos un esquema progresivo de calentamiento seguro.
+        <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
+            <View style={st.overlay}>
+                <View style={st.container}>
+                    <Text style={st.title}>Warm-up</Text>
+                    <Text style={st.description}>
+                        Generaremos un esquema progresivo de calentamiento seguro basado en tu peso objetivo.
                     </Text>
 
-                    <Text style={{ color: Colors.iron[500], fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Peso objetivo ({unit})</Text>
+                    <Text style={st.label}>Peso objetivo ({unit})</Text>
                     <TextInput
                         value={targetWeight}
                         onChangeText={setTargetWeight}
-                        placeholder={unit === 'kg' ? 'Ej. 100' : 'Ej. 225'}
+                        placeholder={unit === 'kg' ? '100' : '225'}
+                        placeholderTextColor={colors.iron[400]}
                         keyboardType="numeric"
                         autoFocus
-                        style={{
-                            backgroundColor: Colors.iron[200], borderRadius: 12, padding: 14,
-                            fontSize: 16, color: Colors.iron[950], borderWidth: 1, borderColor: Colors.iron[300],
-                            marginBottom: 20
-                        }}
+                        style={st.input}
                     />
 
                     {calculatedSets.length > 0 && (
-                        <View style={{ marginBottom: 24 }}>
-                            <Text style={{ color: Colors.iron[500], fontSize: 10, fontWeight: '800', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Progresión sugerida</Text>
-                            <View style={{ backgroundColor: Colors.iron[200], borderRadius: 12, padding: 16, borderWidth: 1, borderColor: Colors.iron[300] }}>
+                        <View style={{ marginBottom: 4 }}>
+                            <Text style={st.label}>Progresión sugerida</Text>
+                            <View style={st.progressionCard}>
                                 {calculatedSets.map((set, idx) => (
-                                    <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: idx === calculatedSets.length - 1 ? 0 : 1, borderBottomColor: Colors.iron[300] }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                            <View style={{ width: 24, height: 24, borderRadius: 8, backgroundColor: Colors.primary.DEFAULT + '20', justifyContent: 'center', alignItems: 'center' }}>
-                                                <Text style={{ color: Colors.primary.DEFAULT, fontSize: 10, fontWeight: '900' }}>{idx + 1}</Text>
+                                    <View key={idx} style={[st.row, idx < calculatedSets.length - 1 && st.rowBorder]}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                            <View style={st.badge}>
+                                                <Text style={st.badgeText}>{idx + 1}</Text>
                                             </View>
-                                            <Text style={{ color: Colors.iron[950], fontWeight: '800', fontSize: 14 }}>{set.weight} {unit}</Text>
+                                            <Text style={st.weightText}>{set.weight} {unit}</Text>
                                         </View>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                            <Text style={{ color: Colors.iron[600], fontWeight: '700', fontSize: 13 }}>{set.reps} reps</Text>
-                                        </View>
+                                        <Text style={st.repsText}>{set.reps} reps</Text>
                                     </View>
                                 ))}
                             </View>
                         </View>
                     )}
 
-                    <View style={{ flexDirection: 'row', gap: 12 }}>
-                        <View style={{ flex: 1 }}>
-                            <TouchableOpacity onPress={onClose} style={{ padding: 14, borderRadius: 12, borderWidth: 1, borderColor: Colors.iron[300], alignItems: 'center' }}>
-                                <Text style={{ color: Colors.iron[600], fontWeight: '700', fontSize: 14 }}>Cancelar</Text>
-                            </TouchableOpacity>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <TouchableOpacity
-                                onPress={() => {
-                                    if (calculatedSets.length > 0) {
-                                        onAddSets(calculatedSets);
-                                        onClose();
-                                    }
-                                }}
-                                disabled={calculatedSets.length === 0}
-                                style={{ backgroundColor: calculatedSets.length > 0 ? Colors.primary.DEFAULT : Colors.iron[300], padding: 14, borderRadius: 12, alignItems: 'center' }}
-                            >
-                                <Text style={{ color: Colors.surface, fontWeight: '800', fontSize: 14 }}>Agregar series</Text>
-                            </TouchableOpacity>
-                        </View>
+                    <View style={st.footer}>
+                        <TouchableOpacity onPress={onClose} style={st.cancelBtn}>
+                            <Text style={st.cancelBtnText}>Cancelar</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => {
+                                if (calculatedSets.length > 0) {
+                                    onAddSets(calculatedSets);
+                                    onClose();
+                                }
+                            }}
+                            disabled={calculatedSets.length === 0}
+                            style={[
+                                st.addBtn,
+                                { backgroundColor: calculatedSets.length > 0 ? colors.primary.DEFAULT : colors.iron[300] }
+                            ]}
+                        >
+                            <Text style={st.addBtnText}>Agregar series</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </View>

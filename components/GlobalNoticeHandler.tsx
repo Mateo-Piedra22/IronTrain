@@ -6,20 +6,170 @@ import { decideGlobalInterruption } from '@/src/services/BroadcastInterruptionPo
 import { ChangelogService, type ChangelogRelease } from '@/src/services/ChangelogService';
 import { configService } from '@/src/services/ConfigService';
 import { useAuthStore } from '@/src/store/authStore';
-import { Colors, ThemeFx, withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { useRouter } from 'expo-router';
 import { Bell, X } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { SlideInUp, SlideOutUp } from 'react-native-reanimated';
+import { useColors } from '../src/hooks/useColors';
 import { PushRegistrationService } from '../src/services/PushRegistrationService';
 import { WhatsNewModal } from './WhatsNewModal';
 
 export const GlobalNoticeHandler: React.FC = () => {
+    const colors = useColors();
     const [whatsNew, setWhatsNew] = useState<ChangelogRelease | null>(null);
     const [activeAnnouncement, setActiveAnnouncement] = useState<BroadcastItem | null>(null);
     const [showToast, setShowToast] = useState(false);
     const router = useRouter();
+
+    const ss = useMemo(() => StyleSheet.create({
+        modalOverlay: {
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 24,
+        },
+        modalBackdropPressable: {
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: ThemeFx.backdrop,
+        },
+        modalContainer: {
+            width: '100%',
+            maxWidth: 420,
+            minHeight: 260,
+            maxHeight: '86%',
+            backgroundColor: colors.surface,
+            borderRadius: 24,
+            borderWidth: 1,
+            borderColor: colors.iron[300],
+            padding: 24,
+            elevation: 8,
+            shadowColor: ThemeFx.shadowColor,
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: ThemeFx.shadowOpacityStrong,
+            shadowRadius: 24,
+            overflow: 'hidden',
+        },
+        modalHeader: {
+            alignItems: 'center',
+            marginBottom: 20,
+            gap: 12,
+        },
+        iconCircle: {
+            width: 52,
+            height: 52,
+            borderRadius: 26,
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '14'),
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: 8,
+        },
+        modalTitle: {
+            fontSize: 19,
+            fontWeight: '900',
+            color: colors.iron[950],
+            letterSpacing: -0.3,
+            textAlign: 'center',
+            flexShrink: 1,
+        },
+        modalBody: {
+            flexShrink: 1,
+            minHeight: 120,
+            maxHeight: 360,
+            marginBottom: 16,
+            backgroundColor: withAlpha(colors.iron[100], 'CC'),
+            borderRadius: 16,
+            padding: 4,
+        },
+        modalMessageScroll: {
+            maxHeight: 310,
+        },
+        modalMessageContent: {
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+        },
+        modalActionText: {
+            color: colors.primary.DEFAULT,
+            fontWeight: '900',
+            fontSize: 12,
+            letterSpacing: 0.8,
+            textTransform: 'uppercase',
+        },
+        modalMessage: {
+            fontSize: 14,
+            color: colors.iron[950],
+            lineHeight: 22,
+            fontWeight: '500',
+            textAlign: 'left',
+        },
+        richBold: {
+            fontWeight: '900',
+            color: colors.black,
+        },
+        modalActionBtn: {
+            alignSelf: 'flex-start',
+            marginLeft: 16,
+            marginBottom: 12,
+        },
+        modalButton: {
+            backgroundColor: colors.primary.DEFAULT,
+            borderRadius: 14,
+            paddingVertical: 14,
+            alignItems: 'center',
+        },
+        modalButtonText: {
+            color: colors.white,
+            fontWeight: '700',
+            fontSize: 16,
+        },
+        toastContainer: {
+            position: 'absolute',
+            top: 60,
+            left: 20,
+            right: 20,
+            backgroundColor: colors.surface,
+            borderRadius: 18,
+            flexDirection: 'row',
+            alignItems: 'center',
+            padding: 12,
+            borderWidth: 1,
+            borderColor: colors.iron[300],
+            zIndex: 9999,
+            elevation: 10,
+            shadowColor: ThemeFx.shadowColor,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: ThemeFx.shadowOpacityStrong,
+            shadowRadius: 8,
+        },
+        toastIcon: {
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            backgroundColor: colors.primary.DEFAULT,
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginRight: 12,
+        },
+        toastContent: {
+            flex: 1,
+        },
+        toastTitle: {
+            color: colors.iron[950],
+            fontSize: 14,
+            fontWeight: '900',
+            textTransform: 'uppercase',
+        },
+        toastMessage: {
+            color: colors.iron[500],
+            fontSize: 12,
+            marginTop: 2,
+            fontWeight: '500',
+        },
+        toastClose: {
+            padding: 8,
+        }
+    }), [colors]);
 
     useEffect(() => {
         let cancelled = false;
@@ -105,11 +255,9 @@ export const GlobalNoticeHandler: React.FC = () => {
 
     const handleUrlAction = async (actionUrl: string) => {
         try {
-            // Cierro el modal/toast antes para evitar bloqueos visuales
             setActiveAnnouncement(null);
             setShowToast(false);
 
-            // Pequeño timeout antes de navegar
             setTimeout(async () => {
                 if (actionUrl === 'changelog' || actionUrl === 'social' || actionUrl.startsWith('/') || actionUrl.startsWith('irontrain://')) {
                     const rawPath = actionUrl.replace('irontrain://', '');
@@ -147,7 +295,6 @@ export const GlobalNoticeHandler: React.FC = () => {
     const handleNotifPress = async () => {
         if (!activeAnnouncement) return;
 
-        // Log the click
         const { token } = useAuthStore.getState();
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) headers.Authorization = `Bearer ${token}`;
@@ -163,7 +310,6 @@ export const GlobalNoticeHandler: React.FC = () => {
             handleUrlAction(actionUrl);
         }
 
-        // Close it unless it's displayMode 'always'
         if (activeAnnouncement.displayMode !== 'always') {
             await handleCloseNotification();
         }
@@ -204,10 +350,10 @@ export const GlobalNoticeHandler: React.FC = () => {
                                     accessibilityRole="button"
                                     accessibilityLabel="Cerrar notificación"
                                 >
-                                    <X size={20} color={Colors.iron[500]} />
+                                    <X size={20} color={colors.iron[500]} />
                                 </TouchableOpacity>
                                 <View style={ss.iconCircle}>
-                                    <Bell size={20} color={Colors.primary.DEFAULT} />
+                                    <Bell size={20} color={colors.primary.DEFAULT} />
                                 </View>
                                 <Text style={ss.modalTitle}>{activeAnnouncement.title}</Text>
                             </View>
@@ -243,7 +389,7 @@ export const GlobalNoticeHandler: React.FC = () => {
                     style={ss.toastContainer}
                 >
                     <View style={ss.toastIcon}>
-                        <Bell size={16} color={Colors.white} />
+                        <Bell size={16} color={colors.white} />
                     </View>
                     <TouchableOpacity
                         style={ss.toastContent}
@@ -260,158 +406,10 @@ export const GlobalNoticeHandler: React.FC = () => {
                         accessibilityRole="button"
                         accessibilityLabel="Cerrar notificación rápida"
                     >
-                        <X size={16} color={Colors.iron[400]} />
+                        <X size={16} color={colors.iron[400]} />
                     </TouchableOpacity>
                 </Animated.View>
             )}
         </>
     );
 };
-
-const ss = StyleSheet.create({
-    modalOverlay: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 24,
-    },
-    modalBackdropPressable: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: ThemeFx.backdrop,
-    },
-    modalContainer: {
-        width: '100%',
-        maxWidth: 420,
-        minHeight: 260,
-        maxHeight: '86%',
-        backgroundColor: Colors.surface,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        padding: 24,
-        elevation: 8,
-        shadowColor: ThemeFx.shadowColor,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: ThemeFx.shadowOpacityStrong,
-        shadowRadius: 24,
-        overflow: 'hidden',
-    },
-    modalHeader: {
-        alignItems: 'center',
-        marginBottom: 20,
-        gap: 12,
-    },
-    iconCircle: {
-        width: 52,
-        height: 52,
-        borderRadius: 26,
-        backgroundColor: withAlpha(Colors.primary.DEFAULT, '14'),
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    modalTitle: {
-        fontSize: 19,
-        fontWeight: '900',
-        color: Colors.iron[950],
-        letterSpacing: -0.3,
-        textAlign: 'center',
-        flexShrink: 1,
-    },
-    modalBody: {
-        flexShrink: 1,
-        minHeight: 120,
-        maxHeight: 360,
-        marginBottom: 16,
-        backgroundColor: withAlpha(Colors.iron[50], 'CC'),
-        borderRadius: 12,
-        padding: 4,
-    },
-    modalMessageScroll: {
-        maxHeight: 310,
-    },
-    modalMessageContent: {
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-    },
-    modalActionText: {
-        color: Colors.primary.DEFAULT,
-        fontWeight: '900',
-        fontSize: 12,
-        letterSpacing: 0.8,
-        textTransform: 'uppercase',
-    },
-    modalMessage: {
-        fontSize: 14,
-        color: Colors.iron[950],
-        lineHeight: 22,
-        fontWeight: '500',
-        textAlign: 'left',
-    },
-    richBold: {
-        fontWeight: '900',
-        color: Colors.black, // Forzamos negro para máximo contraste en las novedades
-    },
-    modalActionBtn: {
-        alignSelf: 'flex-start',
-        marginLeft: 16,
-        marginBottom: 12,
-    },
-    modalButton: {
-        backgroundColor: Colors.primary.DEFAULT,
-        borderRadius: 12,
-        paddingVertical: 14,
-        alignItems: 'center',
-    },
-    modalButtonText: {
-        color: Colors.white,
-        fontWeight: '700',
-        fontSize: 16,
-    },
-    toastContainer: {
-        position: 'absolute',
-        top: 60,
-        left: 20,
-        right: 20,
-        backgroundColor: Colors.surface,
-        borderRadius: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 12,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        zIndex: 9999,
-        elevation: 10,
-        shadowColor: ThemeFx.shadowColor,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: ThemeFx.shadowOpacityStrong,
-        shadowRadius: 8,
-    },
-    toastIcon: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        backgroundColor: Colors.primary.DEFAULT,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    toastContent: {
-        flex: 1,
-    },
-    toastTitle: {
-        color: Colors.iron[950],
-        fontSize: 14,
-        fontWeight: '900',
-        textTransform: 'uppercase',
-    },
-    toastMessage: {
-        color: Colors.iron[950],
-        fontSize: 12,
-        marginTop: 2,
-        fontWeight: '500',
-    },
-    toastClose: {
-        padding: 8,
-    }
-});

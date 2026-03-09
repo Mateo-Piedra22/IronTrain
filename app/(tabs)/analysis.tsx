@@ -10,11 +10,11 @@ import { AnalysisService, CardioSummary, CategoryVolumeRow, ExerciseVolumeRow, O
 import { configService } from '@/src/services/ConfigService';
 import { UnitService } from '@/src/services/UnitService';
 import { workoutService } from '@/src/services/WorkoutService';
-import { Colors } from '@/src/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { useColors } from '../../src/hooks/useColors';
 
 interface RangeAnalysisState {
     summary7: WorkoutSummary | null;
@@ -50,6 +50,7 @@ const INITIAL_RANGE_STATE: RangeAnalysisState = {
 };
 
 export default function AnalysisScreen() {
+    const colors = useColors();
     const [unit, setUnit] = useState(configService.get('weightUnit'));
     const [calcVisible, setCalcVisible] = useState(false);
     const [calcTab, setCalcTab] = useState<'oneRm' | 'warmup' | 'power'>('oneRm');
@@ -190,16 +191,16 @@ export default function AnalysisScreen() {
     });
 
     return (
-        <SafeAreaWrapper className="flex-1 bg-iron-900" edges={['top', 'left', 'right']}>
+        <SafeAreaWrapper style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
             {/* Unified Header */}
             <View style={{
                 flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
                 paddingHorizontal: 16, height: 60,
-                backgroundColor: Colors.iron[900],
-                zIndex: 10, shadowColor: Colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 4
+                backgroundColor: colors.iron[900],
+                zIndex: 10, shadowColor: colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 4
             }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
-                    <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 20, letterSpacing: -0.5 }}>Análisis</Text>
+                    <Text style={{ color: colors.iron[950], fontWeight: '900', fontSize: 20, letterSpacing: -0.5 }}>Análisis</Text>
                 </View>
                 <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                     <View style={{ width: 100, height: 100, alignItems: 'center', justifyContent: 'center' }}>
@@ -225,9 +226,22 @@ export default function AnalysisScreen() {
                                 <Pressable
                                     key={t.key}
                                     onPress={() => setTab(t.key as any)}
-                                    className={`px-4 py-2 rounded-full border ${tab === t.key ? 'bg-primary border-primary' : 'bg-iron-200 border-iron-300'}`}
+                                    style={{
+                                        paddingHorizontal: 16,
+                                        paddingVertical: 8,
+                                        borderRadius: 20,
+                                        borderWidth: 1.5,
+                                        backgroundColor: tab === t.key ? colors.primary.DEFAULT : colors.iron[200],
+                                        borderColor: tab === t.key ? colors.primary.DEFAULT : colors.border,
+                                    }}
                                 >
-                                    <Text className={`font-bold ${tab === t.key ? 'text-white' : 'text-iron-600'}`}>{t.label}</Text>
+                                    <Text style={{
+                                        fontWeight: '800',
+                                        fontSize: 12,
+                                        color: tab === t.key ? colors.white : colors.iron[600],
+                                        textTransform: 'uppercase',
+                                        letterSpacing: 0.5
+                                    }}>{t.label}</Text>
                                 </Pressable>
                             ))}
                         </View>
@@ -236,14 +250,14 @@ export default function AnalysisScreen() {
 
                 <View className="flex-1 relative">
                     <LinearGradient
-                        colors={[Colors.iron[900], 'transparent']}
+                        colors={[colors.iron[900], 'transparent']}
                         style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 16, zIndex: 10 }}
                         pointerEvents="none"
                     />
                     <ScrollView contentContainerStyle={{ paddingBottom: 100, paddingTop: 16 }} showsVerticalScrollIndicator={false}>
                         {isLoading && !rangeData.summary7 ? (
                             <View className="flex-1 justify-center items-center py-20 pb-0">
-                                <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
+                                <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
                                 <Text className="text-iron-500 mt-4 font-bold">Analizando datos...</Text>
                             </View>
                         ) : error ? (

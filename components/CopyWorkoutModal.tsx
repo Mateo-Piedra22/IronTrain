@@ -1,14 +1,15 @@
 import { workoutService } from '@/src/services/WorkoutService';
-import { Colors, ThemeFx } from '@/src/theme';
+import { ThemeFx } from '@/src/theme';
 import { ExerciseType, Workout, WorkoutSet } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { format, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Copy, Tag, X } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 import { DayProps } from 'react-native-calendars/src/calendar/day/index';
+import { useColors } from '../src/hooks/useColors';
 import { confirm, useConfirmStore } from '../src/store/confirmStore';
 
 interface CopyWorkoutModalProps {
@@ -21,10 +22,157 @@ interface CopyWorkoutModalProps {
 }
 
 export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId, onCopyComplete, markedDates }: CopyWorkoutModalProps) {
+    const colors = useColors();
     const [selectedDateStr, setSelectedDateStr] = useState('');
     const [sourceWorkout, setSourceWorkout] = useState<Workout | null>(null);
     const [sourceSets, setSourceSets] = useState<(WorkoutSet & { exercise_name: string; category_color: string; exercise_type: ExerciseType })[]>([]);
     const [loading, setLoading] = useState(false);
+
+    const ss = useMemo(() => StyleSheet.create({
+        overlay: { flex: 1, backgroundColor: ThemeFx.backdropStrong, justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 48 },
+        sheet: {
+            backgroundColor: colors.background,
+            borderWidth: 1.5,
+            borderColor: colors.iron[300],
+            borderRadius: 20,
+            flex: 1,
+            maxHeight: '95%',
+            width: '100%',
+            overflow: 'hidden',
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 12 },
+            shadowOpacity: 0.15,
+            shadowRadius: 24,
+            elevation: 10,
+        },
+        header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1.5, borderBottomColor: colors.iron[200], backgroundColor: colors.surface },
+        headerTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
+        headerSub: { color: colors.iron[400], fontSize: 11, marginTop: 2 },
+        closeBtn: { width: 34, height: 34, borderRadius: 14, backgroundColor: colors.primary.DEFAULT, justifyContent: 'center', alignItems: 'center' },
+
+        calendarDay: {
+            width: 45,
+            height: 45,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 14,
+            margin: 2,
+        },
+        bgPrimary: { backgroundColor: colors.primary.DEFAULT },
+        bgIron800Completed: {
+            backgroundColor: colors.surface,
+            borderWidth: 1.5,
+            borderColor: colors.primary.DEFAULT
+        },
+        calendarDayText: {
+            fontSize: 16,
+            fontWeight: '600',
+        },
+        textWhiteBold: { color: colors.white, fontWeight: 'bold' },
+        textPrimaryBold: { color: colors.primary.DEFAULT, fontWeight: 'bold' },
+        textIron400: { color: colors.iron[400] },
+        textIron950: { color: colors.iron[950] },
+
+        calendarDotsContainer: {
+            flexDirection: 'row',
+            gap: 2,
+            marginTop: 4,
+            position: 'absolute',
+            bottom: 6,
+            justifyContent: 'center',
+            width: '100%',
+        },
+        calDot: {
+            width: 4,
+            height: 4,
+            borderRadius: 2,
+        },
+        calendarCompletedTick: {
+            position: 'absolute',
+            top: 2,
+            right: 2,
+        },
+        tickDot: {
+            width: 6,
+            height: 6,
+            backgroundColor: colors.green,
+            borderRadius: 3,
+        },
+
+        // Consolidated History Detail Styles
+        historyContentContainer: { padding: 16, backgroundColor: colors.background, minHeight: 400 },
+        historyLabel: { color: colors.iron[400], fontSize: 10, marginBottom: 12, textTransform: 'uppercase', fontWeight: '800', letterSpacing: 1 },
+        loadingText: { color: colors.iron[400], fontStyle: 'italic', marginTop: 10 },
+
+        workoutCard: {
+            backgroundColor: colors.surface,
+            padding: 20,
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.1,
+            shadowRadius: 10,
+            elevation: 4,
+        },
+        workoutHeader: { marginBottom: 16 },
+        workoutName: { color: colors.iron[950], fontWeight: '900', fontSize: 20, marginBottom: 4 },
+        workoutDate: { color: colors.primary.DEFAULT, fontWeight: '700', fontSize: 13 },
+
+        exercisesSummaryBox: {
+            marginBottom: 20,
+            backgroundColor: colors.iron[100],
+            borderRadius: 14,
+            padding: 14,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200]
+        },
+        exercisesSummaryTitle: { color: colors.iron[950], fontWeight: '800', marginBottom: 10, fontSize: 13 },
+        exercisesList: { gap: 8 },
+        exerciseRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+        categoryIndicator: { width: 8, height: 8, borderRadius: 4 },
+        exerciseNameText: { color: colors.iron[700], fontWeight: '600', flex: 1, fontSize: 13 },
+        setsBadge: {
+            backgroundColor: colors.surface,
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: 20,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200]
+        },
+        setsBadgeText: { color: colors.iron[400], fontSize: 11, fontWeight: '800' },
+        noExercisesText: { color: colors.iron[400], fontStyle: 'italic', marginBottom: 16 },
+
+        copyButton: {
+            backgroundColor: colors.primary.DEFAULT,
+            paddingVertical: 14,
+            borderRadius: 16,
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginTop: 8,
+            shadowColor: colors.primary.DEFAULT,
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.3,
+            shadowRadius: 12,
+            elevation: 8,
+        },
+        copyButtonText: { color: colors.white, fontWeight: '900', marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 14 },
+
+        emptyStateContainer: {
+            backgroundColor: colors.surface,
+            padding: 24,
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: colors.iron[300],
+            borderStyle: 'dashed',
+            alignItems: 'center',
+            marginTop: 8
+        },
+        emptyStateText: { color: colors.iron[500], fontWeight: '600', textAlign: 'center' },
+        promptText: { color: colors.iron[400], fontStyle: 'italic' }
+    }), [colors]);
 
     const handleDayPress = async (day: { dateString: string; year: number; month: number; day: number }) => {
         setSelectedDateStr(day.dateString);
@@ -179,16 +327,16 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
 
         // Styles
         const containerStyle = [
-            styles.calendarDay,
-            isSelected ? styles.bgPrimary :
-                isCompleted ? styles.bgIron800Completed : {}
+            ss.calendarDay,
+            isSelected ? ss.bgPrimary :
+                isCompleted ? ss.bgIron800Completed : {}
         ];
 
         const textStyle = [
-            styles.calendarDayText,
-            isSelected ? styles.textWhiteBold :
-                isToday ? styles.textPrimaryBold :
-                    isDisabled ? styles.textIron400 : styles.textIron950
+            ss.calendarDayText,
+            isSelected ? ss.textWhiteBold :
+                isToday ? ss.textPrimaryBold :
+                    isDisabled ? ss.textIron400 : ss.textIron950
         ];
 
         return (
@@ -201,25 +349,25 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
                     {date.day}
                 </Text>
 
-                <View style={styles.calendarDotsContainer}>
+                <View style={ss.calendarDotsContainer}>
                     {marks?.colors?.slice(0, 4).map((color: string, i: number) => (
                         <View
                             key={`${dateStr}-cal-dot-${i}`}
-                            style={[styles.calDot, { backgroundColor: color }]}
+                            style={[ss.calDot, { backgroundColor: color }]}
                         />
                     ))}
                 </View>
 
                 {isCompleted && !isSelected && (
-                    <View style={styles.calendarCompletedTick}>
-                        <View style={styles.tickDot} />
+                    <View style={ss.calendarCompletedTick}>
+                        <View style={ss.tickDot} />
                     </View>
                 )}
             </TouchableOpacity>
         );
-    }, [selectedDateStr, markedDates]);
+    }, [selectedDateStr, markedDates, ss]);
 
-    // Group sets by exercise 
+    // Group sets by exercise
     const getGroupedSets = () => {
         const grouped: Record<string, { exercise_name: string; count: number; category_color: string }> = {};
         sourceSets.forEach(s => {
@@ -233,15 +381,15 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
 
     return (
         <Modal visible={visible} animationType="fade" transparent>
-            <View style={styles.overlay}>
-                <View style={styles.sheet}>
-                    <View style={styles.header}>
+            <View style={ss.overlay}>
+                <View style={ss.sheet}>
+                    <View style={ss.header}>
                         <View>
-                            <Text style={styles.headerTitle}>Copiar rutina</Text>
-                            <Text style={styles.headerSub}>Buscar desde historial</Text>
+                            <Text style={ss.headerTitle}>Copiar rutina</Text>
+                            <Text style={ss.headerSub}>Buscar desde historial</Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} style={styles.closeBtn} accessibilityRole="button" accessibilityLabel="Cerrar ventana">
-                            <X size={18} color={Colors.white} />
+                        <TouchableOpacity onPress={onClose} style={ss.closeBtn} accessibilityRole="button" accessibilityLabel="Cerrar ventana">
+                            <X size={18} color={colors.white} />
                         </TouchableOpacity>
                     </View>
 
@@ -250,64 +398,64 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
                             current={format(targetDate, 'yyyy-MM-dd')}
                             dayComponent={renderCalendarDay}
                             theme={{
-                                backgroundColor: Colors.surface,
-                                calendarBackground: Colors.surface,
-                                textSectionTitleColor: Colors.iron[500],
-                                arrowColor: Colors.primary.DEFAULT,
-                                monthTextColor: Colors.iron[950],
+                                backgroundColor: colors.surface,
+                                calendarBackground: colors.surface,
+                                textSectionTitleColor: colors.iron[500],
+                                arrowColor: colors.primary.DEFAULT,
+                                monthTextColor: colors.iron[950],
                                 textMonthFontWeight: 'bold',
                             }}
                         />
 
-                        <View style={{ padding: 16, backgroundColor: Colors.iron[100], minHeight: '100%' }}>
-                            <Text style={{ color: Colors.iron[400], fontSize: 10, marginBottom: 12, textTransform: 'uppercase', fontWeight: '800', letterSpacing: 1 }}>Entrenamiento seleccionado</Text>
+                        <View style={ss.historyContentContainer}>
+                            <Text style={ss.historyLabel}>Entrenamiento seleccionado</Text>
 
                             {loading ? (
-                                <Text style={{ color: Colors.iron[400], fontStyle: 'italic' }}>Buscando en el historial...</Text>
+                                <Text style={ss.loadingText}>Buscando en el historial...</Text>
                             ) : sourceWorkout ? (
-                                <View style={{ backgroundColor: Colors.surface, padding: 20, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], elevation: 1 }}>
-                                    <View style={{ marginBottom: 16 }}>
-                                        <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 20, marginBottom: 4 }}>{sourceWorkout.name || 'Entrenamiento'}</Text>
-                                        <Text style={{ color: Colors.primary.DEFAULT, fontWeight: '700', fontSize: 13 }}>
+                                <View style={ss.workoutCard}>
+                                    <View style={ss.workoutHeader}>
+                                        <Text style={ss.workoutName}>{sourceWorkout.name || 'Entrenamiento'}</Text>
+                                        <Text style={ss.workoutDate}>
                                             {format(new Date(selectedDateStr), 'EEEE, d MMMM yyyy', { locale: es })}
                                         </Text>
                                     </View>
 
                                     {sourceSets.length > 0 ? (
-                                        <View style={{ marginBottom: 20, backgroundColor: Colors.iron[100], borderRadius: 14, padding: 14, borderWidth: 1, borderColor: Colors.iron[200] }}>
-                                            <Text style={{ color: Colors.iron[950], fontWeight: '800', marginBottom: 10, fontSize: 13 }}>Ejercicios ({getGroupedSets().length})</Text>
-                                            <View style={{ gap: 8 }}>
+                                        <View style={ss.exercisesSummaryBox}>
+                                            <Text style={ss.exercisesSummaryTitle}>Ejercicios ({getGroupedSets().length})</Text>
+                                            <View style={ss.exercisesList}>
                                                 {getGroupedSets().map((grp, i) => (
-                                                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: grp.category_color || Colors.primary.dark }} />
-                                                        <Text style={{ color: Colors.iron[700], fontWeight: '600', flex: 1, fontSize: 13 }} numberOfLines={1}>{grp.exercise_name}</Text>
-                                                        <View style={{ backgroundColor: Colors.surface, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, borderWidth: 1, borderColor: Colors.iron[200] }}>
-                                                            <Text style={{ color: Colors.iron[400], fontSize: 11, fontWeight: '800' }}>{grp.count} sets</Text>
+                                                    <View key={i} style={ss.exerciseRow}>
+                                                        <View style={[ss.categoryIndicator, { backgroundColor: grp.category_color || colors.primary.dark }]} />
+                                                        <Text style={ss.exerciseNameText} numberOfLines={1}>{grp.exercise_name}</Text>
+                                                        <View style={ss.setsBadge}>
+                                                            <Text style={ss.setsBadgeText}>{grp.count} sets</Text>
                                                         </View>
                                                     </View>
                                                 ))}
                                             </View>
                                         </View>
                                     ) : (
-                                        <Text style={{ color: Colors.iron[400], fontStyle: 'italic', marginBottom: 16 }}>Este entrenamiento no tiene ejercicios.</Text>
+                                        <Text style={ss.noExercisesText}>Este entrenamiento no tiene ejercicios.</Text>
                                     )}
 
                                     <TouchableOpacity
                                         onPress={handleCopy}
-                                        style={{ backgroundColor: Colors.primary.DEFAULT, paddingVertical: 14, borderRadius: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 8, shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 }}
+                                        style={ss.copyButton}
                                         disabled={sourceSets.length === 0}
                                     >
-                                        <Copy color={Colors.white} size={18} />
-                                        <Text style={{ color: Colors.white, fontWeight: '900', marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 14 }}>Copiar rutina</Text>
+                                        <Copy color={colors.white} size={18} />
+                                        <Text style={ss.copyButtonText}>Copiar rutina</Text>
                                     </TouchableOpacity>
                                 </View>
                             ) : selectedDateStr ? (
-                                <View style={{ backgroundColor: Colors.surface, padding: 24, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], borderStyle: 'dashed', alignItems: 'center', marginTop: 8 }}>
-                                    <Tag size={32} color={Colors.iron[300]} style={{ marginBottom: 12 }} />
-                                    <Text style={{ color: Colors.iron[500], fontWeight: '600', textAlign: 'center' }}>No hay entrenamiento registrado en esta fecha.</Text>
+                                <View style={ss.emptyStateContainer}>
+                                    <Tag size={32} color={colors.iron[300]} style={{ marginBottom: 12 }} />
+                                    <Text style={ss.emptyStateText}>No hay entrenamiento registrado en esta fecha.</Text>
                                 </View>
                             ) : (
-                                <Text style={{ color: Colors.iron[400], fontStyle: 'italic' }}>Seleccioná un día en el calendario para ver detalles.</Text>
+                                <Text style={ss.promptText}>Seleccioná un día en el calendario para ver detalles.</Text>
                             )}
                         </View>
                     </ScrollView>
@@ -316,61 +464,3 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
         </Modal>
     );
 }
-
-const styles = StyleSheet.create({
-    overlay: { flex: 1, backgroundColor: ThemeFx.backdropStrong, justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 48 },
-    sheet: { backgroundColor: Colors.iron[900], borderWidth: 1, borderColor: Colors.iron[700], borderRadius: 20, flex: 1, maxHeight: '95%', width: '100%', overflow: 'hidden' },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.iron[200], backgroundColor: Colors.surface },
-    headerTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
-    headerSub: { color: Colors.iron[400], fontSize: 11, marginTop: 2 },
-    closeBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: Colors.primary.DEFAULT, justifyContent: 'center', alignItems: 'center' },
-
-    calendarDay: {
-        width: 45,
-        height: 45,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 12,
-        margin: 2,
-    },
-    bgPrimary: { backgroundColor: Colors.primary.DEFAULT },
-    bgIron800Completed: {
-        backgroundColor: Colors.white,
-        borderWidth: 2,
-        borderColor: ThemeFx.successBorder
-    },
-    calendarDayText: {
-        fontSize: 16,
-        fontWeight: '500',
-    },
-    textWhiteBold: { color: Colors.white, fontWeight: 'bold' },
-    textPrimaryBold: { color: Colors.primary.DEFAULT, fontWeight: 'bold' },
-    textIron400: { color: Colors.iron[400] },
-    textIron950: { color: Colors.iron[950] },
-
-    calendarDotsContainer: {
-        flexDirection: 'row',
-        gap: 2,
-        marginTop: 4,
-        position: 'absolute',
-        bottom: 6,
-        justifyContent: 'center',
-        width: '100%',
-    },
-    calDot: {
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-    },
-    calendarCompletedTick: {
-        position: 'absolute',
-        top: 2,
-        right: 2,
-    },
-    tickDot: {
-        width: 6,
-        height: 6,
-        backgroundColor: Colors.green,
-        borderRadius: 3,
-    }
-});

@@ -1,11 +1,12 @@
 import { EmptyChartPlaceholder } from '@/components/EmptyChartPlaceholder';
 import { BadgePill } from '@/components/ui/BadgePill';
 import { ExerciseVolumeRow, VolumeSeriesPoint } from '@/src/services/AnalysisService';
-import { Colors, ThemeFx, withAlpha } from '@/src/theme';
+import { withAlpha } from '@/src/theme';
 import { useRouter } from 'expo-router';
 import { ChevronRight, Minus, TrendingDown, TrendingUp, Zap } from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useColors } from '../../src/hooks/useColors';
 
 interface AnalysisTrendsProps {
     volumeSeries: VolumeSeriesPoint[];
@@ -15,6 +16,245 @@ interface AnalysisTrendsProps {
 }
 
 export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, handleRangeChange }: AnalysisTrendsProps) {
+    const colors = useColors();
+    const styles = useMemo(() => StyleSheet.create({
+        container: {
+            paddingBottom: 32
+        },
+        rangeRow: {
+            flexDirection: 'row',
+            gap: 12,
+            marginBottom: 24
+        },
+        rangeChip: {
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            borderRadius: 12,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            backgroundColor: colors.surface,
+            flex: 1,
+            alignItems: 'center',
+        },
+        rangeChipActive: {
+            backgroundColor: colors.primary.DEFAULT,
+            borderColor: colors.primary.DEFAULT,
+            shadowColor: colors.primary.DEFAULT,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.2,
+            shadowRadius: 8,
+            elevation: 4,
+        },
+        rangeChipText: {
+            fontWeight: '900',
+            fontSize: 14,
+            color: colors.iron[500]
+        },
+        rangeChipTextActive: {
+            color: colors.white
+        },
+
+        trendCard: {
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            padding: 24,
+            marginBottom: 28,
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.06,
+            shadowRadius: 20,
+            elevation: 5,
+        },
+        trendHeader: {
+            marginBottom: 24
+        },
+        trendTitleContainer: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10
+        },
+        trendAccent: {
+            width: 4,
+            height: 22,
+            borderRadius: 2,
+            backgroundColor: colors.primary.DEFAULT
+        },
+        trendTitle: {
+            fontSize: 20,
+            fontWeight: '900',
+            color: colors.iron[950],
+            letterSpacing: -0.5
+        },
+        trendGrid: {
+            flexDirection: 'row',
+            backgroundColor: colors.iron[50], // Slightly lighter
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: colors.iron[100],
+            padding: 20,
+        },
+        trendCell: {
+            flex: 1
+        },
+        trendCellSeparator: {
+            borderLeftWidth: 1.5,
+            borderLeftColor: colors.iron[200],
+            paddingLeft: 20
+        },
+        trendCellLabel: {
+            fontSize: 11,
+            fontWeight: '900',
+            color: colors.iron[500],
+            textTransform: 'uppercase',
+            marginBottom: 12,
+            letterSpacing: 0.5,
+        },
+        trendDirectionRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10
+        },
+        trendCellValue: {
+            fontSize: 18,
+            fontWeight: '900',
+            color: colors.iron[950]
+        },
+        trendChangeValue: {
+            fontSize: 28,
+            letterSpacing: -1,
+            fontWeight: '900',
+        },
+        trendIconCircle: {
+            width: 38,
+            height: 38,
+            borderRadius: 14,
+            justifyContent: 'center',
+            alignItems: 'center',
+            borderWidth: 1,
+        },
+        insufficientData: {
+            marginTop: 20,
+            paddingTop: 16,
+            borderTopWidth: 1.5,
+            borderTopColor: colors.iron[100],
+        },
+        insufficientDataText: {
+            fontSize: 13,
+            color: colors.iron[400],
+            fontStyle: 'italic',
+            textAlign: 'center',
+            fontWeight: '600'
+        },
+
+        sectionTitleContainer: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            marginBottom: 16
+        },
+        sectionAccent: {
+            width: 4,
+            height: 20,
+            borderRadius: 2,
+            backgroundColor: colors.primary.DEFAULT
+        },
+        sectionTitle: {
+            fontSize: 18,
+            fontWeight: '900',
+            color: colors.iron[950],
+            letterSpacing: -0.3
+        },
+
+        exerciseCard: {
+            backgroundColor: colors.surface,
+            padding: 16,
+            borderRadius: 20,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.05,
+            shadowRadius: 15,
+            elevation: 4,
+            marginBottom: 12,
+        },
+        exerciseCardContent: {
+            flexDirection: 'row',
+            alignItems: 'center'
+        },
+        rankBadge: {
+            width: 36,
+            height: 36,
+            borderRadius: 12,
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '15'),
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        rankText: {
+            fontSize: 15,
+            fontWeight: '900',
+            color: colors.primary.DEFAULT
+        },
+        exerciseInfo: {
+            flex: 1,
+            marginLeft: 14
+        },
+        categoryRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8
+        },
+        categoryDot: {
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+        },
+        exerciseCategory: {
+            fontSize: 11,
+            fontWeight: '900',
+            color: colors.iron[400],
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+        },
+        exerciseName: {
+            fontSize: 16,
+            fontWeight: '900',
+            color: colors.iron[950],
+            marginTop: 2
+        },
+        badgesContainer: {
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 6,
+            marginTop: 6
+        },
+        exerciseSets: {
+            fontSize: 12,
+            fontWeight: '800',
+            color: colors.iron[400],
+            marginTop: 6
+        },
+        volumeContainer: {
+            alignItems: 'flex-end'
+        },
+        exerciseVolume: {
+            fontSize: 22,
+            fontWeight: '900',
+            color: colors.iron[950],
+            letterSpacing: -0.5,
+        },
+        exerciseVolUnit: {
+            fontSize: 11,
+            fontWeight: '900',
+            color: colors.iron[400],
+            textTransform: 'uppercase'
+        },
+        chevron: {
+            marginLeft: 8
+        },
+    }), [colors]);
     const router = useRouter();
 
     const volumeTrend = useMemo(() => {
@@ -44,7 +284,7 @@ export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, 
     const isDown = volumeTrend.slopePerPoint < -0.01;
 
     return (
-        <View style={{ paddingBottom: 32 }}>
+        <View style={styles.container}>
             {/* Range Selector */}
             <View style={styles.rangeRow}>
                 {[7, 30, 90, 365].map((d) => (
@@ -63,7 +303,7 @@ export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, 
             {/* Volume Trend Card */}
             <View style={styles.trendCard}>
                 <View style={styles.trendHeader}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={styles.trendTitleContainer}>
                         <View style={styles.trendAccent} />
                         <Text style={styles.trendTitle}>Tendencia de carga</Text>
                     </View>
@@ -73,17 +313,17 @@ export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, 
                     {/* Direction */}
                     <View style={styles.trendCell}>
                         <Text style={styles.trendCellLabel}>Dirección</Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={styles.trendDirectionRow}>
                             <View style={[
                                 styles.trendIconCircle,
-                                { backgroundColor: isUp ? withAlpha(Colors.green, '33') : isDown ? withAlpha(Colors.red, '33') : Colors.iron[200] }
+                                { backgroundColor: isUp ? withAlpha(colors.green, '33') : isDown ? withAlpha(colors.red, '33') : colors.iron[200] }
                             ]}>
-                                {isUp ? <TrendingUp size={16} color={Colors.green} />
-                                    : isDown ? <TrendingDown size={16} color={Colors.red} />
-                                        : <Minus size={16} color={Colors.iron[500]} />}
+                                {isUp ? <TrendingUp size={18} color={colors.green} />
+                                    : isDown ? <TrendingDown size={18} color={colors.red} />
+                                        : <Minus size={18} color={colors.iron[500]} />}
                             </View>
                             <Text style={[styles.trendCellValue, {
-                                color: isUp ? Colors.green : isDown ? Colors.red : Colors.iron[950]
+                                color: isUp ? colors.green : isDown ? colors.red : colors.iron[950]
                             }]}>
                                 {isUp ? 'Subiendo' : isDown ? 'Bajando' : 'Estable'}
                             </Text>
@@ -91,12 +331,12 @@ export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, 
                     </View>
 
                     {/* Change */}
-                    <View style={[styles.trendCell, { borderLeftWidth: 1, borderLeftColor: Colors.iron[300], paddingLeft: 16 }]}>
+                    <View style={[styles.trendCell, styles.trendCellSeparator]}>
                         <Text style={styles.trendCellLabel}>Cambio</Text>
                         <Text style={[styles.trendCellValue, styles.trendChangeValue, {
-                            color: volumeTrend.changePct && volumeTrend.changePct > 0 ? Colors.green
-                                : volumeTrend.changePct && volumeTrend.changePct < 0 ? Colors.red
-                                    : Colors.iron[950]
+                            color: volumeTrend.changePct && volumeTrend.changePct > 0 ? colors.green
+                                : volumeTrend.changePct && volumeTrend.changePct < 0 ? colors.red
+                                    : colors.iron[950]
                         }]}>
                             {volumeTrend.changePct == null ? '—' : `${volumeTrend.changePct >= 0 ? '+' : ''}${volumeTrend.changePct}%`}
                         </Text>
@@ -113,10 +353,10 @@ export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, 
             </View>
 
             {/* Top Exercises */}
-            <View style={{ marginBottom: 28 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                    <View style={{ width: 3, height: 18, borderRadius: 2, backgroundColor: Colors.primary.DEFAULT }} />
-                    <Zap size={16} color={Colors.iron[950]} />
+            <View style={{ marginBottom: 20 }}>
+                <View style={styles.sectionTitleContainer}>
+                    <View style={styles.sectionAccent} />
+                    <Zap size={16} color={colors.iron[950]} />
                     <Text style={styles.sectionTitle}>Mejores ejercicios por carga</Text>
                 </View>
                 {topExercisesByVolume.length === 0 ? (
@@ -130,25 +370,25 @@ export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, 
                         <Pressable
                             key={e.exerciseId}
                             onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: e.exerciseId, exerciseId: e.exerciseId, exerciseName: e.exerciseName } } as any)}
-                            style={[styles.exerciseCard, idx < topExercisesByVolume.length - 1 && { marginBottom: 10 }]}
+                            style={styles.exerciseCard}
                         >
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={styles.exerciseCardContent}>
                                 {/* Rank */}
                                 <View style={styles.rankBadge}>
                                     <Text style={styles.rankText}>{idx + 1}</Text>
                                 </View>
 
                                 {/* Info */}
-                                <View style={{ flex: 1, marginLeft: 12 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <View style={{
-                                            width: 8, height: 8, borderRadius: 4,
-                                            backgroundColor: e.categoryColor || Colors.iron[500]
-                                        }} />
+                                <View style={styles.exerciseInfo}>
+                                    <View style={styles.categoryRow}>
+                                        <View style={[
+                                            styles.categoryDot,
+                                            { backgroundColor: e.categoryColor || colors.iron[500] }
+                                        ]} />
                                         <Text style={styles.exerciseCategory}>{e.categoryName}</Text>
                                     </View>
                                     <Text style={styles.exerciseName} numberOfLines={1}>{e.exerciseName}</Text>
-                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                                    <View style={styles.badgesContainer}>
                                         {e.badges?.map((b, i) => (
                                             <BadgePill key={i} name={b.name} color={b.color} icon={b.icon} size="xs" />
                                         ))}
@@ -157,14 +397,16 @@ export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, 
                                 </View>
 
                                 {/* Volume */}
-                                <View style={{ alignItems: 'flex-end' }}>
-                                    <Text style={styles.exerciseVolume}>
-                                        {e.volume >= 1000 ? `${(e.volume / 1000).toFixed(1)}k` : Math.round(e.volume)}
-                                    </Text>
-                                    <Text style={styles.exerciseVolUnit}>KG</Text>
+                                <View style={styles.volumeContainer}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
+                                        <Text style={styles.exerciseVolume}>
+                                            {e.volume >= 1000 ? `${(e.volume / 1000).toFixed(1)}k` : Math.round(e.volume)}
+                                        </Text>
+                                        <Text style={styles.exerciseVolUnit}>kg</Text>
+                                    </View>
                                 </View>
 
-                                <ChevronRight size={16} color={Colors.iron[400]} style={{ marginLeft: 8 }} />
+                                <ChevronRight size={16} color={colors.iron[400]} style={styles.chevron} />
                             </View>
                         </Pressable>
                     ))
@@ -174,59 +416,4 @@ export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, 
     );
 }
 
-const styles = StyleSheet.create({
-    rangeRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
-    rangeChip: {
-        paddingHorizontal: 14, paddingVertical: 8,
-        borderRadius: 20, borderWidth: 1, borderColor: Colors.iron[700],
-    },
-    rangeChipActive: { backgroundColor: Colors.primary.DEFAULT, borderColor: Colors.primary.DEFAULT },
-    rangeChipText: { fontWeight: '800', fontSize: 13, color: Colors.iron[950] },
-    rangeChipTextActive: { color: Colors.surface },
 
-    trendCard: {
-        backgroundColor: Colors.surface, borderRadius: 16,
-        borderWidth: 1, borderColor: Colors.iron[700],
-        padding: 20, marginBottom: 24,
-        elevation: 2, shadowColor: ThemeFx.shadowColor,
-        shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8,
-    },
-    trendHeader: { marginBottom: 16 },
-    trendAccent: { width: 3, height: 18, borderRadius: 2, backgroundColor: Colors.primary.DEFAULT },
-    trendTitle: { fontSize: 17, fontWeight: '900', color: Colors.iron[950], letterSpacing: -0.3 },
-    trendGrid: {
-        flexDirection: 'row',
-        backgroundColor: Colors.iron[200], borderRadius: 12,
-        borderWidth: 1, borderColor: Colors.iron[300],
-        padding: 16,
-    },
-    trendCell: { flex: 1 },
-    trendCellLabel: { fontSize: 10, fontWeight: '700', color: Colors.iron[500], textTransform: 'uppercase', marginBottom: 8 },
-    trendCellValue: { fontSize: 18, fontWeight: '900', color: Colors.iron[950] },
-    trendChangeValue: { fontSize: 24, letterSpacing: -0.5 },
-    trendIconCircle: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-    insufficientData: {
-        marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.iron[300],
-    },
-    insufficientDataText: { fontSize: 12, color: Colors.iron[400], fontStyle: 'italic' },
-
-    sectionTitle: { fontSize: 17, fontWeight: '900', color: Colors.iron[950], letterSpacing: -0.3 },
-
-    exerciseCard: {
-        backgroundColor: Colors.surface, padding: 14, borderRadius: 14,
-        borderWidth: 1, borderColor: Colors.iron[700],
-        elevation: 1, shadowColor: ThemeFx.shadowColor,
-        shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4,
-    },
-    rankBadge: {
-        width: 28, height: 28, borderRadius: 14,
-        backgroundColor: withAlpha(Colors.primary.DEFAULT, '15'),
-        justifyContent: 'center', alignItems: 'center',
-    },
-    rankText: { fontSize: 13, fontWeight: '900', color: Colors.primary.DEFAULT },
-    exerciseCategory: { fontSize: 10, fontWeight: '700', color: Colors.iron[500], textTransform: 'uppercase' },
-    exerciseName: { fontSize: 14, fontWeight: '700', color: Colors.iron[950], marginTop: 2 },
-    exerciseSets: { fontSize: 11, fontWeight: '600', color: Colors.iron[400], marginTop: 2 },
-    exerciseVolume: { fontSize: 18, fontWeight: '900', color: Colors.iron[950] },
-    exerciseVolUnit: { fontSize: 9, fontWeight: '700', color: Colors.iron[400], textTransform: 'uppercase' },
-});

@@ -2,10 +2,11 @@ import { EmptyChartPlaceholder } from '@/components/EmptyChartPlaceholder';
 import { ExerciseFormModal } from '@/components/ExerciseFormModal';
 import { IronButton } from '@/components/IronButton';
 import { IronCard } from '@/components/IronCard';
-import { SET_TYPE_CONFIG, SetRow } from '@/components/SetRow';
+import { SetRow, SetTypeConfigItemWithColors, useSetTypeConfig } from '@/components/SetRow';
 import { BadgePill } from '@/components/ui/BadgePill';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { WarmupCalculatorModal } from '@/components/WarmupCalculatorModal';
+import { useColors } from '@/src/hooks/useColors';
 import { CalculatorService } from '@/src/services/CalculatorService';
 import { configService } from '@/src/services/ConfigService';
 import { dbService } from '@/src/services/DatabaseService';
@@ -13,7 +14,7 @@ import { ExerciseService } from '@/src/services/ExerciseService';
 import { UnitService } from '@/src/services/UnitService';
 import { workoutService } from '@/src/services/WorkoutService';
 import { useTimerStore } from '@/src/store/timerStore';
-import { Colors, ThemeFx, withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { Exercise, WorkoutSet } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { formatTimeSeconds } from '@/src/utils/time';
@@ -34,6 +35,8 @@ type CardioMetric = 'distance' | 'time' | 'pace' | 'speed';
 export default function ExerciseDetailScreen() {
     const { workoutId, exerciseId, exerciseName } = useLocalSearchParams<{ workoutId: string, exerciseId: string, exerciseName: string }>();
     const router = useRouter();
+    const colors = useColors();
+    const { configs: SET_TYPE_CONFIG } = useSetTypeConfig();
     const [unit, setUnit] = useState(configService.get('weightUnit'));
     const displayWeight = (kgValue: number) => unit === 'kg' ? kgValue : UnitService.kgToLbs(kgValue);
     const toKg = (displayValue: number) => unit === 'kg' ? displayValue : UnitService.lbsToKg(displayValue);
@@ -621,16 +624,16 @@ export default function ExerciseDetailScreen() {
 
     // --- RENDER CONTENT ---
     const renderTrack = () => {
-        if (!workoutId) return <View style={{ paddingVertical: 40, alignItems: 'center' }}><Text style={{ color: Colors.iron[500], fontWeight: '700' }}>No active workout</Text></View>;
+        if (!workoutId) return <View style={{ paddingVertical: 40, alignItems: 'center' }}><Text style={{ color: colors.iron[500], fontWeight: '700' }}>No active workout</Text></View>;
 
         return (
             <IronCard className="mb-4">
                 {workoutLocked && (
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: withAlpha(Colors.red, '10'), borderRadius: 12, borderWidth: 1, borderColor: withAlpha(Colors.red, '25'), padding: 12, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: Colors.red }}>
-                        <Info size={14} color={Colors.red} style={{ marginRight: 8, marginTop: 2 }} />
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: withAlpha(colors.red, '10'), borderRadius: 12, borderWidth: 1, borderColor: withAlpha(colors.red, '25'), padding: 12, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: colors.red }}>
+                        <Info size={14} color={colors.red} style={{ marginRight: 8, marginTop: 2 }} />
                         <View style={{ flex: 1 }}>
-                            <Text style={{ color: Colors.iron[950], fontWeight: '800', fontSize: 13 }}>Entrenamiento finalizado</Text>
-                            <Text style={{ color: Colors.iron[400], fontSize: 11, marginTop: 2 }}>Para editar, reabre el entrenamiento desde su pantalla.</Text>
+                            <Text style={{ color: colors.iron[950], fontWeight: '800', fontSize: 13 }}>Entrenamiento finalizado</Text>
+                            <Text style={{ color: colors.iron[400], fontSize: 11, marginTop: 2 }}>Para editar, reabre el entrenamiento desde su pantalla.</Text>
                         </View>
                     </View>
                 )}
@@ -678,12 +681,12 @@ export default function ExerciseDetailScreen() {
             onPress={onPress}
             style={{
                 paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1,
-                backgroundColor: isActive ? Colors.primary.DEFAULT + '15' : 'transparent',
-                borderColor: isActive ? Colors.primary.DEFAULT : Colors.iron[700],
+                backgroundColor: isActive ? colors.primary.DEFAULT + '15' : 'transparent',
+                borderColor: isActive ? colors.primary.DEFAULT : colors.iron[700],
             }}
             accessibilityRole="button"
         >
-            <Text style={{ fontWeight: '700', fontSize: 12, color: isActive ? Colors.primary.DEFAULT : Colors.iron[500] }}>{label}</Text>
+            <Text style={{ fontWeight: '700', fontSize: 12, color: isActive ? colors.primary.DEFAULT : colors.iron[500] }}>{label}</Text>
         </TouchableOpacity>
     );
 
@@ -700,10 +703,10 @@ export default function ExerciseDetailScreen() {
             </View>
 
             {(!history || history.length === 0) ? (
-                <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 40, backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], marginTop: 8 }}>
-                    <Info size={36} color={Colors.iron[300]} />
-                    <Text style={{ color: Colors.iron[950], textAlign: 'center', fontWeight: '800', fontSize: 14, marginTop: 10 }}>Aún no hay historial</Text>
-                    <Text style={{ color: Colors.iron[400], textAlign: 'center', fontSize: 12, marginTop: 4, paddingHorizontal: 24 }}>Aparecerá aquí cuando completes series de este ejercicio.</Text>
+                <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 40, backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.iron[700], marginTop: 8 }}>
+                    <Info size={36} color={colors.iron[300]} />
+                    <Text style={{ color: colors.iron[950], textAlign: 'center', fontWeight: '800', fontSize: 14, marginTop: 10 }}>Aún no hay historial</Text>
+                    <Text style={{ color: colors.iron[400], textAlign: 'center', fontSize: 12, marginTop: 4, paddingHorizontal: 24 }}>Aparecerá aquí cuando completes series de este ejercicio.</Text>
                 </View>
             ) : historyTab === 'sets' ? (
                 <View>
@@ -719,7 +722,7 @@ export default function ExerciseDetailScreen() {
                     </View>
 
                     {sortedHistorySets.length === 0 ? (
-                        <Text style={{ color: Colors.iron[400], textAlign: 'center', marginTop: 40, fontSize: 13, fontWeight: '600' }}>No hay series completadas en este rango.</Text>
+                        <Text style={{ color: colors.iron[400], textAlign: 'center', marginTop: 40, fontSize: 13, fontWeight: '600' }}>No hay series completadas en este rango.</Text>
                     ) : (
                         <View style={{ gap: 12 }}>
                             {sortedHistorySets.slice(0, 80).map((s: any, idx: number) => {
@@ -732,29 +735,30 @@ export default function ExerciseDetailScreen() {
                                     }
                                 })();
                                 return (
-                                    <View key={`${s.id}-${idx}`} style={{ backgroundColor: Colors.surface, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
+                                    <View key={`${s.id}-${idx}`} style={{ backgroundColor: colors.surface, padding: 16, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border, elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                <View style={{ backgroundColor: Colors.iron[200], paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: Colors.iron[300] }}>
-                                                    <Text style={{ color: Colors.iron[600], fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>{dateLabel}</Text>
+                                                <View style={{ backgroundColor: colors.iron[200], paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border }}>
+                                                    <Text style={{ color: colors.iron[600], fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>{dateLabel}</Text>
                                                 </View>
                                                 {(() => {
                                                     const t = (s as any).type || 'normal';
                                                     if (t === 'normal') return null;
-                                                    const cfg = SET_TYPE_CONFIG.find(c => c.key === t);
+                                                    const cfg = SET_TYPE_CONFIG.find((c: SetTypeConfigItemWithColors) => c.key === t);
                                                     if (!cfg) return null;
                                                     return (
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: cfg.bg, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: cfg.text + '25' }}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: cfg.bg, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 12, borderWidth: 1.5, borderColor: cfg.text + '25' }}>
+
                                                             <cfg.Icon size={9} color={cfg.text} />
                                                             <Text style={{ fontSize: 9, fontWeight: '900', color: cfg.text }}>{cfg.shortLabel}</Text>
                                                         </View>
                                                     );
                                                 })()}
                                             </View>
-                                            {s.rpe ? <View style={{ backgroundColor: Colors.primary.DEFAULT + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: Colors.primary.DEFAULT + '30' }}><Text style={{ fontSize: 10, fontWeight: '900', color: Colors.primary.DEFAULT }}>RPE @{s.rpe}</Text></View> : null}
+                                            {s.rpe ? <View style={{ backgroundColor: colors.primary.DEFAULT + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, borderWidth: 1.5, borderColor: colors.primary.DEFAULT + '30' }}><Text style={{ fontSize: 10, fontWeight: '900', color: colors.primary.DEFAULT }}>RPE @{s.rpe}</Text></View> : null}
                                         </View>
                                         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16 }}>
-                                            <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 26, letterSpacing: -0.5 }}>
+                                            <Text style={{ color: colors.iron[950], fontWeight: '900', fontSize: 26, letterSpacing: -0.5 }}>
                                                 {exType === 'distance_time'
                                                     ? `${Math.round((s.__distKm || 0) * 100) / 100} km`
                                                     : exType === 'reps_only'
@@ -763,33 +767,33 @@ export default function ExerciseDetailScreen() {
                                                             ? `${Math.round((s.__w || 0) * 100) / 100} ${unit}`
                                                             : (
                                                                 <>
-                                                                    {Math.round((s.__w || 0) * 100) / 100}<Text style={{ color: Colors.iron[500], fontSize: 14, fontWeight: '700' }}> {unit}</Text>
-                                                                    <Text style={{ color: Colors.iron[500], fontSize: 14, fontWeight: '700' }}> × </Text>
-                                                                    {s.reps || 0}<Text style={{ color: Colors.iron[500], fontSize: 14, fontWeight: '700' }}> reps</Text>
+                                                                    {Math.round((s.__w || 0) * 100) / 100}<Text style={{ color: colors.iron[500], fontSize: 14, fontWeight: '700' }}> {unit}</Text>
+                                                                    <Text style={{ color: colors.iron[500], fontSize: 14, fontWeight: '700' }}> × </Text>
+                                                                    {s.reps || 0}<Text style={{ color: colors.iron[500], fontSize: 14, fontWeight: '700' }}> reps</Text>
                                                                 </>
                                                             )
                                                 }
                                             </Text>
                                             {exType === 'distance_time' ? (
-                                                <Text style={{ color: Colors.iron[500], fontSize: 13, fontWeight: '800' }}>{formatTimeSeconds(s.__timeSec || 0)}</Text>
+                                                <Text style={{ color: colors.iron[500], fontSize: 13, fontWeight: '800' }}>{formatTimeSeconds(s.__timeSec || 0)}</Text>
                                             ) : null}
                                         </View>
-                                        <View style={{ height: 1, backgroundColor: Colors.iron[200], marginBottom: 12 }} />
+                                        <View style={{ height: 1, backgroundColor: colors.iron[200], marginBottom: 12 }} />
                                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                                             {exType === 'weight_reps' ? (
                                                 <>
-                                                    <Text style={{ color: Colors.iron[500], fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>1RM: <Text style={{ color: Colors.iron[950] }}>{s.__orm || 0}</Text></Text>
-                                                    <Text style={{ color: Colors.iron[500], fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Vol: <Text style={{ color: Colors.iron[950] }}>{Math.round(s.__vol || 0)}</Text></Text>
+                                                    <Text style={{ color: colors.iron[500], fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>1RM: <Text style={{ color: colors.iron[950] }}>{s.__orm || 0}</Text></Text>
+                                                    <Text style={{ color: colors.iron[500], fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Vol: <Text style={{ color: colors.iron[950] }}>{Math.round(s.__vol || 0)}</Text></Text>
                                                 </>
                                             ) : exType === 'distance_time' ? (
                                                 <>
-                                                    <Text style={{ color: Colors.iron[500], fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Ritmo: <Text style={{ color: Colors.iron[950] }}>{s.__pace ? formatTimeSeconds(s.__pace) : '—'}</Text></Text>
-                                                    <Text style={{ color: Colors.iron[500], fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Vel: <Text style={{ color: Colors.iron[950] }}>{s.__speed ? `${Math.round(s.__speed * 10) / 10} km/h` : '—'}</Text></Text>
+                                                    <Text style={{ color: colors.iron[500], fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Ritmo: <Text style={{ color: colors.iron[950] }}>{s.__pace ? formatTimeSeconds(s.__pace) : '—'}</Text></Text>
+                                                    <Text style={{ color: colors.iron[500], fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Vel: <Text style={{ color: colors.iron[950] }}>{s.__speed ? `${Math.round(s.__speed * 10) / 10} km/h` : '—'}</Text></Text>
                                                 </>
                                             ) : exType === 'reps_only' ? (
-                                                <Text style={{ color: Colors.iron[500], fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Reps: <Text style={{ color: Colors.iron[950] }}>{s.reps || 0}</Text></Text>
+                                                <Text style={{ color: colors.iron[500], fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Reps: <Text style={{ color: colors.iron[950] }}>{s.reps || 0}</Text></Text>
                                             ) : (
-                                                <Text style={{ color: Colors.iron[500], fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Peso: <Text style={{ color: Colors.iron[950] }}>{Math.round((s.__w || 0) * 100) / 100}</Text> {unit}</Text>
+                                                <Text style={{ color: colors.iron[500], fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>Peso: <Text style={{ color: colors.iron[950] }}>{Math.round((s.__w || 0) * 100) / 100}</Text> {unit}</Text>
                                             )}
                                         </View>
                                     </View>
@@ -809,26 +813,26 @@ export default function ExerciseDetailScreen() {
                     <View key={i} style={{ flexDirection: 'row', marginBottom: 16 }}>
                         {/* Left Date Column */}
                         <View style={{ width: 56, alignItems: 'center', marginRight: 12, paddingTop: 4 }}>
-                            <View style={{ backgroundColor: Colors.surface, borderRadius: 14, paddingHorizontal: 6, paddingVertical: 10, alignItems: 'center', width: '100%', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 }}>
-                                <Text style={{ fontWeight: '900', color: Colors.iron[950], fontSize: 20 }}>{dateDisplay.day}</Text>
-                                <Text style={{ color: Colors.iron[500], fontSize: 9, textTransform: 'uppercase', fontWeight: '900', letterSpacing: 1, marginTop: 2 }}>{dateDisplay.month}</Text>
+                            <View style={{ backgroundColor: colors.surface, borderRadius: 14, paddingHorizontal: 6, paddingVertical: 10, alignItems: 'center', width: '100%', borderWidth: 1.5, borderColor: colors.border, elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 }}>
+                                <Text style={{ fontWeight: '900', color: colors.iron[950], fontSize: 20 }}>{dateDisplay.day}</Text>
+                                <Text style={{ color: colors.iron[500], fontSize: 9, textTransform: 'uppercase', fontWeight: '900', letterSpacing: 1, marginTop: 2 }}>{dateDisplay.month}</Text>
                             </View>
-                            {i < history.length - 1 && <View style={{ flex: 1, width: 2, backgroundColor: Colors.iron[300], marginVertical: 8, borderRadius: 1 }} />}
+                            {i < history.length - 1 && <View style={{ flex: 1, width: 2, backgroundColor: colors.iron[300], marginVertical: 8, borderRadius: 1 }} />}
                         </View>
 
                         {/* Right Content Card */}
                         <View style={{ flex: 1, paddingTop: 4 }}>
-                            <View style={{ padding: 16, backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottomWidth: 1, borderBottomColor: Colors.iron[200], paddingBottom: 12 }}>
-                                    <Text style={{ fontSize: 12, color: Colors.iron[500], fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>Sesión completada</Text>
+                            <View style={{ padding: 16, backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border, elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.iron[200], paddingBottom: 12 }}>
+                                    <Text style={{ fontSize: 12, color: colors.iron[500], fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>Sesión completada</Text>
                                     {workoutId && (
                                         <TouchableOpacity
                                             onPress={() => copyFromHistory(h.sets)}
-                                            style={{ backgroundColor: Colors.iron[200], paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: Colors.iron[300] }}
+                                            style={{ backgroundColor: colors.iron[200], paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1.5, borderColor: colors.border }}
                                             accessibilityRole="button"
                                             accessibilityLabel="Copiar series de esta sesión"
                                         >
-                                            <Text style={{ color: Colors.iron[950], fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>COPIAR</Text>
+                                            <Text style={{ color: colors.iron[950], fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>COPIAR</Text>
                                         </TouchableOpacity>
                                     )}
                                 </View>
@@ -837,17 +841,19 @@ export default function ExerciseDetailScreen() {
                                     {(h.sets && h.sets.length > 0) ? h.sets.map((s, idx) => (
                                         <View key={idx} style={{
                                             flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                                            backgroundColor: Colors.iron[100], padding: 12, borderRadius: 12,
-                                            borderWidth: 1, borderColor: Colors.iron[200],
+                                            backgroundColor: colors.iron[100], padding: 12, borderRadius: 12,
+                                            borderWidth: 1, borderColor: colors.iron[200],
                                             ...(s.type && s.type !== 'normal' ? {
-                                                borderColor: (SET_TYPE_CONFIG.find(c => c.key === s.type)?.text || Colors.iron[300]) + '25',
+                                                borderColor: (SET_TYPE_CONFIG.find((c: SetTypeConfigItemWithColors) => c.key === s.type)?.text || colors.iron[300]) + '25',
                                                 borderLeftWidth: 3,
-                                                borderLeftColor: SET_TYPE_CONFIG.find(c => c.key === s.type)?.text || Colors.iron[300],
+                                                borderLeftColor: SET_TYPE_CONFIG.find((c: SetTypeConfigItemWithColors) => c.key === s.type)?.text || colors.iron[300],
+
                                             } : {}),
                                         }}>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                                                 {(() => {
-                                                    const cfg = SET_TYPE_CONFIG.find(c => c.key === (s.type || 'normal')) || SET_TYPE_CONFIG[0];
+                                                    const cfg = SET_TYPE_CONFIG.find((c: SetTypeConfigItemWithColors) => c.key === (s.type || 'normal')) || SET_TYPE_CONFIG[0];
+
                                                     const isNormal = (s.type || 'normal') === 'normal';
                                                     return (
                                                         <View style={{ width: isNormal ? 28 : 'auto' as any, minWidth: 28, height: 28, borderRadius: 8, backgroundColor: cfg.bg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: isNormal ? 0 : 6, flexDirection: 'row', gap: 4 }}>
@@ -859,7 +865,7 @@ export default function ExerciseDetailScreen() {
                                                     );
                                                 })()}
                                                 <View>
-                                                    <Text style={{ fontWeight: '900', color: Colors.iron[950], fontSize: 18, letterSpacing: -0.3 }}>
+                                                    <Text style={{ fontWeight: '900', color: colors.iron[950], fontSize: 18, letterSpacing: -0.3 }}>
                                                         {exType === 'distance_time'
                                                             ? `${Math.round((((s as any).distance || 0) / 1000) * 100) / 100} km`
                                                             : exType === 'reps_only'
@@ -869,14 +875,14 @@ export default function ExerciseDetailScreen() {
                                                                     : `${s.weight !== undefined && s.weight !== null ? Math.round(displayWeight(s.weight) * 100) / 100 : 0}`
                                                         }
                                                         {exType === 'weight_reps' || exType === 'weight_only' ? (
-                                                            <Text style={{ fontSize: 12, fontWeight: '800', color: Colors.iron[500] }}> {unit}</Text>
+                                                            <Text style={{ fontSize: 12, fontWeight: '800', color: colors.iron[500] }}> {unit}</Text>
                                                         ) : null}
                                                         {exType === 'reps_only' ? (
-                                                            <Text style={{ fontSize: 12, fontWeight: '800', color: Colors.iron[500] }}> reps</Text>
+                                                            <Text style={{ fontSize: 12, fontWeight: '800', color: colors.iron[500] }}> reps</Text>
                                                         ) : null}
                                                     </Text>
                                                     {exType === 'distance_time' ? (
-                                                        <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.iron[500], marginTop: 2 }}>
+                                                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.iron[500], marginTop: 2 }}>
                                                             {formatTimeSeconds((s as any).time || 0)}
                                                         </Text>
                                                     ) : null}
@@ -885,12 +891,12 @@ export default function ExerciseDetailScreen() {
 
                                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                 {exType === 'weight_reps' ? (
-                                                    <Text style={{ fontWeight: '900', color: Colors.iron[950], fontSize: 18, letterSpacing: -0.3 }}>
+                                                    <Text style={{ fontWeight: '900', color: colors.iron[950], fontSize: 18, letterSpacing: -0.3 }}>
                                                         {s.reps !== undefined && s.reps !== null ? s.reps : 0}
-                                                        <Text style={{ fontSize: 12, fontWeight: '800', color: Colors.iron[500] }}> reps</Text>
+                                                        <Text style={{ fontSize: 12, fontWeight: '800', color: colors.iron[500] }}> reps</Text>
                                                     </Text>
                                                 ) : exType === 'distance_time' ? (
-                                                    <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.iron[500] }}>
+                                                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.iron[500] }}>
                                                         {(() => {
                                                             const dKm = (((s as any).distance || 0) / 1000);
                                                             const t = (s as any).time || 0;
@@ -900,12 +906,12 @@ export default function ExerciseDetailScreen() {
                                                         })()}
                                                     </Text>
                                                 ) : null}
-                                                {s.rpe ? <View style={{ backgroundColor: Colors.primary.DEFAULT, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 12 }}><Text style={{ fontSize: 10, fontWeight: '900', color: Colors.surface }}>@{s.rpe}</Text></View> : null}
+                                                {s.rpe ? <View style={{ backgroundColor: colors.primary.DEFAULT, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 12 }}><Text style={{ fontSize: 10, fontWeight: '900', color: colors.surface }}>@{s.rpe}</Text></View> : null}
                                             </View>
                                         </View>
                                     )) : (
-                                        <View style={{ padding: 14, backgroundColor: Colors.iron[200], borderRadius: 12, borderWidth: 1, borderColor: Colors.iron[300] }}>
-                                            <Text style={{ color: Colors.iron[500], fontWeight: '800', fontSize: 13, textAlign: 'center' }}>Sin datos en esta sesión</Text>
+                                        <View style={{ padding: 14, backgroundColor: colors.iron[200], borderRadius: 12, borderWidth: 1.5, borderColor: colors.border }}>
+                                            <Text style={{ color: colors.iron[500], fontWeight: '800', fontSize: 13, textAlign: 'center' }}>Sin datos en esta sesión</Text>
                                         </View>
                                     )}
                                 </View>
@@ -929,18 +935,18 @@ export default function ExerciseDetailScreen() {
                 <View style={{ gap: 20 }}>
                     <View style={{ flexDirection: 'row', gap: 10 }}>
                         <IronCard className="flex-1">
-                            <Text style={{ color: Colors.iron[400], fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Sesiones (30d)</Text>
-                            <Text style={{ color: Colors.iron[950], fontSize: 24, fontWeight: '900', marginTop: 4 }}>{insights.sessions30}</Text>
-                            <Text style={{ color: Colors.iron[400], fontSize: 11, fontWeight: '700' }}>última: {insights.daysSince == null ? '—' : `${insights.daysSince}d`}</Text>
+                            <Text style={{ color: colors.iron[400], fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Sesiones (30d)</Text>
+                            <Text style={{ color: colors.iron[950], fontSize: 24, fontWeight: '900', marginTop: 4 }}>{insights.sessions30}</Text>
+                            <Text style={{ color: colors.iron[400], fontSize: 11, fontWeight: '700' }}>última: {insights.daysSince == null ? '—' : `${insights.daysSince}d`}</Text>
                         </IronCard>
                         <IronCard className="flex-1">
-                            <Text style={{ color: Colors.iron[400], fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                            <Text style={{ color: colors.iron[400], fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                                 {exType === 'distance_time'
                                     ? cardioMetric === 'distance' ? 'Mejor distancia' : cardioMetric === 'time' ? 'Mayor tiempo' : cardioMetric === 'pace' ? 'Mejor ritmo' : 'Mejor velocidad'
                                     : exType === 'reps_only' ? 'Mejor reps' : exType === 'weight_only' ? 'Mejor peso' : 'Mejor 1RM'
                                 }
                             </Text>
-                            <Text style={{ color: Colors.iron[950], fontSize: 24, fontWeight: '900', marginTop: 4 }}>
+                            <Text style={{ color: colors.iron[950], fontSize: 24, fontWeight: '900', marginTop: 4 }}>
                                 {exType === 'distance_time'
                                     ? cardioMetric === 'distance'
                                         ? (insights.bestSessionDistance?.distKm != null ? Math.round(insights.bestSessionDistance.distKm * 100) / 100 : 0)
@@ -948,7 +954,7 @@ export default function ExerciseDetailScreen() {
                                     : exType === 'reps_only' ? (insights.bestReps?.reps ?? 0) : exType === 'weight_only' ? (insights.heaviest?.weight ?? 0) : (insights.best1rm?.est ?? 0)
                                 }
                             </Text>
-                            <Text style={{ color: Colors.iron[400], fontSize: 11, fontWeight: '700' }}>
+                            <Text style={{ color: colors.iron[400], fontSize: 11, fontWeight: '700' }}>
                                 {exType === 'distance_time' ? cardioMetric === 'distance' ? 'km' : cardioMetric === 'time' ? '' : cardioMetric === 'pace' ? '/km' : 'km/h' : exType === 'reps_only' ? 'reps' : unit}
                             </Text>
                         </IronCard>
@@ -956,40 +962,40 @@ export default function ExerciseDetailScreen() {
 
                     {exType === 'weight_reps' ? (
                         <>
-                            <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.iron[700], elevation: 1 }}>
-                                <View style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.iron[100], flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.iron[200] }}>
-                                    <View style={{ width: 5, height: 16, backgroundColor: Colors.primary.DEFAULT, borderRadius: 3 }} />
-                                    <Text style={{ color: Colors.iron[950], fontWeight: '900', letterSpacing: -0.3, fontSize: 13, textTransform: 'uppercase' }}>1RM estimado</Text>
+                            <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.iron[700], elevation: 1 }}>
+                                <View style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.iron[100], flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.iron[200] }}>
+                                    <View style={{ width: 5, height: 16, backgroundColor: colors.primary.DEFAULT, borderRadius: 3 }} />
+                                    <Text style={{ color: colors.iron[950], fontWeight: '900', letterSpacing: -0.3, fontSize: 13, textTransform: 'uppercase' }}>1RM estimado</Text>
                                 </View>
-                                <View style={{ paddingVertical: 24, alignItems: 'center', backgroundColor: Colors.surface }}>
+                                <View style={{ paddingVertical: 24, alignItems: 'center', backgroundColor: colors.surface }}>
                                     {oneRmSeries.length > 1 ? (
                                         <LineChart
                                             data={oneRmSeries}
-                                            color={Colors.primary.DEFAULT}
+                                            color={colors.primary.DEFAULT}
                                             thickness={3}
-                                            dataPointsColor={Colors.primary.DEFAULT}
+                                            dataPointsColor={colors.primary.DEFAULT}
                                             dataPointsRadius={4}
                                             hideRules={false}
-                                            rulesColor={Colors.iron[200]}
+                                            rulesColor={colors.iron[200]}
                                             rulesType="solid"
                                             height={200}
                                             width={screenWidth - 64}
                                             curved
                                             isAnimated
                                             animationDuration={400}
-                                            startFillColor={Colors.primary.DEFAULT}
-                                            endFillColor={Colors.primary.DEFAULT}
+                                            startFillColor={colors.primary.DEFAULT}
+                                            endFillColor={colors.primary.DEFAULT}
                                             startOpacity={0.2}
                                             endOpacity={0}
                                             areaChart
-                                            yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
-                                            xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                            yAxisTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                            xAxisLabelTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
                                             initialSpacing={0}
                                             endSpacing={0}
                                             yAxisLabelSuffix={` ${unit}`}
                                             yAxisLabelWidth={36}
                                             xAxisThickness={1}
-                                            xAxisColor={Colors.iron[200]}
+                                            xAxisColor={colors.iron[200]}
                                             yAxisThickness={0}
                                         />
                                     ) : (
@@ -1001,25 +1007,25 @@ export default function ExerciseDetailScreen() {
                                 </View>
                             </View>
 
-                            <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.iron[700], elevation: 1 }}>
-                                <View style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.iron[100], flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.iron[200] }}>
-                                    <View style={{ width: 5, height: 16, backgroundColor: Colors.iron[600], borderRadius: 3 }} />
-                                    <Text style={{ color: Colors.iron[950], fontWeight: '900', letterSpacing: -0.3, fontSize: 13, textTransform: 'uppercase' }}>Carga</Text>
+                            <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.iron[700], elevation: 1 }}>
+                                <View style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.iron[100], flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.iron[200] }}>
+                                    <View style={{ width: 5, height: 16, backgroundColor: colors.iron[600], borderRadius: 3 }} />
+                                    <Text style={{ color: colors.iron[950], fontWeight: '900', letterSpacing: -0.3, fontSize: 13, textTransform: 'uppercase' }}>Carga</Text>
                                 </View>
-                                <View style={{ paddingVertical: 24, alignItems: 'center', backgroundColor: Colors.surface }}>
+                                <View style={{ paddingVertical: 24, alignItems: 'center', backgroundColor: colors.surface }}>
                                     {volumeData.length > 0 ? (
                                         <BarChart
                                             data={volumeData}
-                                            frontColor={Colors.primary.dark}
+                                            frontColor={colors.primary.dark}
                                             barWidth={18}
                                             spacing={18}
                                             roundedTop
                                             roundedBottom
                                             hideRules={false}
-                                            rulesColor={Colors.iron[200]}
+                                            rulesColor={colors.iron[200]}
                                             rulesType="solid"
-                                            yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
-                                            xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                            yAxisTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                            xAxisLabelTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
                                             initialSpacing={0}
                                             endSpacing={0}
                                             isAnimated
@@ -1027,7 +1033,7 @@ export default function ExerciseDetailScreen() {
                                             yAxisLabelSuffix=" kg"
                                             yAxisLabelWidth={36}
                                             xAxisThickness={1}
-                                            xAxisColor={Colors.iron[200]}
+                                            xAxisColor={colors.iron[200]}
                                         />
                                     ) : (
                                         <EmptyChartPlaceholder
@@ -1046,43 +1052,43 @@ export default function ExerciseDetailScreen() {
                                 )}
                             </View>
 
-                            <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.iron[700], elevation: 1 }}>
-                                <View style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.iron[100], flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.iron[200] }}>
+                            <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.iron[700], elevation: 1 }}>
+                                <View style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.iron[100], flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.iron[200] }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                        <View style={{ width: 5, height: 16, borderRadius: 3, backgroundColor: cardioMetric === 'distance' ? Colors.primary.DEFAULT : Colors.iron[600] }} />
-                                        <Text style={{ color: Colors.iron[950], fontWeight: '900', letterSpacing: -0.3, fontSize: 13, textTransform: 'uppercase' }}>
+                                        <View style={{ width: 5, height: 16, borderRadius: 3, backgroundColor: cardioMetric === 'distance' ? colors.primary.DEFAULT : colors.iron[600] }} />
+                                        <Text style={{ color: colors.iron[950], fontWeight: '900', letterSpacing: -0.3, fontSize: 13, textTransform: 'uppercase' }}>
                                             {cardioMetric === 'distance' ? 'Distancia por sesión' : cardioMetric === 'time' ? 'Tiempo por sesión' : cardioMetric === 'pace' ? 'Ritmo (min/km)' : 'Velocidad (km/h)'}
                                         </Text>
                                     </View>
                                     {cardioPrimarySummary ? (
                                         <View style={{ alignItems: 'flex-end' }}>
-                                            <Text style={{ color: Colors.iron[400], fontSize: 10, fontWeight: '800', textTransform: 'uppercase' }}>
+                                            <Text style={{ color: colors.iron[400], fontSize: 10, fontWeight: '800', textTransform: 'uppercase' }}>
                                                 PR: {cardioPrimarySummary.title}{cardioPrimarySummary.dateLabel ? ` • ${cardioPrimarySummary.dateLabel}` : ''}
                                             </Text>
-                                            <Text style={{ color: Colors.iron[950], fontSize: 12, fontWeight: '900' }}>{cardioPrimarySummary.value}</Text>
+                                            <Text style={{ color: colors.iron[950], fontSize: 12, fontWeight: '900' }}>{cardioPrimarySummary.value}</Text>
                                         </View>
                                     ) : null}
                                 </View>
-                                <View style={{ paddingVertical: 24, alignItems: 'center', backgroundColor: Colors.surface }}>
+                                <View style={{ paddingVertical: 24, alignItems: 'center', backgroundColor: colors.surface }}>
                                     {cardioMetric === 'distance' ? (
                                         distanceSeries.length > 0 ? (
                                             <BarChart
                                                 data={distanceSeries}
-                                                frontColor={Colors.primary.DEFAULT}
+                                                frontColor={colors.primary.DEFAULT}
                                                 barWidth={18}
                                                 spacing={18}
                                                 roundedTop
                                                 roundedBottom
                                                 hideRules={false}
-                                                rulesColor={Colors.iron[200]}
+                                                rulesColor={colors.iron[200]}
                                                 rulesType="solid"
                                                 xAxisThickness={1}
-                                                xAxisColor={Colors.iron[200]}
+                                                xAxisColor={colors.iron[200]}
                                                 yAxisThickness={0}
                                                 height={200}
                                                 width={screenWidth - 64}
-                                                yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
-                                                xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                                yAxisTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                                xAxisLabelTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
                                                 initialSpacing={0}
                                                 endSpacing={0}
                                                 isAnimated
@@ -1100,37 +1106,37 @@ export default function ExerciseDetailScreen() {
                                         speedSeries.length > 1 ? (
                                             <LineChart
                                                 data={speedSeries}
-                                                color={Colors.primary.DEFAULT}
+                                                color={colors.primary.DEFAULT}
                                                 thickness={3}
-                                                dataPointsColor={Colors.primary.DEFAULT}
+                                                dataPointsColor={colors.primary.DEFAULT}
                                                 dataPointsRadius={4}
                                                 hideRules={false}
-                                                rulesColor={Colors.iron[200]}
+                                                rulesColor={colors.iron[200]}
                                                 rulesType="solid"
                                                 height={200}
                                                 width={screenWidth - 64}
                                                 curved
                                                 isAnimated
                                                 animationDuration={400}
-                                                startFillColor={Colors.primary.DEFAULT}
-                                                endFillColor={Colors.primary.DEFAULT}
+                                                startFillColor={colors.primary.DEFAULT}
+                                                endFillColor={colors.primary.DEFAULT}
                                                 startOpacity={0.2}
                                                 endOpacity={0}
                                                 areaChart
-                                                yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
-                                                xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                                yAxisTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                                xAxisLabelTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
                                                 initialSpacing={0}
                                                 endSpacing={0}
                                                 yAxisLabelSuffix=" km/h"
                                                 yAxisLabelWidth={45}
                                                 xAxisThickness={1}
-                                                xAxisColor={Colors.iron[200]}
+                                                xAxisColor={colors.iron[200]}
                                                 yAxisThickness={0}
                                                 pointerConfig={{
                                                     pointerStripHeight: 190,
-                                                    pointerStripColor: Colors.iron[300],
+                                                    pointerStripColor: colors.iron[300],
                                                     pointerStripWidth: 2,
-                                                    pointerColor: Colors.primary.DEFAULT,
+                                                    pointerColor: colors.primary.DEFAULT,
                                                     pointerLabelWidth: 140,
                                                     pointerLabelHeight: 60,
                                                     shiftPointerLabelX: -70,
@@ -1141,9 +1147,9 @@ export default function ExerciseDetailScreen() {
                                                         const v = Number(it.value ?? 0);
                                                         const speed = Number.isFinite(v) ? Math.round(v * 10) / 10 : 0;
                                                         return (
-                                                            <View style={{ backgroundColor: Colors.iron[900], borderWidth: 1, borderColor: Colors.iron[700], borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}>
-                                                                <Text style={{ color: Colors.iron[400], fontSize: 10, fontWeight: '700' }}>{String(it.label ?? '')}</Text>
-                                                                <Text style={{ color: Colors.iron[950], fontSize: 15, fontWeight: '900' }}>{speed > 0 ? `${speed} km/h` : '—'}</Text>
+                                                            <View style={{ backgroundColor: colors.iron[900], borderWidth: 1, borderColor: colors.iron[700], borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}>
+                                                                <Text style={{ color: colors.iron[400], fontSize: 10, fontWeight: '700' }}>{String(it.label ?? '')}</Text>
+                                                                <Text style={{ color: colors.iron[950], fontSize: 15, fontWeight: '900' }}>{speed > 0 ? `${speed} km/h` : '—'}</Text>
                                                             </View>
                                                         );
                                                     }
@@ -1159,21 +1165,21 @@ export default function ExerciseDetailScreen() {
                                         timeSeries.length > 0 ? (
                                             <BarChart
                                                 data={timeSeries}
-                                                frontColor={Colors.primary.DEFAULT}
+                                                frontColor={colors.primary.DEFAULT}
                                                 barWidth={18}
                                                 spacing={18}
                                                 roundedTop
                                                 roundedBottom
                                                 hideRules={false}
-                                                rulesColor={Colors.iron[200]}
+                                                rulesColor={colors.iron[200]}
                                                 rulesType="solid"
                                                 xAxisThickness={1}
-                                                xAxisColor={Colors.iron[200]}
+                                                xAxisColor={colors.iron[200]}
                                                 yAxisThickness={0}
                                                 height={200}
                                                 width={screenWidth - 64}
-                                                yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
-                                                xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                                yAxisTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                                xAxisLabelTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
                                                 initialSpacing={0}
                                                 endSpacing={0}
                                                 isAnimated
@@ -1191,25 +1197,25 @@ export default function ExerciseDetailScreen() {
                                         paceSeries.length > 1 ? (
                                             <LineChart
                                                 data={paceSeries}
-                                                color={Colors.primary.DEFAULT}
+                                                color={colors.primary.DEFAULT}
                                                 thickness={3}
-                                                dataPointsColor={Colors.primary.DEFAULT}
+                                                dataPointsColor={colors.primary.DEFAULT}
                                                 dataPointsRadius={4}
                                                 hideRules={false}
-                                                rulesColor={Colors.iron[200]}
+                                                rulesColor={colors.iron[200]}
                                                 rulesType="solid"
                                                 height={200}
                                                 width={screenWidth - 64}
                                                 curved
                                                 isAnimated
                                                 animationDuration={400}
-                                                startFillColor={Colors.primary.DEFAULT}
-                                                endFillColor={Colors.primary.DEFAULT}
+                                                startFillColor={colors.primary.DEFAULT}
+                                                endFillColor={colors.primary.DEFAULT}
                                                 startOpacity={0.2}
                                                 endOpacity={0}
                                                 areaChart
-                                                yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
-                                                xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                                yAxisTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                                xAxisLabelTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
                                                 formatYLabel={(label: string) => {
                                                     const n = Number(String(label).replace(',', '.'));
                                                     if (!Number.isFinite(n) || n <= 0) return label;
@@ -1218,14 +1224,14 @@ export default function ExerciseDetailScreen() {
                                                 initialSpacing={0}
                                                 endSpacing={0}
                                                 xAxisThickness={1}
-                                                xAxisColor={Colors.iron[200]}
+                                                xAxisColor={colors.iron[200]}
                                                 yAxisThickness={0}
                                                 yAxisLabelWidth={45}
                                                 pointerConfig={{
                                                     pointerStripHeight: 190,
-                                                    pointerStripColor: Colors.iron[300],
+                                                    pointerStripColor: colors.iron[300],
                                                     pointerStripWidth: 2,
-                                                    pointerColor: Colors.primary.DEFAULT,
+                                                    pointerColor: colors.primary.DEFAULT,
                                                     pointerLabelWidth: 140,
                                                     pointerLabelHeight: 60,
                                                     shiftPointerLabelX: -70,
@@ -1236,9 +1242,9 @@ export default function ExerciseDetailScreen() {
                                                         const minutesPerKm = Number(it.value ?? 0);
                                                         const paceSec = Number.isFinite(minutesPerKm) && minutesPerKm > 0 ? Math.round(minutesPerKm * 60) : 0;
                                                         return (
-                                                            <View style={{ backgroundColor: Colors.iron[900], borderWidth: 1, borderColor: Colors.iron[700], borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}>
-                                                                <Text style={{ color: Colors.iron[400], fontSize: 10, fontWeight: '700' }}>{String(it.label ?? '')}</Text>
-                                                                <Text style={{ color: Colors.iron[950], fontSize: 15, fontWeight: '900' }}>
+                                                            <View style={{ backgroundColor: colors.iron[900], borderWidth: 1, borderColor: colors.iron[700], borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 }}>
+                                                                <Text style={{ color: colors.iron[400], fontSize: 10, fontWeight: '700' }}>{String(it.label ?? '')}</Text>
+                                                                <Text style={{ color: colors.iron[950], fontSize: 15, fontWeight: '900' }}>
                                                                     {paceSec > 0 ? `${formatTimeSeconds(paceSec)}/km` : '—'}
                                                                 </Text>
                                                             </View>
@@ -1257,40 +1263,40 @@ export default function ExerciseDetailScreen() {
                             </View>
                         </>
                     ) : exType === 'reps_only' ? (
-                        <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.iron[700], elevation: 1 }}>
-                            <View style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.iron[100], flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.iron[200] }}>
-                                <View style={{ width: 5, height: 16, backgroundColor: Colors.primary.DEFAULT, borderRadius: 3 }} />
-                                <Text style={{ color: Colors.iron[950], fontWeight: '900', letterSpacing: -0.3, fontSize: 13, textTransform: 'uppercase' }}>Reps máximas</Text>
+                        <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.iron[700], elevation: 1 }}>
+                            <View style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.iron[100], flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.iron[200] }}>
+                                <View style={{ width: 5, height: 16, backgroundColor: colors.primary.DEFAULT, borderRadius: 3 }} />
+                                <Text style={{ color: colors.iron[950], fontWeight: '900', letterSpacing: -0.3, fontSize: 13, textTransform: 'uppercase' }}>Reps máximas</Text>
                             </View>
-                            <View style={{ paddingVertical: 24, alignItems: 'center', backgroundColor: Colors.surface }}>
+                            <View style={{ paddingVertical: 24, alignItems: 'center', backgroundColor: colors.surface }}>
                                 {repsSeries.length > 1 ? (
                                     <LineChart
                                         data={repsSeries}
-                                        color={Colors.primary.DEFAULT}
+                                        color={colors.primary.DEFAULT}
                                         thickness={3}
-                                        dataPointsColor={Colors.primary.DEFAULT}
+                                        dataPointsColor={colors.primary.DEFAULT}
                                         dataPointsRadius={4}
                                         hideRules={false}
-                                        rulesColor={Colors.iron[200]}
+                                        rulesColor={colors.iron[200]}
                                         rulesType="solid"
                                         height={200}
                                         width={screenWidth - 64}
                                         curved
                                         isAnimated
                                         animationDuration={400}
-                                        startFillColor={Colors.primary.DEFAULT}
-                                        endFillColor={Colors.primary.DEFAULT}
+                                        startFillColor={colors.primary.DEFAULT}
+                                        endFillColor={colors.primary.DEFAULT}
                                         startOpacity={0.2}
                                         endOpacity={0}
                                         areaChart
-                                        yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
-                                        xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                        yAxisTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                        xAxisLabelTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
                                         initialSpacing={0}
                                         endSpacing={0}
                                         yAxisLabelSuffix=" rep"
                                         yAxisLabelWidth={35}
                                         xAxisThickness={1}
-                                        xAxisColor={Colors.iron[200]}
+                                        xAxisColor={colors.iron[200]}
                                         yAxisThickness={0}
                                     />
                                 ) : (
@@ -1302,40 +1308,40 @@ export default function ExerciseDetailScreen() {
                             </View>
                         </View>
                     ) : (
-                        <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.iron[700], elevation: 1 }}>
-                            <View style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.iron[100], flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.iron[200] }}>
-                                <View style={{ width: 5, height: 16, backgroundColor: Colors.primary.DEFAULT, borderRadius: 3 }} />
-                                <Text style={{ color: Colors.iron[950], fontWeight: '900', letterSpacing: -0.3, fontSize: 13, textTransform: 'uppercase' }}>Peso máximo</Text>
+                        <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.iron[700], elevation: 1 }}>
+                            <View style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.iron[100], flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.iron[200] }}>
+                                <View style={{ width: 5, height: 16, backgroundColor: colors.primary.DEFAULT, borderRadius: 3 }} />
+                                <Text style={{ color: colors.iron[950], fontWeight: '900', letterSpacing: -0.3, fontSize: 13, textTransform: 'uppercase' }}>Peso máximo</Text>
                             </View>
-                            <View style={{ paddingVertical: 24, alignItems: 'center', backgroundColor: Colors.surface }}>
+                            <View style={{ paddingVertical: 24, alignItems: 'center', backgroundColor: colors.surface }}>
                                 {weightSeries.length > 1 ? (
                                     <LineChart
                                         data={weightSeries}
-                                        color={Colors.primary.DEFAULT}
+                                        color={colors.primary.DEFAULT}
                                         thickness={3}
-                                        dataPointsColor={Colors.primary.DEFAULT}
+                                        dataPointsColor={colors.primary.DEFAULT}
                                         dataPointsRadius={4}
                                         hideRules={false}
-                                        rulesColor={Colors.iron[200]}
+                                        rulesColor={colors.iron[200]}
                                         rulesType="solid"
                                         height={200}
                                         width={screenWidth - 64}
                                         curved
                                         isAnimated
                                         animationDuration={400}
-                                        startFillColor={Colors.primary.DEFAULT}
-                                        endFillColor={Colors.primary.DEFAULT}
+                                        startFillColor={colors.primary.DEFAULT}
+                                        endFillColor={colors.primary.DEFAULT}
                                         startOpacity={0.2}
                                         endOpacity={0}
                                         areaChart
-                                        yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
-                                        xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                        yAxisTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                                        xAxisLabelTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
                                         initialSpacing={0}
                                         endSpacing={0}
                                         yAxisLabelSuffix={` ${unit}`}
                                         yAxisLabelWidth={35}
                                         xAxisThickness={1}
-                                        xAxisColor={Colors.iron[200]}
+                                        xAxisColor={colors.iron[200]}
                                         yAxisThickness={0}
                                     />
                                 ) : (
@@ -1350,32 +1356,32 @@ export default function ExerciseDetailScreen() {
                 </View>
             ) : analysisTab === 'prs' ? (
                 <View style={{ gap: 16 }}>
-                    <View style={{ backgroundColor: Colors.surface, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: Colors.iron[200] }}>
-                            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: Colors.primary.DEFAULT + '15', justifyContent: 'center', alignItems: 'center' }}>
-                                <Trophy size={20} color={Colors.primary.DEFAULT} />
+                    <View style={{ backgroundColor: colors.surface, borderRadius: 20, padding: 24, borderWidth: 1.5, borderColor: colors.border, elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.iron[200] }}>
+                            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: colors.primary.DEFAULT + '15', justifyContent: 'center', alignItems: 'center' }}>
+                                <Trophy size={20} color={colors.primary.DEFAULT} />
                             </View>
                             <View>
-                                <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 18, letterSpacing: -0.3 }}>Mejores Marcas</Text>
-                                <Text style={{ color: Colors.iron[500], fontWeight: '700', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginTop: 2 }}>En el rango seleccionado</Text>
+                                <Text style={{ color: colors.iron[950], fontWeight: '900', fontSize: 18, letterSpacing: -0.3 }}>Mejores Marcas</Text>
+                                <Text style={{ color: colors.iron[500], fontWeight: '700', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginTop: 2 }}>En el rango seleccionado</Text>
                             </View>
                         </View>
 
                         {exType === 'weight_reps' ? (
                             <View style={{ gap: 8 }}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.iron[100], padding: 16, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[200] }}>
-                                    <Text style={{ color: Colors.iron[500], fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Serie más pesada</Text>
-                                    <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 16 }}>{(insights.heaviest?.weight ?? 0)} <Text style={{ color: Colors.iron[500], fontSize: 12 }}>{unit} ×</Text> {(insights.heaviest?.reps ?? 0)}</Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.iron[100], padding: 16, borderRadius: 14, borderWidth: 1, borderColor: colors.iron[200] }}>
+                                    <Text style={{ color: colors.iron[500], fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Serie más pesada</Text>
+                                    <Text style={{ color: colors.iron[950], fontWeight: '900', fontSize: 16 }}>{(insights.heaviest?.weight ?? 0)} <Text style={{ color: colors.iron[500], fontSize: 12 }}>{unit} ×</Text> {(insights.heaviest?.reps ?? 0)}</Text>
                                 </View>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.iron[100], padding: 16, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[200] }}>
-                                    <Text style={{ color: Colors.iron[500], fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>1RM Estimado (Epley)</Text>
-                                    <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 16 }}>{insights.best1rm?.est ?? 0} <Text style={{ color: Colors.iron[500], fontSize: 12 }}>{unit}</Text></Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.iron[100], padding: 16, borderRadius: 14, borderWidth: 1, borderColor: colors.iron[200] }}>
+                                    <Text style={{ color: colors.iron[500], fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>1RM Estimado (Epley)</Text>
+                                    <Text style={{ color: colors.iron[950], fontWeight: '900', fontSize: 16 }}>{insights.best1rm?.est ?? 0} <Text style={{ color: colors.iron[500], fontSize: 12 }}>{unit}</Text></Text>
                                 </View>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.iron[100], padding: 16, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[200] }}>
-                                    <Text style={{ color: Colors.iron[500], fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Carga Max / Sesión</Text>
-                                    <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 16 }}>{insights.bestSessionVol?.vol ? Math.round(insights.bestSessionVol.vol) : 0}</Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.iron[100], padding: 16, borderRadius: 14, borderWidth: 1, borderColor: colors.iron[200] }}>
+                                    <Text style={{ color: colors.iron[500], fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Carga Max / Sesión</Text>
+                                    <Text style={{ color: colors.iron[950], fontWeight: '900', fontSize: 16 }}>{insights.bestSessionVol?.vol ? Math.round(insights.bestSessionVol.vol) : 0}</Text>
                                 </View>
-                                <Text style={{ color: Colors.iron[400], fontSize: 10, marginTop: 12, fontStyle: 'italic', textAlign: 'center' }}>Las PRs se calculan únicamente en base a tus series completadas.</Text>
+                                <Text style={{ color: colors.iron[400], fontSize: 10, marginTop: 12, fontStyle: 'italic', textAlign: 'center' }}>Las PRs se calculan únicamente en base a tus series completadas.</Text>
                             </View>
                         ) : exType === 'distance_time' ? (
                             <View style={{ gap: 8 }}>
@@ -1385,24 +1391,24 @@ export default function ExerciseDetailScreen() {
                                     )}
                                 </View>
 
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.primary.DEFAULT + '10', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: Colors.primary.DEFAULT + '30' }}>
-                                    <Text style={{ color: Colors.primary.DEFAULT, fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.primary.DEFAULT + '10', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: colors.primary.DEFAULT + '30' }}>
+                                    <Text style={{ color: colors.primary.DEFAULT, fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                                         {cardioPrimaryPR === 'distance' ? 'Mejor distancia' : cardioPrimaryPR === 'time' ? 'Mayor tiempo' : cardioPrimaryPR === 'pace' ? 'Mejor ritmo' : 'Mejor velocidad'}
                                     </Text>
-                                    <Text style={{ color: Colors.primary.DEFAULT, fontWeight: '900', fontSize: 18 }}>
+                                    <Text style={{ color: colors.primary.DEFAULT, fontWeight: '900', fontSize: 18 }}>
                                         {cardioPrimaryPR === 'distance' ? `${insights.bestSessionDistance?.distKm != null ? (Math.round(insights.bestSessionDistance.distKm * 100) / 100) : 0} km` : cardioPrimaryPR === 'time' ? (insights.bestSessionTime?.timeSec ? formatTimeSeconds(insights.bestSessionTime.timeSec) : '—') : cardioPrimaryPR === 'pace' ? (insights.bestPace?.paceSecPerKm ? `${formatTimeSeconds(insights.bestPace.paceSecPerKm)}/km` : '—') : `${insights.bestSpeed?.speedKmh != null ? (Math.round(insights.bestSpeed.speedKmh * 10) / 10) : 0} km/h`}
                                     </Text>
                                 </View>
                             </View>
                         ) : exType === 'reps_only' ? (
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.iron[100], padding: 16, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[200] }}>
-                                <Text style={{ color: Colors.iron[500], fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Serie más larga</Text>
-                                <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 16 }}>{insights.bestReps?.reps ?? 0} <Text style={{ color: Colors.iron[500], fontSize: 12 }}>reps</Text></Text>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.iron[100], padding: 16, borderRadius: 14, borderWidth: 1, borderColor: colors.iron[200] }}>
+                                <Text style={{ color: colors.iron[500], fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Serie más larga</Text>
+                                <Text style={{ color: colors.iron[950], fontWeight: '900', fontSize: 16 }}>{insights.bestReps?.reps ?? 0} <Text style={{ color: colors.iron[500], fontSize: 12 }}>reps</Text></Text>
                             </View>
                         ) : (
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.iron[100], padding: 16, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[200] }}>
-                                <Text style={{ color: Colors.iron[500], fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Serie más pesada</Text>
-                                <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 16 }}>{insights.heaviest?.weight ?? 0} <Text style={{ color: Colors.iron[500], fontSize: 12 }}>{unit}</Text></Text>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.iron[100], padding: 16, borderRadius: 14, borderWidth: 1, borderColor: colors.iron[200] }}>
+                                <Text style={{ color: colors.iron[500], fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Serie más pesada</Text>
+                                <Text style={{ color: colors.iron[950], fontWeight: '900', fontSize: 16 }}>{insights.heaviest?.weight ?? 0} <Text style={{ color: colors.iron[500], fontSize: 12 }}>{unit}</Text></Text>
                             </View>
                         )}
                     </View>
@@ -1410,15 +1416,15 @@ export default function ExerciseDetailScreen() {
             ) : (
                 <View style={{ gap: 16 }}>
                     <IronCard>
-                        <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 16, marginBottom: 16, letterSpacing: -0.3 }}>Herramientas</Text>
+                        <Text style={{ color: colors.iron[950], fontWeight: '900', fontSize: 16, marginBottom: 16, letterSpacing: -0.3 }}>Herramientas</Text>
                         <TouchableOpacity
                             onPress={() => useTimerStore.getState().startTimer(configService.get('defaultRestTimer'))}
-                            style={{ backgroundColor: Colors.primary.DEFAULT, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 3 }}
+                            style={{ backgroundColor: colors.primary.DEFAULT, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 3 }}
                             accessibilityRole="button"
                             accessibilityLabel="Iniciar descanso"
                         >
-                            <Text style={{ color: Colors.white, fontWeight: '900', fontSize: 14 }}>Iniciar descanso ({configService.get('defaultRestTimer')}s)</Text>
-                            <Timer size={18} color={Colors.white} />
+                            <Text style={{ color: colors.white, fontWeight: '900', fontSize: 14 }}>Iniciar descanso ({configService.get('defaultRestTimer')}s)</Text>
+                            <Timer size={18} color={colors.white} />
                         </TouchableOpacity>
 
                         <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -1426,25 +1432,25 @@ export default function ExerciseDetailScreen() {
                                 <TouchableOpacity
                                     key={s}
                                     onPress={async () => { await configService.set('defaultRestTimer', s); useTimerStore.getState().startTimer(s); }}
-                                    style={{ flex: 1, backgroundColor: Colors.iron[200], paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: Colors.iron[300], alignItems: 'center' }}
+                                    style={{ flex: 1, backgroundColor: colors.iron[200], paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center' }}
                                     accessibilityRole="button"
                                     accessibilityLabel={`Iniciar descanso de ${s} segundos`}
                                 >
-                                    <Text style={{ color: Colors.iron[950], fontWeight: '800', fontSize: 14 }}>{s}s</Text>
+                                    <Text style={{ color: colors.iron[950], fontWeight: '800', fontSize: 14 }}>{s}s</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
 
-                        <View style={{ height: 1, backgroundColor: Colors.iron[200], marginVertical: 16 }} />
+                        <View style={{ height: 1, backgroundColor: colors.iron[200], marginVertical: 16 }} />
 
                         <TouchableOpacity
                             onPress={() => router.push('/tools/plate-calculator' as any)}
-                            style={{ backgroundColor: Colors.surface, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[700] }}
+                            style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.iron[700] }}
                             accessibilityRole="button"
                             accessibilityLabel="Abrir calculadora de discos"
                         >
-                            <Text style={{ color: Colors.iron[950], fontWeight: '800', fontSize: 14 }}>Calculadora de discos</Text>
-                            <Text style={{ color: Colors.iron[400], fontSize: 12, marginTop: 4 }}>Útil si no llegas exacto: muestra alternativas por arriba/abajo.</Text>
+                            <Text style={{ color: colors.iron[950], fontWeight: '800', fontSize: 14 }}>Calculadora de discos</Text>
+                            <Text style={{ color: colors.iron[400], fontSize: 12, marginTop: 4 }}>Útil si no llegas exacto: muestra alternativas por arriba/abajo.</Text>
                         </TouchableOpacity>
                     </IronCard>
                 </View>
@@ -1457,21 +1463,21 @@ export default function ExerciseDetailScreen() {
         : ['history', 'analysis'];
 
     return (
-        <SafeAreaWrapper style={{ flex: 1, backgroundColor: Colors.iron[900] }} edges={['bottom', 'left', 'right']}>
+        <SafeAreaWrapper style={{ flex: 1, backgroundColor: colors.iron[900] }} edges={['bottom', 'left', 'right']}>
             <Stack.Screen options={{
                 title: currentExercise?.name || exerciseName || 'Exercise',
                 headerBackTitle: 'Volver',
-                headerTitleStyle: { fontWeight: '900', color: Colors.iron[950], fontSize: 16, letterSpacing: -0.3 } as any,
-                headerStyle: { backgroundColor: Colors.iron[900] },
-                headerTintColor: Colors.primary.DEFAULT,
+                headerTitleStyle: { fontWeight: '900', color: colors.iron[950], fontSize: 16, letterSpacing: -0.3 } as any,
+                headerStyle: { backgroundColor: colors.iron[900] },
+                headerTintColor: colors.primary.DEFAULT,
                 headerRight: () => (
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                         {!workoutId && (
                             <TouchableOpacity
                                 onPress={() => setIsConfigVisible(true)}
-                                style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: Colors.iron[200], borderWidth: 1, borderColor: Colors.iron[300], justifyContent: 'center', alignItems: 'center' }}
+                                style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: colors.iron[200], borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}
                             >
-                                <Pencil size={16} color={Colors.iron[500]} />
+                                <Pencil size={16} color={colors.iron[500]} />
                             </TouchableOpacity>
                         )}
                         {workoutId && (exType === 'weight_reps' || exType === 'weight_only') && (
@@ -1480,11 +1486,11 @@ export default function ExerciseDetailScreen() {
                                     if (workoutLocked) { notify.info('Bloqueado', 'El entrenamiento finalizó. Para editar debés reabrirlo.'); return; }
                                     setWarmupVisible(true);
                                 }}
-                                style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: withAlpha(Colors.yellow, '15'), borderWidth: 1, borderColor: withAlpha(Colors.yellow, '30'), justifyContent: 'center', alignItems: 'center' }}
+                                style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: withAlpha(colors.yellow, '15'), borderWidth: 1, borderColor: withAlpha(colors.yellow, '30'), justifyContent: 'center', alignItems: 'center' }}
                                 accessibilityRole="button"
                                 accessibilityLabel="Abrir calculadora de calentamiento"
                             >
-                                <Zap size={16} color={Colors.yellow} fill={Colors.yellow} />
+                                <Zap size={16} color={colors.yellow} fill={colors.yellow} />
                             </TouchableOpacity>
                         )}
                     </View>
@@ -1492,27 +1498,27 @@ export default function ExerciseDetailScreen() {
             }} />
 
             {notes && (
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: withAlpha(Colors.yellow, '10'), borderBottomWidth: 1, borderBottomColor: withAlpha(Colors.yellow, '25'), padding: 12 }}>
-                    <View style={{ width: 3, height: '100%' as any, borderRadius: 2, backgroundColor: Colors.yellow, marginRight: 10, minHeight: 18 }} />
-                    <Info size={14} color={Colors.yellow} style={{ marginTop: 1, marginRight: 8 }} />
-                    <Text style={{ color: Colors.yellow, fontWeight: '700', flex: 1, fontSize: 13, lineHeight: 18 }}>{notes}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: withAlpha(colors.yellow, '10'), borderBottomWidth: 1, borderBottomColor: withAlpha(colors.yellow, '25'), padding: 12 }}>
+                    <View style={{ width: 3, height: '100%' as any, borderRadius: 2, backgroundColor: colors.yellow, marginRight: 10, minHeight: 18 }} />
+                    <Info size={14} color={colors.yellow} style={{ marginTop: 1, marginRight: 8 }} />
+                    <Text style={{ color: colors.yellow, fontWeight: '700', flex: 1, fontSize: 13, lineHeight: 18 }}>{notes}</Text>
                 </View>
             )}
 
-            <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4, backgroundColor: Colors.iron[900] }}>
-                <View style={{ flex: 1, flexDirection: 'row', backgroundColor: Colors.surface, padding: 4, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[700] }}>
+            <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4, backgroundColor: colors.iron[900] }}>
+                <View style={{ flex: 1, flexDirection: 'row', backgroundColor: colors.surface, padding: 4, borderRadius: 14, borderWidth: 1, borderColor: colors.iron[700] }}>
                     {availableTabs.map(tab => (
                         <TouchableOpacity
                             key={tab}
                             onPress={() => setActiveTab(tab)}
                             style={{
                                 flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
-                                ...(activeTab === tab ? { backgroundColor: Colors.primary.DEFAULT } : {})
+                                ...(activeTab === tab ? { backgroundColor: colors.primary.DEFAULT } : {})
                             }}
                         >
                             <Text style={{
                                 fontWeight: '800', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5,
-                                color: activeTab === tab ? Colors.white : Colors.iron[500]
+                                color: activeTab === tab ? colors.white : colors.iron[500]
                             }}>
                                 {tab === 'track' ? 'Registrar' : tab === 'history' ? 'Historial' : 'Análisis'}
                             </Text>
@@ -1537,7 +1543,7 @@ export default function ExerciseDetailScreen() {
                 )}
                 {loading ? (
                     <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                        <Text style={{ color: Colors.iron[500], fontWeight: '700' }}>Cargando…</Text>
+                        <Text style={{ color: colors.iron[500], fontWeight: '700' }}>Cargando…</Text>
                     </View>
                 ) : (
                     <>

@@ -5,13 +5,14 @@ import { RoutineDayWithExercises, routineService } from '@/src/services/RoutineS
 import { SocialService } from '@/src/services/SocialService';
 import { useAuthStore } from '@/src/store/authStore';
 import { confirm } from '@/src/store/confirmStore';
-import { Colors, ThemeFx, withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { Routine } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { Calendar, ChevronRight, Dumbbell, Edit3, GripVertical, Plus, Send, Share2, Trash2, User, Users, X } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import { useColors } from '../src/hooks/useColors';
 import { BadgePill } from './ui/BadgePill';
 
 interface RoutineDetailModalProps {
@@ -24,6 +25,302 @@ interface RoutineDetailModalProps {
 type ViewMode = 'routine' | 'day';
 
 export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: RoutineDetailModalProps) {
+    const colors = useColors();
+
+    const ss = useMemo(() => StyleSheet.create({
+        overlay: {
+            flex: 1,
+            backgroundColor: ThemeFx.backdropStrong,
+            justifyContent: 'center',
+            paddingHorizontal: 16,
+            paddingVertical: 48,
+        },
+        sheet: {
+            backgroundColor: colors.iron[100],
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            borderRadius: 20,
+            flex: 1,
+            maxHeight: '95%',
+            width: '100%',
+            overflow: 'hidden',
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 12 },
+            shadowOpacity: 0.15,
+            shadowRadius: 20,
+            elevation: 12,
+        },
+        header: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: 18,
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.border,
+            backgroundColor: colors.surface,
+        },
+        headerTextContainer: { flex: 1 },
+        headerTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 17, letterSpacing: -0.4 },
+        headerSub: { color: colors.iron[500], fontSize: 12, fontWeight: '700', marginTop: 2 },
+        closeBtn: {
+            width: 32, height: 32, borderRadius: 10,
+            backgroundColor: colors.iron[100], justifyContent: 'center', alignItems: 'center',
+            borderWidth: 1, borderColor: colors.border,
+        },
+        centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+        contentArea: {
+            padding: 16,
+            backgroundColor: colors.iron[100],
+            minHeight: '100%',
+        },
+        scrollContent: { paddingBottom: 40 },
+        sectionLabel: {
+            color: colors.iron[400],
+            fontSize: 10,
+            marginBottom: 12,
+            marginTop: 20,
+            textTransform: 'uppercase',
+            fontWeight: '800',
+            letterSpacing: 1.2,
+            marginLeft: 4,
+        },
+        infoCard: {
+            backgroundColor: colors.surface,
+            padding: 16,
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            borderLeftWidth: 4,
+            borderLeftColor: colors.primary.DEFAULT,
+        },
+        infoCardText: { fontSize: 14, color: colors.iron[600], lineHeight: 20, fontWeight: '600' },
+        warningCard: {
+            backgroundColor: withAlpha(colors.yellow, '15'),
+            borderColor: withAlpha(colors.yellow, '40'),
+            borderLeftColor: colors.yellow,
+        },
+        warningLabel: { color: colors.yellow, fontWeight: '900', fontSize: 11, marginBottom: 4, textTransform: 'uppercase' },
+
+        btnRow: {
+            flexDirection: 'row',
+            gap: 10,
+            marginTop: 16,
+        },
+        btnCol: { flex: 1 },
+        smallBtn: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            height: 44,
+            borderRadius: 14,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            backgroundColor: colors.surface,
+        },
+        smallBtnPrimary: {
+            backgroundColor: colors.primary.DEFAULT,
+            borderColor: colors.primary.DEFAULT,
+        },
+        smallBtnDanger: {
+            borderColor: withAlpha(colors.red, '30'),
+            backgroundColor: withAlpha(colors.red, '05'),
+        },
+        smallBtnText: { fontSize: 12, fontWeight: '800', color: colors.primary.DEFAULT, textTransform: 'uppercase' },
+        smallBtnTextWhite: { color: colors.white },
+        smallBtnTextDanger: { color: colors.red },
+
+        dayBlockOuter: {
+            marginBottom: 14,
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            elevation: 2,
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.05,
+            shadowRadius: 8,
+            overflow: 'hidden',
+        },
+        dayBlockActive: { borderColor: colors.primary.DEFAULT, elevation: 6, shadowOpacity: 0.12 },
+        dayBlockHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingVertical: 14,
+            paddingHorizontal: 16,
+            backgroundColor: colors.surface,
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.border,
+        },
+        dayHeaderContent: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
+        dayIconBox: {
+            width: 36, height: 36, borderRadius: 11,
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '12'),
+            borderWidth: 1, borderColor: withAlpha(colors.primary.DEFAULT, '25'),
+            justifyContent: 'center', alignItems: 'center',
+        },
+        dayTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3, flex: 1 },
+        arrowCircle: {
+            width: 28, height: 28, borderRadius: 14,
+            backgroundColor: colors.iron[100], alignItems: 'center', justifyContent: 'center',
+            borderWidth: 1, borderColor: colors.border,
+        },
+        dayBlockInner: {
+            padding: 16,
+            backgroundColor: colors.surface,
+        },
+        dayMetaEmpty: { color: colors.iron[400], fontSize: 13, fontStyle: 'italic', paddingVertical: 8 },
+        dayInnerExRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            paddingVertical: 10,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.iron[100],
+        },
+        dayInnerExNum: { color: colors.primary.DEFAULT, fontWeight: '900', fontSize: 13, width: 22 },
+        dayInnerExText: { flex: 1, color: colors.iron[950], fontSize: 14, fontWeight: '800' },
+        dayBadgeContainer: { flexDirection: 'row', gap: 4, marginTop: 4 },
+        dayMoreBadge: { backgroundColor: colors.iron[200], paddingHorizontal: 6, borderRadius: 6, justifyContent: 'center', height: 16 },
+        dayMoreBadgeText: { fontSize: 9, fontWeight: '900', color: colors.iron[500] },
+
+        addInnerBtn: {
+            flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 14, marginTop: 6, justifyContent: 'center'
+        },
+        addInnerBtnText: { color: colors.primary.DEFAULT, fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
+
+        exCard: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingVertical: 14,
+            paddingHorizontal: 16,
+            marginBottom: 12,
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            elevation: 3,
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.08,
+            shadowRadius: 10,
+            gap: 12,
+        },
+        exCardActive: { borderColor: colors.primary.DEFAULT, elevation: 8, shadowOpacity: 0.15 },
+        exDragHandle: { paddingVertical: 6, paddingHorizontal: 4 },
+        exIconBox: {
+            width: 38, height: 38, borderRadius: 12,
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '12'),
+            borderWidth: 1, borderColor: withAlpha(colors.primary.DEFAULT, '25'),
+            alignItems: 'center', justifyContent: 'center',
+        },
+        exContent: { flex: 1, overflow: 'hidden' },
+        exCardTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
+        exMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' },
+        exCardMeta: { color: colors.iron[500], fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.8 },
+        exBadgeRow: { flexDirection: 'row', gap: 4, alignItems: 'center' },
+        exDeleteBtn: { padding: 10, backgroundColor: withAlpha(colors.red, '10'), borderRadius: 12, borderWidth: 1, borderColor: withAlpha(colors.red, '20') },
+
+        addRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+            paddingVertical: 18,
+            marginTop: 12,
+            borderRadius: 18,
+            borderWidth: 2,
+            borderColor: withAlpha(colors.primary.DEFAULT, '25'),
+            borderStyle: 'dashed',
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '05'),
+        },
+        addRowText: { color: colors.primary.DEFAULT, fontWeight: '900', fontSize: 15, textTransform: 'uppercase', letterSpacing: 0.5 },
+
+        emptyBlock: {
+            alignItems: 'center',
+            paddingVertical: 48,
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            borderWidth: 2,
+            borderColor: colors.border,
+            borderStyle: 'dashed',
+            gap: 12,
+            marginTop: 8,
+        },
+        emptyTitle: { fontSize: 16, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.2 },
+        emptyText: { fontSize: 14, color: colors.iron[500], textAlign: 'center', paddingHorizontal: 32, lineHeight: 20 },
+
+        innerOverlay: {
+            flex: 1,
+            backgroundColor: ThemeFx.backdropStrong,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 16,
+        },
+        formBox: {
+            backgroundColor: colors.surface,
+            width: '100%',
+            maxWidth: 380,
+            borderRadius: 24,
+            padding: 24,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            elevation: 12,
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 16 },
+            shadowOpacity: 0.25,
+            shadowRadius: 32,
+        },
+        formTitle: { fontSize: 22, fontWeight: '900', color: colors.iron[950], marginBottom: 24, letterSpacing: -0.5 },
+        formControlRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, paddingHorizontal: 4 },
+        formLabelCol: { flex: 1, paddingRight: 16 },
+        formLabelMain: { color: colors.iron[950], fontWeight: '800', fontSize: 15 },
+        formLabelSub: { color: colors.iron[500], fontSize: 12, marginTop: 2, lineHeight: 16 },
+        formActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
+        formActionBtn: { flex: 1 },
+
+        friendPickerContent: { flex: 1, padding: 16, backgroundColor: colors.iron[100] },
+        friendItem: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: colors.surface,
+            padding: 16,
+            borderRadius: 20,
+            marginBottom: 12,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            elevation: 2,
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.05,
+            shadowRadius: 10
+        },
+        friendInfo: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+        friendAvatar: {
+            width: 44, height: 44, borderRadius: 22,
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '12'),
+            alignItems: 'center', justifyContent: 'center',
+            borderWidth: 1.5, borderColor: withAlpha(colors.primary.DEFAULT, '25')
+        },
+        friendName: { color: colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
+        friendSendBtn: {
+            width: 36, height: 36, borderRadius: 12,
+            backgroundColor: colors.iron[100], alignItems: 'center', justifyContent: 'center',
+            borderWidth: 1, borderColor: colors.border
+        },
+
+        flex1: { flex: 1 },
+        rowGap12: { flexDirection: 'row', gap: 12 },
+        loadingContainer: { paddingVertical: 40, alignItems: 'center' },
+        utilWidth32: { width: 32 },
+        utilGripPad: { paddingRight: 8, paddingVertical: 4 },
+        utilBadgePillGap: { backgroundColor: colors.iron[200], paddingHorizontal: 4, borderRadius: 4, justifyContent: 'center' },
+        utilBadgePillText: { fontSize: 8, fontWeight: '800', color: colors.iron[500] },
+    }), [colors]);
+
     const [routine, setRoutine] = useState<Routine | null>(null);
     const [days, setDays] = useState<RoutineDayWithExercises[]>([]);
     const [loading, setLoading] = useState(true);
@@ -207,48 +504,48 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
 
     const renderDayItem = ({ item, drag, isActive }: RenderItemParams<RoutineDayWithExercises>) => (
         <ScaleDecorator>
-            <View style={[st.dayBlockOuter, isActive && st.dayBlockActive]}>
+            <View style={[ss.dayBlockOuter, isActive && ss.dayBlockActive]}>
                 <TouchableOpacity
-                    style={st.dayBlockHeader}
+                    style={ss.dayBlockHeader}
                     onPress={() => openDay(item)}
                     onLongPress={drag}
                     delayLongPress={200}
                     activeOpacity={0.7}
                 >
-                    <View style={{ paddingRight: 8, paddingVertical: 4 }}>
-                        <GripVertical color={Colors.iron[400]} size={16} />
+                    <View style={ss.utilGripPad}>
+                        <GripVertical color={colors.iron[400]} size={16} />
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
-                        <View style={st.dayIconBox}>
-                            <Calendar color={Colors.primary.DEFAULT} size={18} />
+                    <View style={ss.dayHeaderContent}>
+                        <View style={ss.dayIconBox}>
+                            <Calendar color={colors.primary.DEFAULT} size={18} />
                         </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={st.dayTitle} numberOfLines={1}>{item.name}</Text>
+                        <View style={ss.flex1}>
+                            <Text style={ss.dayTitle} numberOfLines={1}>{item.name}</Text>
                         </View>
                     </View>
-                    <View style={st.arrowCircle}>
-                        <ChevronRight size={16} color={Colors.iron[500]} />
+                    <View style={ss.arrowCircle}>
+                        <ChevronRight size={16} color={colors.iron[500]} />
                     </View>
                 </TouchableOpacity>
 
                 {/* Show Preview of Exercises Inside the Day Block */}
-                <View style={st.dayBlockInner}>
+                <View style={ss.dayBlockInner}>
                     {item.exercises.length === 0 ? (
-                        <Text style={st.dayMetaEmpty}>Sin ejercicios añadidos.</Text>
+                        <Text style={ss.dayMetaEmpty}>Sin ejercicios añadidos.</Text>
                     ) : (
                         item.exercises.map((ex, idx) => (
-                            <View key={ex.id} style={st.dayInnerExRow}>
-                                <Text style={st.dayInnerExNum}>{idx + 1}.</Text>
-                                <View style={{ flex: 1, overflow: 'hidden' }}>
-                                    <Text style={st.dayInnerExText} numberOfLines={1}>{ex.exercise_name}</Text>
+                            <View key={ex.id} style={ss.dayInnerExRow}>
+                                <Text style={ss.dayInnerExNum}>{idx + 1}.</Text>
+                                <View style={ss.exContent}>
+                                    <Text style={ss.dayInnerExText} numberOfLines={1}>{ex.exercise_name}</Text>
                                     {ex.badges && ex.badges.length > 0 && (
-                                        <View style={{ flexDirection: 'row', gap: 4, marginTop: 2 }}>
+                                        <View style={ss.dayBadgeContainer}>
                                             {ex.badges.slice(0, 2).map((b, bIdx) => (
                                                 <BadgePill key={`${ex.id}-p-${bIdx}`} name={b.name} color={b.color} icon={b.icon} size="xs" />
                                             ))}
                                             {ex.badges.length > 2 && (
-                                                <View style={{ backgroundColor: Colors.iron[200], paddingHorizontal: 4, borderRadius: 4, justifyContent: 'center' }}>
-                                                    <Text style={{ fontSize: 8, fontWeight: '800', color: Colors.iron[500] }}>+{ex.badges.length - 2}</Text>
+                                                <View style={ss.dayMoreBadge}>
+                                                    <Text style={ss.dayMoreBadgeText}>+{ex.badges.length - 2}</Text>
                                                 </View>
                                             )}
                                         </View>
@@ -257,9 +554,9 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                             </View>
                         ))
                     )}
-                    <TouchableOpacity style={st.addInnerBtn} onPress={() => openDay(item)}>
-                        <Plus size={14} color={Colors.primary.DEFAULT} />
-                        <Text style={st.addInnerBtnText}>Gestionar Ejercicios</Text>
+                    <TouchableOpacity style={ss.addInnerBtn} onPress={() => openDay(item)}>
+                        <Plus size={14} color={colors.primary.DEFAULT} />
+                        <Text style={ss.addInnerBtnText}>Gestionar Ejercicios</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -268,26 +565,26 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
 
     const renderExerciseItem = ({ item, drag, isActive }: RenderItemParams<RoutineDayWithExercises['exercises'][0]>) => (
         <ScaleDecorator>
-            <View style={[st.exCard, isActive && st.exCardActive]}>
-                <Pressable onLongPress={drag} delayLongPress={200} style={{ paddingVertical: 6, paddingHorizontal: 4 }}>
-                    <GripVertical color={Colors.iron[600]} size={16} />
+            <View style={[ss.exCard, isActive && ss.exCardActive]}>
+                <Pressable onLongPress={drag} delayLongPress={200} style={ss.exDragHandle}>
+                    <GripVertical color={colors.iron[600]} size={16} />
                 </Pressable>
-                <View style={st.exIconBox}>
-                    <Dumbbell color={Colors.primary.DEFAULT} size={16} />
+                <View style={ss.exIconBox}>
+                    <Dumbbell color={colors.primary.DEFAULT} size={16} />
                 </View>
-                <View style={{ flex: 1, overflow: 'hidden' }}>
-                    <Text style={st.exCardTitle} numberOfLines={1}>{item.exercise_name}</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                        {item.category_name ? <Text style={st.exCardMeta}>{item.category_name.toUpperCase()}</Text> : null}
+                <View style={ss.exContent}>
+                    <Text style={ss.exCardTitle} numberOfLines={1}>{item.exercise_name}</Text>
+                    <View style={ss.exMetaRow}>
+                        {item.category_name ? <Text style={ss.exCardMeta}>{item.category_name.toUpperCase()}</Text> : null}
 
                         {item.badges && item.badges.length > 0 && (
-                            <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+                            <View style={ss.exBadgeRow}>
                                 {item.badges.slice(0, 3).map((b, bIdx) => (
                                     <BadgePill key={`${item.id}-b-${bIdx}`} name={b.name} color={b.color} icon={b.icon} size="xs" />
                                 ))}
                                 {item.badges.length > 3 && (
-                                    <View style={{ backgroundColor: Colors.iron[200], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                                        <Text style={{ fontSize: 9, fontWeight: '800', color: Colors.iron[500] }}>+{item.badges.length - 3}</Text>
+                                    <View style={ss.dayMoreBadge}>
+                                        <Text style={ss.dayMoreBadgeText}>+{item.badges.length - 3}</Text>
                                     </View>
                                 )}
                             </View>
@@ -295,8 +592,8 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                     </View>
                 </View>
                 <TouchableOpacity onPress={() => handleDeleteExercise(item.id, item.exercise_name)}
-                    style={{ padding: 8, backgroundColor: withAlpha(Colors.red, '12'), borderRadius: 10, borderWidth: 1, borderColor: withAlpha(Colors.red, '25') }}>
-                    <Trash2 size={14} color={Colors.red} />
+                    style={ss.exDeleteBtn}>
+                    <Trash2 size={14} color={colors.red} />
                 </TouchableOpacity>
             </View>
         </ScaleDecorator>
@@ -304,82 +601,82 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
 
     return (
         <Modal visible={visible} animationType="fade" transparent onRequestClose={handleClose}>
-            <View style={st.overlay}>
-                <View style={st.sheet}>
+            <View style={ss.overlay}>
+                <View style={ss.sheet}>
                     {/* Header */}
-                    <View style={st.header}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={st.headerTitle}>
+                    <View style={ss.header}>
+                        <View style={ss.headerTextContainer}>
+                            <Text style={ss.headerTitle}>
                                 {viewMode === 'day' && selectedDay ? selectedDay.name : routine?.name || 'Rutina'}
                             </Text>
-                            <Text style={st.headerSub}>
+                            <Text style={ss.headerSub}>
                                 {viewMode === 'day'
                                     ? `${selectedDay?.exercises?.length || 0} ejercicios`
                                     : `${days.length} ${days.length === 1 ? 'día' : 'días'} de entrenamiento`}
                             </Text>
                         </View>
-                        <TouchableOpacity onPress={handleClose} style={st.closeBtn}>
-                            <X size={18} color={Colors.white} />
+                        <TouchableOpacity onPress={handleClose} style={ss.closeBtn}>
+                            <X size={18} color={colors.iron[950]} />
                         </TouchableOpacity>
                     </View>
 
                     {loading ? (
-                        <View style={st.centered}><ActivityIndicator size="large" color={Colors.primary.DEFAULT} /></View>
+                        <View style={ss.centered}><ActivityIndicator size="large" color={colors.primary.DEFAULT} /></View>
                     ) : viewMode === 'routine' ? (
-                        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-                            <View style={st.contentArea}>
+                        <ScrollView contentContainerStyle={ss.scrollContent}>
+                            <View style={ss.contentArea}>
                                 {routine?.is_moderated === 1 ? (
-                                    <View style={[st.infoCard, { borderLeftColor: Colors.yellow, backgroundColor: withAlpha(Colors.yellow, '30') }]}>
-                                        <Text style={{ color: Colors.iron[600], fontWeight: '900', fontSize: 12, marginBottom: 4 }}>⚠️ ESTADO: OCULTA</Text>
-                                        <Text style={[st.infoCardText, { color: Colors.iron[600] }]}>
+                                    <View style={[ss.infoCard, ss.warningCard]}>
+                                        <Text style={ss.warningLabel}>⚠️ ESTADO: OCULTA</Text>
+                                        <Text style={ss.infoCardText}>
                                             {routine.moderation_message || 'Esta rutina ha sido ocultada del directorio público por un administrador.'}
                                         </Text>
                                     </View>
                                 ) : routine?.description ? (
-                                    <View style={st.infoCard}>
-                                        <Text style={st.infoCardText}>{routine.description}</Text>
+                                    <View style={ss.infoCard}>
+                                        <Text style={ss.infoCardText}>{routine.description}</Text>
                                     </View>
                                 ) : null}
 
                                 {/* Action buttons row */}
-                                <View style={st.btnRow}>
-                                    <View style={{ flex: 1 }}>
-                                        <TouchableOpacity style={[st.smallBtn, { backgroundColor: Colors.primary.DEFAULT, borderColor: Colors.primary.DEFAULT }]} onPress={handleShareRoutine}>
-                                            <Share2 size={12} color="white" />
-                                            <Text style={[st.smallBtnText, { color: 'white' }]}>Link</Text>
+                                <View style={ss.btnRow}>
+                                    <View style={ss.btnCol}>
+                                        <TouchableOpacity style={[ss.smallBtn, ss.smallBtnPrimary]} onPress={handleShareRoutine}>
+                                            <Share2 size={12} color={colors.white} />
+                                            <Text style={[ss.smallBtnText, ss.smallBtnTextWhite]}>Link</Text>
                                         </TouchableOpacity>
                                     </View>
-                                    <View style={{ flex: 1 }}>
-                                        <TouchableOpacity style={st.smallBtn} onPress={handleOpenFriendPicker}>
-                                            <Send size={12} color={Colors.primary.DEFAULT} />
-                                            <Text style={st.smallBtnText}>Amigo</Text>
+                                    <View style={ss.btnCol}>
+                                        <TouchableOpacity style={ss.smallBtn} onPress={handleOpenFriendPicker}>
+                                            <Send size={12} color={colors.primary.DEFAULT} />
+                                            <Text style={ss.smallBtnText}>Amigo</Text>
                                         </TouchableOpacity>
                                     </View>
-                                    <View style={{ flex: 1 }}>
-                                        <TouchableOpacity style={st.smallBtn} onPress={() => {
+                                    <View style={ss.btnCol}>
+                                        <TouchableOpacity style={ss.smallBtn} onPress={() => {
                                             setEditRoutineName(routine?.name || ''); setEditRoutineDesc(routine?.description || ''); setEditRoutinePublic(routine?.is_public === 1); setEditRoutineVisible(true);
                                         }}>
-                                            <Edit3 size={12} color={Colors.primary.DEFAULT} />
-                                            <Text style={st.smallBtnText}>Edit</Text>
+                                            <Edit3 size={12} color={colors.primary.DEFAULT} />
+                                            <Text style={ss.smallBtnText}>Edit</Text>
                                         </TouchableOpacity>
                                     </View>
-                                    <View style={{ flex: 1 }}>
-                                        <TouchableOpacity style={[st.smallBtn, { borderColor: withAlpha(Colors.red, '30') }]} onPress={handleDeleteRoutine}>
-                                            <Trash2 size={12} color={Colors.red} />
-                                            <Text style={[st.smallBtnText, { color: Colors.red }]}>Del</Text>
+                                    <View style={ss.btnCol}>
+                                        <TouchableOpacity style={[ss.smallBtn, ss.smallBtnDanger]} onPress={handleDeleteRoutine}>
+                                            <Trash2 size={12} color={colors.red} />
+                                            <Text style={[ss.smallBtnText, ss.smallBtnTextDanger]}>Del</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
 
                                 {/* Section label */}
-                                <Text style={st.sectionLabel}>Días de entrenamiento</Text>
+                                <Text style={ss.sectionLabel}>Días de entrenamiento</Text>
 
                                 {/* Days */}
                                 {days.length === 0 ? (
-                                    <View style={st.emptyBlock}>
-                                        <Calendar size={28} color={Colors.iron[400]} />
-                                        <Text style={st.emptyTitle}>Sin días definidos</Text>
-                                        <Text style={st.emptyText}>Tocá el botón para agregar estructura.</Text>
+                                    <View style={ss.emptyBlock}>
+                                        <Calendar size={28} color={colors.iron[400]} />
+                                        <Text style={ss.emptyTitle}>Sin días definidos</Text>
+                                        <Text style={ss.emptyText}>Tocá el botón para agregar estructura.</Text>
                                     </View>
                                 ) : (
                                     <DraggableFlatList
@@ -393,36 +690,40 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                 )}
 
                                 {/* Add day button */}
-                                <TouchableOpacity style={st.addRow} onPress={handleAddDay}>
-                                    <Plus size={18} color={Colors.primary.DEFAULT} />
-                                    <Text style={st.addRowText}>Agregar día</Text>
+                                <TouchableOpacity style={ss.addRow} onPress={handleAddDay}>
+                                    <Plus size={18} color={colors.primary.DEFAULT} />
+                                    <Text style={ss.addRowText}>Agregar día</Text>
                                 </TouchableOpacity>
                             </View>
                         </ScrollView>
                     ) : (
-                        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-                            <View style={st.contentArea}>
+                        <ScrollView contentContainerStyle={ss.scrollContent}>
+                            <View style={ss.contentArea}>
                                 {/* Day action buttons */}
-                                <View style={st.btnRow}>
-                                    <TouchableOpacity style={st.smallBtn} onPress={() => { setEditDayName(selectedDay?.name || ''); setEditDayVisible(true); }}>
-                                        <Edit3 size={14} color={Colors.primary.DEFAULT} />
-                                        <Text style={st.smallBtnText}>Renombrar</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={[st.smallBtn, { borderColor: withAlpha(Colors.red, '30') }]} onPress={handleDeleteDay}>
-                                        <Trash2 size={14} color={Colors.red} />
-                                        <Text style={[st.smallBtnText, { color: Colors.red }]}>Eliminar día</Text>
-                                    </TouchableOpacity>
+                                <View style={ss.btnRow}>
+                                    <View style={ss.btnCol}>
+                                        <TouchableOpacity style={ss.smallBtn} onPress={() => { setEditDayName(selectedDay?.name || ''); setEditDayVisible(true); }}>
+                                            <Edit3 size={14} color={colors.primary.DEFAULT} />
+                                            <Text style={ss.smallBtnText}>Renombrar</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <View style={ss.btnCol}>
+                                        <TouchableOpacity style={[ss.smallBtn, ss.smallBtnDanger]} onPress={handleDeleteDay}>
+                                            <Trash2 size={14} color={colors.red} />
+                                            <Text style={[ss.smallBtnText, ss.smallBtnTextDanger]}>Eliminar día</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
 
-                                <Text style={st.sectionLabel}>Ejercicios del día</Text>
+                                <Text style={ss.sectionLabel}>Ejercicios del día</Text>
 
                                 {dayLoading ? (
-                                    <View style={{ paddingVertical: 40, alignItems: 'center' }}><ActivityIndicator color={Colors.primary.DEFAULT} /></View>
+                                    <View style={ss.loadingContainer}><ActivityIndicator color={colors.primary.DEFAULT} /></View>
                                 ) : (selectedDay?.exercises || []).length === 0 ? (
-                                    <View style={st.emptyBlock}>
-                                        <Dumbbell size={28} color={Colors.iron[400]} />
-                                        <Text style={st.emptyTitle}>Sin ejercicios</Text>
-                                        <Text style={st.emptyText}>Agregá ejercicios a este día.</Text>
+                                    <View style={ss.emptyBlock}>
+                                        <Dumbbell size={28} color={colors.iron[400]} />
+                                        <Text style={ss.emptyTitle}>Sin ejercicios</Text>
+                                        <Text style={ss.emptyText}>Agregá ejercicios a este día.</Text>
                                     </View>
                                 ) : (
                                     <DraggableFlatList
@@ -435,9 +736,9 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                     />
                                 )}
 
-                                <TouchableOpacity style={st.addRow} onPress={() => setAddExerciseVisible(true)}>
-                                    <Plus size={18} color={Colors.primary.DEFAULT} />
-                                    <Text style={st.addRowText}>Agregar ejercicio</Text>
+                                <TouchableOpacity style={ss.addRow} onPress={() => setAddExerciseVisible(true)}>
+                                    <Plus size={18} color={colors.primary.DEFAULT} />
+                                    <Text style={ss.addRowText}>Agregar ejercicio</Text>
                                 </TouchableOpacity>
                             </View>
                         </ScrollView>
@@ -448,23 +749,23 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             {/* Edit Routine */}
             {editRoutineVisible && (
                 <Modal transparent visible animationType="fade" onRequestClose={() => setEditRoutineVisible(false)}>
-                    <View style={st.innerOverlay}>
-                        <View style={st.formBox}>
-                            <Text style={st.formTitle}>Editar rutina</Text>
+                    <View style={ss.innerOverlay}>
+                        <View style={ss.formBox}>
+                            <Text style={ss.formTitle}>Editar rutina</Text>
                             <IronInput label="Nombre" value={editRoutineName} onChangeText={setEditRoutineName} autoFocus />
                             <IronInput label="Descripción" value={editRoutineDesc} onChangeText={setEditRoutineDesc} multiline numberOfLines={2} />
 
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingHorizontal: 4 }}>
-                                <View style={{ flex: 1, paddingRight: 16 }}>
-                                    <Text style={{ color: Colors.iron[950], fontWeight: 'bold' }}>Hacer Pública</Text>
-                                    <Text style={{ color: Colors.iron[500], fontSize: 11 }}>Aparecerá en el Directorio Global para que otros la descarguen.</Text>
+                            <View style={ss.formControlRow}>
+                                <View style={ss.formLabelCol}>
+                                    <Text style={ss.formLabelMain}>Hacer Pública</Text>
+                                    <Text style={ss.formLabelSub}>Aparecerá en el Directorio Global para que otros la descarguen.</Text>
                                 </View>
-                                <Switch value={editRoutinePublic} onValueChange={setEditRoutinePublic} trackColor={{ true: Colors.primary.DEFAULT }} />
+                                <Switch value={editRoutinePublic} onValueChange={setEditRoutinePublic} trackColor={{ true: colors.primary.DEFAULT }} />
                             </View>
 
-                            <View style={{ flexDirection: 'row', gap: 12 }}>
-                                <View style={{ flex: 1 }}><IronButton label="Cancelar" variant="ghost" onPress={() => setEditRoutineVisible(false)} /></View>
-                                <View style={{ flex: 1 }}><IronButton label="Guardar" onPress={handleSaveRoutineEdit} disabled={!editRoutineName.trim()} /></View>
+                            <View style={ss.rowGap12}>
+                                <View style={ss.flex1}><IronButton label="Cancelar" variant="ghost" onPress={() => setEditRoutineVisible(false)} /></View>
+                                <View style={ss.flex1}><IronButton label="Guardar" onPress={handleSaveRoutineEdit} disabled={!editRoutineName.trim()} /></View>
                             </View>
                         </View>
                     </View>
@@ -474,13 +775,13 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             {/* Edit Day */}
             {editDayVisible && (
                 <Modal transparent visible animationType="fade" onRequestClose={() => setEditDayVisible(false)}>
-                    <View style={st.innerOverlay}>
-                        <View style={st.formBox}>
-                            <Text style={st.formTitle}>Renombrar día</Text>
+                    <View style={ss.innerOverlay}>
+                        <View style={ss.formBox}>
+                            <Text style={ss.formTitle}>Renombrar día</Text>
                             <IronInput label="Nombre del día" value={editDayName} onChangeText={setEditDayName} autoFocus />
-                            <View style={{ flexDirection: 'row', gap: 12 }}>
-                                <View style={{ flex: 1 }}><IronButton label="Cancelar" variant="ghost" onPress={() => setEditDayVisible(false)} /></View>
-                                <View style={{ flex: 1 }}><IronButton label="Guardar" onPress={handleSaveDayEdit} disabled={!editDayName.trim()} /></View>
+                            <View style={ss.rowGap12}>
+                                <View style={ss.flex1}><IronButton label="Cancelar" variant="ghost" onPress={() => setEditDayVisible(false)} /></View>
+                                <View style={ss.flex1}><IronButton label="Guardar" onPress={handleSaveDayEdit} disabled={!editDayName.trim()} /></View>
                             </View>
                         </View>
                     </View>
@@ -490,18 +791,18 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             {/* Exercise Picker */}
             {addExerciseVisible && (
                 <Modal visible transparent animationType="fade" onRequestClose={() => setAddExerciseVisible(false)}>
-                    <View style={st.overlay}>
-                        <View style={st.sheet}>
-                            <View style={st.header}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={st.headerTitle}>Seleccionar ejercicio</Text>
-                                    <Text style={st.headerSub}>Tocá uno para agregarlo a {selectedDay?.name}</Text>
+                    <View style={ss.overlay}>
+                        <View style={ss.sheet}>
+                            <View style={ss.header}>
+                                <View style={ss.headerTextContainer}>
+                                    <Text style={ss.headerTitle}>Seleccionar ejercicio</Text>
+                                    <Text style={ss.headerSub}>Tocá uno para agregarlo a {selectedDay?.name}</Text>
                                 </View>
-                                <TouchableOpacity onPress={() => setAddExerciseVisible(false)} style={st.closeBtn}>
-                                    <X size={18} color={Colors.white} />
+                                <TouchableOpacity onPress={() => setAddExerciseVisible(false)} style={ss.closeBtn}>
+                                    <X size={18} color={colors.iron[950]} />
                                 </TouchableOpacity>
                             </View>
-                            <View style={{ flex: 1 }}>
+                            <View style={ss.flex1}>
                                 <ExerciseList onSelect={handleAddExercise} inModal />
                             </View>
                         </View>
@@ -511,22 +812,22 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             {/* Friend Picker */}
             {friendPickerVisible && (
                 <Modal visible transparent animationType="fade" onRequestClose={() => setFriendPickerVisible(false)}>
-                    <View style={st.overlay}>
-                        <View style={st.sheet}>
-                            <View style={st.header}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={st.headerTitle}>Enviar a amigo</Text>
-                                    <Text style={st.headerSub}>Comparte esta rutina al inbox de un amigo</Text>
+                    <View style={ss.overlay}>
+                        <View style={ss.sheet}>
+                            <View style={ss.header}>
+                                <View style={ss.headerTextContainer}>
+                                    <Text style={ss.headerTitle}>Enviar a amigo</Text>
+                                    <Text style={ss.headerSub}>Comparte esta rutina al inbox de un amigo</Text>
                                 </View>
-                                <TouchableOpacity onPress={() => setFriendPickerVisible(false)} style={st.closeBtn}>
-                                    <X size={18} color={Colors.white} />
+                                <TouchableOpacity onPress={() => setFriendPickerVisible(false)} style={ss.closeBtn}>
+                                    <X size={18} color={colors.iron[950]} />
                                 </TouchableOpacity>
                             </View>
-                            <View style={{ flex: 1, padding: 16, backgroundColor: Colors.iron[100] }}>
+                            <View style={ss.friendPickerContent}>
                                 {friends.length === 0 ? (
-                                    <View style={st.centered}>
-                                        <Users size={40} color={Colors.iron[300]} strokeWidth={1} />
-                                        <Text style={{ color: Colors.iron[400], textAlign: 'center', marginTop: 12, fontWeight: '600' }}>No tienes amigos agregados.</Text>
+                                    <View style={ss.centered}>
+                                        <Users size={40} color={colors.iron[300]} strokeWidth={1} />
+                                        <Text style={ss.dayMetaEmpty}>No tienes amigos agregados.</Text>
                                     </View>
                                 ) : (
                                     <FlatList
@@ -534,36 +835,21 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                         keyExtractor={(item) => item.friendId}
                                         renderItem={({ item }) => (
                                             <TouchableOpacity
-                                                style={{
-                                                    flexDirection: 'row',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'space-between',
-                                                    backgroundColor: Colors.surface,
-                                                    padding: 16,
-                                                    borderRadius: 16,
-                                                    marginBottom: 10,
-                                                    borderWidth: 1,
-                                                    borderColor: Colors.iron[300],
-                                                    elevation: 2,
-                                                    shadowColor: ThemeFx.shadowColor,
-                                                    shadowOffset: { width: 0, height: 2 },
-                                                    shadowOpacity: 0.05,
-                                                    shadowRadius: 4
-                                                }}
+                                                style={ss.friendItem}
                                                 onPress={() => handleSendToFriend(item.friendId)}
                                                 disabled={sendingRoutine}
                                             >
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary.DEFAULT + '15', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.primary.DEFAULT + '30' }}>
-                                                        <User size={18} color={Colors.primary.DEFAULT} />
+                                                <View style={ss.friendInfo}>
+                                                    <View style={ss.friendAvatar}>
+                                                        <User size={18} color={colors.primary.DEFAULT} />
                                                     </View>
-                                                    <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 16 }}>{item.displayName}</Text>
+                                                    <Text style={ss.friendName}>{item.displayName}</Text>
                                                 </View>
                                                 {sendingRoutine ? (
-                                                    <ActivityIndicator size="small" color={Colors.primary.DEFAULT} />
+                                                    <ActivityIndicator size="small" color={colors.primary.DEFAULT} />
                                                 ) : (
-                                                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.iron[100], alignItems: 'center', justifyContent: 'center' }}>
-                                                        <Send size={14} color={Colors.primary.DEFAULT} />
+                                                    <View style={ss.friendSendBtn}>
+                                                        <Send size={14} color={colors.primary.DEFAULT} />
                                                     </View>
                                                 )}
                                             </TouchableOpacity>
@@ -579,217 +865,4 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
     );
 }
 
-const st = StyleSheet.create({
-    overlay: {
-        flex: 1,
-        backgroundColor: withAlpha(Colors.black, 'B3'),
-        justifyContent: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 48,
-    },
-    sheet: {
-        backgroundColor: Colors.iron[900],
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        borderRadius: 20,
-        flex: 1,
-        maxHeight: '95%',
-        width: '100%',
-        overflow: 'hidden',
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.iron[200],
-        backgroundColor: Colors.surface,
-    },
-    headerTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
-    headerSub: { color: Colors.iron[400], fontSize: 11, marginTop: 2 },
-    closeBtn: {
-        width: 32, height: 32, borderRadius: 10,
-        backgroundColor: Colors.primary.DEFAULT, justifyContent: 'center', alignItems: 'center',
-    },
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-    // Content area — matches CopyWorkoutModal
-    contentArea: {
-        padding: 16,
-        backgroundColor: Colors.iron[100],
-        minHeight: '100%',
-    },
-    sectionLabel: {
-        color: Colors.iron[400],
-        fontSize: 10,
-        marginBottom: 12,
-        marginTop: 16,
-        textTransform: 'uppercase',
-        fontWeight: '800',
-        letterSpacing: 1,
-    },
-    infoCard: {
-        backgroundColor: Colors.surface,
-        padding: 16,
-        borderRadius: 14,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        borderLeftWidth: 3,
-        borderLeftColor: Colors.primary.DEFAULT,
-    },
-    infoCardText: { fontSize: 14, color: Colors.iron[500], lineHeight: 20 },
-    btnRow: {
-        flexDirection: 'row',
-        gap: 8,
-        marginTop: 12,
-    },
-    smallBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 4,
-        paddingHorizontal: 6,
-        paddingVertical: 10,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: Colors.iron[300],
-        backgroundColor: Colors.surface,
-    },
-    smallBtnText: { fontSize: 11, fontWeight: '800', color: Colors.primary.DEFAULT, textTransform: 'uppercase' },
-
-    // Day block (Container that visually differentiates a Day with its inner exercises)
-    dayBlockOuter: {
-        marginBottom: 16,
-        backgroundColor: Colors.surface,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: Colors.iron[300],
-        elevation: 2,
-        shadowColor: ThemeFx.shadowColor,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 6,
-        overflow: 'hidden',
-    },
-    dayBlockActive: { borderColor: Colors.primary.DEFAULT, elevation: 4, shadowOpacity: 0.12 },
-    dayBlockHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        backgroundColor: Colors.iron[50], // Slightly lighter/darker
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.iron[200],
-    },
-    dayIconBox: {
-        width: 36, height: 36, borderRadius: 10,
-        backgroundColor: withAlpha(Colors.primary.DEFAULT, '20'),
-        borderWidth: 1, borderColor: withAlpha(Colors.primary.DEFAULT, '40'),
-        justifyContent: 'center', alignItems: 'center',
-    },
-    dayTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
-    arrowCircle: {
-        width: 28, height: 28, borderRadius: 14,
-        backgroundColor: Colors.iron[200], alignItems: 'center', justifyContent: 'center',
-    },
-    dayBlockInner: {
-        padding: 16,
-        backgroundColor: Colors.surface,
-    },
-    dayMetaEmpty: { color: Colors.iron[400], fontSize: 13, fontStyle: 'italic' },
-    dayInnerExRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        paddingVertical: 6,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.iron[100],
-    },
-    dayInnerExNum: { color: Colors.primary.DEFAULT, fontWeight: '800', fontSize: 13, width: 20 },
-    dayInnerExText: { flex: 1, color: Colors.iron[950], fontSize: 14, fontWeight: '900' },
-    addInnerBtn: {
-        flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 12, marginTop: 4
-    },
-    addInnerBtnText: { color: Colors.primary.DEFAULT, fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
-
-    // Exercise cards — clean flat style
-    exCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 12,
-        marginBottom: 10,
-        backgroundColor: Colors.surface,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: Colors.iron[300],
-        elevation: 2,
-        shadowColor: ThemeFx.shadowColor,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 6,
-        gap: 10,
-    },
-    exCardActive: { borderColor: Colors.primary.DEFAULT, elevation: 4, shadowOpacity: 0.12 },
-    exIconBox: {
-        width: 38, height: 38, borderRadius: 11,
-        backgroundColor: withAlpha(Colors.primary.DEFAULT, '15'),
-        borderWidth: 1, borderColor: withAlpha(Colors.primary.DEFAULT, '30'),
-        alignItems: 'center', justifyContent: 'center',
-    },
-    exCardTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
-    exCardMeta: { color: Colors.iron[500], fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 },
-
-    addRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        paddingVertical: 14,
-        marginTop: 8,
-        borderRadius: 14,
-        borderWidth: 1.5,
-        borderColor: withAlpha(Colors.primary.DEFAULT, '40'),
-        borderStyle: 'dashed',
-        backgroundColor: withAlpha(Colors.primary.DEFAULT, '06'),
-    },
-    addRowText: { color: Colors.primary.DEFAULT, fontWeight: '800', fontSize: 14 },
-
-    emptyBlock: {
-        alignItems: 'center',
-        paddingVertical: 32,
-        backgroundColor: Colors.surface,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        borderStyle: 'dashed',
-        gap: 10,
-    },
-    emptyTitle: { fontSize: 15, fontWeight: '800', color: Colors.iron[950] },
-    emptyText: { fontSize: 13, color: Colors.iron[500], textAlign: 'center' },
-
-    // Inner form modals
-    innerOverlay: {
-        flex: 1,
-        backgroundColor: ThemeFx.backdrop,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 16,
-    },
-    formBox: {
-        backgroundColor: Colors.surface,
-        width: '100%',
-        maxWidth: 360,
-        borderRadius: 20,
-        padding: 24,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        elevation: 8,
-        shadowColor: ThemeFx.shadowColor,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2,
-        shadowRadius: 24,
-    },
-    formTitle: { fontSize: 20, fontWeight: '900', color: Colors.iron[950], marginBottom: 20, letterSpacing: -0.3 },
-});

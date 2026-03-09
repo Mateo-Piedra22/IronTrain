@@ -1,4 +1,5 @@
 import { Pressable, PressableProps, View, ViewProps } from 'react-native';
+import { useColors } from '../src/hooks/useColors';
 
 interface IronCardProps extends ViewProps {
     onPress?: PressableProps['onPress'];
@@ -6,6 +7,7 @@ interface IronCardProps extends ViewProps {
 }
 
 export function IronCard({ children, style, onPress, className, variant = 'default', ...props }: IronCardProps) {
+    const colors = useColors();
     const baseClasses = "bg-surface rounded-xl p-4 elevation-1 border border-iron-700";
     const outlineClasses = "border border-iron-400 bg-transparent elevation-none";
 

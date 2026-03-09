@@ -1,11 +1,13 @@
 import { BadgePill } from '@/components/ui/BadgePill';
 import { AnalysisService, PowerliftingPRs } from '@/src/services/AnalysisService';
-import { Colors, withAlpha } from '@/src/theme';
+import { withAlpha } from '@/src/theme';
 import { AlertCircle, Crown, Info, Trophy } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useColors } from '../src/hooks/useColors';
 
 export function PRCenter() {
+    const colors = useColors();
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showInfo, setShowInfo] = useState(false);
@@ -31,15 +33,287 @@ export function PRCenter() {
         }
     };
 
-    const liftData = [
-        { label: 'SQUAT', value: data.squat?.weight ?? 0, color: Colors.red, name: data.squatName },
-        { label: 'BENCH', value: data.bench?.weight ?? 0, color: Colors.blue, name: data.benchName },
-        { label: 'DEADLIFT', value: data.deadlift?.weight ?? 0, color: Colors.yellow, name: data.deadliftName },
-    ];
+    const liftData = useMemo(() => [
+        { label: 'SQUAT', value: data.squat?.weight ?? 0, color: colors.red, name: data.squatName },
+        { label: 'BENCH', value: data.bench?.weight ?? 0, color: colors.blue, name: data.benchName },
+        { label: 'DEADLIFT', value: data.deadlift?.weight ?? 0, color: colors.yellow, name: data.deadliftName },
+    ], [data, colors]);
 
     const maxLift = Math.max(...liftData.map(l => l.value), 1);
     const allDetected = liftData.every(l => l.name != null);
     const noneDetected = liftData.every(l => l.name == null);
+
+    const styles = useMemo(() => StyleSheet.create({
+        container: {
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            borderWidth: 1.5,
+            borderColor: withAlpha(colors.yellow, '30'),
+            padding: 20,
+            marginBottom: 16,
+            shadowColor: colors.yellow,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.08,
+            shadowRadius: 15,
+            elevation: 4,
+        },
+        header: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 20,
+        },
+        headerRight: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10
+        },
+        headerLeft: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+        },
+        trophyCircle: {
+            width: 42,
+            height: 42,
+            borderRadius: 21,
+            backgroundColor: withAlpha(colors.yellow, '15'),
+            borderWidth: 1.5,
+            borderColor: withAlpha(colors.yellow, '30'),
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        title: {
+            fontSize: 18,
+            fontWeight: '900',
+            color: colors.yellow,
+            letterSpacing: -0.3,
+        },
+        subtitle: {
+            fontSize: 11,
+            fontWeight: '700',
+            color: colors.iron[400],
+            textTransform: 'uppercase',
+            letterSpacing: 0.8,
+            marginTop: 2,
+        },
+        infoButton: {
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            backgroundColor: colors.iron[100],
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        totalBadge: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            backgroundColor: withAlpha(colors.yellow, '15'),
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            borderRadius: 12,
+            borderWidth: 1.5,
+            borderColor: withAlpha(colors.yellow, '30'),
+            shadowColor: colors.yellow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 2,
+        },
+        totalValue: {
+            fontSize: 18,
+            fontWeight: '900',
+            color: colors.yellow,
+        },
+        totalUnit: {
+            fontSize: 11,
+            fontWeight: '800',
+            color: colors.iron[600],
+            textTransform: 'uppercase',
+        },
+        infoPanel: {
+            backgroundColor: withAlpha(colors.yellow, '08'),
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: withAlpha(colors.yellow, '20'),
+            padding: 16,
+            marginBottom: 16,
+        },
+        infoPanelHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 10,
+        },
+        infoPanelTitle: {
+            fontSize: 14,
+            fontWeight: '900',
+            color: colors.yellow,
+        },
+        infoPanelText: {
+            fontSize: 12,
+            color: colors.iron[500],
+            lineHeight: 18,
+            fontWeight: '600',
+            marginBottom: 12,
+        },
+        detectionList: {
+            gap: 8,
+        },
+        detectionRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            backgroundColor: colors.surface,
+            padding: 8,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: withAlpha(colors.yellow, '10'),
+        },
+        detectionDot: {
+            width: 10,
+            height: 10,
+            borderRadius: 5,
+        },
+        detectionLabel: {
+            fontSize: 11,
+            fontWeight: '900',
+            color: colors.iron[400],
+            width: 75,
+        },
+        detectionValue: {
+            fontSize: 12,
+            fontWeight: '700',
+            flex: 1,
+        },
+        infoPanelHint: {
+            fontSize: 11,
+            color: colors.iron[400],
+            marginTop: 12,
+            fontStyle: 'italic',
+            lineHeight: 16,
+            fontWeight: '600',
+        },
+        emptyState: {
+            alignItems: 'center',
+            paddingVertical: 24,
+            gap: 8,
+            backgroundColor: colors.iron[50],
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: colors.iron[100],
+        },
+        emptyTitle: {
+            color: colors.iron[500],
+            fontWeight: '900',
+            fontSize: 14,
+        },
+        emptyMessage: {
+            color: colors.iron[400],
+            fontSize: 12,
+            textAlign: 'center',
+            lineHeight: 18,
+            paddingHorizontal: 20,
+            fontWeight: '600'
+        },
+        loadingContainer: {
+            paddingVertical: 40,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        loadingText: {
+            color: colors.iron[500],
+            marginTop: 12,
+            fontSize: 13,
+            fontWeight: '700',
+        },
+        errorContainer: {
+            paddingVertical: 24,
+            alignItems: 'center'
+        },
+        errorText: {
+            color: colors.red,
+            fontWeight: '700'
+        },
+        liftsContainer: {
+            backgroundColor: colors.iron[50],
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: colors.iron[100],
+            overflow: 'hidden',
+        },
+        liftRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            paddingVertical: 18,
+        },
+        liftRowBorder: {
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.iron[100],
+        },
+        liftInfo: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            width: 110,
+            gap: 10,
+        },
+        liftDot: {
+            width: 10,
+            height: 10,
+            borderRadius: 5,
+        },
+        liftLabel: {
+            fontSize: 12,
+            fontWeight: '900',
+            color: colors.iron[950],
+            letterSpacing: 0.5,
+        },
+        liftExName: {
+            fontSize: 10,
+            fontWeight: '600',
+            color: colors.iron[500],
+            marginTop: 2,
+        },
+        liftBadges: {
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 4,
+            marginTop: 6
+        },
+        liftBarTrack: {
+            flex: 1,
+            height: 10,
+            backgroundColor: colors.iron[200],
+            borderRadius: 5,
+            overflow: 'hidden',
+            marginHorizontal: 16,
+        },
+        liftBarFill: {
+            height: '100%',
+            borderRadius: 5,
+        },
+        liftValueContainer: {
+            flexDirection: 'row',
+            alignItems: 'baseline',
+            gap: 2,
+            width: 65,
+            justifyContent: 'flex-end',
+        },
+        liftValue: {
+            fontSize: 20,
+            fontWeight: '900',
+            color: colors.iron[950],
+        },
+        liftUnit: {
+            fontSize: 11,
+            fontWeight: '800',
+            color: colors.iron[400],
+        },
+    }), [colors]);
 
     return (
         <View style={styles.container}>
@@ -47,24 +321,24 @@ export function PRCenter() {
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
                     <View style={styles.trophyCircle}>
-                        <Trophy size={18} color={Colors.yellow} />
+                        <Trophy size={20} color={colors.yellow} />
                     </View>
                     <View>
                         <Text style={styles.title}>Sala de Trofeos</Text>
                         <Text style={styles.subtitle}>Powerlifting Total</Text>
                     </View>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={styles.headerRight}>
                     <TouchableOpacity
                         onPress={() => setShowInfo(!showInfo)}
                         style={styles.infoButton}
                         accessibilityRole="button"
                         accessibilityLabel="Info sobre sala de trofeos"
                     >
-                        <Info size={14} color={showInfo ? Colors.yellow : Colors.iron[400]} />
+                        <Info size={16} color={showInfo ? colors.yellow : colors.iron[400]} />
                     </TouchableOpacity>
                     <View style={styles.totalBadge}>
-                        <Crown size={12} color={Colors.yellow} />
+                        <Crown size={14} color={colors.yellow} />
                         <Text style={styles.totalValue}>{data.totalKg}</Text>
                         <Text style={styles.totalUnit}>kg</Text>
                     </View>
@@ -75,7 +349,7 @@ export function PRCenter() {
             {showInfo && (
                 <View style={styles.infoPanel}>
                     <View style={styles.infoPanelHeader}>
-                        <AlertCircle size={14} color={Colors.yellow} />
+                        <AlertCircle size={16} color={colors.yellow} />
                         <Text style={styles.infoPanelTitle}>¿Cómo funciona?</Text>
                     </View>
                     <Text style={styles.infoPanelText}>
@@ -89,7 +363,7 @@ export function PRCenter() {
                                 <Text style={styles.detectionLabel}>{l.label}:</Text>
                                 <Text style={[
                                     styles.detectionValue,
-                                    { color: l.name ? Colors.iron[950] : Colors.iron[400] }
+                                    { color: l.name ? colors.iron[950] : colors.iron[400] }
                                 ]}>
                                     {l.name ?? 'No detectado'}
                                 </Text>
@@ -106,16 +380,16 @@ export function PRCenter() {
 
             {isLoading ? (
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator color={Colors.primary.DEFAULT} />
+                    <ActivityIndicator color={colors.primary.DEFAULT} />
                     <Text style={styles.loadingText}>Calculando PRs...</Text>
                 </View>
             ) : error ? (
-                <View style={{ paddingVertical: 24 }}>
-                    <Text style={{ color: Colors.iron[500] }}>{error}</Text>
+                <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{error}</Text>
                 </View>
             ) : noneDetected ? (
                 <View style={styles.emptyState}>
-                    <Trophy size={24} color={Colors.iron[300]} />
+                    <Trophy size={32} color={colors.iron[300]} />
                     <Text style={styles.emptyTitle}>Sin ejercicios detectados</Text>
                     <Text style={styles.emptyMessage}>
                         Agrega ejercicios con nombres como "Sentadilla", "Press Banca" o "Peso Muerto" para ver tu total.
@@ -129,12 +403,12 @@ export function PRCenter() {
                             <View key={lift.label} style={[styles.liftRow, idx < liftData.length - 1 && styles.liftRowBorder]}>
                                 <View style={styles.liftInfo}>
                                     <View style={[styles.liftDot, { backgroundColor: lift.color }]} />
-                                    <View>
+                                    <View style={{ flex: 1 }}>
                                         <Text style={styles.liftLabel}>{lift.label}</Text>
                                         {lift.name && (
                                             <Text style={styles.liftExName} numberOfLines={1}>{lift.name}</Text>
                                         )}
-                                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 2, marginTop: 2 }}>
+                                        <View style={styles.liftBadges}>
                                             {(data[lift.label.toLowerCase() as keyof typeof data] as any)?.badges?.map((b: any, i: number) => (
                                                 <BadgePill key={i} name={b.name} color={b.color} icon={b.icon} size="xs" />
                                             ))}
@@ -146,6 +420,7 @@ export function PRCenter() {
                                         style={[styles.liftBarFill, {
                                             width: `${pct}%`,
                                             backgroundColor: lift.color,
+                                            opacity: 0.8,
                                         }]}
                                     />
                                 </View>
@@ -161,245 +436,3 @@ export function PRCenter() {
         </View>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        backgroundColor: Colors.surface,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: withAlpha(Colors.yellow, '30'),
-        padding: 20,
-        marginBottom: 12,
-        elevation: 3,
-        shadowColor: Colors.yellow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-    },
-    trophyCircle: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        backgroundColor: withAlpha(Colors.yellow, '15'),
-        borderWidth: 1,
-        borderColor: withAlpha(Colors.yellow, '30'),
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    title: {
-        fontSize: 16,
-        fontWeight: '900',
-        color: Colors.yellow,
-        letterSpacing: -0.3,
-    },
-    subtitle: {
-        fontSize: 10,
-        fontWeight: '600',
-        color: Colors.iron[400],
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-    infoButton: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: Colors.iron[200],
-        borderWidth: 1,
-        borderColor: Colors.iron[300],
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    totalBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: withAlpha(Colors.yellow, '15'),
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: withAlpha(Colors.yellow, '30'),
-    },
-    totalValue: {
-        fontSize: 18,
-        fontWeight: '900',
-        color: Colors.yellow,
-    },
-    totalUnit: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: Colors.iron[600],
-        textTransform: 'uppercase',
-    },
-
-    // Info Panel
-    infoPanel: {
-        backgroundColor: withAlpha(Colors.yellow, '08'),
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: withAlpha(Colors.yellow, '20'),
-        padding: 14,
-        marginBottom: 16,
-    },
-    infoPanelHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        marginBottom: 8,
-    },
-    infoPanelTitle: {
-        fontSize: 13,
-        fontWeight: '800',
-        color: Colors.yellow,
-    },
-    infoPanelText: {
-        fontSize: 12,
-        color: Colors.iron[500],
-        lineHeight: 18,
-        marginBottom: 10,
-    },
-    detectionList: {
-        gap: 6,
-    },
-    detectionRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    detectionDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-    },
-    detectionLabel: {
-        fontSize: 11,
-        fontWeight: '800',
-        color: Colors.iron[500],
-        width: 70,
-    },
-    detectionValue: {
-        fontSize: 12,
-        fontWeight: '600',
-        flex: 1,
-    },
-    infoPanelHint: {
-        fontSize: 11,
-        color: Colors.iron[400],
-        marginTop: 10,
-        fontStyle: 'italic',
-        lineHeight: 16,
-    },
-
-    // Empty state
-    emptyState: {
-        alignItems: 'center',
-        paddingVertical: 20,
-        gap: 6,
-    },
-    emptyTitle: {
-        color: Colors.iron[500],
-        fontWeight: '800',
-        fontSize: 13,
-    },
-    emptyMessage: {
-        color: Colors.iron[400],
-        fontSize: 11,
-        textAlign: 'center',
-        lineHeight: 16,
-    },
-
-    // Loading
-    loadingContainer: {
-        paddingVertical: 32,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    loadingText: {
-        color: Colors.iron[500],
-        marginTop: 12,
-        fontSize: 12,
-    },
-
-    // Lifts
-    liftsContainer: {
-        backgroundColor: Colors.iron[200],
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: Colors.iron[300],
-        overflow: 'hidden',
-    },
-    liftRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 14,
-    },
-    liftRowBorder: {
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.iron[300],
-    },
-    liftInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        width: 100,
-        gap: 8,
-    },
-    liftDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-    },
-    liftLabel: {
-        fontSize: 11,
-        fontWeight: '800',
-        color: Colors.iron[500],
-        letterSpacing: 0.5,
-    },
-    liftExName: {
-        fontSize: 9,
-        fontWeight: '500',
-        color: Colors.iron[400],
-        marginTop: 1,
-    },
-    liftBarTrack: {
-        flex: 1,
-        height: 8,
-        backgroundColor: Colors.iron[300],
-        borderRadius: 4,
-        overflow: 'hidden',
-        marginHorizontal: 12,
-    },
-    liftBarFill: {
-        height: '100%',
-        borderRadius: 4,
-        opacity: 0.75,
-    },
-    liftValueContainer: {
-        flexDirection: 'row',
-        alignItems: 'baseline',
-        gap: 2,
-        width: 56,
-        justifyContent: 'flex-end',
-    },
-    liftValue: {
-        fontSize: 18,
-        fontWeight: '900',
-        color: Colors.iron[950],
-    },
-    liftUnit: {
-        fontSize: 10,
-        fontWeight: '600',
-        color: Colors.iron[400],
-    },
-});

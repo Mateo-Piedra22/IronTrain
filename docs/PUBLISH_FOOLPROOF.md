@@ -97,7 +97,8 @@ Para disparar la construcción del APK y la publicación del release:
 
 Esto activa el flujo de GitHub Actions que:
 - Ejecuta `eas build` para Android/iOS.
-- Crea el Release en GitHub con el tag correspondiente.
+- Lee el changelog desde `src/changelog.generated.json` y lo usa como notas del release.
+- Crea el Release en GitHub con el tag correspondiente y el contenido detallado del changelog.
 - Sube el binario (`.apk`) y el archivo de sumas de verificación (`sha256`).
 
 ---

@@ -1,12 +1,13 @@
 import { ConsistencyHeatmap } from '@/components/ConsistencyHeatmap';
 import { GoalsWidget } from '@/components/GoalsWidget';
+import { BodySnapshotWidget } from '@/components/analysis/BodySnapshotWidget';
 import { VolumeChart } from '@/components/analysis/VolumeChart';
 import { CardioSummary, CategoryVolumeRow, RepsOnlySummary, WeightOnlySummary, WorkoutComparison, WorkoutStreak, WorkoutSummary } from '@/src/services/AnalysisService';
-import { Colors, ThemeFx, withAlpha } from '@/src/theme';
-import { useRouter } from 'expo-router';
-import { Activity, BarChart3, ChevronRight, Clock, Flame, Ruler, Scale, TrendingDown, TrendingUp, Trophy, Zap } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import { withAlpha } from '@/src/theme';
+import { Activity, BarChart3, Clock, Flame, TrendingDown, TrendingUp, Trophy, Zap } from 'lucide-react-native';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useColors } from '../../src/hooks/useColors';
 
 interface AnalysisOverviewProps {
     rangeDays: 7 | 30 | 90 | 365;
@@ -43,13 +44,410 @@ export function AnalysisOverview({
     unit,
     displayWeight
 }: AnalysisOverviewProps) {
+    const colors = useColors();
+
+    const styles = useMemo(() => StyleSheet.create({
+        container: {
+            paddingBottom: 32
+        },
+        rangeRow: {
+            flexDirection: 'row',
+            gap: 10,
+            marginBottom: 24
+        },
+        rangeChip: {
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            borderRadius: 12,
+            backgroundColor: colors.iron[100],
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            flex: 1,
+            alignItems: 'center',
+        },
+        rangeChipActive: {
+            backgroundColor: colors.primary.DEFAULT,
+            borderColor: colors.primary.DEFAULT,
+            shadowColor: colors.primary.DEFAULT,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.2,
+            shadowRadius: 8,
+            elevation: 4,
+        },
+        rangeChipText: {
+            fontWeight: '900',
+            fontSize: 13,
+            color: colors.iron[500],
+        },
+        rangeChipTextActive: {
+            color: colors.white,
+        },
+        heroRow: {
+            flexDirection: 'row',
+            gap: 16,
+            marginBottom: 24,
+        },
+        heroCard: {
+            flex: 1,
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            padding: 20,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.05,
+            shadowRadius: 15,
+            elevation: 4,
+        },
+        heroIconRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            marginBottom: 12,
+        },
+        heroIconCircle: {
+            width: 36,
+            height: 36,
+            borderRadius: 12,
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        heroLabel: {
+            fontSize: 12,
+            fontWeight: '900',
+            color: colors.iron[500],
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+        },
+        heroValue: {
+            fontSize: 34,
+            fontWeight: '900',
+            color: colors.iron[950],
+            letterSpacing: -1,
+        },
+        heroValueAccent: {
+            color: colors.primary.DEFAULT,
+        },
+        heroUnitContainer: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            marginTop: 4,
+        },
+        heroUnit: {
+            fontSize: 12,
+            fontWeight: '800',
+            color: colors.iron[400],
+        },
+        bestBadge: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            backgroundColor: withAlpha(colors.yellow, '15'),
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: withAlpha(colors.yellow, '30'),
+        },
+        bestBadgeText: {
+            fontSize: 11,
+            fontWeight: '900',
+            color: colors.yellow,
+        },
+        summaryCard: {
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            padding: 24,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            marginBottom: 24,
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.06,
+            shadowRadius: 20,
+            elevation: 5,
+        },
+        summaryHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 24,
+        },
+        summaryHeaderTitleContainer: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10
+        },
+        summaryAccent: {
+            width: 4,
+            height: 22,
+            borderRadius: 2,
+            backgroundColor: colors.primary.DEFAULT,
+        },
+        summaryTitle: {
+            fontSize: 20,
+            fontWeight: '900',
+            color: colors.iron[950],
+            letterSpacing: -0.5,
+        },
+        changeBadge: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 12,
+            borderWidth: 1.5,
+        },
+        metricsGrid: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: 24,
+            padding: 20,
+            backgroundColor: colors.iron[50], // Slightly lighter for inner grid
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: colors.iron[100],
+        },
+        metricCell: {
+            flex: 1,
+        },
+        metricDivider: {
+            width: 1.5,
+            height: 44,
+            backgroundColor: colors.iron[200],
+            marginHorizontal: 16,
+        },
+        metricIconRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            marginBottom: 6,
+        },
+        metricLabel: {
+            fontSize: 11,
+            fontWeight: '900',
+            color: colors.iron[500],
+            textTransform: 'uppercase',
+            letterSpacing: 0.3,
+        },
+        metricValue: {
+            fontSize: 26,
+            fontWeight: '900',
+            color: colors.iron[950],
+            letterSpacing: -0.5,
+        },
+        metricUnit: {
+            fontSize: 12,
+            fontWeight: '800',
+            color: colors.iron[400],
+            marginTop: 4,
+        },
+        secondaryRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            paddingHorizontal: 4,
+        },
+        secondaryCell: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 14,
+        },
+        secondaryLabel: {
+            fontSize: 11,
+            fontWeight: '900',
+            color: colors.iron[400],
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+        },
+        secondaryValue: {
+            fontSize: 16,
+            fontWeight: '900',
+            color: colors.iron[950],
+        },
+        subSection: {
+            marginTop: 24,
+            paddingTop: 16,
+            borderTopWidth: 1.5,
+            borderTopColor: colors.iron[100],
+        },
+        subSectionTitle: {
+            fontSize: 12,
+            fontWeight: '900',
+            color: colors.iron[400],
+            textTransform: 'uppercase',
+            marginBottom: 6,
+            letterSpacing: 0.8,
+        },
+        subSectionRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+        },
+        subSectionText: {
+            fontSize: 15,
+            fontWeight: '900',
+            color: colors.iron[950],
+        },
+        sectionHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            marginBottom: 16,
+        },
+        sectionAccent: {
+            width: 4,
+            height: 20,
+            borderRadius: 2,
+            backgroundColor: colors.primary.DEFAULT,
+        },
+        sectionTitle: {
+            fontSize: 18,
+            fontWeight: '900',
+            color: colors.iron[950],
+            letterSpacing: -0.3,
+        },
+        emptyState: {
+            padding: 40,
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            alignItems: 'center',
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.05,
+            shadowRadius: 15,
+            elevation: 4,
+        },
+        emptyTitle: {
+            fontSize: 18,
+            fontWeight: '900',
+            color: colors.iron[950],
+            marginBottom: 8,
+        },
+        emptyMessage: {
+            fontSize: 14,
+            color: colors.iron[500],
+            textAlign: 'center',
+            lineHeight: 20,
+            fontWeight: '600',
+        },
+        widgetSpacing: {
+            marginBottom: 24
+        },
+        widgetSpacingLarge: {
+            marginBottom: 32
+        },
+        tableContainer: {
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            overflow: 'hidden',
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.05,
+            shadowRadius: 15,
+            elevation: 4,
+        },
+        tableSectionHeader: {
+            paddingHorizontal: 20,
+            paddingTop: 24,
+            marginBottom: 16,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+        },
+        tableHeader: {
+            flexDirection: 'row',
+            paddingHorizontal: 20,
+            paddingVertical: 14,
+            backgroundColor: colors.iron[50],
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.iron[100],
+        },
+        tableHeaderText: {
+            fontSize: 11,
+            fontWeight: '900',
+            color: colors.iron[400],
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+        },
+        tableRow: {
+            paddingHorizontal: 20,
+            paddingVertical: 20,
+        },
+        tableRowBorder: {
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.iron[50],
+        },
+        tableRowContent: {
+            flexDirection: 'row',
+            alignItems: 'center'
+        },
+        tableNameContainer: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            flex: 1,
+            paddingRight: 12
+        },
+        categoryIndicator: {
+            width: 12,
+            height: 12,
+            borderRadius: 6,
+            marginRight: 12,
+        },
+        tableName: {
+            fontSize: 15,
+            fontWeight: '900',
+            color: colors.iron[950],
+        },
+        tableMaxWeight: {
+            fontSize: 14,
+            fontWeight: '900',
+            color: colors.primary.DEFAULT
+        },
+        tableVolume: {
+            width: 85,
+            textAlign: 'right',
+            fontSize: 16,
+            fontWeight: '900',
+            color: colors.iron[950],
+        },
+        setPill: {
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '15'),
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 10,
+            width: 65,
+            alignItems: 'center',
+        },
+        setPillText: {
+            fontSize: 13,
+            fontWeight: '900',
+            color: colors.primary.DEFAULT,
+        },
+        progressTrack: {
+            height: 8,
+            backgroundColor: colors.iron[100],
+            borderRadius: 4,
+            marginTop: 14,
+            overflow: 'hidden',
+        },
+        progressFill: {
+            height: '100%',
+            borderRadius: 4,
+        },
+    }), [colors]);
 
     const sessionCount7 = summary7?.workoutCount ?? 0;
     const currentStreak = streak?.current ?? 0;
     const bestStreak = streak?.best ?? 0;
 
     return (
-        <View style={{ paddingBottom: 32 }}>
+        <View style={styles.container}>
             {/* Range Selector */}
             <View style={styles.rangeRow}>
                 {[7, 30, 90, 365].map((d) => (
@@ -68,10 +466,10 @@ export function AnalysisOverview({
             {/* Hero Stats Row: 7 Days + Streak */}
             <View style={styles.heroRow}>
                 {/* Last 7 Days Card */}
-                <View style={[styles.heroCard, { flex: 1 }]}>
+                <View style={styles.heroCard}>
                     <View style={styles.heroIconRow}>
-                        <View style={[styles.heroIconCircle, { backgroundColor: withAlpha(Colors.primary.DEFAULT, '15') }]}>
-                            <Activity size={16} color={Colors.primary.DEFAULT} />
+                        <View style={[styles.heroIconCircle, { backgroundColor: withAlpha(colors.primary.DEFAULT, '15') }]}>
+                            <Activity size={18} color={colors.primary.DEFAULT} />
                         </View>
                         <Text style={styles.heroLabel}>Últimos 7 días</Text>
                     </View>
@@ -80,21 +478,21 @@ export function AnalysisOverview({
                 </View>
 
                 {/* Streak Card */}
-                <View style={[styles.heroCard, { flex: 1 }]}>
+                <View style={styles.heroCard}>
                     <View style={styles.heroIconRow}>
-                        <View style={[styles.heroIconCircle, { backgroundColor: withAlpha(Colors.yellow, '15') }]}>
-                            <Flame size={16} color={Colors.yellow} />
+                        <View style={[styles.heroIconCircle, { backgroundColor: withAlpha(colors.yellow, '15') }]}>
+                            <Flame size={18} color={colors.yellow} />
                         </View>
                         <Text style={styles.heroLabel}>Racha</Text>
                     </View>
-                    <Text style={[styles.heroValue, { color: currentStreak > 0 ? Colors.primary.DEFAULT : Colors.iron[950] }]}>
+                    <Text style={[styles.heroValue, currentStreak > 0 && styles.heroValueAccent]}>
                         {currentStreak}
                     </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <View style={styles.heroUnitContainer}>
                         <Text style={styles.heroUnit}>días activos</Text>
                         {bestStreak > 0 && (
                             <View style={styles.bestBadge}>
-                                <Trophy size={8} color={Colors.primary.dark} />
+                                <Trophy size={10} color={colors.yellow} />
                                 <Text style={styles.bestBadgeText}>{bestStreak}</Text>
                             </View>
                         )}
@@ -106,22 +504,25 @@ export function AnalysisOverview({
             <View style={styles.summaryCard}>
                 {/* Header */}
                 <View style={styles.summaryHeader}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={styles.summaryHeaderTitleContainer}>
                         <View style={styles.summaryAccent} />
                         <Text style={styles.summaryTitle}>Resumen · {rangeDays} días</Text>
                     </View>
                     {comparison?.workoutChangePct != null && (
                         <View style={[
                             styles.changeBadge,
-                            { backgroundColor: comparison.workoutChangePct >= 0 ? withAlpha(Colors.green, '33') : withAlpha(Colors.red, '33') }
+                            {
+                                backgroundColor: comparison.workoutChangePct >= 0 ? withAlpha(colors.green, '15') : withAlpha(colors.red, '15'),
+                                borderColor: comparison.workoutChangePct >= 0 ? withAlpha(colors.green, '30') : withAlpha(colors.red, '30'),
+                            }
                         ]}>
                             {comparison.workoutChangePct >= 0
-                                ? <TrendingUp size={12} color={Colors.green} />
-                                : <TrendingDown size={12} color={Colors.red} />}
+                                ? <TrendingUp size={14} color={colors.green} />
+                                : <TrendingDown size={14} color={colors.red} />}
                             <Text style={{
-                                fontSize: 11,
-                                fontWeight: '800',
-                                color: comparison.workoutChangePct >= 0 ? Colors.green : Colors.red,
+                                fontSize: 13,
+                                fontWeight: '900',
+                                color: comparison.workoutChangePct >= 0 ? colors.green : colors.red,
                             }}>
                                 {comparison.workoutChangePct > 0 ? '+' : ''}{comparison.workoutChangePct}%
                             </Text>
@@ -133,7 +534,7 @@ export function AnalysisOverview({
                 <View style={styles.metricsGrid}>
                     <View style={styles.metricCell}>
                         <View style={styles.metricIconRow}>
-                            <Zap size={12} color={Colors.primary.DEFAULT} />
+                            <Zap size={14} color={colors.primary.DEFAULT} />
                             <Text style={styles.metricLabel}>Carga Movida</Text>
                         </View>
                         <Text style={styles.metricValue}>
@@ -146,7 +547,7 @@ export function AnalysisOverview({
                     <View style={styles.metricDivider} />
                     <View style={styles.metricCell}>
                         <View style={styles.metricIconRow}>
-                            <TrendingUp size={12} color={Colors.primary.DEFAULT} />
+                            <TrendingUp size={14} color={colors.primary.DEFAULT} />
                             <Text style={styles.metricLabel}>Intensidad</Text>
                         </View>
                         <Text style={styles.metricValue}>
@@ -161,7 +562,7 @@ export function AnalysisOverview({
                 {/* Secondary Metrics */}
                 <View style={styles.secondaryRow}>
                     <View style={styles.secondaryCell}>
-                        <Clock size={14} color={Colors.iron[400]} />
+                        <Clock size={18} color={colors.iron[400]} />
                         <View>
                             <Text style={styles.secondaryLabel}>Duración Media</Text>
                             <Text style={styles.secondaryValue}>
@@ -170,7 +571,7 @@ export function AnalysisOverview({
                         </View>
                     </View>
                     <View style={styles.secondaryCell}>
-                        <Zap size={14} color={Colors.iron[400]} />
+                        <Zap size={18} color={colors.iron[400]} />
                         <View>
                             <Text style={styles.secondaryLabel}>Densidad</Text>
                             <Text style={styles.secondaryValue}>
@@ -218,17 +619,17 @@ export function AnalysisOverview({
             </View>
 
             {/* Goals */}
-            <View style={{ marginBottom: 24 }}>
+            <View style={styles.widgetSpacing}>
                 <GoalsWidget />
             </View>
 
             {/* Heatmap */}
-            <View style={{ marginBottom: 28 }}>
+            <View style={styles.widgetSpacingLarge}>
                 <ConsistencyHeatmap timestamps={heatmapData} />
             </View>
 
             {/* Volume Chart */}
-            <View style={{ marginBottom: 28 }}>
+            <View style={styles.widgetSpacingLarge}>
                 <VolumeChart data={volumeSeries} bucket={bucket} />
             </View>
 
@@ -238,7 +639,7 @@ export function AnalysisOverview({
                     <>
                         <View style={styles.sectionHeader}>
                             <View style={styles.sectionAccent} />
-                            <BarChart3 size={16} color={Colors.iron[950]} />
+                            <BarChart3 size={18} color={colors.iron[950]} />
                             <Text style={styles.sectionTitle}>Distribución por Grupo Muscular</Text>
                         </View>
                         <View style={styles.emptyState}>
@@ -251,17 +652,17 @@ export function AnalysisOverview({
                 ) : (
                     <View style={styles.tableContainer}>
                         {/* Card-internal header */}
-                        <View style={[styles.sectionHeader, { paddingHorizontal: 16, paddingTop: 14 }]}>
+                        <View style={styles.tableSectionHeader}>
                             <View style={styles.sectionAccent} />
-                            <BarChart3 size={16} color={Colors.iron[950]} />
+                            <BarChart3 size={18} color={colors.iron[950]} />
                             <Text style={styles.sectionTitle}>Distribución por Grupo Muscular</Text>
                         </View>
                         {/* Table Header */}
                         <View style={styles.tableHeader}>
                             <Text style={[styles.tableHeaderText, { flex: 1 }]}>Grupo</Text>
-                            <Text style={[styles.tableHeaderText, { width: 56, textAlign: 'center' }]}>Series</Text>
+                            <Text style={[styles.tableHeaderText, { width: 65, textAlign: 'center' }]}>Series</Text>
                             <Text style={[styles.tableHeaderText, { width: 64, textAlign: 'center' }]}>Peso Max</Text>
-                            <Text style={[styles.tableHeaderText, { width: 80, textAlign: 'right' }]}>Carga Kg</Text>
+                            <Text style={[styles.tableHeaderText, { width: 85, textAlign: 'right' }]}>Carga Kg</Text>
                         </View>
 
                         {/* Table Rows */}
@@ -271,22 +672,18 @@ export function AnalysisOverview({
                                 const pct = Math.round((c.volume / maxVol) * 100);
                                 return (
                                     <View
-                                        key={c.categoryId}
+                                        key={idx}
                                         style={[
                                             styles.tableRow,
                                             idx < categoryVolume.length - 1 && styles.tableRowBorder,
                                         ]}
                                     >
-                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
+                                        <View style={styles.tableRowContent}>
+                                            <View style={styles.tableNameContainer}>
                                                 <View
-                                                    style={{
-                                                        width: 10,
-                                                        height: 10,
-                                                        borderRadius: 5,
-                                                        marginRight: 8,
-                                                        backgroundColor: c.categoryColor || Colors.iron[400]
-                                                    }}
+                                                    style={[styles.categoryIndicator, {
+                                                        backgroundColor: c.categoryColor || colors.iron[400]
+                                                    }]}
                                                 />
                                                 <Text
                                                     style={styles.tableName}
@@ -302,7 +699,7 @@ export function AnalysisOverview({
                                             </View>
 
                                             <View style={{ width: 64, alignItems: 'center' }}>
-                                                <Text style={{ fontSize: 13, fontWeight: '900', color: Colors.primary.DEFAULT }}>
+                                                <Text style={styles.tableMaxWeight}>
                                                     {c.maxWeight ? `${Math.round(displayWeight(c.maxWeight))}${unit}` : '-'}
                                                 </Text>
                                             </View>
@@ -317,7 +714,7 @@ export function AnalysisOverview({
                                             <View
                                                 style={[styles.progressFill, {
                                                     width: `${pct}%`,
-                                                    backgroundColor: c.categoryColor || Colors.primary.DEFAULT,
+                                                    backgroundColor: c.categoryColor || colors.primary.DEFAULT,
                                                 }]}
                                             />
                                         </View>
@@ -335,489 +732,5 @@ export function AnalysisOverview({
     );
 }
 
-function BodySnapshotWidget({ unit, displayWeight }: { unit: string; displayWeight: (kg: number) => number }) {
-    const router = useRouter();
-    const [latestWeight, setLatestWeight] = useState<{ value: number; delta: number | null } | null>(null);
-    const [latestFat, setLatestFat] = useState<{ value: number; delta: number | null } | null>(null);
 
-    const loadBodyData = useCallback(async () => {
-        try {
-            const { bodyService } = await import('@/src/services/BodyService');
-            const [weightHistory, fatHistory] = await Promise.all([
-                bodyService.getHistory('weight'),
-                bodyService.getHistory('body_fat'),
-            ]);
-            if (weightHistory.length > 0) {
-                const latest = weightHistory[0].value;
-                const delta = weightHistory.length > 1 ? Math.round((latest - weightHistory[1].value) * 10) / 10 : null;
-                setLatestWeight({ value: latest, delta });
-            }
-            if (fatHistory.length > 0) {
-                const latest = fatHistory[0].value;
-                const delta = fatHistory.length > 1 ? Math.round((latest - fatHistory[1].value) * 10) / 10 : null;
-                setLatestFat({ value: latest, delta });
-            }
-        } catch { /* safe */ }
-    }, []);
 
-    useEffect(() => { loadBodyData(); }, [loadBodyData]);
-
-    if (!latestWeight && !latestFat) return null;
-
-    return (
-        <Pressable onPress={() => router.push('/body' as any)} style={styles.bodyCard}>
-            <View style={styles.bodyHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <View style={styles.bodyIconCircle}>
-                        <Ruler size={14} color={Colors.primary.DEFAULT} />
-                    </View>
-                    <Text style={styles.bodyTitle}>Evolución Física</Text>
-                </View>
-                <ChevronRight size={16} color={Colors.iron[400]} />
-            </View>
-            <View style={styles.bodyGrid}>
-                {latestWeight && (
-                    <View style={styles.bodyMetric}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Scale size={12} color={Colors.iron[500]} />
-                            <Text style={styles.bodyMetricLabel}>Peso</Text>
-                        </View>
-                        <Text style={styles.bodyMetricValue}>
-                            {Math.round(displayWeight(latestWeight.value) * 10) / 10} {unit}
-                        </Text>
-                        {latestWeight.delta !== null && (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 }}>
-                                {latestWeight.delta > 0
-                                    ? <TrendingUp size={10} color={Colors.green} />
-                                    : latestWeight.delta < 0 ? <TrendingDown size={10} color={Colors.red} /> : null}
-                                <Text style={{ fontSize: 10, fontWeight: '800', color: latestWeight.delta > 0 ? Colors.green : latestWeight.delta < 0 ? Colors.red : Colors.iron[500] }}>
-                                    {latestWeight.delta > 0 ? '+' : ''}{Math.round(displayWeight(latestWeight.delta) * 10) / 10} {unit}
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-                )}
-                {latestFat && (
-                    <View style={styles.bodyMetric}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <TrendingDown size={12} color={Colors.iron[500]} />
-                            <Text style={styles.bodyMetricLabel}>Grasa</Text>
-                        </View>
-                        <Text style={styles.bodyMetricValue}>{latestFat.value}%</Text>
-                        {latestFat.delta !== null && (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 }}>
-                                {latestFat.delta > 0
-                                    ? <TrendingUp size={10} color={Colors.red} />
-                                    : latestFat.delta < 0 ? <TrendingDown size={10} color={Colors.green} /> : null}
-                                <Text style={{ fontSize: 10, fontWeight: '800', color: latestFat.delta < 0 ? Colors.green : latestFat.delta > 0 ? Colors.red : Colors.iron[500] }}>
-                                    {latestFat.delta > 0 ? '+' : ''}{latestFat.delta}%
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-                )}
-            </View>
-        </Pressable>
-    );
-}
-
-const styles = StyleSheet.create({
-    // Range Selector
-    rangeRow: {
-        flexDirection: 'row',
-        gap: 8,
-        marginBottom: 20,
-    },
-    rangeChip: {
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        backgroundColor: 'transparent',
-    },
-    rangeChipActive: {
-        backgroundColor: Colors.primary.DEFAULT,
-        borderColor: Colors.primary.DEFAULT,
-    },
-    rangeChipText: {
-        fontWeight: '800',
-        fontSize: 13,
-        color: Colors.iron[950],
-    },
-    rangeChipTextActive: {
-        color: Colors.surface,
-    },
-
-    // Hero Cards
-    heroRow: {
-        flexDirection: 'row',
-        gap: 12,
-        marginBottom: 16,
-    },
-    heroCard: {
-        backgroundColor: Colors.surface,
-        borderRadius: 16,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        elevation: 2,
-        shadowColor: ThemeFx.shadowColor,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-    },
-    heroIconRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        marginBottom: 8,
-    },
-    heroIconCircle: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    heroLabel: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: Colors.iron[500],
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-    heroValue: {
-        fontSize: 32,
-        fontWeight: '900',
-        color: Colors.iron[950],
-        letterSpacing: -1,
-        lineHeight: 36,
-    },
-    heroUnit: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: Colors.iron[400],
-        marginTop: 2,
-    },
-    bestBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 3,
-        backgroundColor: withAlpha(Colors.primary.DEFAULT, '15'),
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 8,
-    },
-    bestBadgeText: {
-        fontSize: 9,
-        fontWeight: '800',
-        color: Colors.primary.dark,
-    },
-
-    // Summary Card
-    summaryCard: {
-        backgroundColor: Colors.surface,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        padding: 20,
-        marginBottom: 24,
-        elevation: 2,
-        shadowColor: ThemeFx.shadowColor,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-    },
-    summaryHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    summaryAccent: {
-        width: 3,
-        height: 18,
-        borderRadius: 2,
-        backgroundColor: Colors.primary.DEFAULT,
-    },
-    summaryTitle: {
-        fontSize: 16,
-        fontWeight: '900',
-        color: Colors.iron[950],
-        letterSpacing: -0.3,
-    },
-    changeBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 8,
-    },
-
-    // Metrics Grid
-    metricsGrid: {
-        flexDirection: 'row',
-        backgroundColor: Colors.iron[200],
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: Colors.iron[300],
-        padding: 16,
-        marginBottom: 16,
-    },
-    metricCell: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    metricDivider: {
-        width: 1,
-        backgroundColor: Colors.iron[300],
-        marginHorizontal: 12,
-    },
-    metricIconRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        marginBottom: 6,
-    },
-    metricLabel: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: Colors.iron[500],
-        textTransform: 'uppercase',
-    },
-    metricValue: {
-        fontSize: 22,
-        fontWeight: '900',
-        color: Colors.iron[950],
-        letterSpacing: -0.5,
-    },
-    metricUnit: {
-        fontSize: 10,
-        color: Colors.iron[400],
-        fontWeight: '500',
-    },
-
-    // Secondary Metrics
-    secondaryRow: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    secondaryCell: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        backgroundColor: Colors.iron[200],
-        borderRadius: 10,
-        padding: 12,
-        borderWidth: 1,
-        borderColor: Colors.iron[300],
-    },
-    secondaryLabel: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: Colors.iron[500],
-        textTransform: 'uppercase',
-        marginBottom: 2,
-    },
-    secondaryValue: {
-        fontSize: 15,
-        fontWeight: '800',
-        color: Colors.iron[950],
-    },
-
-    // Sub Sections
-    subSection: {
-        marginTop: 16,
-        paddingTop: 16,
-        borderTopWidth: 1,
-        borderTopColor: Colors.iron[300],
-    },
-    subSectionTitle: {
-        fontSize: 13,
-        fontWeight: '800',
-        color: Colors.iron[950],
-        marginBottom: 6,
-    },
-    subSectionRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    subSectionText: {
-        fontSize: 12,
-        color: Colors.iron[500],
-        fontWeight: '500',
-    },
-
-    // Section Title
-    sectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 14,
-    },
-    sectionAccent: {
-        width: 3,
-        height: 18,
-        borderRadius: 2,
-        backgroundColor: Colors.primary.DEFAULT,
-    },
-    sectionTitle: {
-        fontSize: 17,
-        fontWeight: '900',
-        color: Colors.iron[950],
-        letterSpacing: -0.3,
-    },
-
-    // Empty State
-    emptyState: {
-        backgroundColor: Colors.surface,
-        padding: 24,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        borderStyle: 'dashed',
-        alignItems: 'center',
-    },
-    emptyTitle: {
-        color: Colors.iron[500],
-        fontWeight: '800',
-        fontSize: 13,
-        marginBottom: 4,
-    },
-    emptyMessage: {
-        color: Colors.iron[400],
-        fontSize: 11,
-        textAlign: 'center',
-    },
-
-    // Table
-    tableContainer: {
-        backgroundColor: Colors.surface,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        overflow: 'hidden',
-        elevation: 2,
-        shadowColor: ThemeFx.shadowColor,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-    },
-    tableHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        backgroundColor: Colors.iron[200],
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.iron[300],
-    },
-    tableHeaderText: {
-        fontSize: 9,
-        fontWeight: '800',
-        color: Colors.iron[500],
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-    },
-    tableRow: {
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-    },
-    tableRowBorder: {
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.iron[200],
-    },
-    tableName: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: Colors.iron[950],
-    },
-    setPill: {
-        width: 56,
-        alignItems: 'center',
-    },
-    setPillText: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: Colors.iron[500],
-        backgroundColor: Colors.iron[200],
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 10,
-        overflow: 'hidden',
-    },
-    tableVolume: {
-        width: 80,
-        fontSize: 14,
-        fontWeight: '900',
-        color: Colors.iron[950],
-        textAlign: 'right',
-    },
-    progressTrack: {
-        height: 4,
-        backgroundColor: Colors.iron[200],
-        borderRadius: 2,
-        marginTop: 8,
-        overflow: 'hidden',
-    },
-    progressFill: {
-        height: '100%',
-        borderRadius: 2,
-        opacity: 0.65,
-    },
-
-    // Body Snapshot
-    bodyCard: {
-        backgroundColor: Colors.surface,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        padding: 16,
-        marginTop: 20,
-        elevation: 1,
-    },
-    bodyHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 14,
-    },
-    bodyIconCircle: {
-        width: 30,
-        height: 30,
-        borderRadius: 8,
-        backgroundColor: withAlpha(Colors.primary.DEFAULT, '12'),
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    bodyTitle: {
-        fontSize: 14,
-        fontWeight: '900',
-        color: Colors.iron[950],
-        letterSpacing: -0.3,
-    },
-    bodyGrid: {
-        flexDirection: 'row',
-        gap: 16,
-    },
-    bodyMetric: {
-        flex: 1,
-        backgroundColor: Colors.iron[200],
-        borderRadius: 12,
-        padding: 12,
-    },
-    bodyMetricLabel: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: Colors.iron[500],
-    },
-    bodyMetricValue: {
-        fontSize: 20,
-        fontWeight: '900',
-        color: Colors.iron[950],
-        marginTop: 4,
-    },
-});

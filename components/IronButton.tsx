@@ -1,6 +1,8 @@
-import { Colors } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import * as Haptics from 'expo-haptics';
-import { ActivityIndicator, Pressable, PressableProps, Text, View } from 'react-native';
+import { useMemo } from 'react';
+import { ActivityIndicator, Pressable, PressableProps, StyleSheet, Text, View } from 'react-native';
+import { useColors } from '../src/hooks/useColors';
 
 interface IronButtonProps extends PressableProps {
     variant?: 'solid' | 'outline' | 'ghost';
@@ -14,31 +16,77 @@ export function IronButton({
     variant = 'solid',
     size = 'md',
     loading = false,
-    className,
     disabled,
     onPress,
     ...props
 }: IronButtonProps) {
+    const colors = useColors();
 
-    const baseClasses = "flex-row items-center justify-center rounded-xl overflow-hidden";
+    const ss = useMemo(() => {
+        const variants = {
+            solid: {
+                backgroundColor: colors.primary.DEFAULT,
+                borderColor: colors.primary.DEFAULT,
+                elevation: 1,
+                shadowColor: ThemeFx.shadowColor,
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.1,
+                shadowRadius: 2,
+            },
+            outline: {
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                borderColor: colors.primary.DEFAULT,
+                elevation: 0,
+            },
+            ghost: {
+                backgroundColor: 'transparent',
+                borderColor: 'transparent',
+                elevation: 0,
+            }
+        };
 
-    const variants = {
-        solid: "bg-primary elevation-1 active:bg-primary-dark",
-        outline: "border border-primary bg-transparent active:bg-primary/5",
-        ghost: "bg-transparent active:bg-iron-200"
-    };
+        const sizes = {
+            sm: { paddingHorizontal: 16, height: 36 },
+            md: { paddingHorizontal: 20, height: 48 },
+            lg: { paddingHorizontal: 24, height: 56 }
+        };
 
-    const sizes = {
-        sm: "px-3 py-2 min-h-[36px]",
-        md: "px-4 py-3 min-h-[48px]",
-        lg: "px-6 py-4 min-h-[56px]"
-    };
+        const textVariants: Record<string, { color: string; fontWeight: "800" | "700" }> = {
+            solid: { color: colors.white, fontWeight: '800' },
+            outline: { color: colors.primary.DEFAULT, fontWeight: '800' },
+            ghost: { color: colors.iron[950], fontWeight: '700' }
+        };
 
-    const textVariants = {
-        solid: "text-white font-bold",
-        outline: "text-primary font-bold",
-        ghost: "text-iron-950 font-medium"
-    };
+        return StyleSheet.create({
+            container: {
+                borderRadius: 16,
+                overflow: 'hidden',
+                justifyContent: 'center',
+                alignItems: 'center',
+                ...variants[variant],
+                ...sizes[size],
+            },
+            disabled: {
+                opacity: 0.5,
+                elevation: 0,
+                // @ts-ignore
+                shadowOpacity: 0,
+            },
+            pressable: {
+                width: '100%',
+                height: '100%',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+            },
+            text: {
+                fontSize: 15,
+                textAlign: 'center',
+                ...textVariants[variant],
+            }
+        });
+    }, [colors, variant, size]);
 
     const handlePress = (e: any) => {
         if (!disabled && !loading) {
@@ -47,21 +95,28 @@ export function IronButton({
         }
     };
 
+    const rippleColor = useMemo(() => {
+        if (variant === 'solid') return withAlpha(colors.white, '20');
+        return withAlpha(colors.primary.DEFAULT, '15');
+    }, [colors, variant]);
+
     return (
-        <View className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 elevation-none' : ''} ${className || ''}`}>
-             <Pressable
-                className="w-full h-full flex-row items-center justify-center"
-                android_ripple={{ color: variant === 'solid' ? 'rgba(255,255,255,0.2)' : 'rgba(92, 46, 46, 0.1)' }}
+        <View style={[ss.container, disabled && ss.disabled]}>
+            <Pressable
+                style={ss.pressable}
+                android_ripple={{ color: rippleColor }}
                 onPress={handlePress}
                 disabled={disabled || loading}
                 accessibilityRole="button"
                 accessibilityLabel={props.accessibilityLabel || label}
                 {...props}
+            // Custom active state for iOS would go here via style function if needed, 
+            // but we rely on ripple for Android and standard opacity for iOS in simple setups.
             >
                 {loading ? (
-                    <ActivityIndicator color={variant === 'solid' ? 'white' : Colors.primary.dark} />
+                    <ActivityIndicator color={variant === 'solid' ? colors.white : colors.primary.dark} />
                 ) : (
-                    <Text className={`${textVariants[variant]} text-center text-base`}>
+                    <Text style={ss.text}>
                         {label}
                     </Text>
                 )}

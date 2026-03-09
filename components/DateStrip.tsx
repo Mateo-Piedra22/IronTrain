@@ -1,4 +1,4 @@
-import { Colors, ThemeFx, withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { FlashList, ViewToken } from '@shopify/flash-list';
 import { addDays, differenceInDays, format, isSameDay, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -8,6 +8,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, DateData, LocaleConfig } from 'react-native-calendars';
 import { DayProps } from 'react-native-calendars/src/calendar/day/index';
+import { useColors } from '../src/hooks/useColors';
 
 // --- Configuration & Localization ---
 
@@ -43,6 +44,7 @@ interface DateStripProps {
 }
 
 export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, markedDates = {}, headerCenter, headerRight }: DateStripProps) {
+    const colors = useColors();
     const [isExpanded, setIsExpanded] = useState(false);
     const [visibleMonth, setVisibleMonth] = useState(selectedDate);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -128,7 +130,7 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
             <TouchableOpacity onPress={() => handleDateSelect(item)} style={containerStyle} activeOpacity={0.7}>
                 {isCompleted && (
                     <View style={styles.completedBadge}>
-                        <Check size={8} color={Colors.green} />
+                        <Check size={8} color={colors.green} />
                     </View>
                 )}
                 <Text style={dayNameStyle}>{format(item, 'EEE', { locale: es })}</Text>
@@ -176,6 +178,176 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
         );
     }, [selectedDate, markedDates, handleDateSelect]);
 
+    // --- Styles ---
+    const styles = useMemo(() => StyleSheet.create({
+        wrapper: {
+            backgroundColor: colors.background,
+            zIndex: 10,
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.iron[200],
+            ...ThemeFx.shadowSm,
+        },
+        header: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            height: 64,
+            backgroundColor: colors.background,
+        },
+        monthTitle: {
+            color: colors.iron[950],
+            fontWeight: '900',
+            fontSize: 20,
+            textTransform: 'capitalize',
+            letterSpacing: -0.5,
+        },
+        expandButton: {
+            padding: 10,
+            backgroundColor: colors.surface,
+            borderRadius: 14,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            ...ThemeFx.shadowSm,
+        },
+        stripContainer: {
+            paddingVertical: 12,
+            height: 96,
+            backgroundColor: colors.background,
+        },
+        listContent: {
+            paddingHorizontal: 16,
+        },
+        // Strip Item Styles
+        stripItem: {
+            width: ITEM_WIDTH,
+            height: 72,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 8,
+            borderRadius: 16,
+            borderWidth: 1.5,
+            ...ThemeFx.shadowSm,
+        },
+        stripItemBorder: {
+            // dynamic override
+        },
+        stripItemSelected: {
+            backgroundColor: colors.primary.DEFAULT,
+            borderColor: colors.primary.DEFAULT,
+        },
+        stripItemSelectedCompleted: {
+            backgroundColor: colors.primary.DEFAULT,
+            borderColor: colors.green,
+        },
+        stripItemCompleted: {
+            backgroundColor: colors.surface,
+            borderColor: withAlpha(colors.green, '40'),
+        },
+        stripItemDefault: {
+            backgroundColor: colors.surface,
+            borderColor: colors.iron[200],
+        },
+        textWhite: { color: colors.white },
+        textMuted: { color: colors.iron[500] },
+        textPrimary: { color: colors.primary.DEFAULT },
+        textIron200: { color: colors.iron[400] },
+
+        stripDayName: {
+            fontSize: 10,
+            fontWeight: '700',
+            textTransform: 'uppercase',
+            marginBottom: 4,
+            letterSpacing: 0.5,
+        },
+        stripDayNum: {
+            fontSize: 20,
+            fontWeight: '900',
+        },
+        completedBadge: {
+            position: 'absolute',
+            top: -4,
+            right: -4,
+            backgroundColor: colors.green,
+            borderRadius: 999,
+            padding: 2,
+            borderWidth: 1.5,
+            borderColor: colors.background,
+        },
+        dotsContainer: {
+            flexDirection: 'row',
+            gap: 2,
+            marginTop: 6,
+            height: 6,
+            justifyContent: 'center',
+        },
+        dot: {
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+        },
+        // Calendar Styles
+        calendarContainer: {
+            backgroundColor: colors.background,
+            paddingBottom: 8,
+        },
+        calendarDay: {
+            width: 44,
+            height: 44,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 14,
+            margin: 2,
+            borderWidth: 1.5,
+            borderColor: 'transparent',
+        },
+        bgPrimary: {
+            backgroundColor: colors.primary.DEFAULT,
+            borderColor: colors.primary.DEFAULT
+        },
+        bgPrimaryCompleted: {
+            backgroundColor: colors.primary.DEFAULT,
+            borderColor: colors.green
+        },
+        bgIron800Completed: {
+            backgroundColor: colors.surface,
+            borderColor: withAlpha(colors.green, '40'),
+        },
+        calendarDayText: {
+            fontSize: 15,
+            fontWeight: '600',
+        },
+        textWhiteBold: { color: colors.white, fontWeight: '900' },
+        textPrimaryBold: { color: colors.primary.DEFAULT, fontWeight: '900' },
+        textIron700: { color: colors.iron[700] },
+
+        calendarDotsContainer: {
+            flexDirection: 'row',
+            gap: 2,
+            marginTop: 4,
+            position: 'absolute',
+            bottom: 6,
+            justifyContent: 'center',
+            width: '100%',
+        },
+        calDot: {
+            width: 4,
+            height: 4,
+            borderRadius: 2,
+        },
+        calendarCompletedTick: {
+            position: 'absolute',
+            top: 2,
+            right: 2,
+        },
+        tickDot: {
+            width: 6,
+            height: 6,
+            backgroundColor: colors.green,
+            borderRadius: 3,
+        }
+    }), [colors]);
+
     // --- Main Render ---
 
     return (
@@ -189,9 +361,9 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
 
                     <TouchableOpacity onPress={toggleExpand} style={[styles.expandButton, { marginLeft: 8 }]} accessibilityLabel={isExpanded ? "Colapsar calendario" : "Expandir calendario"}>
                         {isExpanded ? (
-                            <ChevronUp color={Colors.primary.DEFAULT} size={20} />
+                            <ChevronUp color={colors.primary.DEFAULT} size={20} />
                         ) : (
-                            <CalendarIcon color={Colors.iron[400]} size={20} />
+                            <CalendarIcon color={colors.iron[400]} size={20} />
                         )}
                     </TouchableOpacity>
                 </View>
@@ -215,15 +387,15 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
                         setVisibleMonth(new Date(date.year, date.month - 1, date.day));
                     }}
                     dayComponent={renderCalendarDay}
-                    renderArrow={(direction: string) => (direction === 'left' ? <ChevronLeft color={Colors.iron[400]} size={24} /> : <ChevronRight color={Colors.iron[400]} size={24} />)}
+                    renderArrow={(direction: string) => (direction === 'left' ? <ChevronLeft color={colors.iron[400]} size={24} /> : <ChevronRight color={colors.iron[400]} size={24} />)}
                     enableSwipeMonths={true}
                     theme={{
-                        backgroundColor: Colors.iron[900],
-                        calendarBackground: Colors.iron[900],
-                        textSectionTitleColor: Colors.iron[500],
-                        todayTextColor: Colors.primary.DEFAULT,
-                        dayTextColor: Colors.iron[50],
-                        monthTextColor: Colors.iron[950],
+                        backgroundColor: colors.iron[900],
+                        calendarBackground: colors.iron[900],
+                        textSectionTitleColor: colors.iron[500],
+                        todayTextColor: colors.primary.DEFAULT,
+                        dayTextColor: colors.iron[50],
+                        monthTextColor: colors.iron[950],
                         textMonthFontWeight: '900',
                         textMonthFontSize: 16,
                         'stylesheet.calendar.header': {
@@ -265,161 +437,3 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
     );
 }
 
-const styles = StyleSheet.create({
-    wrapper: {
-        backgroundColor: Colors.iron[800],
-        zIndex: 10,
-        shadowColor: Colors.black,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 4,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        height: 60,
-        backgroundColor: Colors.iron[900],
-    },
-    monthTitle: {
-        color: Colors.iron[950],
-        fontWeight: '900',
-        fontSize: 20,
-        textTransform: 'capitalize',
-        letterSpacing: -0.5,
-    },
-    expandButton: {
-        padding: 8,
-        backgroundColor: Colors.iron[800],
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-    },
-    stripContainer: {
-        paddingVertical: 8,
-        height: 90,
-        backgroundColor: Colors.iron[900],
-    },
-    listContent: {
-        paddingHorizontal: 16,
-    },
-    // Strip Item Styles
-    stripItem: {
-        width: ITEM_WIDTH,
-        height: 72,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 8,
-        borderRadius: 12,
-        borderWidth: 1,
-    },
-    stripItemBorder: {
-        // dynamic override
-    },
-    stripItemSelected: {
-        backgroundColor: Colors.primary.DEFAULT + 'E6', // slightly translucent
-        borderColor: Colors.primary.light,
-    },
-    stripItemSelectedCompleted: {
-        backgroundColor: Colors.primary.DEFAULT + 'E6',
-        borderColor: Colors.green,
-    },
-    stripItemCompleted: {
-        backgroundColor: Colors.iron[900],
-        borderColor: withAlpha(Colors.green, '80'),
-    },
-    stripItemDefault: {
-        backgroundColor: Colors.iron[900],
-        borderColor: withAlpha(Colors.primary.light, '66'),
-    },
-    textWhite: { color: Colors.white },
-    textMuted: { color: Colors.iron[500] },
-    textPrimary: { color: Colors.primary.DEFAULT },
-    textIron200: { color: Colors.iron[400] },
-
-    stripDayName: {
-        fontSize: 10,
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        marginBottom: 4,
-    },
-    stripDayNum: {
-        fontSize: 20,
-        fontWeight: 'bold',
-    },
-    completedBadge: {
-        position: 'absolute',
-        top: 4,
-        right: 4,
-        backgroundColor: ThemeFx.successBg,
-        borderRadius: 999,
-        padding: 2,
-    },
-    dotsContainer: {
-        flexDirection: 'row',
-        gap: 2,
-        marginTop: 6,
-        height: 6,
-        justifyContent: 'center',
-    },
-    dot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-    },
-    // Calendar Styles
-    calendarContainer: {
-        backgroundColor: Colors.iron[900],
-        paddingBottom: 8,
-    },
-    calendarDay: {
-        width: 45,
-        height: 45,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 12,
-        margin: 2,
-    },
-    bgPrimary: { backgroundColor: Colors.primary.DEFAULT + 'E6', borderWidth: 1, borderColor: Colors.primary.light },
-    bgPrimaryCompleted: { backgroundColor: Colors.primary.DEFAULT + 'E6', borderWidth: 1, borderColor: Colors.green },
-    bgIron800Completed: {
-        backgroundColor: Colors.iron[800],
-        borderWidth: 1,
-        borderColor: ThemeFx.successBorder,
-    },
-    calendarDayText: {
-        fontSize: 16,
-        fontWeight: '500',
-    },
-    textWhiteBold: { color: Colors.white, fontWeight: 'bold' },
-    textPrimaryBold: { color: Colors.primary.DEFAULT, fontWeight: 'bold' },
-    textIron700: { color: Colors.iron[700] },
-
-    calendarDotsContainer: {
-        flexDirection: 'row',
-        gap: 2,
-        marginTop: 4,
-        position: 'absolute',
-        bottom: 6,
-        justifyContent: 'center',
-        width: '100%',
-    },
-    calDot: {
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-    },
-    calendarCompletedTick: {
-        position: 'absolute',
-        top: 2,
-        right: 2,
-    },
-    tickDot: {
-        width: 6,
-        height: 6,
-        backgroundColor: Colors.green,
-        borderRadius: 3,
-    }
-});

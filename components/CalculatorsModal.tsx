@@ -3,11 +3,11 @@ import { CalculatorService, OneRMFormula } from '@/src/services/CalculatorServic
 import { configService } from '@/src/services/ConfigService';
 import { statsService } from '@/src/services/StatsService';
 import { UnitService } from '@/src/services/UnitService';
-import { Colors } from '@/src/theme';
 import { X } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useColors } from '../src/hooks/useColors';
 
 interface CalculatorsModalProps {
     visible: boolean;
@@ -16,8 +16,52 @@ interface CalculatorsModalProps {
 }
 
 export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: CalculatorsModalProps) {
+    const colors = useColors();
     const unit = configService.get('weightUnit');
     const rounding = unit === 'kg' ? configService.get('calculatorsRoundingKg') : configService.get('calculatorsRoundingLbs');
+
+    const ss = useMemo(() => StyleSheet.create({
+        container: { flex: 1, backgroundColor: colors.surface },
+        inner: { flex: 1, padding: 20 },
+        header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+        headerTitle: { fontSize: 24, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.8 },
+        headerSubtitle: { fontSize: 13, fontWeight: '600', color: colors.iron[400], marginTop: 2 },
+        closeBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.iron[100], justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: colors.border },
+        tabTrack: { flexDirection: 'row', backgroundColor: colors.iron[100], padding: 4, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border, marginBottom: 24 },
+        tab: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+        tabActive: { backgroundColor: colors.primary.DEFAULT },
+        tabText: { fontWeight: '800', fontSize: 13, color: colors.iron[500] },
+        tabTextActive: { color: colors.white },
+        sectionTitle: { fontSize: 18, fontWeight: '900', color: colors.iron[950], marginBottom: 14, letterSpacing: -0.4 },
+        card: { backgroundColor: colors.iron[50], borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, padding: 20, marginBottom: 24 },
+        cardLabel: { fontSize: 10, fontWeight: '800', color: colors.iron[500], textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10, marginLeft: 2 },
+        chipRow: { flexDirection: 'row', gap: 10 },
+        chip: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.iron[100], alignItems: 'center' },
+        chipActive: { backgroundColor: colors.primary.DEFAULT, borderColor: colors.primary.DEFAULT },
+        chipText: { fontWeight: '800', fontSize: 13, color: colors.iron[500] },
+        chipTextActive: { color: colors.white },
+        resultBox: { marginTop: 24, backgroundColor: colors.iron[100], padding: 24, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center' },
+        resultLabel: { fontSize: 11, fontWeight: '800', color: colors.iron[500], textTransform: 'uppercase', letterSpacing: 1.5 },
+        resultValue: { fontSize: 48, fontWeight: '900', color: colors.iron[950], letterSpacing: -1.5, marginVertical: 4 },
+        resultUnit: { fontSize: 14, fontWeight: '800', color: colors.iron[400], textTransform: 'uppercase' },
+        tableCard: { backgroundColor: colors.iron[50], borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, overflow: 'hidden', marginBottom: 32 },
+        tableHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12, backgroundColor: colors.iron[100], borderBottomWidth: 1.5, borderBottomColor: colors.border },
+        tableHeaderText: { fontSize: 10, fontWeight: '800', color: colors.iron[500], textTransform: 'uppercase', letterSpacing: 1.2 },
+        tableRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
+        tableRowBorder: { borderBottomWidth: 1.5, borderBottomColor: colors.border },
+        tablePct: { fontSize: 17, fontWeight: '900', color: colors.iron[950] },
+        tableZone: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 },
+        repsBadge: { backgroundColor: colors.iron[100], paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1.5, borderColor: colors.border },
+        repsText: { fontSize: 14, fontWeight: '900', color: colors.iron[950] },
+        tableWeight: { fontSize: 20, fontWeight: '900', color: colors.primary.DEFAULT, letterSpacing: -0.6 },
+        tableWeightText: { fontSize: 18, fontWeight: '900', color: colors.iron[950] },
+        inputLabel: { fontSize: 13, fontWeight: '700', color: colors.iron[500], marginBottom: 8, marginLeft: 4 },
+        hintText: { fontSize: 12, color: colors.iron[400], marginTop: 14, fontStyle: 'italic', textAlign: 'center' },
+        emptyText: { color: colors.iron[500], textAlign: 'center', fontSize: 14, paddingVertical: 20 },
+        scoreCard: { flex: 1, backgroundColor: colors.iron[100], padding: 20, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center' },
+        scoreLabel: { fontSize: 11, fontWeight: '800', color: colors.primary.DEFAULT, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8 },
+        scoreValue: { fontSize: 28, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.5 },
+    }), [colors]);
 
     const [activeTab, setActiveTab] = useState<'oneRm' | 'warmup' | 'power'>('oneRm');
 
@@ -48,10 +92,7 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
     const wilks = statsService.calculateWilks(bwKg, totalKg, isFemale);
     const dots = statsService.calculateDOTS(bwKg, totalKg, isFemale);
 
-
     const warmup = CalculatorService.warmupSuggestions({ workingWeight: parseFloat(warmupWorking) || 0, barWeight: parseFloat(warmupBar) || 0, rounding });
-
-
 
     const tabs = [
         { id: 'oneRm', label: '1RM' },
@@ -60,31 +101,31 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
     ] as const;
 
     return (
-        <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-            <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={s.container}>
-                <View style={s.inner}>
+        <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+            <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={ss.container}>
+                <View style={ss.inner}>
                     {/* Header */}
-                    <View style={s.header}>
+                    <View style={ss.header}>
                         <View>
-                            <Text style={s.headerTitle}>Calculadoras</Text>
-                            <Text style={s.headerSubtitle}>Herramientas de entrenamiento</Text>
+                            <Text style={ss.headerTitle}>Calculadoras</Text>
+                            <Text style={ss.headerSubtitle}>Herramientas de entrenamiento</Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} style={s.closeBtn} accessibilityRole="button" accessibilityLabel="Cerrar calculadoras">
-                            <X color={Colors.white} size={20} />
+                        <TouchableOpacity onPress={onClose} style={ss.closeBtn} accessibilityRole="button" accessibilityLabel="Cerrar calculadoras">
+                            <X color={colors.iron[950]} size={20} />
                         </TouchableOpacity>
                     </View>
 
                     {/* Tabs */}
-                    <View style={s.tabTrack}>
+                    <View style={ss.tabTrack}>
                         {tabs.map((t) => (
                             <TouchableOpacity
                                 key={t.id}
-                                style={[s.tab, activeTab === t.id && s.tabActive]}
+                                style={[ss.tab, activeTab === t.id && ss.tabActive]}
                                 onPress={() => setActiveTab(t.id)}
                                 accessibilityRole="button"
                                 accessibilityLabel={`Abrir ${t.label}`}
                             >
-                                <Text style={[s.tabText, activeTab === t.id && s.tabTextActive]}>{t.label}</Text>
+                                <Text style={[ss.tabText, activeTab === t.id && ss.tabTextActive]}>{t.label}</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
@@ -92,74 +133,74 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
                     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
                         {activeTab === 'oneRm' ? (
                             <View>
-                                <Text style={s.sectionTitle}>Estimación de 1RM</Text>
-                                <View style={s.card}>
-                                    <Text style={s.cardLabel}>Fórmula</Text>
-                                    <View style={s.chipRow}>
+                                <Text style={ss.sectionTitle}>Estimación de 1RM</Text>
+                                <View style={ss.card}>
+                                    <Text style={ss.cardLabel}>Fórmula</Text>
+                                    <View style={ss.chipRow}>
                                         {([{ id: 'epley', label: 'Epley' }, { id: 'brzycki', label: 'Brzycki' }, { id: 'lombardi', label: 'Lombardi' }] as const).map((f) => (
                                             <TouchableOpacity
                                                 key={f.id}
                                                 onPress={() => { setFormula(f.id); configService.set('calculatorsDefault1RMFormula', f.id); }}
-                                                style={[s.chip, formula === f.id && s.chipActive]}
+                                                style={[ss.chip, formula === f.id && ss.chipActive]}
                                                 accessibilityRole="button"
                                             >
-                                                <Text style={[s.chipText, formula === f.id && s.chipTextActive]}>{f.label}</Text>
+                                                <Text style={[ss.chipText, formula === f.id && ss.chipTextActive]}>{f.label}</Text>
                                             </TouchableOpacity>
                                         ))}
                                     </View>
 
-                                    <Text style={[s.cardLabel, { marginTop: 16 }]}>Desde una serie</Text>
+                                    <Text style={[ss.cardLabel, { marginTop: 16 }]}>Desde una serie</Text>
                                     <View style={{ flexDirection: 'row', gap: 12 }}>
                                         <View style={{ flex: 1 }}><IronInput value={setWeight} onChangeText={setSetWeight} keyboardType="numeric" placeholder={`Peso (${unit})`} /></View>
                                         <View style={{ flex: 1 }}><IronInput value={setReps} onChangeText={setSetReps} keyboardType="numeric" placeholder="Reps" /></View>
                                     </View>
 
-                                    <Text style={[s.cardLabel, { marginTop: 16 }]}>1RM manual</Text>
+                                    <Text style={[ss.cardLabel, { marginTop: 16 }]}>1RM manual</Text>
                                     <IronInput value={oneRmManual} onChangeText={setOneRmManual} keyboardType="numeric" placeholder={`1RM (${unit})`} />
 
                                     {/* Result */}
-                                    <View style={s.resultBox}>
-                                        <Text style={s.resultLabel}>TU 1RM ACTUAL</Text>
-                                        <Text style={s.resultValue}>{Math.round(oneRm)}</Text>
-                                        <Text style={s.resultUnit}>{unit}</Text>
+                                    <View style={ss.resultBox}>
+                                        <Text style={ss.resultLabel}>TU 1RM ACTUAL</Text>
+                                        <Text style={ss.resultValue}>{Math.round(oneRm)}</Text>
+                                        <Text style={ss.resultUnit}>{unit}</Text>
                                     </View>
                                 </View>
 
-                                <Text style={s.sectionTitle}>Perfil de Intensidades</Text>
-                                <View style={s.tableCard}>
-                                    <View style={s.tableHeader}>
-                                        <Text style={[s.tableHeaderText, { flex: 1.2 }]}>INTENSIDAD</Text>
-                                        <Text style={[s.tableHeaderText, { flex: 1, textAlign: 'center' }]}>REPS</Text>
-                                        <Text style={[s.tableHeaderText, { flex: 1.5, textAlign: 'right' }]}>PESO ({unit})</Text>
+                                <Text style={ss.sectionTitle}>Perfil de Intensidades</Text>
+                                <View style={ss.tableCard}>
+                                    <View style={ss.tableHeader}>
+                                        <Text style={[ss.tableHeaderText, { flex: 1.2 }]}>INTENSIDAD</Text>
+                                        <Text style={[ss.tableHeaderText, { flex: 1, textAlign: 'center' }]}>REPS</Text>
+                                        <Text style={[ss.tableHeaderText, { flex: 1.5, textAlign: 'right' }]}>PESO ({unit})</Text>
                                     </View>
                                     {[
-                                        { pct: 1.00, reps: '1', zone: 'MÁXIMA', color: Colors.red },
-                                        { pct: 0.95, reps: '2', zone: 'MÁXIMA', color: Colors.red },
-                                        { pct: 0.90, reps: '4', zone: 'FUERZA', color: Colors.blue },
-                                        { pct: 0.85, reps: '6', zone: 'FUERZA', color: Colors.blue },
-                                        { pct: 0.80, reps: '8', zone: 'HIPERTROFIA', color: Colors.green },
-                                        { pct: 0.75, reps: '10', zone: 'HIPERTROFIA', color: Colors.green },
-                                        { pct: 0.70, reps: '12', zone: 'RESISTENCIA', color: Colors.primary.light },
-                                        { pct: 0.65, reps: '16', zone: 'RESISTENCIA', color: Colors.primary.light },
-                                        { pct: 0.60, reps: '20', zone: 'TÉCNICA', color: Colors.iron[500] },
-                                        { pct: 0.50, reps: '30+', zone: 'TÉCNICA', color: Colors.iron[500] },
+                                        { pct: 1.00, reps: '1', zone: 'MÁXIMA', color: colors.red },
+                                        { pct: 0.95, reps: '2', zone: 'MÁXIMA', color: colors.red },
+                                        { pct: 0.90, reps: '4', zone: 'FUERZA', color: colors.blue },
+                                        { pct: 0.85, reps: '6', zone: 'FUERZA', color: colors.blue },
+                                        { pct: 0.80, reps: '8', zone: 'HIPERTROFIA', color: colors.green },
+                                        { pct: 0.75, reps: '10', zone: 'HIPERTROFIA', color: colors.green },
+                                        { pct: 0.70, reps: '12', zone: 'RESISTENCIA', color: colors.primary.light },
+                                        { pct: 0.65, reps: '16', zone: 'RESISTENCIA', color: colors.primary.light },
+                                        { pct: 0.60, reps: '20', zone: 'TÉCNICA', color: colors.iron[500] },
+                                        { pct: 0.50, reps: '30+', zone: 'TÉCNICA', color: colors.iron[500] },
                                     ].map((row, idx, arr) => {
                                         const weight = CalculatorService.roundToIncrement(oneRm * row.pct, rounding);
                                         return (
-                                            <View key={row.pct} style={[s.tableRow, idx < arr.length - 1 && s.tableRowBorder]}>
+                                            <View key={row.pct} style={[ss.tableRow, idx < arr.length - 1 && ss.tableRowBorder]}>
                                                 <View style={{ flex: 1.2, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                                     <View style={{ width: 4, height: 24, backgroundColor: row.color, borderRadius: 2 }} />
                                                     <View>
-                                                        <Text style={s.tablePct}>{Math.round(row.pct * 100)}%</Text>
-                                                        <Text style={[s.tableZone, { color: row.color }]}>{row.zone}</Text>
+                                                        <Text style={ss.tablePct}>{Math.round(row.pct * 100)}%</Text>
+                                                        <Text style={[ss.tableZone, { color: row.color }]}>{row.zone}</Text>
                                                     </View>
                                                 </View>
                                                 <View style={{ flex: 1, alignItems: 'center' }}>
-                                                    <View style={s.repsBadge}>
-                                                        <Text style={s.repsText}>{row.reps}</Text>
+                                                    <View style={ss.repsBadge}>
+                                                        <Text style={ss.repsText}>{row.reps}</Text>
                                                     </View>
                                                 </View>
-                                                <Text style={[s.tableWeight, { flex: 1.5, textAlign: 'right' }]}>{weight}</Text>
+                                                <Text style={[ss.tableWeight, { flex: 1.5, textAlign: 'right' }]}>{weight}</Text>
                                             </View>
                                         );
                                     })}
@@ -167,78 +208,78 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
                             </View>
                         ) : activeTab === 'warmup' ? (
                             <View>
-                                <Text style={s.sectionTitle}>Warm-up</Text>
-                                <View style={s.card}>
-                                    <Text style={s.cardLabel}>Peso de trabajo</Text>
+                                <Text style={ss.sectionTitle}>Warm-up</Text>
+                                <View style={ss.card}>
+                                    <Text style={ss.cardLabel}>Peso de trabajo</Text>
                                     <IronInput value={warmupWorking} onChangeText={setWarmupWorking} keyboardType="numeric" placeholder={unit === 'kg' ? '100' : '225'} />
-                                    <Text style={[s.cardLabel, { marginTop: 16 }]}>Barra</Text>
+                                    <Text style={[ss.cardLabel, { marginTop: 16 }]}>Barra</Text>
                                     <IronInput value={warmupBar} onChangeText={setWarmupBar} keyboardType="numeric" placeholder={unit === 'kg' ? '20' : '45'} />
-                                    <Text style={s.hintText}>Redondeo: {rounding} {unit}</Text>
+                                    <Text style={ss.hintText}>Redondeo: {rounding} {unit}</Text>
                                 </View>
 
-                                <View style={s.tableCard}>
+                                <View style={ss.tableCard}>
                                     {warmup.length > 0 ? warmup.map((ws, idx) => (
-                                        <View key={`${ws.weight}-${idx}`} style={[s.tableRow, idx < warmup.length - 1 && s.tableRowBorder]}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.yellow }} />
-                                                <Text style={s.tableWeightText}>{ws.weight} {unit}</Text>
+                                        <View key={`${ws.weight}-${idx}`} style={[ss.tableRow, idx < warmup.length - 1 && ss.tableRowBorder]}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.yellow }} />
+                                                <Text style={ss.tableWeightText}>{ws.weight} {unit}</Text>
                                             </View>
-                                            <Text style={s.tablePct}>{ws.reps} reps</Text>
+                                            <Text style={ss.tablePct}>{ws.reps} reps</Text>
                                         </View>
                                     )) : (
                                         <View style={{ padding: 20 }}>
-                                            <Text style={s.emptyText}>Ingresa un peso de trabajo válido.</Text>
+                                            <Text style={ss.emptyText}>Ingresa un peso de trabajo válido.</Text>
                                         </View>
                                     )}
                                 </View>
                             </View>
                         ) : (
                             <View>
-                                <Text style={s.sectionTitle}>Power Scores</Text>
+                                <Text style={ss.sectionTitle}>Power Scores</Text>
                                 <View style={{ marginBottom: 20 }}>
-                                    <Text style={s.inputLabel}>Género</Text>
-                                    <View style={s.chipRow}>
+                                    <Text style={ss.inputLabel}>Género</Text>
+                                    <View style={ss.chipRow}>
                                         <TouchableOpacity
                                             onPress={() => setIsFemale(false)}
-                                            style={[s.chip, !isFemale && s.chipActive]}
+                                            style={[ss.chip, !isFemale && ss.chipActive]}
                                             accessibilityRole="button"
                                         >
-                                            <Text style={[s.chipText, !isFemale && s.chipTextActive]}>Masculino</Text>
+                                            <Text style={[ss.chipText, !isFemale && ss.chipTextActive]}>Masculino</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             onPress={() => setIsFemale(true)}
-                                            style={[s.chip, isFemale && s.chipActive]}
+                                            style={[ss.chip, isFemale && ss.chipActive]}
                                             accessibilityRole="button"
                                         >
-                                            <Text style={[s.chipText, isFemale && s.chipTextActive]}>Femenino</Text>
+                                            <Text style={[ss.chipText, isFemale && ss.chipTextActive]}>Femenino</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
 
                                 <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={s.inputLabel}>Peso corporal ({unit})</Text>
+                                        <Text style={ss.inputLabel}>Peso corporal ({unit})</Text>
                                         <IronInput value={bw} onChangeText={setBw} keyboardType="numeric" placeholder={unit === 'kg' ? '80' : '180'} />
                                     </View>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={s.inputLabel}>Total SBD</Text>
+                                        <Text style={ss.inputLabel}>Total SBD</Text>
                                         <IronInput value={total} onChangeText={setTotal} keyboardType="numeric" placeholder={unit === 'kg' ? '500' : '1100'} />
                                     </View>
                                 </View>
 
 
                                 <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
-                                    <View style={s.scoreCard}>
-                                        <Text style={s.scoreLabel}>WILKS</Text>
-                                        <Text style={s.scoreValue}>{Number.isFinite(wilks) ? wilks.toFixed(2) : '0.00'}</Text>
+                                    <View style={ss.scoreCard}>
+                                        <Text style={ss.scoreLabel}>WILKS</Text>
+                                        <Text style={ss.scoreValue}>{Number.isFinite(wilks) ? wilks.toFixed(2) : '0.00'}</Text>
                                     </View>
-                                    <View style={s.scoreCard}>
-                                        <Text style={s.scoreLabel}>DOTS</Text>
-                                        <Text style={s.scoreValue}>{Number.isFinite(dots) ? dots.toFixed(2) : '0.00'}</Text>
+                                    <View style={ss.scoreCard}>
+                                        <Text style={ss.scoreLabel}>DOTS</Text>
+                                        <Text style={ss.scoreValue}>{Number.isFinite(dots) ? dots.toFixed(2) : '0.00'}</Text>
                                     </View>
                                 </View>
 
-                                <Text style={s.hintText}>*Wilks/DOTS se calculan en kg internamente.</Text>
+                                <Text style={ss.hintText}>*Wilks/DOTS se calculan en kg internamente.</Text>
                             </View>
                         )}
                     </ScrollView>
@@ -247,46 +288,3 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
         </Modal>
     );
 }
-
-const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: Colors.iron[900] },
-    inner: { flex: 1, padding: 16 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-    headerTitle: { fontSize: 22, fontWeight: '900', color: Colors.iron[950], letterSpacing: -0.5 },
-    headerSubtitle: { fontSize: 11, fontWeight: '600', color: Colors.iron[400], marginTop: 2 },
-    closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary.DEFAULT, justifyContent: 'center', alignItems: 'center' },
-    tabTrack: { flexDirection: 'row', backgroundColor: Colors.surface, padding: 4, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[700], marginBottom: 20 },
-    tab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-    tabActive: { backgroundColor: Colors.primary.DEFAULT },
-    tabText: { fontWeight: '800', fontSize: 13, color: Colors.iron[500] },
-    tabTextActive: { color: Colors.white },
-    sectionTitle: { fontSize: 17, fontWeight: '900', color: Colors.iron[950], marginBottom: 12, letterSpacing: -0.3 },
-    card: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], padding: 20, marginBottom: 20 },
-    cardLabel: { fontSize: 10, fontWeight: '800', color: Colors.iron[500], textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
-    chipRow: { flexDirection: 'row', gap: 8 },
-    chip: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: Colors.iron[300], backgroundColor: Colors.iron[200], alignItems: 'center' },
-    chipActive: { backgroundColor: Colors.primary.DEFAULT, borderColor: Colors.primary.DEFAULT },
-    chipText: { fontWeight: '800', fontSize: 13, color: Colors.iron[500] },
-    chipTextActive: { color: Colors.white },
-    resultBox: { marginTop: 20, backgroundColor: Colors.iron[200], padding: 20, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[300], alignItems: 'center' },
-    resultLabel: { fontSize: 10, fontWeight: '800', color: Colors.iron[500], textTransform: 'uppercase', letterSpacing: 1 },
-    resultValue: { fontSize: 40, fontWeight: '900', color: Colors.iron[950], letterSpacing: -1, marginTop: 4 },
-    resultUnit: { fontSize: 12, fontWeight: '700', color: Colors.iron[400], textTransform: 'uppercase' },
-    tableCard: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], overflow: 'hidden', marginBottom: 24 },
-    tableHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: Colors.iron[200], borderBottomWidth: 1, borderBottomColor: Colors.iron[300] },
-    tableHeaderText: { fontSize: 10, fontWeight: '800', color: Colors.iron[500], textTransform: 'uppercase', letterSpacing: 1 },
-    tableRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
-    tableRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.iron[200] },
-    tablePct: { fontSize: 16, fontWeight: '900', color: Colors.iron[950] },
-    tableZone: { fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.3, marginTop: 1 },
-    repsBadge: { backgroundColor: Colors.iron[200], paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: Colors.iron[300] },
-    repsText: { fontSize: 13, fontWeight: '900', color: Colors.iron[950] },
-    tableWeight: { fontSize: 18, fontWeight: '900', color: Colors.primary.DEFAULT, letterSpacing: -0.5 },
-    tableWeightText: { fontSize: 18, fontWeight: '900', color: Colors.iron[950] },
-    inputLabel: { fontSize: 12, fontWeight: '700', color: Colors.iron[500], marginBottom: 6 },
-    hintText: { fontSize: 11, color: Colors.iron[400], marginTop: 12, fontStyle: 'italic' },
-    emptyText: { color: Colors.iron[500], textAlign: 'center', fontSize: 13 },
-    scoreCard: { flex: 1, backgroundColor: Colors.iron[200], padding: 20, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[300], alignItems: 'center' },
-    scoreLabel: { fontSize: 10, fontWeight: '800', color: Colors.primary.DEFAULT, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
-    scoreValue: { fontSize: 28, fontWeight: '900', color: Colors.iron[950], letterSpacing: -0.5 },
-});

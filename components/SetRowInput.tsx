@@ -1,8 +1,8 @@
-import { Colors, ThemeFx } from '@/src/theme';
 import { WorkoutSet } from '@/src/types/db';
 import { LucideCheck } from 'lucide-react-native';
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useColors } from '../src/hooks/useColors';
 import { configService } from '../src/services/ConfigService';
 import { UnitService } from '../src/services/UnitService';
 
@@ -15,6 +15,22 @@ interface SetRowInputProps {
 }
 
 export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disabled }: SetRowInputProps) => {
+    const colors = useColors();
+    const ss = useMemo(() => StyleSheet.create({
+        row: { flexDirection: 'row', alignItems: 'center', padding: 8, gap: 8, borderRadius: 12, borderWidth: 1 },
+        rowDefault: { backgroundColor: colors.surface, borderColor: colors.iron[200] },
+        rowCompleted: { backgroundColor: colors.iron[50], borderColor: colors.primary.DEFAULT },
+        indexCol: { width: 24, alignItems: 'center' },
+        indexText: { fontSize: 13, fontWeight: '700', color: colors.iron[400] },
+        inputCol: { flex: 1, backgroundColor: colors.iron[200], borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center' },
+        input: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.iron[950], textAlign: 'center', padding: 4 },
+        unitLabel: { fontSize: 9, fontWeight: '800', color: colors.iron[400], marginLeft: 4 },
+        checkBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+        checkActive: { backgroundColor: colors.primary.DEFAULT },
+        checkInactive: { backgroundColor: colors.iron[300] + '33', borderWidth: 1, borderColor: colors.iron[300] },
+        checkDisabled: { opacity: 0.5 },
+    }), [colors]);
+
     const unit = configService.get('weightUnit');
     const displayWeight = unit === 'kg' ? (set.weight || 0) : UnitService.kgToLbs(set.weight || 0);
     const isCompleted = !!set.completed;
@@ -23,7 +39,7 @@ export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disab
         <View style={[ss.row, isCompleted ? ss.rowCompleted : ss.rowDefault]}>
             {/* Index */}
             <View style={ss.indexCol}>
-                <Text style={[ss.indexText, isCompleted && { color: Colors.green }]}>{index + 1}</Text>
+                <Text style={[ss.indexText, isCompleted && { color: colors.green }]}>{index + 1}</Text>
             </View>
 
             {/* Weight */}
@@ -70,7 +86,7 @@ export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disab
                     style={ss.input}
                     value={set.rpe?.toString() ?? ''}
                     placeholder="-"
-                    placeholderTextColor={Colors.iron[400]}
+                    placeholderTextColor={colors.iron[400]}
                     editable={!disabled}
                     onChangeText={(t) => {
                         if (disabled) return;
@@ -90,7 +106,7 @@ export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disab
                 }}
                 style={[ss.checkBtn, disabled ? ss.checkDisabled : (isCompleted ? ss.checkActive : ss.checkInactive)]}
             >
-                <LucideCheck size={22} color={isCompleted ? "white" : Colors.iron[400]} strokeWidth={3} />
+                <LucideCheck size={22} color={isCompleted ? "white" : colors.iron[400]} strokeWidth={3} />
             </Pressable>
         </View>
     );
@@ -105,17 +121,4 @@ export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disab
     );
 });
 
-const ss = StyleSheet.create({
-    row: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, padding: 8, borderRadius: 14, borderWidth: 1 },
-    rowDefault: { backgroundColor: Colors.surface, borderColor: Colors.iron[700], elevation: 1 },
-    rowCompleted: { backgroundColor: ThemeFx.successBg, borderColor: ThemeFx.successBorder },
-    indexCol: { width: 32, alignItems: 'center', justifyContent: 'center' },
-    indexText: { fontWeight: '800', fontSize: 16, color: Colors.iron[400] },
-    inputCol: { flex: 1, paddingHorizontal: 6 },
-    input: { backgroundColor: Colors.iron[200], color: Colors.iron[950], padding: 10, borderRadius: 10, textAlign: 'center', fontWeight: '800', fontSize: 16 },
-    unitLabel: { fontSize: 9, color: Colors.iron[400], fontWeight: '800', marginTop: 3, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 },
-    checkBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
-    checkActive: { backgroundColor: Colors.green, shadowColor: Colors.green, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2 },
-    checkInactive: { backgroundColor: Colors.iron[200], borderWidth: 1, borderColor: Colors.iron[300] },
-    checkDisabled: { backgroundColor: Colors.iron[300] },
-});
+

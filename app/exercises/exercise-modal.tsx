@@ -1,15 +1,16 @@
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
 import { ExerciseService } from '@/src/services/ExerciseService';
-import { Colors } from '@/src/theme';
 import { ExerciseType } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Dumbbell, FileText, Tag } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useColors } from '../../src/hooks/useColors';
 
 export default function ExerciseModal() {
+    const colors = useColors();
     const router = useRouter();
     const params = useLocalSearchParams();
     const categoryId = params.categoryId as string;
@@ -56,20 +57,34 @@ export default function ExerciseModal() {
         { id: 'reps_only', label: 'Solo reps', icon: '🔄' },
     ];
 
+    const s = useMemo(() => StyleSheet.create({
+        container: { flex: 1, backgroundColor: colors.iron[900], padding: 16 },
+        section: { marginBottom: 20 },
+        sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+        sectionIconCircle: { width: 28, height: 28, borderRadius: 8, backgroundColor: colors.primary.DEFAULT + '15', justifyContent: 'center', alignItems: 'center' },
+        sectionLabel: { fontSize: 12, fontWeight: '800', color: colors.iron[500], textTransform: 'uppercase', letterSpacing: 0.5 },
+        typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+        typeCard: { width: '48%' as any, flexBasis: '48%', flexGrow: 0, paddingVertical: 14, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: 10 },
+        typeCardActive: { borderColor: colors.primary.DEFAULT, backgroundColor: colors.primary.DEFAULT + '12' },
+        typeIcon: { fontSize: 18 },
+        typeLabel: { fontSize: 12, fontWeight: '700', color: colors.iron[500], flex: 1 },
+        typeLabelActive: { color: colors.primary.DEFAULT, fontWeight: '800' },
+    }), [colors]);
+
     return (
         <View style={s.container}>
             <Stack.Screen options={{
                 title: exerciseId ? 'Editar ejercicio' : 'Nuevo ejercicio',
                 presentation: 'modal',
-                headerTitleStyle: { fontWeight: '900', color: Colors.iron[950] },
-                headerStyle: { backgroundColor: Colors.iron[900] },
-                headerTintColor: Colors.primary.DEFAULT,
+                headerTitleStyle: { fontWeight: '900', color: colors.iron[950] },
+                headerStyle: { backgroundColor: colors.iron[900] },
+                headerTintColor: colors.primary.DEFAULT,
             }} />
 
             {/* Exercise Name */}
             <View style={s.section}>
                 <View style={s.sectionHeader}>
-                    <View style={s.sectionIconCircle}><Tag size={14} color={Colors.primary.DEFAULT} /></View>
+                    <View style={s.sectionIconCircle}><Tag size={14} color={colors.primary.DEFAULT} /></View>
                     <Text style={s.sectionLabel}>Nombre del ejercicio</Text>
                 </View>
                 <IronInput
@@ -83,7 +98,7 @@ export default function ExerciseModal() {
             {/* Type */}
             <View style={s.section}>
                 <View style={s.sectionHeader}>
-                    <View style={s.sectionIconCircle}><Dumbbell size={14} color={Colors.primary.DEFAULT} /></View>
+                    <View style={s.sectionIconCircle}><Dumbbell size={14} color={colors.primary.DEFAULT} /></View>
                     <Text style={s.sectionLabel}>Tipo</Text>
                 </View>
                 <View style={s.typeGrid}>
@@ -105,7 +120,7 @@ export default function ExerciseModal() {
             {/* Notes */}
             <View style={s.section}>
                 <View style={s.sectionHeader}>
-                    <View style={s.sectionIconCircle}><FileText size={14} color={Colors.primary.DEFAULT} /></View>
+                    <View style={s.sectionIconCircle}><FileText size={14} color={colors.primary.DEFAULT} /></View>
                     <Text style={s.sectionLabel}>Notas (opcional)</Text>
                 </View>
                 <IronInput
@@ -127,17 +142,3 @@ export default function ExerciseModal() {
         </View>
     );
 }
-
-const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: Colors.iron[900], padding: 16 },
-    section: { marginBottom: 20 },
-    sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-    sectionIconCircle: { width: 28, height: 28, borderRadius: 8, backgroundColor: Colors.primary.DEFAULT + '15', justifyContent: 'center', alignItems: 'center' },
-    sectionLabel: { fontSize: 12, fontWeight: '800', color: Colors.iron[500], textTransform: 'uppercase', letterSpacing: 0.5 },
-    typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    typeCard: { width: '48%' as any, flexBasis: '48%', flexGrow: 0, paddingVertical: 14, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: Colors.iron[700], backgroundColor: Colors.surface, flexDirection: 'row', alignItems: 'center', gap: 10 },
-    typeCardActive: { borderColor: Colors.primary.DEFAULT, backgroundColor: Colors.primary.DEFAULT + '12' },
-    typeIcon: { fontSize: 18 },
-    typeLabel: { fontSize: 12, fontWeight: '700', color: Colors.iron[500], flex: 1 },
-    typeLabelActive: { color: Colors.primary.DEFAULT, fontWeight: '800' },
-});

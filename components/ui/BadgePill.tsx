@@ -1,7 +1,7 @@
-import { Colors } from '@/src/theme';
+import { useColors } from '@/src/hooks/useColors';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as LucideIcons from 'lucide-react-native';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 interface BadgePillProps {
@@ -13,56 +13,112 @@ interface BadgePillProps {
 }
 
 export function BadgePill({ name, color, icon, size = 'sm', variant = 'default' }: BadgePillProps) {
+    const colors = useColors();
     const IconComponent = icon && (LucideIcons as any)[icon] ? (LucideIcons as any)[icon] : null;
 
-    const isXs = size === 'xs';
-    const isSm = size === 'sm';
-    const isMd = size === 'md';
-    const isLg = size === 'lg';
+    const config = useMemo(() => {
+        const isXs = size === 'xs';
+        const isSm = size === 'sm';
+        const isMd = size === 'md';
+        const isLg = size === 'lg';
 
-    // Premium HSL-based translucency logic
-    const baseOpacity = variant === 'minimal' ? '10' : '15';
-    const gradientColors = variant === 'vibrant'
-        ? [color, color + 'cc']
-        : [color + baseOpacity, color + baseOpacity];
+        let borderRadius = 10;
+        let paddingH = 8;
+        let paddingV = 4;
+        let fontSize = 11;
+        let iconSize = 12;
+        let letterSpacing = 0.2;
+        let gap = 5;
 
-    const textColor = variant === 'vibrant' ? Colors.white : color;
-    const iconSize = isXs ? 8 : isSm ? 10 : isMd ? 12 : 14;
+        if (isXs) {
+            borderRadius = 6;
+            paddingH = 6;
+            paddingV = 2;
+            fontSize = 7.5;
+            iconSize = 8;
+            letterSpacing = 0;
+            gap = 2;
+        } else if (isSm) {
+            borderRadius = 8;
+            paddingH = 7;
+            paddingV = 3;
+            fontSize = 9;
+            iconSize = 10;
+            letterSpacing = 0.1;
+            gap = 3;
+        } else if (isLg) {
+            borderRadius = 14;
+            paddingH = 10;
+            paddingV = 6;
+            fontSize = 13;
+            iconSize = 14;
+            letterSpacing = 0.3;
+            gap = 6;
+        }
+
+        const baseOpacity = variant === 'minimal' ? '14' : '20';
+        const gradientColors = variant === 'vibrant'
+            ? [color, color]
+            : [color + baseOpacity, color + baseOpacity];
+
+        const textColor = variant === 'vibrant' ? colors.white : color;
+        const borderColor = variant === 'minimal' ? 'transparent' : color + '40';
+
+        const styles = StyleSheet.create({
+            container: {
+                borderRadius,
+                borderWidth: 1,
+                borderColor,
+                overflow: 'hidden',
+                alignSelf: 'flex-start',
+                ...(variant === 'vibrant' ? {
+                    shadowColor: colors.black,
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.15,
+                    shadowRadius: 6,
+                    elevation: 3,
+                } : {})
+            },
+            content: {
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: paddingH,
+                paddingVertical: paddingV,
+            },
+            icon: {
+                marginRight: gap
+            },
+            text: {
+                color: textColor,
+                fontSize,
+                fontWeight: '900',
+                letterSpacing,
+                textTransform: 'uppercase',
+            }
+        });
+
+        return { styles, gradientColors, textColor, iconSize };
+    }, [colors, color, size, variant]);
 
     return (
-        <View style={[
-            styles.container,
-            { borderColor: variant === 'minimal' ? 'transparent' : color + '40' },
-            isXs && styles.xsContainer,
-            isSm && styles.smContainer,
-            isMd && styles.mdContainer,
-            isLg && styles.lgContainer,
-            variant === 'vibrant' && styles.shadow
-        ]}>
+        <View style={config.styles.container}>
             <LinearGradient
-                colors={gradientColors as any}
+                colors={config.gradientColors as any}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFill}
             />
-            <View style={styles.content}>
+            <View style={config.styles.content}>
                 {IconComponent && (
                     <IconComponent
-                        size={iconSize}
-                        color={textColor}
+                        size={config.iconSize}
+                        color={config.textColor}
                         strokeWidth={2.5}
-                        style={{ marginRight: isXs ? 2 : isSm ? 3 : 5 }}
+                        style={config.styles.icon}
                     />
                 )}
                 <Text
-                    style={[
-                        styles.text,
-                        { color: textColor },
-                        isXs && styles.xsText,
-                        isSm && styles.smText,
-                        isMd && styles.mdText,
-                        isLg && styles.lgText
-                    ]}
+                    style={config.styles.text}
                     numberOfLines={1}
                     ellipsizeMode="tail"
                 >
@@ -72,60 +128,3 @@ export function BadgePill({ name, color, icon, size = 'sm', variant = 'default' 
         </View>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        borderRadius: 8,
-        borderWidth: 1,
-        overflow: 'hidden',
-        alignSelf: 'flex-start',
-    },
-    content: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-    },
-    xsContainer: {
-        borderRadius: 4,
-    },
-    smContainer: {
-        borderRadius: 6,
-    },
-    mdContainer: {
-        borderRadius: 8,
-    },
-    lgContainer: {
-        borderRadius: 10,
-    },
-    xsText: {
-        fontSize: 7.5,
-        fontWeight: '900',
-        letterSpacing: 0,
-    },
-    smText: {
-        fontSize: 9,
-        fontWeight: '900',
-        letterSpacing: 0.1,
-    },
-    mdText: {
-        fontSize: 11,
-        fontWeight: '900',
-        letterSpacing: 0.2,
-    },
-    lgText: {
-        fontSize: 13,
-        fontWeight: '900',
-        letterSpacing: 0.3,
-    },
-    text: {
-        textTransform: 'uppercase',
-    },
-    shadow: {
-        shadowColor: Colors.black,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 3,
-    }
-});

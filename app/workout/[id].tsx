@@ -2,16 +2,18 @@ import { SetRowInput } from '@/components/SetRowInput';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { configService } from '@/src/services/ConfigService';
 import { useWorkoutStore } from '@/src/store/workoutStore';
-import { Colors, ThemeFx } from '@/src/theme';
+import { ThemeFx } from '@/src/theme';
 import { WorkoutSet } from '@/src/types/db';
 import { FlashList } from '@shopify/flash-list';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { LucideClock, LucideMoreVertical } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { useColors } from '../../src/hooks/useColors';
 import { confirm } from '../../src/store/confirmStore';
 
 export default function ActiveWorkoutScreen() {
+    const colors = useColors();
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const {
@@ -20,6 +22,147 @@ export default function ActiveWorkoutScreen() {
     } = useWorkoutStore();
 
     const [unit, setUnit] = useState(configService.get('weightUnit'));
+
+    const ss = useMemo(() => StyleSheet.create({
+        header: { 
+            paddingHorizontal: 16, 
+            paddingBottom: 14, 
+            paddingTop: 8, 
+            backgroundColor: colors.background, 
+            borderBottomWidth: 1.5, 
+            borderBottomColor: colors.border, 
+            flexDirection: 'row', 
+            justifyContent: 'space-between', 
+            alignItems: 'center' 
+        },
+        headerTitle: { 
+            color: colors.iron[950], 
+            fontWeight: '900', 
+            fontSize: 17, 
+            letterSpacing: -0.3 
+        },
+        headerSub: { 
+            color: colors.iron[400], 
+            fontSize: 11, 
+            fontWeight: '700', 
+            marginTop: 2 
+        },
+        headerActions: { 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            gap: 10 
+        },
+        timerChip: { 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            backgroundColor: colors.surface, 
+            paddingHorizontal: 10, 
+            paddingVertical: 6, 
+            borderRadius: 12, 
+            borderWidth: 1.5, 
+            borderColor: colors.border 
+        },
+        timerText: { 
+            color: colors.primary.DEFAULT, 
+            marginLeft: 6, 
+            fontSize: 13, 
+            fontWeight: '800', 
+            fontVariant: ['tabular-nums'] 
+        },
+        statusChip: { 
+            paddingHorizontal: 10, 
+            paddingVertical: 6, 
+            borderRadius: 20, 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            borderWidth: 1.5 
+        },
+        statusFinished: { 
+            backgroundColor: ThemeFx.successBg, 
+            borderColor: ThemeFx.successBorder 
+        },
+        statusActive: { 
+            backgroundColor: colors.surface, 
+            borderColor: colors.border 
+        },
+        statusText: { 
+            fontSize: 10, 
+            fontWeight: '800', 
+            textTransform: 'uppercase', 
+            letterSpacing: 0.5, 
+            marginRight: 6 
+        },
+        exerciseHeader: { 
+            flexDirection: 'row', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: 8 
+        },
+        exerciseName: { 
+            color: colors.iron[950], 
+            fontWeight: '800', 
+            fontSize: 16 
+        },
+        setsHeaderRow: { 
+            flexDirection: 'row', 
+            marginBottom: 8, 
+            paddingHorizontal: 8 
+        },
+        colLabel: { 
+            textAlign: 'center', 
+            color: colors.iron[400], 
+            fontSize: 10, 
+            fontWeight: '800', 
+            letterSpacing: 0.8 
+        },
+        addSetBtn: { 
+            backgroundColor: colors.surface, 
+            paddingVertical: 12, 
+            borderRadius: 14, 
+            alignItems: 'center', 
+            marginTop: 8, 
+            borderWidth: 1.5, 
+            borderColor: colors.border, 
+            borderStyle: 'dashed' 
+        },
+        addSetText: { 
+            color: colors.iron[950], 
+            fontSize: 11, 
+            fontWeight: '800', 
+            textTransform: 'uppercase' 
+        },
+        addExerciseBtn: { 
+            backgroundColor: colors.surface, 
+            paddingVertical: 14, 
+            borderRadius: 14, 
+            alignItems: 'center', 
+            borderWidth: 1.5, 
+            borderColor: colors.primary.DEFAULT, 
+            borderStyle: 'dashed', 
+            marginBottom: 32 
+        },
+        addExerciseText: { 
+            color: colors.primary.DEFAULT, 
+            fontWeight: '800', 
+            textTransform: 'uppercase', 
+            fontSize: 13 
+        },
+        backBtn: { 
+            backgroundColor: colors.surface, 
+            paddingVertical: 14, 
+            borderRadius: 14, 
+            alignItems: 'center', 
+            borderWidth: 1.5, 
+            borderColor: colors.border, 
+            marginBottom: 32 
+        },
+        backBtnText: { 
+            color: colors.iron[950], 
+            fontWeight: '800', 
+            textTransform: 'uppercase', 
+            fontSize: 13 
+        },
+    }), [colors]);
 
     const handleUpdateSet = useCallback((setId: string, updates: Partial<WorkoutSet>) => {
         updateSet(setId, updates);
@@ -90,7 +233,7 @@ export default function ActiveWorkoutScreen() {
     }, [activeWorkout, activeSets.length]);
 
     return (
-        <SafeAreaWrapper style={{ backgroundColor: Colors.iron[900] }} edges={['top', 'left', 'right']}>
+        <SafeAreaWrapper style={{ backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
                 <Stack.Screen options={{ headerShown: false }} />
 
@@ -108,14 +251,14 @@ export default function ActiveWorkoutScreen() {
                     <View style={ss.headerActions}>
                         {!isTemplate && (
                             <View style={ss.timerChip}>
-                                <LucideClock size={14} color={Colors.primary.DEFAULT} />
+                                <LucideClock size={14} color={colors.primary.DEFAULT} />
                                 <Text style={ss.timerText}>{formatTime(workoutTimer)}</Text>
                             </View>
                         )}
 
                         {!isTemplate && activeWorkout && (
                             <View style={[ss.statusChip, isFinished ? ss.statusFinished : ss.statusActive]}>
-                                <Text style={[ss.statusText, isFinished ? { color: Colors.green } : { color: Colors.iron[950] }]}>
+                                <Text style={[ss.statusText, isFinished ? { color: colors.green } : { color: colors.iron[950] }]}>
                                     {isFinished ? 'Finalizado' : 'Activo'}
                                 </Text>
                                 <Switch value={!isFinished} onValueChange={(v) => requestToggleStatus(v)} />
@@ -126,7 +269,7 @@ export default function ActiveWorkoutScreen() {
 
                 {emptyState && (
                     <View style={{ paddingHorizontal: 16, paddingVertical: 24 }}>
-                        <Text style={{ color: Colors.iron[400], fontWeight: '700', textAlign: 'center' }}>{emptyState}</Text>
+                        <Text style={{ color: colors.iron[400], fontWeight: '700', textAlign: 'center' }}>{emptyState}</Text>
                     </View>
                 )}
 
@@ -139,7 +282,7 @@ export default function ActiveWorkoutScreen() {
                         <View style={{ marginBottom: 24 }}>
                             <View style={ss.exerciseHeader}>
                                 <Text style={ss.exerciseName}>{exerciseNames[exId] || 'Loading Exercise...'}</Text>
-                                <Pressable onPress={() => { }}><LucideMoreVertical size={20} color={Colors.iron[400]} /></Pressable>
+                                <Pressable onPress={() => { }}><LucideMoreVertical size={20} color={colors.iron[400]} /></Pressable>
                             </View>
 
                             {/* Sets Header */}
@@ -179,25 +322,3 @@ export default function ActiveWorkoutScreen() {
     );
 }
 
-const ss = StyleSheet.create({
-    header: { paddingHorizontal: 16, paddingBottom: 14, paddingTop: 8, backgroundColor: Colors.iron[900], borderBottomWidth: 1, borderBottomColor: Colors.iron[700], flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    headerTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 17, letterSpacing: -0.3 },
-    headerSub: { color: Colors.iron[400], fontSize: 11, fontWeight: '700', marginTop: 2 },
-    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    timerChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: Colors.iron[700] },
-    timerText: { color: Colors.primary.DEFAULT, marginLeft: 6, fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
-    statusChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, flexDirection: 'row', alignItems: 'center', borderWidth: 1 },
-    statusFinished: { backgroundColor: ThemeFx.successBg, borderColor: ThemeFx.successBorder },
-    statusActive: { backgroundColor: Colors.surface, borderColor: Colors.iron[700] },
-    statusText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 6 },
-    exerciseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    exerciseName: { color: Colors.iron[950], fontWeight: '800', fontSize: 16 },
-    setsHeaderRow: { flexDirection: 'row', marginBottom: 8, paddingHorizontal: 8 },
-    colLabel: { textAlign: 'center', color: Colors.iron[400], fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
-    addSetBtn: { backgroundColor: Colors.surface, paddingVertical: 12, borderRadius: 14, alignItems: 'center', marginTop: 8, borderWidth: 1, borderColor: Colors.iron[400], borderStyle: 'dashed' },
-    addSetText: { color: Colors.iron[950], fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
-    addExerciseBtn: { backgroundColor: Colors.surface, paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: Colors.primary.DEFAULT, borderStyle: 'dashed', marginBottom: 32 },
-    addExerciseText: { color: Colors.primary.DEFAULT, fontWeight: '800', textTransform: 'uppercase', fontSize: 13 },
-    backBtn: { backgroundColor: Colors.surface, paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: Colors.iron[700], marginBottom: 32 },
-    backBtnText: { color: Colors.iron[950], fontWeight: '800', textTransform: 'uppercase', fontSize: 13 },
-});

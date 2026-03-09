@@ -1,16 +1,38 @@
 {
-  "generatedAt": "2026-03-08T15:42:32.874Z",
+  "generatedAt": "2026-03-09T16:54:17.257Z",
   "source": "docs/CHANGELOG.md",
   "releases": [
     {
-      "version": "2.0.1",
+      "version": "2.1.1",
       "date": null,
       "unreleased": true,
       "items": [
-        "**Sistema de temas**: Posibilidad de elegir entre tema claro y oscuro.",
+        "**Sistema de temas**: Posibilidad completa de elegir entre tema claro y oscuro.",
         "**Soporte para diferentes idiomas**: Posibilidad de elegir entre inglés y español.",
         "**Conexión con múltiples dispositivos**: Posibilidad de conectar con múltiples dispositivos (relojes/bands compatibles).",
         "**Vinculación con servicios de salud**: Posibilidad de vincular con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos."
+      ]
+    },
+    {
+      "version": "2.1.0",
+      "date": "2026-03-09",
+      "unreleased": false,
+      "items": [
+        "**Nuevos Badges**: Se añadió un sistema de *badges* (insignias) personalizables para ejercicios, permitiendo indicar equipamiento, variación, posición y otros. Estos *badges* se pueden colocar en conjunto para mejorar y acortar los nombres de los ejercicios (ej: pasando de \"Press Banca c/barra\" a \"Press\" [banca] [barra]).",
+        "**IronSocial**: En base a los testeos y métricas de la versión 2.0.0, se rehizo en gran medida el sistema social. Se añadieron sistemas de comparación con amigos, se dejó el feed funcional y se activó el sistema de *likes* (kudos).",
+        "**Sistema de Puntos**: Se recreó el sistema de puntajes desde cero. Se amplió el sistema de rachas (pasó de diaria a semanal) y los puntos ya no se pierden. Además, se añadió un panel que permite activar puntos dobles y un multiplicador mayor **(ya activo)** cuando esté lloviendo en tu zona (mediante GPS no invasivo), a modo de motivación para entrenar.",
+        "**Changelog y Kudos**: Se implementó una funcionalidad que permite a los usuarios dar *like* (kudos) a las actualizaciones, permitiendo al equipo orientar mejor las futuras versiones.",
+        "**Notificaciones y Avisos**: Se añadieron nuevas ventanas modales para implementar un sistema automatizado que muestra los cambios al actualizar la app y mensajes enviados por nuestro equipo.",
+        "**Marketplace de ejercicios**: Se amplió el /feed en la pagina principal, ahora se pueden obtener ejercicios precreados rapidamente.",
+        "**Body Measures**: Se corrigió un error en el sistema de sincronización que impedía guardar cualquier registro en esta pestaña.",
+        "**Sistema de Notificaciones**: Se corrigieron y mejoraron algunos lanzadores que impedían que ciertos tipos de notificaciones persistentes y push se mostraran.",
+        "**Data Reload**: Se implementó una solución robusta para los fallos de recarga. Ahora, cuando el backend o la base de datos local reciben nuevos datos, se reflejan en el frontend sin necesidad de forzar una recarga (sujeto a mejoras en futuros parches).",
+        "**Calculadora 1RM**: Se corrigió un problema visual que hacía que la tabla de porcentajes no mostrara la columna de repeticiones. Adicionalmente, se mejoró el aspecto de esta tabla para hacerla más intuitiva.",
+        "**Firebase Cloud Messaging**: Se implementó esta plataforma para asegurar que las notificaciones importantes y los avisos lleguen a la aplicación incluso cuando está cerrada.",
+        "**Feedback**: Se mejoró el sistema de feedback. Ahora podés acceder a él y enviar tus reportes de bugs o ideas directamente desde *Settings*.",
+        "**Tema de la Aplicación**: Se prepararon las bases del sistema para cambiar el aspecto de la interfaz, sumar el modo oscuro y armar un subsistema para crear y compartir temas personalizados.",
+        "**Métricas Ampliadas**: Se mejoraron y ampliaron las métricas de uso de la aplicación para optimizar el soporte técnico y brindar mejores experiencias futuras.",
+        "**Play Store y App Store**: Se comenzó a preparar y pulir el terreno para desplegar la aplicación en las tiendas oficiales de Android e iOS. Pronto se comunicarán más noticias."
       ]
     },
     {

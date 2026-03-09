@@ -1,9 +1,10 @@
-import { Colors, ThemeFx, withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import * as Haptics from 'expo-haptics';
 import { ArrowDownCircle, Check, CirclePause, Copy, Dumbbell, Flame, MessageSquare, RefreshCw, Skull, Trash2, Trophy } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
+import { useColors } from '../src/hooks/useColors';
 import { configService } from '../src/services/ConfigService';
 import { UnitService } from '../src/services/UnitService';
 import { confirm } from '../src/store/confirmStore';
@@ -21,21 +22,79 @@ interface SetRowProps {
     disabled?: boolean;
 }
 
-export const SET_TYPE_CONFIG: { key: string; label: string; shortLabel: string; Icon: any; bg: string; text: string }[] = [
-    { key: 'normal', label: 'Serie Normal', shortLabel: 'SERIE', Icon: Dumbbell, bg: Colors.iron[200], text: Colors.iron[500] },
-    { key: 'warmup', label: 'Calentamiento', shortLabel: 'CALENT', Icon: Flame, bg: withAlpha(Colors.yellow, '35'), text: Colors.iron[600] },
-    { key: 'failure', label: 'Al Fallo', shortLabel: 'FALLO', Icon: Skull, bg: withAlpha(Colors.red, '20'), text: Colors.red },
-    { key: 'drop', label: 'Drop Set', shortLabel: 'DROP', Icon: ArrowDownCircle, bg: withAlpha(Colors.primary.light, '30'), text: Colors.primary.dark },
-    { key: 'myo_reps', label: 'Myo-Reps', shortLabel: 'MYO', Icon: RefreshCw, bg: withAlpha(Colors.blue, '25'), text: Colors.blue },
-    { key: 'rest_pause', label: 'Rest-Pause', shortLabel: 'R-P', Icon: CirclePause, bg: withAlpha(Colors.green, '25'), text: Colors.green },
-    { key: 'pr', label: 'Récord Personal', shortLabel: 'PR', Icon: Trophy, bg: withAlpha(Colors.primary.DEFAULT, '15'), text: Colors.primary.DEFAULT },
+export type SetTypeConfigItem = {
+    key: string;
+    label: string;
+    shortLabel: string;
+    Icon: any;
+};
+
+export interface SetTypeConfigItemWithColors extends SetTypeConfigItem {
+    bg: string;
+    text: string;
+}
+
+export const SET_TYPES: SetTypeConfigItem[] = [
+    { key: 'normal', label: 'Serie Normal', shortLabel: 'SERIE', Icon: Dumbbell },
+    { key: 'warmup', label: 'Calentamiento', shortLabel: 'CALENT', Icon: Flame },
+    { key: 'failure', label: 'Al Fallo', shortLabel: 'FALLO', Icon: Skull },
+    { key: 'drop', label: 'Drop Set', shortLabel: 'DROP', Icon: ArrowDownCircle },
+    { key: 'myo_reps', label: 'Myo-Reps', shortLabel: 'MYO', Icon: RefreshCw },
+    { key: 'rest_pause', label: 'Rest-Pause', shortLabel: 'R-P', Icon: CirclePause },
+    { key: 'pr', label: 'Récord Personal', shortLabel: 'PR', Icon: Trophy },
 ];
 
-export const TYPE_COLORS: Record<string, { bg: string; text: string }> = Object.fromEntries(
-    SET_TYPE_CONFIG.map(c => [c.key, { bg: c.bg, text: c.text }])
-);
+export function useSetTypeConfig() {
+    const colors = useColors();
+    return useMemo(() => {
+        const configs: SetTypeConfigItemWithColors[] = SET_TYPES.map(c => {
+            let styling = { bg: colors.iron[200], text: colors.iron[500] };
+            if (c.key === 'warmup') styling = { bg: withAlpha(colors.yellow, '35'), text: colors.iron[600] };
+            else if (c.key === 'failure') styling = { bg: withAlpha(colors.red, '20'), text: colors.red };
+            else if (c.key === 'drop') styling = { bg: withAlpha(colors.primary.light, '30'), text: colors.primary.dark };
+            else if (c.key === 'myo_reps') styling = { bg: withAlpha(colors.blue, '25'), text: colors.blue };
+            else if (c.key === 'rest_pause') styling = { bg: withAlpha(colors.green, '25'), text: colors.green };
+            else if (c.key === 'pr') styling = { bg: withAlpha(colors.primary.DEFAULT, '15'), text: colors.primary.DEFAULT };
+            return { ...c, ...styling };
+        });
+
+        const typeColors = Object.fromEntries(
+            configs.map(c => [c.key, { bg: c.bg, text: c.text }])
+        );
+
+        return { configs, typeColors };
+    }, [colors]);
+}
 
 export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, exerciseType = 'weight_reps', disabled }: SetRowProps) {
+    const colors = useColors();
+    const { configs: SET_TYPE_CONFIG, typeColors: TYPE_COLORS } = useSetTypeConfig();
+
+    const ss = useMemo(() => StyleSheet.create({
+        card: { borderRadius: 16, borderWidth: 1.5, overflow: 'hidden' },
+        cardDefault: { borderColor: colors.border, backgroundColor: colors.surface },
+        cardCompleted: { borderColor: colors.primary.DEFAULT, backgroundColor: withAlpha(colors.primary.DEFAULT, '03') },
+        header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1.5 },
+        headerDefault: { backgroundColor: colors.iron[100], borderBottomColor: colors.border },
+        headerCompleted: { backgroundColor: withAlpha(colors.primary.DEFAULT, '08'), borderBottomColor: withAlpha(colors.primary.DEFAULT, '20') },
+        body: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+        separator: { color: colors.iron[300], fontWeight: '900', fontSize: 24, marginHorizontal: -4 },
+        inputLabel: { fontSize: 10, color: colors.iron[400], fontWeight: '800', marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.8 },
+        checkBtn: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+        checkBtnActive: { backgroundColor: colors.primary.DEFAULT, shadowColor: colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+        checkBtnInactive: { backgroundColor: colors.iron[100], borderWidth: 1.5, borderColor: colors.border },
+        notesInput: { fontSize: 14, backgroundColor: withAlpha(colors.yellow, '08'), color: colors.iron[800], padding: 12, borderRadius: 12, borderWidth: 1.5, borderColor: withAlpha(colors.yellow, '20'), fontWeight: '500' },
+        swipeDelete: { justifyContent: 'center', alignItems: 'flex-end', borderTopRightRadius: 16, borderBottomRightRadius: 16, marginLeft: -16, width: 96, backgroundColor: colors.red },
+        swipeCopy: { justifyContent: 'center', alignItems: 'flex-start', width: 96, borderTopLeftRadius: 16, borderBottomLeftRadius: 16, marginRight: -16, backgroundColor: colors.primary.dark },
+        swipeLabel: { color: colors.white, fontSize: 10, fontWeight: '900', marginTop: 4, letterSpacing: 0.6 },
+        pickerOverlay: { flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center', padding: 24 },
+        pickerContainer: { backgroundColor: colors.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 360, shadowColor: colors.black, shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.25, shadowRadius: 32, elevation: 12, borderWidth: 1.5, borderColor: colors.border },
+        pickerTitle: { fontSize: 18, fontWeight: '900', color: colors.iron[950], marginBottom: 18, letterSpacing: -0.5 },
+        pickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1.5, borderColor: withAlpha(colors.black, '00'), marginBottom: 6, gap: 14 },
+        pickerIconCircle: { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+        pickerLabel: { fontSize: 15, fontWeight: '700', color: colors.iron[950] },
+        pickerCheck: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+    }), [colors]);
     const unit = configService.get('weightUnit');
     const toDisplayWeight = (kgValue: number) => unit === 'kg' ? kgValue : UnitService.kgToLbs(kgValue);
     const toKg = (displayValue: number) => unit === 'kg' ? displayValue : UnitService.lbsToKg(displayValue);
@@ -153,7 +212,7 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
                         style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
                         accessibilityRole="button" accessibilityLabel={`Eliminar serie ${index + 1}`}
                     >
-                        <Trash2 size={22} color={Colors.white} />
+                        <Trash2 size={22} color={colors.white} />
                         <Text style={ss.swipeLabel}>BORRAR</Text>
                     </TouchableOpacity>
                 </Animated.View>
@@ -177,7 +236,7 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
                         style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
                         accessibilityRole="button" accessibilityLabel={`Copiar serie ${index + 1}`}
                     >
-                        <Copy size={22} color={Colors.white} />
+                        <Copy size={22} color={colors.white} />
                         <Text style={ss.swipeLabel}>COPIAR</Text>
                     </TouchableOpacity>
                 </Animated.View>
@@ -187,13 +246,15 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
 
     const inputStyle = (completed: boolean) => ({
         fontSize: 24,
-        fontWeight: '800' as const,
+        fontWeight: '900' as const,
         textAlign: 'center' as const,
         width: '100%' as any,
-        padding: 8,
-        borderRadius: 10,
-        color: completed ? Colors.primary.DEFAULT : Colors.iron[950],
-        backgroundColor: completed ? withAlpha(Colors.primary.DEFAULT, '08') : Colors.iron[200],
+        padding: 10,
+        borderRadius: 12,
+        color: completed ? colors.primary.DEFAULT : colors.iron[950],
+        backgroundColor: completed ? withAlpha(colors.primary.DEFAULT, '08') : colors.iron[100],
+        borderWidth: 1.5,
+        borderColor: completed ? withAlpha(colors.primary.DEFAULT, '20') : colors.border,
     });
 
     return (
@@ -227,8 +288,8 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
                                 activeOpacity={0.7}
                                 style={{
                                     flexDirection: 'row', alignItems: 'center', gap: 5,
-                                    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
-                                    backgroundColor: typeColor.bg, borderWidth: 1, borderColor: typeColor.text + '30',
+                                    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10,
+                                    backgroundColor: typeColor.bg, borderWidth: 1.5, borderColor: typeColor.text + '30',
                                 }}
                             >
                                 <currentConfig.Icon size={11} color={typeColor.text} />
@@ -238,22 +299,22 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
                                 <Text style={{ fontSize: 8, color: typeColor.text, opacity: 0.5 }}>▼</Text>
                             </TouchableOpacity>
                             {set.previous_weight != null && (
-                                <Text style={{ fontSize: 10, color: Colors.iron[400], fontWeight: '500' }}>
+                                <Text style={{ fontSize: 10, color: colors.iron[400], fontWeight: '500' }}>
                                     ANT: {normalize(toDisplayWeight(set.previous_weight))}{unit} x {set.previous_reps}
                                 </Text>
                             )}
                         </View>
 
-                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.iron[200], borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 }}>
-                            <Text style={{ fontSize: 9, color: Colors.iron[400], fontWeight: '800', marginRight: 4 }}>RPE</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.iron[200], borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                            <Text style={{ fontSize: 10, color: colors.iron[500], fontWeight: '800', marginRight: 6 }}>RPE</Text>
                             <TextInput
                                 value={rpe}
                                 onChangeText={setRpe}
                                 onBlur={handleBlur}
                                 keyboardType="numeric"
                                 placeholder="-"
-                                placeholderTextColor={Colors.iron[400]}
-                                style={{ padding: 0, fontSize: 12, fontWeight: '800', color: Colors.iron[700], textAlign: 'center', width: 22, height: 16 }}
+                                placeholderTextColor={colors.iron[400]}
+                                style={{ padding: 0, fontSize: 13, fontWeight: '900', color: colors.iron[950], textAlign: 'center', width: 24, height: 18 }}
                                 maxLength={3}
                             />
                         </View>
@@ -264,12 +325,12 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
                         {exerciseType === 'distance_time' ? (
                             <>
                                 <View style={{ flex: 1, alignItems: 'center' }}>
-                                    <TextInput value={distanceKm} onChangeText={setDistanceKm} onBlur={handleBlur} keyboardType="numeric" placeholder="0" placeholderTextColor={Colors.iron[300]} style={inputStyle(isCompleted)} editable={!disabled} selectTextOnFocus />
+                                    <TextInput value={distanceKm} onChangeText={setDistanceKm} onBlur={handleBlur} keyboardType="numeric" placeholder="0" placeholderTextColor={colors.iron[300]} style={inputStyle(isCompleted)} editable={!disabled} selectTextOnFocus />
                                     <Text style={ss.inputLabel}>KM</Text>
                                 </View>
                                 <Text style={ss.separator}>/</Text>
                                 <View style={{ flex: 1, alignItems: 'center' }}>
-                                    <TextInput value={timeText} onChangeText={setTimeText} onBlur={handleBlur} keyboardType="default" placeholder="mm:ss ó 10m" placeholderTextColor={Colors.iron[300]} style={inputStyle(isCompleted)} editable={!disabled} selectTextOnFocus />
+                                    <TextInput value={timeText} onChangeText={setTimeText} onBlur={handleBlur} keyboardType="default" placeholder="mm:ss ó 10m" placeholderTextColor={colors.iron[300]} style={inputStyle(isCompleted)} editable={!disabled} selectTextOnFocus />
                                     <Text style={ss.inputLabel}>MM:SS</Text>
                                 </View>
                             </>
@@ -277,14 +338,14 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
                             <>
                                 {(exerciseType === 'weight_reps' || exerciseType === 'weight_only') && (
                                     <View style={{ flex: 1, alignItems: 'center' }}>
-                                        <TextInput value={weight} onChangeText={setWeight} onBlur={handleBlur} keyboardType="numeric" placeholder={set.previous_weight != null ? normalize(toDisplayWeight(set.previous_weight)).toString() : "0"} placeholderTextColor={Colors.iron[300]} style={inputStyle(isCompleted)} editable={!disabled} selectTextOnFocus />
+                                        <TextInput value={weight} onChangeText={setWeight} onBlur={handleBlur} keyboardType="numeric" placeholder={set.previous_weight != null ? normalize(toDisplayWeight(set.previous_weight)).toString() : "0"} placeholderTextColor={colors.iron[300]} style={inputStyle(isCompleted)} editable={!disabled} selectTextOnFocus />
                                         <Text style={ss.inputLabel}>{unit.toUpperCase()}</Text>
                                     </View>
                                 )}
                                 {exerciseType === 'weight_reps' && <Text style={ss.separator}>X</Text>}
                                 {(exerciseType === 'weight_reps' || exerciseType === 'reps_only') && (
                                     <View style={{ flex: 1, alignItems: 'center' }}>
-                                        <TextInput value={reps} onChangeText={setReps} onBlur={handleBlur} keyboardType="numeric" placeholder={set.previous_reps?.toString() || "0"} placeholderTextColor={Colors.iron[300]} style={inputStyle(isCompleted)} editable={!disabled} selectTextOnFocus />
+                                        <TextInput value={reps} onChangeText={setReps} onBlur={handleBlur} keyboardType="numeric" placeholder={set.previous_reps?.toString() || "0"} placeholderTextColor={colors.iron[300]} style={inputStyle(isCompleted)} editable={!disabled} selectTextOnFocus />
                                         <Text style={ss.inputLabel}>REPS</Text>
                                     </View>
                                 )}
@@ -302,11 +363,11 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
                                 style={[ss.checkBtn, isCompleted ? ss.checkBtnActive : ss.checkBtnInactive]}
                                 accessibilityRole="button"
                             >
-                                <Check size={22} color={isCompleted ? 'white' : Colors.iron[400]} strokeWidth={3} />
+                                <Check size={22} color={isCompleted ? 'white' : colors.iron[400]} strokeWidth={3} />
                             </TouchableOpacity>
 
                             <TouchableOpacity onPress={() => setShowNotes(!showNotes)} style={{ alignItems: 'center', justifyContent: 'center' }}>
-                                <MessageSquare size={15} color={notes ? Colors.primary.DEFAULT : Colors.iron[300]} fill={notes ? Colors.primary.DEFAULT : 'none'} />
+                                <MessageSquare size={15} color={notes ? colors.primary.DEFAULT : colors.iron[300]} fill={notes ? colors.primary.DEFAULT : 'none'} />
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -319,7 +380,7 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
                                 onChangeText={setNotes}
                                 onBlur={handleBlur}
                                 placeholder="Agregar notas..."
-                                placeholderTextColor={Colors.iron[400]}
+                                placeholderTextColor={colors.iron[400]}
                                 style={ss.notesInput}
                                 editable={!disabled}
                             />
@@ -347,8 +408,8 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
                                     <View style={{ flex: 1 }}>
                                         <Text style={[ss.pickerLabel, isSelected && { color: cfg.text, fontWeight: '900' }]}>{cfg.label}</Text>
                                     </View>
-                                {isSelected && <View style={[ss.pickerCheck, { backgroundColor: cfg.text }]}>
-                                        <Check size={12} color={Colors.white} />
+                                    {isSelected && <View style={[ss.pickerCheck, { backgroundColor: cfg.text }]}>
+                                        <Check size={12} color={colors.white} />
                                     </View>}
                                 </Pressable>
                             );
@@ -360,28 +421,4 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
     );
 }
 
-const ss = StyleSheet.create({
-    card: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-    cardDefault: { borderColor: Colors.iron[300], backgroundColor: Colors.surface },
-    cardCompleted: { borderColor: Colors.primary.DEFAULT, backgroundColor: Colors.iron[50] },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1 },
-    headerDefault: { backgroundColor: Colors.iron[200], borderBottomColor: Colors.iron[200] },
-    headerCompleted: { backgroundColor: withAlpha(Colors.primary.DEFAULT, '08'), borderBottomColor: withAlpha(Colors.primary.DEFAULT, '20') },
-    body: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10 },
-    separator: { color: Colors.iron[300], fontWeight: '900', fontSize: 20 },
-    inputLabel: { fontSize: 9, color: Colors.iron[400], fontWeight: '800', marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
-    checkBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-    checkBtnActive: { backgroundColor: Colors.primary.DEFAULT, shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2 },
-    checkBtnInactive: { backgroundColor: Colors.iron[200], borderWidth: 1, borderColor: Colors.iron[300] },
-    notesInput: { fontSize: 13, backgroundColor: withAlpha(Colors.yellow, '14'), color: Colors.iron[700], padding: 10, borderRadius: 10, borderWidth: 1, borderColor: withAlpha(Colors.yellow, '20') },
-    swipeDelete: { justifyContent: 'center', alignItems: 'flex-end', borderTopRightRadius: 14, borderBottomRightRadius: 14, marginLeft: -16, width: 96, backgroundColor: Colors.red },
-    swipeCopy: { justifyContent: 'center', alignItems: 'flex-start', width: 96, borderTopLeftRadius: 14, borderBottomLeftRadius: 14, marginRight: -16, backgroundColor: Colors.primary.dark },
-    swipeLabel: { color: Colors.white, fontSize: 9, fontWeight: '800', marginTop: 4, letterSpacing: 0.5 },
-    pickerOverlay: { flex: 1, backgroundColor: withAlpha(Colors.black, '8C'), justifyContent: 'center', alignItems: 'center', padding: 32 },
-    pickerContainer: { backgroundColor: Colors.surface, borderRadius: 20, padding: 20, width: '100%', maxWidth: 340, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 24, elevation: 10 },
-    pickerTitle: { fontSize: 16, fontWeight: '900', color: Colors.iron[950], marginBottom: 14, letterSpacing: -0.3 },
-    pickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: withAlpha(Colors.black, '00'), marginBottom: 4, gap: 12 },
-    pickerIconCircle: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    pickerLabel: { fontSize: 14, fontWeight: '700', color: Colors.iron[950] },
-    pickerCheck: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-});
+

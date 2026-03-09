@@ -1,9 +1,10 @@
 import { backupService } from '@/src/services/BackupService';
-import { Colors } from '@/src/theme';
+import { withAlpha } from '@/src/theme';
 import { useRouter } from 'expo-router';
 import { Calculator, ChevronRight, CircleDot, Database, Ruler, Settings, Wrench } from 'lucide-react-native';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useColors } from '../../src/hooks/useColors';
 import { confirm, useConfirmStore } from '../../src/store/confirmStore';
 
 interface AnalysisToolsProps {
@@ -19,6 +20,71 @@ const tools = [
 ] as const;
 
 export function AnalysisTools({ setCalcVisible }: AnalysisToolsProps) {
+    const colors = useColors();
+    const styles = useMemo(() => StyleSheet.create({
+        container: {
+            paddingBottom: 32,
+        },
+        header: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            marginBottom: 16,
+        },
+        headerAccent: {
+            width: 4,
+            height: 20,
+            borderRadius: 2,
+            backgroundColor: colors.primary.DEFAULT,
+        },
+        headerTitle: {
+            fontSize: 18,
+            fontWeight: '900',
+            color: colors.iron[950],
+            letterSpacing: -0.3,
+        },
+        toolsGrid: {
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            overflow: 'hidden',
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.06,
+            shadowRadius: 16,
+            elevation: 4,
+        },
+        toolCard: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            padding: 18,
+            gap: 16,
+        },
+        toolCardBorder: {
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.iron[100],
+        },
+        toolIconCircle: {
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '12'),
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        toolLabel: {
+            fontSize: 16,
+            fontWeight: '900',
+            color: colors.iron[950],
+        },
+        toolSubtitle: {
+            fontSize: 12,
+            fontWeight: '600',
+            color: colors.iron[500],
+            marginTop: 2,
+        },
+    }), [colors]);
     const router = useRouter();
 
     const handleBackup = () => {
@@ -83,7 +149,7 @@ export function AnalysisTools({ setCalcVisible }: AnalysisToolsProps) {
             <View style={styles.toolsGrid}>
                 <View style={[styles.header, { paddingHorizontal: 16, paddingTop: 14 }]}>
                     <View style={styles.headerAccent} />
-                    <Wrench size={16} color={Colors.iron[950]} />
+                    <Wrench size={16} color={colors.iron[950]} />
                     <Text style={styles.headerTitle}>Herramientas</Text>
                 </View>
 
@@ -94,16 +160,16 @@ export function AnalysisTools({ setCalcVisible }: AnalysisToolsProps) {
                             key={tool.id}
                             style={[styles.toolCard, idx < tools.length - 1 && styles.toolCardBorder]}
                             onPress={() => handlePress(tool.id)}
-                            android_ripple={{ color: Colors.iron[300] }}
+                            android_ripple={{ color: colors.iron[300] }}
                         >
                             <View style={styles.toolIconCircle}>
-                                <IconComponent size={18} color={Colors.primary.DEFAULT} />
+                                <IconComponent size={18} color={colors.primary.DEFAULT} />
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.toolLabel}>{tool.label}</Text>
                                 <Text style={styles.toolSubtitle}>{tool.subtitle}</Text>
                             </View>
-                            <ChevronRight size={16} color={Colors.iron[400]} />
+                            <ChevronRight size={16} color={colors.iron[400]} />
                         </Pressable>
                     );
                 })}
@@ -112,67 +178,4 @@ export function AnalysisTools({ setCalcVisible }: AnalysisToolsProps) {
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        paddingBottom: 32,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 14,
-    },
-    headerAccent: {
-        width: 3,
-        height: 18,
-        borderRadius: 2,
-        backgroundColor: Colors.primary.DEFAULT,
-    },
-    headerTitle: {
-        fontSize: 17,
-        fontWeight: '900',
-        color: Colors.iron[950],
-        letterSpacing: -0.3,
-    },
-    toolsGrid: {
-        backgroundColor: Colors.surface,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        overflow: 'hidden',
-        elevation: 2,
-        shadowColor: Colors.black,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-    },
-    toolCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        gap: 14,
-    },
-    toolCardBorder: {
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.iron[200],
-    },
-    toolIconCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: Colors.primary.DEFAULT + '12',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    toolLabel: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: Colors.iron[950],
-    },
-    toolSubtitle: {
-        fontSize: 11,
-        fontWeight: '500',
-        color: Colors.iron[400],
-        marginTop: 2,
-    },
-});
+

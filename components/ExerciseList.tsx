@@ -1,13 +1,13 @@
-// @ts-nocheck
 import { useDataReload } from '@/src/hooks/useDataReload';
-import { Colors } from '@/src/theme';
+import { withAlpha } from '@/src/theme';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react-native';
-import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useColors } from '../src/hooks/useColors';
 import { CategoryService } from '../src/services/CategoryService';
 import { ExerciseService } from '../src/services/ExerciseService';
 import { confirm } from '../src/store/confirmStore';
@@ -26,6 +26,7 @@ type ExerciseItem = Exercise & { category_name: string; category_color: string; 
 type CategoryItem = Category | { id: string; name: string; color: string };
 
 export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
+    const colors = useColors();
     const [exercises, setExercises] = useState<ExerciseItem[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -38,6 +39,94 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
     const insets = useSafeAreaInsets();
     const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
     const bottomOffset = (tabBarHeight ? tabBarHeight : insets.bottom) + 12;
+
+    const st = useMemo(() => StyleSheet.create({
+        container: { flex: 1, backgroundColor: inModal ? colors.iron[100] : colors.background },
+        header: { padding: 18, paddingBottom: 12 },
+        searchBar: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: colors.surface,
+            paddingHorizontal: 16,
+            height: 52,
+            borderRadius: 14,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            elevation: 2,
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.05,
+            shadowRadius: 10,
+            gap: 12
+        },
+        searchInput: { flex: 1, fontSize: 16, color: colors.iron[950], padding: 0, fontWeight: '700' },
+        categoryList: { marginTop: 14 },
+        categoryChip: {
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            borderRadius: 12,
+            marginRight: 10,
+            borderWidth: 1.5,
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+        },
+        categoryChipActive: {
+            backgroundColor: colors.primary.DEFAULT,
+            borderColor: colors.primary.DEFAULT,
+            elevation: 4,
+            shadowColor: colors.primary.DEFAULT,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.2,
+            shadowRadius: 8,
+        },
+        categoryText: { fontSize: 13, fontWeight: '800', color: colors.iron[500] },
+        categoryTextActive: { color: colors.white },
+
+        listContent: { padding: 16, paddingBottom: inModal ? 40 : 100 },
+        card: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: 16,
+            marginBottom: 12,
+            backgroundColor: colors.surface,
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            elevation: 2,
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.04,
+            shadowRadius: 10,
+        },
+        cardInfo: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 14, overflow: 'hidden' },
+        cardIcon: {
+            width: 44, height: 44, borderRadius: 12,
+            justifyContent: 'center', alignItems: 'center',
+            borderWidth: 1.5,
+        },
+        cardDot: { width: 12, height: 12, borderRadius: 6 },
+        cardText: { flex: 1, overflow: 'hidden' },
+        cardTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.4 },
+        cardMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8, flex: 1, overflow: 'hidden' },
+        cardCategory: { color: colors.iron[500], fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, flexShrink: 0 },
+        cardBadges: { flexDirection: 'row', gap: 4, flexShrink: 1, alignItems: 'center' },
+        badgeMore: { backgroundColor: colors.iron[100], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, justifyContent: 'center', flexShrink: 0 },
+        badgeMoreText: { fontSize: 9, fontWeight: '900', color: colors.iron[500] },
+
+        actions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 12 },
+        actionBtn: { width: 34, height: 34, backgroundColor: colors.iron[100], borderRadius: 10, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
+        deleteBtn: { width: 34, height: 34, backgroundColor: withAlpha(colors.red, '10'), borderRadius: 10, borderWidth: 1.5, borderColor: withAlpha(colors.red, '25'), justifyContent: 'center', alignItems: 'center' },
+
+        fab: {
+            position: 'absolute', right: 24, bottom: bottomOffset, zIndex: 10,
+            width: 56, height: 56, borderRadius: 18,
+            backgroundColor: colors.primary.DEFAULT, alignItems: 'center', justifyContent: 'center',
+            shadowColor: colors.primary.DEFAULT, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
+        },
+        gradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: bottomOffset + 60, zIndex: 1 },
+        centered: { flex: 1, alignItems: 'center', justifyContent: 'center' }
+    }), [colors, inModal, bottomOffset]);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -112,47 +201,34 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: inModal ? Colors.iron[100] : Colors.iron[900] }}>
+        <View style={st.container}>
             {/* Search Header */}
-            <View style={{ padding: 16 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], elevation: 1, shadowColor: Colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, gap: 10 }}>
-                    <Search size={20} color={Colors.iron[400]} />
+            <View style={st.header}>
+                <View style={st.searchBar}>
+                    <Search size={20} color={colors.iron[400]} />
                     <TextInput
-                        style={{ flex: 1, fontSize: 16, color: Colors.iron[950], padding: 0, fontWeight: '500' }}
+                        style={st.searchInput}
                         placeholder="Buscar ejercicio…"
-                        placeholderTextColor={Colors.iron[400]}
+                        placeholderTextColor={colors.iron[400]}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                     />
                 </View>
 
                 {/* Category Chips */}
-                <View style={{ marginTop: 12 }}>
+                <View style={st.categoryList}>
                     <FlatList<CategoryItem>
                         horizontal
-                        data={[{ id: 'all', name: 'Todos', color: Colors.iron[950] }, ...categories]}
+                        data={[{ id: 'all', name: 'Todos', color: colors.iron[950] }, ...categories]}
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={{ paddingRight: 20 }}
                         keyExtractor={(item) => item.id}
                         renderItem={({ item }) => (
                             <TouchableOpacity
                                 onPress={() => setSelectedCategory(item.id)}
-                                style={{
-                                    paddingHorizontal: 14,
-                                    paddingVertical: 10,
-                                    borderRadius: 999,
-                                    marginRight: 10,
-                                    borderWidth: 1,
-                                    backgroundColor: selectedCategory === item.id ? Colors.primary.DEFAULT : Colors.surface,
-                                    borderColor: selectedCategory === item.id ? Colors.primary.DEFAULT : Colors.iron[300],
-                                    elevation: selectedCategory === item.id ? 2 : 1,
-                                    shadowColor: Colors.black, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2,
-                                }}
+                                style={[st.categoryChip, selectedCategory === item.id && st.categoryChipActive]}
                             >
-                                <Text style={{
-                                    fontSize: 13, fontWeight: '800',
-                                    color: selectedCategory === item.id ? Colors.white : Colors.iron[500]
-                                }}>
+                                <Text style={[st.categoryText, selectedCategory === item.id && st.categoryTextActive]}>
                                     {item.name}
                                 </Text>
                             </TouchableOpacity>
@@ -163,49 +239,37 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
 
             {/* List */}
             {loading ? (
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                    <ActivityIndicator color={Colors.primary.dark} />
+                <View style={st.centered}>
+                    <ActivityIndicator color={colors.primary.DEFAULT} />
                 </View>
             ) : (
                 <FlatList<ExerciseItem>
                     data={exercises}
-                    contentContainerStyle={{ padding: 16, paddingBottom: inModal ? 40 : 100 }}
+                    contentContainerStyle={st.listContent}
                     onEndReachedThreshold={0.5}
                     keyExtractor={(item) => item.id}
                     renderItem={({ item }) => (
                         <TouchableOpacity
                             onPress={() => handlePress(item)}
-                            style={{
-                                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                                padding: 16, marginBottom: 12, backgroundColor: Colors.surface,
-                                borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[300], elevation: 2,
-                                shadowColor: Colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6,
-                            }}
+                            style={st.card}
                             accessibilityRole="button"
                             accessibilityLabel={`Abrir ejercicio ${item.name}`}
                         >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12, overflow: 'hidden' }}>
-                                <View style={{
-                                    width: 40, height: 40, borderRadius: 12,
-                                    backgroundColor: (item.category_color || Colors.iron[400]) + '20',
-                                    borderWidth: 1, borderColor: (item.category_color || Colors.iron[400]) + '40',
-                                    justifyContent: 'center', alignItems: 'center',
-                                }}>
-                                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: item.category_color || Colors.iron[400] }} />
+                            <View style={st.cardInfo}>
+                                <View style={[st.cardIcon, {
+                                    backgroundColor: (item.category_color || colors.iron[400]) + '15',
+                                    borderColor: (item.category_color || colors.iron[400]) + '30',
+                                }]}>
+                                    <View style={[st.cardDot, { backgroundColor: item.category_color || colors.iron[400] }]} />
                                 </View>
-                                <View style={{ flex: 1, overflow: 'hidden' }}>
-                                    <Text style={{ color: Colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 }} numberOfLines={1}>{item.name}</Text>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8, flex: 1, overflow: 'hidden' }}>
-                                        <Text
-                                            style={{ color: Colors.iron[500], fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0 }}
-                                            numberOfLines={1}
-                                        >
-                                            {item.category_name}
-                                        </Text>
+                                <View style={st.cardText}>
+                                    <Text style={st.cardTitle} numberOfLines={1}>{item.name}</Text>
+                                    <View style={st.cardMeta}>
+                                        <Text style={st.cardCategory} numberOfLines={1}>{item.category_name}</Text>
 
                                         {/* Badges Preview */}
                                         {item.badges && item.badges.length > 0 && (
-                                            <View style={{ flexDirection: 'row', gap: 4, flexShrink: 1, alignItems: 'center' }}>
+                                            <View style={st.cardBadges}>
                                                 {item.badges.slice(0, 3).map((badge, idx) => (
                                                     <View key={`${item.id}-badge-${idx}`} style={{ flexShrink: 1 }}>
                                                         <BadgePill
@@ -217,34 +281,33 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
                                                     </View>
                                                 ))}
                                                 {item.badges.length > 3 && (
-                                                    <View style={{ backgroundColor: Colors.iron[100], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, justifyContent: 'center', flexShrink: 0 }}>
-                                                        <Text style={{ fontSize: 9, fontWeight: '800', color: Colors.iron[500] }}>+{item.badges.length - 3}</Text>
+                                                    <View style={st.badgeMore}>
+                                                        <Text style={st.badgeMoreText}>+{item.badges.length - 3}</Text>
                                                     </View>
                                                 )}
                                             </View>
                                         )}
                                     </View>
                                 </View>
-
                             </View>
                             {!onSelect && (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 8 }}>
+                                <View style={st.actions}>
                                     <TouchableOpacity
                                         onPress={() => handleEdit(item)}
-                                        style={{ padding: 8, backgroundColor: Colors.iron[200], borderRadius: 10, borderWidth: 1, borderColor: Colors.iron[300] }}
+                                        style={st.actionBtn}
                                         accessibilityRole="button"
                                         accessibilityLabel={`Editar ejercicio ${item.name}`}
                                     >
-                                        <Pencil size={14} color={Colors.iron[500]} />
+                                        <Pencil size={15} color={colors.iron[600]} />
                                     </TouchableOpacity>
                                     {!item.is_system && (
                                         <TouchableOpacity
                                             onPress={() => handleDelete(item)}
-                                            style={{ padding: 8, backgroundColor: Colors.red + '12', borderRadius: 10, borderWidth: 1, borderColor: Colors.red + '25' }}
+                                            style={st.deleteBtn}
                                             accessibilityRole="button"
                                             accessibilityLabel={`Eliminar ejercicio ${item.name}`}
                                         >
-                                            <Trash2 size={14} color={Colors.red} />
+                                            <Trash2 size={15} color={colors.red} />
                                         </TouchableOpacity>
                                     )}
                                 </View>
@@ -258,23 +321,18 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
             {!onSelect && (
                 <TouchableOpacity
                     onPress={handleCreate}
-                    style={{
-                        position: 'absolute', right: 24, bottom: bottomOffset, zIndex: 10,
-                        width: 56, height: 56, borderRadius: 16,
-                        backgroundColor: Colors.primary.DEFAULT, alignItems: 'center', justifyContent: 'center',
-                        shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
-                    }}
+                    style={st.fab}
                     accessibilityRole="button"
                     accessibilityLabel="Crear ejercicio"
                 >
-                    <Plus color={Colors.white} size={24} />
+                    <Plus color={colors.white} size={28} />
                 </TouchableOpacity>
             )}
 
             {!inModal && (
                 <LinearGradient
-                    colors={['transparent', Colors.iron[900]]}
-                    style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: bottomOffset + 60, zIndex: 1 }}
+                    colors={['transparent', colors.background]}
+                    style={st.gradient}
                     pointerEvents="none"
                 />
             )}

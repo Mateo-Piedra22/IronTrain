@@ -1,9 +1,10 @@
-import { Colors, ThemeFx, withAlpha } from '@/src/theme';
+import { withAlpha } from '@/src/theme';
 import { ChevronDown, Minus, Pause, Play, Plus, RotateCcw, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
+import { useColors } from '../src/hooks/useColors';
 import { feedbackService } from '../src/services/FeedbackService';
 import { systemNotificationService } from '../src/services/SystemNotificationService';
 
@@ -47,7 +48,143 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps) {
+    const colors = useColors();
     const insets = useSafeAreaInsets();
+
+    const ss = useMemo(() => StyleSheet.create({
+        container: { flex: 1, backgroundColor: colors.iron[100] },
+        idleHeader: {
+            marginBottom: 12,
+            paddingHorizontal: 20,
+            paddingTop: 16,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 16,
+            backgroundColor: colors.surface,
+            paddingBottom: 20,
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.border,
+        },
+        backBtn: {
+            width: 38, height: 38, borderRadius: 12,
+            backgroundColor: colors.iron[100], alignItems: 'center', justifyContent: 'center',
+            borderWidth: 1.5, borderColor: colors.border,
+            elevation: 2, shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4
+        },
+        pageTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 24, letterSpacing: -1 },
+        pageSub: { color: colors.primary.DEFAULT, fontSize: 11, fontWeight: '800', marginTop: 2, letterSpacing: 0.8, textTransform: 'uppercase' },
+        closeBtn: { padding: 8 },
+        sectionLabel: { color: colors.iron[400], fontSize: 10, fontWeight: '800', textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1.2, marginLeft: 4 },
+        presetsSection: { paddingVertical: 20 },
+        presetCard: {
+            width: 140, backgroundColor: colors.surface, borderRadius: 16,
+            borderWidth: 1.5, borderColor: colors.border, padding: 14, justifyContent: 'center',
+            shadowColor: colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2
+        },
+        presetCardActive: { backgroundColor: colors.primary.DEFAULT, borderColor: colors.primary.DEFAULT, elevation: 4, shadowOpacity: 0.15 },
+        presetCardName: { fontWeight: '900', fontSize: 14, color: colors.iron[950], marginBottom: 4 },
+        presetCardDesc: { fontSize: 11, color: colors.iron[400], fontWeight: '600', lineHeight: 15 },
+        steppersTopRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+        stepperCard: {
+            flex: 1, backgroundColor: colors.surface, borderRadius: 18,
+            borderWidth: 1.5, borderColor: colors.border, padding: 16, marginBottom: 12,
+            shadowColor: colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2
+        },
+        stepperAccent: { width: 4, height: 14, borderRadius: 2, backgroundColor: colors.primary.DEFAULT },
+        stepperLabel: { color: colors.iron[500], fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+        stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+        stepperBtn: {
+            width: 40, height: 40, borderRadius: 12,
+            backgroundColor: colors.iron[100], borderWidth: 1.5, borderColor: colors.border,
+            alignItems: 'center', justifyContent: 'center'
+        },
+        stepperValue: { color: colors.iron[950], fontSize: 26, fontWeight: '900', fontVariant: ['tabular-nums'] },
+        summaryCard: {
+            backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1.5, borderColor: colors.border,
+            padding: 16, shadowColor: colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2
+        },
+        detailBox: {
+            backgroundColor: colors.surface, borderRadius: 16, padding: 16, borderWidth: 1.5, borderColor: colors.border
+        },
+        detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+        detailLabel: { color: colors.iron[500], fontSize: 12, fontWeight: '700' },
+        detailValue: { color: colors.iron[950], fontSize: 13, fontWeight: '900', textTransform: 'uppercase' },
+        summaryRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+        dot: { width: 12, height: 12, borderRadius: 6, marginRight: 8 },
+        summaryLabel: { color: colors.iron[950], fontWeight: '700', flex: 1 },
+        summaryValue: { color: colors.iron[950], fontWeight: '800' },
+        summaryTotal: { borderTopWidth: 1.5, borderTopColor: colors.border, marginTop: 4, paddingTop: 8, flexDirection: 'row', alignItems: 'center' },
+        startBtn: {
+            backgroundColor: colors.primary.DEFAULT, borderRadius: 16, paddingVertical: 18, alignItems: 'center',
+            elevation: 4, shadowColor: colors.primary.DEFAULT, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12
+        },
+        startBtnText: { color: colors.white, fontWeight: '900', fontSize: 16, textTransform: 'uppercase', letterSpacing: 1 },
+        activeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+        activeTopBar: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, zIndex: 10 },
+        activePhaseChip: {
+            flexDirection: 'row', alignItems: 'center', backgroundColor: withAlpha(colors.white, '1F'),
+            borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, gap: 8, borderWidth: 1.5, borderColor: withAlpha(colors.white, '1A')
+        },
+        activePhaseIndicator: { width: 8, height: 8, borderRadius: 4 },
+        activePhaseChipText: { color: withAlpha(colors.white, 'D9'), fontSize: 11, fontWeight: '900', letterSpacing: 1.5 },
+        activeCloseBtn: {
+            width: 40, height: 40, borderRadius: 20, backgroundColor: withAlpha(colors.white, '1F'),
+            alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: withAlpha(colors.white, '1A')
+        },
+        pillsRow: { position: 'absolute', flexDirection: 'row', gap: 4, paddingHorizontal: 20, left: 0, right: 0 },
+        pill: { height: 4, borderRadius: 2, flex: 1 },
+        phaseLabel: { color: withAlpha(colors.white, '99'), fontWeight: '900', fontSize: 14, marginBottom: 24, textTransform: 'uppercase', letterSpacing: 6 },
+        timerBig: {
+            color: colors.white, fontWeight: '900', fontSize: 84, fontVariant: ['tabular-nums'],
+            textShadowColor: withAlpha(colors.black, '26'), textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 10
+        },
+        roundInfo: { color: withAlpha(colors.white, '73'), fontSize: 16, fontWeight: '700', marginTop: 24 },
+        elapsedChip: {
+            flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12,
+            backgroundColor: withAlpha(colors.white, '14'), paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12
+        },
+        elapsedInfo: { color: withAlpha(colors.white, '66'), fontSize: 12, fontWeight: '800' },
+        controlsRow: { position: 'absolute', flexDirection: 'row', gap: 32, alignItems: 'center' },
+        controlBtn: {
+            width: 58, height: 58, backgroundColor: withAlpha(colors.white, '1A'), borderRadius: 29,
+            alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: withAlpha(colors.white, '1F')
+        },
+        controlLabel: { color: withAlpha(colors.white, '59'), fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 },
+        pauseBtn: {
+            width: 84, height: 84, backgroundColor: colors.white, borderRadius: 42,
+            alignItems: 'center', justifyContent: 'center', elevation: 8,
+            shadowColor: colors.black, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16
+        },
+        finishedControls: { position: 'absolute', width: '100%', paddingHorizontal: 20 },
+        finishedCard: {
+            backgroundColor: withAlpha(colors.white, '14'), borderRadius: 24, padding: 20, marginBottom: 16,
+            borderWidth: 1.5, borderColor: withAlpha(colors.white, '14')
+        },
+        finSectionLabel: { color: withAlpha(colors.white, '59'), fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 16 },
+        finishedRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+        finishedLabel: { color: withAlpha(colors.white, '80'), fontWeight: '700', fontSize: 14 },
+        finishedValue: { color: colors.white, fontWeight: '900', fontSize: 14 },
+        finishedTotalRow: { borderTopWidth: 1.5, borderTopColor: withAlpha(colors.white, '1A'), marginTop: 6, paddingTop: 16, flexDirection: 'row', justifyContent: 'space-between' },
+        finishedTotalLabel: { color: withAlpha(colors.white, 'B3'), fontWeight: '900', fontSize: 15 },
+        finishedTotalValue: { color: colors.white, fontWeight: '900', fontSize: 18 },
+        repeatBtn: {
+            flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', alignItems: 'center',
+            borderWidth: 1.5, borderColor: withAlpha(colors.white, '4D'), borderRadius: 16, paddingVertical: 18, backgroundColor: withAlpha(colors.white, '0F')
+        },
+        repeatBtnText: { color: colors.white, fontWeight: '800', fontSize: 15 },
+        doneBtn: {
+            flex: 1, backgroundColor: colors.white, borderRadius: 16, paddingVertical: 18, alignItems: 'center',
+            elevation: 4, shadowColor: colors.black, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.15, shadowRadius: 8
+        },
+        doneBtnText: { color: colors.black, fontWeight: '900', fontSize: 15 },
+        flex1: { flex: 1 },
+        rowGap10: { flexDirection: 'row', gap: 10 },
+        alignCenter: { alignItems: 'center' },
+        justifyCenter: { justifyContent: 'center' },
+        mt16: { marginTop: 16 },
+        mb12: { marginBottom: 12 },
+    }), [colors]);
 
     const [workSec, setWorkSec] = useState(20);
     const [restSec, setRestSec] = useState(10);
@@ -202,19 +339,19 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
         value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; label: string; formatFn?: (v: number) => string; accentColor?: string;
     }) => (
         <View style={ss.stepperCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+            <View style={[ss.rowGap10, ss.alignCenter, { marginBottom: 12, paddingHorizontal: 2 }]}>
                 <View style={[ss.stepperAccent, accentColor ? { backgroundColor: accentColor } : {}]} />
                 <Text style={ss.stepperLabel}>{label}</Text>
             </View>
             <View style={ss.stepperRow}>
                 <TouchableOpacity onPress={() => { onChange(Math.max(min, value - step)); feedbackService.buttonPress(); }} style={ss.stepperBtn} activeOpacity={0.8}>
-                    <Minus size={16} color={Colors.iron[950]} />
+                    <Minus size={16} color={colors.iron[950]} />
                 </TouchableOpacity>
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                    <Text style={ss.stepperValue}>{formatFn ? formatFn(value) : value}</Text>
+                <View style={ss.flex1}>
+                    <Text style={[ss.stepperValue, { textAlign: 'center' }]}>{formatFn ? formatFn(value) : value}</Text>
                 </View>
                 <TouchableOpacity onPress={() => { onChange(Math.min(max, value + step)); feedbackService.buttonPress(); }} style={ss.stepperBtn} activeOpacity={0.8}>
-                    <Plus size={16} color={Colors.iron[950]} />
+                    <Plus size={16} color={colors.iron[950]} />
                 </TouchableOpacity>
             </View>
         </View>
@@ -222,11 +359,11 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
 
     const getPhaseConfig = () => {
         switch (phase) {
-            case 'prepare': return { bg: '#92400e', label: 'PREPÁRATE', ringColor: '#fbbf24', accentBg: withAlpha(Colors.yellow, '26') };
-            case 'work': return { bg: '#3e1c1c', label: '¡TRABAJO!', ringColor: '#d4a574', accentBg: withAlpha(Colors.primary.light, '1F') };
-            case 'rest': return { bg: '#14532d', label: 'DESCANSO', ringColor: '#86efac', accentBg: withAlpha(Colors.green, '1F') };
-            case 'finished': return { bg: '#3e1c1c', label: '¡COMPLETADO!', ringColor: '#d4a574', accentBg: withAlpha(Colors.primary.light, '1F') };
-            default: return { bg: Colors.iron[900], label: '', ringColor: Colors.primary.DEFAULT, accentBg: 'transparent' };
+            case 'prepare': return { bg: '#92400e', label: 'PREPÁRATE', ringColor: '#fbbf24', accentBg: withAlpha(colors.yellow, '26') };
+            case 'work': return { bg: '#3e1c1c', label: '¡TRABAJO!', ringColor: '#d4a574', accentBg: withAlpha(colors.primary.light, '1F') };
+            case 'rest': return { bg: '#14532d', label: 'DESCANSO', ringColor: '#86efac', accentBg: withAlpha(colors.green, '1F') };
+            case 'finished': return { bg: '#3e1c1c', label: '¡COMPLETADO!', ringColor: '#d4a574', accentBg: withAlpha(colors.primary.light, '1F') };
+            default: return { bg: colors.iron[900], label: '', ringColor: colors.primary.DEFAULT, accentBg: 'transparent' };
         }
     };
 
@@ -242,83 +379,85 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                     {/* Modern Header */}
                     <View style={ss.idleHeader}>
                         <TouchableOpacity onPress={handleClose} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Cerrar">
-                            <ChevronDown size={20} color={Colors.iron[950]} />
+                            <ChevronDown size={20} color={colors.iron[950]} />
                         </TouchableOpacity>
-                        <View style={{ flex: 1 }}>
+                        <View style={ss.flex1}>
                             <Text style={ss.pageTitle}>Interval Timer</Text>
-                            <Text style={ss.pageSub}>TOTAL: {formatDuration(totalWorkoutTime).toUpperCase()}</Text>
+                            <Text style={ss.pageSub}>TOTAL: {formatDuration(totalWorkoutTime)}</Text>
                         </View>
                     </View>
 
-                    {/* Presets - Two Rows */}
-                    <View style={ss.presetsSection}>
-                        <Text style={ss.sectionLabel}>Presets rápidos</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'column', gap: 10, paddingRight: 20 }}>
-                            <View style={{ flexDirection: 'row', gap: 10 }}>
-                                {PRESETS.slice(0, 5).map(preset => {
-                                    const isActive = preset.work === workSec && preset.rest === restSec && preset.rounds === rounds;
-                                    return (
-                                        <Pressable key={preset.id} onPress={() => applyPreset(preset)} style={[ss.presetCard, isActive && ss.presetCardActive]}>
-                                            <Text style={[ss.presetCardName, isActive && { color: Colors.white }]}>{preset.name}</Text>
-                                            <Text style={[ss.presetCardDesc, isActive && { color: withAlpha(Colors.white, 'B3') }]}>{preset.description}</Text>
-                                        </Pressable>
-                                    );
-                                })}
-                            </View>
-                            <View style={{ flexDirection: 'row', gap: 10 }}>
-                                {PRESETS.slice(5).map(preset => {
-                                    const isActive = preset.work === workSec && preset.rest === restSec && preset.rounds === rounds;
-                                    return (
-                                        <Pressable key={preset.id} onPress={() => applyPreset(preset)} style={[ss.presetCard, isActive && ss.presetCardActive]}>
-                                            <Text style={[ss.presetCardName, isActive && { color: Colors.white }]}>{preset.name}</Text>
-                                            <Text style={[ss.presetCardDesc, isActive && { color: withAlpha(Colors.white, 'B3') }]}>{preset.description}</Text>
-                                        </Pressable>
-                                    );
-                                })}
-                            </View>
-                        </ScrollView>
-                    </View>
-
-                    {/* Steppers & Summary - Grid Layout */}
-                    <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 16 }}>
-                        <View style={ss.steppersTopRow}>
-                            <Stepper value={workSec} onChange={setWorkSec} min={5} max={600} step={5} label="Trabajo" formatFn={formatTime} accentColor={Colors.red} />
-                            <Stepper value={restSec} onChange={setRestSec} min={0} max={300} step={5} label="Descanso" formatFn={formatTime} accentColor={Colors.green} />
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+                        {/* Presets - Two Rows */}
+                        <View style={ss.presetsSection}>
+                            <Text style={ss.sectionLabel}>Presets rápidos</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'column', gap: 12, paddingHorizontal: 20 }}>
+                                <View style={ss.rowGap10}>
+                                    {PRESETS.slice(0, 5).map(preset => {
+                                        const isActive = preset.work === workSec && preset.rest === restSec && preset.rounds === rounds;
+                                        return (
+                                            <Pressable key={preset.id} onPress={() => applyPreset(preset)} style={[ss.presetCard, isActive && ss.presetCardActive]}>
+                                                <Text style={[ss.presetCardName, isActive && { color: colors.white }]}>{preset.name}</Text>
+                                                <Text style={[ss.presetCardDesc, isActive && { color: withAlpha(colors.white, 'B3') }]}>{preset.description}</Text>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                                <View style={ss.rowGap10}>
+                                    {PRESETS.slice(5).map(preset => {
+                                        const isActive = preset.work === workSec && preset.rest === restSec && preset.rounds === rounds;
+                                        return (
+                                            <Pressable key={preset.id} onPress={() => applyPreset(preset)} style={[ss.presetCard, isActive && ss.presetCardActive]}>
+                                                <Text style={[ss.presetCardName, isActive && { color: colors.white }]}>{preset.name}</Text>
+                                                <Text style={[ss.presetCardDesc, isActive && { color: withAlpha(colors.white, 'B3') }]}>{preset.description}</Text>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            </ScrollView>
                         </View>
 
-                        <View style={{ flexDirection: 'row', gap: 12 }}>
-                            <View style={{ flex: 1.1 }}>
-                                <Stepper value={rounds} onChange={setRounds} min={1} max={50} step={1} label="Rondas" accentColor={Colors.yellow} />
+                        {/* Steppers & Summary - Grid Layout */}
+                        <View style={{ paddingHorizontal: 20 }}>
+                            <View style={ss.steppersTopRow}>
+                                <Stepper value={workSec} onChange={setWorkSec} min={5} max={600} step={5} label="Trabajo" formatFn={formatTime} accentColor={colors.primary.light} />
+                                <Stepper value={restSec} onChange={setRestSec} min={0} max={300} step={5} label="Descanso" formatFn={formatTime} accentColor={colors.green} />
                             </View>
 
-                            <View style={[ss.summaryCard, { flex: 0.9, marginBottom: 12 }]}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                    <Text style={[ss.sectionLabel, { marginBottom: 0 }]}>Estimado</Text>
-                                    <Zap size={14} color={Colors.primary.DEFAULT} />
+                            <View style={ss.rowGap10}>
+                                <View style={{ flex: 1.1 }}>
+                                    <Stepper value={rounds} onChange={setRounds} min={1} max={50} step={1} label="Rondas" accentColor={colors.yellow} />
                                 </View>
 
-                                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                                    <Text style={{ fontSize: 24, fontWeight: '900', color: Colors.iron[950] }}>
-                                        {formatDuration(totalWorkoutTime).split(' ')[0]}
-                                    </Text>
-                                    <Text style={{ fontSize: 13, fontWeight: '800', color: Colors.iron[500] }}>
-                                        {formatDuration(totalWorkoutTime).split(' ')[1] || 'min'}
+                                <View style={[ss.summaryCard, { flex: 0.9, marginBottom: 12 }]}>
+                                    <View style={[ss.rowGap10, ss.alignCenter, { justifyContent: 'space-between', marginBottom: 10 }]}>
+                                        <Text style={[ss.sectionLabel, { marginBottom: 0, marginLeft: 0 }]}>Estimado</Text>
+                                        <Zap size={14} color={colors.primary.DEFAULT} />
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                                        <Text style={{ fontSize: 26, fontWeight: '900', color: colors.iron[950] }}>
+                                            {formatDuration(totalWorkoutTime).split(' ')[0]}
+                                        </Text>
+                                        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.iron[500] }}>
+                                            {formatDuration(totalWorkoutTime).split(' ')[1] || 'min'}
+                                        </Text>
+                                    </View>
+                                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.iron[400], marginTop: 2 }}>
+                                        Duración total
                                     </Text>
                                 </View>
-                                <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.iron[400], marginTop: 2 }}>
-                                    Duración total
-                                </Text>
                             </View>
-                        </View>
 
-                        {/* Summary Detail */}
-                        <View style={ss.detailBox}>
-                            <View style={ss.detailRow}>
-                                <Text style={ss.detailLabel}>Secuencia:</Text>
-                                <Text style={ss.detailValue}>{formatTime(workSec)} WRK + {restSec > 0 ? `${formatTime(restSec)} RST` : 'SIN DESC.'}</Text>
+                            {/* Summary Detail */}
+                            <View style={ss.detailBox}>
+                                <View style={ss.detailRow}>
+                                    <Text style={ss.detailLabel}>Secuencia:</Text>
+                                    <Text style={ss.detailValue}>{formatTime(workSec)} Trabajo + {restSec > 0 ? `${formatTime(restSec)} Rest` : 'Sin Desc.'}</Text>
+                                </View>
                             </View>
                         </View>
-                    </View>
+                    </ScrollView>
 
                     {/* Start Button */}
                     <View style={{ paddingHorizontal: 20, paddingBottom: 16 }}>
@@ -346,18 +485,18 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                         </Text>
                     </View>
                     <TouchableOpacity onPress={handleClose} style={ss.activeCloseBtn} activeOpacity={0.8}>
-                        <X color={Colors.white} size={18} />
+                        <X color={colors.white} size={18} />
                     </TouchableOpacity>
                 </View>
 
                 {/* Round indicator pills */}
                 {phase !== 'finished' && (
-                    <View style={[ss.pillsRow, { top: insets.top + 52 }]}>
+                    <View style={[ss.pillsRow, { top: insets.top + 56 }]}>
                         {Array.from({ length: rounds }, (_, i) => (
                             <View key={i} style={[ss.pill, {
-                                backgroundColor: i < currentRound - 1 ? withAlpha(Colors.white, 'D9') :
+                                backgroundColor: i < currentRound - 1 ? withAlpha(colors.white, 'D9') :
                                     i === currentRound - 1 ? phaseConfig.ringColor :
-                                        withAlpha(Colors.white, '26'),
+                                        withAlpha(colors.white, '26'),
                             }]} />
                         ))}
                     </View>
@@ -371,7 +510,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                         <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
                             <View style={{ alignItems: 'center', justifyContent: 'center', width: RING_SIZE, height: RING_SIZE }}>
                                 <Svg width={RING_SIZE} height={RING_SIZE} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
-                                    <Circle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS} stroke={withAlpha(Colors.white, '14')} strokeWidth={RING_STROKE} fill="none" />
+                                    <Circle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS} stroke={withAlpha(colors.white, '14')} strokeWidth={RING_STROKE} fill="none" />
                                     <AnimatedCircle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS} stroke={phaseConfig.ringColor} strokeWidth={RING_STROKE} fill="none" strokeLinecap="round" strokeDasharray={`${RING_CIRCUMFERENCE}`} strokeDashoffset={strokeDashoffset} />
                                 </Svg>
                                 <Text style={ss.timerBig}>{formatTime(timeLeft)}</Text>
@@ -388,7 +527,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                     </Text>
                     {phase !== 'prepare' && (
                         <View style={ss.elapsedChip}>
-                            <Zap size={12} color={withAlpha(Colors.white, '80')} />
+                            <RotateCcw size={12} color={withAlpha(colors.white, '80')} />
                             <Text style={ss.elapsedInfo}>{formatDuration(elapsedTotal)}</Text>
                         </View>
                     )}
@@ -396,19 +535,19 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
 
                 {/* Controls */}
                 {phase !== 'finished' && phase !== 'prepare' && (
-                    <View style={[ss.controlsRow, { bottom: insets.bottom + 32 }]}>
-                        <View style={{ alignItems: 'center', gap: 6 }}>
+                    <View style={[ss.controlsRow, { bottom: insets.bottom + 48 }]}>
+                        <View style={ss.alignCenter}>
                             <TouchableOpacity onPress={handleReset} style={ss.controlBtn} activeOpacity={0.8}>
-                                <RotateCcw color={Colors.white} size={22} />
+                                <RotateCcw color={colors.white} size={22} />
                             </TouchableOpacity>
                             <Text style={ss.controlLabel}>Reset</Text>
                         </View>
                         <TouchableOpacity onPress={handlePause} style={ss.pauseBtn} activeOpacity={0.9}>
-                            {isPaused ? <Play color={Colors.black} size={28} fill={Colors.black} /> : <Pause color={Colors.black} size={28} fill={Colors.black} />}
+                            {isPaused ? <Play color={colors.black} size={32} fill={colors.black} /> : <Pause color={colors.black} size={32} fill={colors.black} />}
                         </TouchableOpacity>
-                        <View style={{ alignItems: 'center', gap: 6 }}>
+                        <View style={ss.alignCenter}>
                             <TouchableOpacity onPress={handleSkipPhase} style={ss.controlBtn} activeOpacity={0.8}>
-                                <ChevronDown color={Colors.white} size={22} />
+                                <ChevronDown color={colors.white} size={22} style={{ transform: [{ rotate: '-90deg' }] }} />
                             </TouchableOpacity>
                             <Text style={ss.controlLabel}>Saltar</Text>
                         </View>
@@ -430,7 +569,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                         </View>
                         <View style={{ flexDirection: 'row', gap: 12 }}>
                             <Pressable onPress={handleReset} style={ss.repeatBtn}>
-                                <RotateCcw color={Colors.white} size={16} />
+                                <RotateCcw color={colors.white} size={16} />
                                 <Text style={ss.repeatBtnText}>Repetir</Text>
                             </Pressable>
                             <Pressable onPress={handleClose} style={ss.doneBtn}>
@@ -444,68 +583,3 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
     );
 }
 
-const ss = StyleSheet.create({
-    container: { flex: 1, backgroundColor: Colors.iron[900] },
-    idleHeader: { marginBottom: 12, paddingHorizontal: 20, paddingTop: 16, flexDirection: 'row', alignItems: 'center', gap: 16 },
-    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
-    pageTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 24, letterSpacing: -1 },
-    pageSub: { color: Colors.primary.DEFAULT, fontSize: 12, fontWeight: '800', marginTop: 2, letterSpacing: 0.5 },
-    closeBtn: { padding: 8 },
-    sectionLabel: { color: Colors.iron[400], fontSize: 10, fontWeight: '800', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 1 },
-    presetsSection: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-    presetCard: { width: 140, backgroundColor: Colors.surface, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[700], padding: 14, justifyContent: 'center' },
-    presetCardActive: { backgroundColor: Colors.primary.DEFAULT, borderColor: Colors.primary.DEFAULT },
-    presetCardName: { fontWeight: '900', fontSize: 14, color: Colors.iron[950], marginBottom: 4 },
-    presetCardDesc: { fontSize: 11, color: Colors.iron[400], fontWeight: '600', lineHeight: 15 },
-    steppersTopRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
-    stepperCard: { flex: 1, backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], padding: 16, marginBottom: 12 },
-    stepperAccent: { width: 4, height: 14, borderRadius: 2, backgroundColor: Colors.primary.DEFAULT },
-    stepperLabel: { color: Colors.iron[500], fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
-    stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    stepperBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.iron[800], borderWidth: 1, borderColor: Colors.iron[700], alignItems: 'center', justifyContent: 'center' },
-    stepperValue: { color: Colors.iron[950], fontSize: 26, fontWeight: '900', fontVariant: ['tabular-nums'] },
-    summaryCard: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.iron[700], padding: 16 },
-    detailBox: { backgroundColor: Colors.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: Colors.iron[700] },
-    detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    detailLabel: { color: Colors.iron[500], fontSize: 12, fontWeight: '700' },
-    detailValue: { color: Colors.iron[950], fontSize: 13, fontWeight: '900', textTransform: 'uppercase' },
-    summaryRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-    dot: { width: 12, height: 12, borderRadius: 6, marginRight: 8 },
-    summaryLabel: { color: Colors.iron[950], fontWeight: '700', flex: 1 },
-    summaryValue: { color: Colors.iron[950], fontWeight: '800' },
-    summaryTotal: { borderTopWidth: 1, borderTopColor: Colors.iron[700], marginTop: 4, paddingTop: 8, flexDirection: 'row', alignItems: 'center' },
-    startBtn: { backgroundColor: Colors.primary.DEFAULT, borderRadius: 16, paddingVertical: 16, alignItems: 'center', elevation: 2, shadowColor: Colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
-    startBtnText: { color: Colors.white, fontWeight: '900', fontSize: 16, textTransform: 'uppercase', letterSpacing: 1 },
-    // ─── Active Screen ───────────────────────────────────────────────────────
-    activeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    activeTopBar: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, zIndex: 10 },
-    activePhaseChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: withAlpha(Colors.white, '1F'), borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, gap: 8, borderWidth: 1, borderColor: withAlpha(Colors.white, '1A') },
-    activePhaseIndicator: { width: 8, height: 8, borderRadius: 4 },
-    activePhaseChipText: { color: withAlpha(Colors.white, 'D9'), fontSize: 11, fontWeight: '900', letterSpacing: 1.5 },
-    activeCloseBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: withAlpha(Colors.white, '1F'), alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: withAlpha(Colors.white, '1A') },
-    pillsRow: { position: 'absolute', flexDirection: 'row', gap: 4, paddingHorizontal: 20, left: 0, right: 0 },
-    pill: { height: 4, borderRadius: 2, flex: 1 },
-    phaseLabel: { color: withAlpha(Colors.white, '99'), fontWeight: '900', fontSize: 14, marginBottom: 20, textTransform: 'uppercase', letterSpacing: 6 },
-    timerBig: { color: Colors.white, fontWeight: '900', fontSize: 72, fontVariant: ['tabular-nums'], textShadowColor: withAlpha(Colors.black, '26'), textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 },
-    roundInfo: { color: withAlpha(Colors.white, '73'), fontSize: 15, fontWeight: '700', marginTop: 16 },
-    elapsedChip: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, backgroundColor: withAlpha(Colors.white, '14'), paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 },
-    elapsedInfo: { color: withAlpha(Colors.white, '66'), fontSize: 12, fontWeight: '700' },
-    controlsRow: { position: 'absolute', flexDirection: 'row', gap: 28, alignItems: 'flex-start' },
-    controlBtn: { width: 54, height: 54, backgroundColor: withAlpha(Colors.white, '1A'), borderRadius: 27, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: withAlpha(Colors.white, '1F') },
-    controlLabel: { color: withAlpha(Colors.white, '59'), fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-    pauseBtn: { width: 72, height: 72, backgroundColor: Colors.white, borderRadius: 36, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12 },
-    // ─── Finished Screen ─────────────────────────────────────────────────────
-    finishedControls: { position: 'absolute', width: '100%', paddingHorizontal: 20 },
-    finishedCard: { backgroundColor: withAlpha(Colors.white, '14'), borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: withAlpha(Colors.white, '14') },
-    finSectionLabel: { color: withAlpha(Colors.white, '59'), fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 14 },
-    finishedRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-    finishedLabel: { color: withAlpha(Colors.white, '80'), fontWeight: '600', fontSize: 14 },
-    finishedValue: { color: Colors.white, fontWeight: '800', fontSize: 14 },
-    finishedTotalRow: { borderTopWidth: 1, borderTopColor: withAlpha(Colors.white, '1A'), marginTop: 6, paddingTop: 12, flexDirection: 'row', justifyContent: 'space-between' },
-    finishedTotalLabel: { color: withAlpha(Colors.white, 'B3'), fontWeight: '800', fontSize: 14 },
-    finishedTotalValue: { color: Colors.white, fontWeight: '900', fontSize: 16 },
-    repeatBtn: { flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: withAlpha(Colors.white, '4D'), borderRadius: 16, paddingVertical: 15, backgroundColor: withAlpha(Colors.white, '0F') },
-    repeatBtnText: { color: Colors.white, fontWeight: '800', fontSize: 15 },
-    doneBtn: { flex: 1, backgroundColor: Colors.white, borderRadius: 16, paddingVertical: 15, alignItems: 'center', elevation: 4, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.15, shadowRadius: 8 },
-    doneBtnText: { color: Colors.black, fontWeight: '900', fontSize: 15 },
-});

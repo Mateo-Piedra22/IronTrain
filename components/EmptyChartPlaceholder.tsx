@@ -1,7 +1,7 @@
-import { Colors } from '@/src/theme';
 import { BarChart2 } from 'lucide-react-native';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useColors } from '../src/hooks/useColors';
 
 interface EmptyChartPlaceholderProps {
     title?: string;
@@ -19,15 +19,79 @@ export function EmptyChartPlaceholder({
     message = 'Registra más entrenamientos para ver tu progreso aquí.',
     height = 200,
 }: EmptyChartPlaceholderProps) {
+    const colors = useColors();
+
+    const ss = useMemo(() => StyleSheet.create({
+        wrapper: {
+            width: '100%',
+            borderRadius: 16,
+            backgroundColor: colors.iron[100],
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            borderStyle: 'dashed',
+            justifyContent: 'center',
+            alignItems: 'center',
+            overflow: 'hidden',
+            position: 'relative',
+        },
+        gridOverlay: {
+            ...StyleSheet.absoluteFillObject,
+        },
+        gridLine: {
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            height: 1,
+            backgroundColor: colors.iron[300],
+            opacity: 0.3,
+        },
+        contentBox: {
+            alignItems: 'center',
+            paddingHorizontal: 32,
+            zIndex: 1,
+        },
+        iconCircle: {
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.iron[300],
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: 12,
+            elevation: 2,
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 4,
+        },
+        title: {
+            color: colors.iron[700],
+            fontWeight: '900',
+            fontSize: 14,
+            marginBottom: 4,
+            textAlign: 'center',
+            letterSpacing: -0.2,
+        },
+        message: {
+            color: colors.iron[500],
+            fontSize: 12,
+            textAlign: 'center',
+            lineHeight: 18,
+            fontWeight: '600',
+        },
+    }), [colors]);
+
     return (
-        <View style={[styles.wrapper, { height }]}>
+        <View style={[ss.wrapper, { height }]}>
             {/* Simulated grid lines */}
-            <View style={styles.gridOverlay}>
+            <View style={ss.gridOverlay}>
                 {[0, 1, 2, 3].map((i) => (
                     <View
                         key={i}
                         style={[
-                            styles.gridLine,
+                            ss.gridLine,
                             { top: `${(i + 1) * 20}%` },
                         ]}
                     />
@@ -35,69 +99,13 @@ export function EmptyChartPlaceholder({
             </View>
 
             {/* Content */}
-            <View style={styles.contentBox}>
-                <View style={styles.iconCircle}>
-                    <BarChart2 size={20} color={Colors.iron[400]} />
+            <View style={ss.contentBox}>
+                <View style={ss.iconCircle}>
+                    <BarChart2 size={20} color={colors.iron[400]} />
                 </View>
-                <Text style={styles.title}>{title}</Text>
-                <Text style={styles.message}>{message}</Text>
+                <Text style={ss.title}>{title}</Text>
+                <Text style={ss.message}>{message}</Text>
             </View>
         </View>
     );
 }
-
-const styles = StyleSheet.create({
-    wrapper: {
-        width: '100%',
-        borderRadius: 12,
-        backgroundColor: Colors.iron[200],
-        borderWidth: 1,
-        borderColor: Colors.iron[300],
-        borderStyle: 'dashed',
-        justifyContent: 'center',
-        alignItems: 'center',
-        overflow: 'hidden',
-        position: 'relative',
-    },
-    gridOverlay: {
-        ...StyleSheet.absoluteFillObject,
-    },
-    gridLine: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        height: 1,
-        backgroundColor: Colors.iron[300],
-        opacity: 0.5,
-    },
-    contentBox: {
-        alignItems: 'center',
-        paddingHorizontal: 32,
-        zIndex: 1,
-    },
-    iconCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: Colors.surface,
-        borderWidth: 1,
-        borderColor: Colors.iron[300],
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    title: {
-        color: Colors.iron[500],
-        fontWeight: '800',
-        fontSize: 13,
-        marginBottom: 4,
-        textAlign: 'center',
-    },
-    message: {
-        color: Colors.iron[400],
-        fontSize: 11,
-        textAlign: 'center',
-        lineHeight: 16,
-        fontWeight: '500',
-    },
-});

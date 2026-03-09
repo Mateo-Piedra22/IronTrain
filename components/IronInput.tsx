@@ -1,7 +1,7 @@
-import { Colors } from '@/src/theme';
 import { X } from 'lucide-react-native';
-import { useState } from 'react';
-import { Text, TextInput, TextInputProps, TouchableOpacity, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { StyleSheet, Text, TextInput, TextInputProps, TouchableOpacity, View } from 'react-native';
+import { useColors } from '../src/hooks/useColors';
 
 interface IronInputProps extends TextInputProps {
     label?: string;
@@ -9,34 +9,71 @@ interface IronInputProps extends TextInputProps {
 }
 
 export function IronInput({ label, error, className, value, onChangeText, ...props }: IronInputProps) {
+    const colors = useColors();
     const [isFocused, setIsFocused] = useState(false);
 
+    const ss = useMemo(() => StyleSheet.create({
+        container: { width: '100%', marginBottom: 16 },
+        label: {
+            color: colors.iron[500],
+            marginBottom: 8,
+            fontSize: 12,
+            fontWeight: '800',
+            textTransform: 'uppercase',
+            letterSpacing: 1,
+            marginLeft: 4,
+        },
+        inputWrapper: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: colors.surface,
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: error ? colors.red : (isFocused ? colors.primary.DEFAULT : colors.border),
+            overflow: 'hidden'
+        },
+        input: {
+            flex: 1,
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            color: colors.iron[950],
+            fontSize: 16,
+            fontWeight: '600'
+        },
+        clearBtn: { padding: 14 },
+        errorText: { color: colors.red, fontSize: 11, marginTop: 6, fontWeight: '700', marginLeft: 6 }
+    }), [colors, isFocused, error]);
+
     return (
-        <View className="w-full mb-4">
+        <View style={ss.container}>
             {label && (
-                <Text className="text-iron-500 mb-2 text-sm font-bold uppercase tracking-wider">
+                <Text style={ss.label}>
                     {label}
                 </Text>
             )}
-            <View className={`flex-row items-center bg-surface rounded-xl border ${isFocused ? 'border-primary' : 'border-iron-700'} ${error ? 'border-red-500' : ''} overflow-hidden`}>
+            <View style={ss.inputWrapper}>
                 <TextInput
                     value={value}
                     onChangeText={onChangeText}
-                    placeholderTextColor={Colors.iron[400]}
+                    placeholderTextColor={colors.iron[400]}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
                     accessibilityLabel={props.accessibilityLabel || label}
-                    className={`flex-1 p-4 text-iron-950 text-base ${className || ''}`}
+                    style={[ss.input, { textAlignVertical: props.multiline ? 'top' : 'center' }]}
                     {...props}
                 />
                 {value && value.length > 0 && onChangeText && (
-                    <TouchableOpacity onPress={() => onChangeText('')} className="p-4 active:opacity-50">
-                        <X size={18} color={Colors.iron[400]} />
+                    <TouchableOpacity
+                        onPress={() => onChangeText('')}
+                        activeOpacity={0.5}
+                        style={ss.clearBtn}
+                    >
+                        <X size={18} color={colors.iron[400]} strokeWidth={2.5} />
                     </TouchableOpacity>
                 )}
             </View>
             {error && (
-                <Text className="text-red-500 text-xs mt-1 font-medium ml-1">
+                <Text style={ss.errorText}>
                     {error}
                 </Text>
             )}

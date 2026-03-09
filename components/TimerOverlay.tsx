@@ -1,16 +1,44 @@
+import { useColors } from '@/src/hooks/useColors';
 import { useTimerStore } from '@/src/store/timerStore';
-import { Colors, ThemeFx } from '@/src/theme';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { Pause, Play, RotateCcw, X } from 'lucide-react-native';
-import React, { useContext, useEffect } from 'react';
+import React, { useContext, useEffect, useMemo } from 'react';
 import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export function TimerOverlay() {
+    const colors = useColors();
     const { timeLeft, isRunning, duration, stopTimer, pauseTimer, resumeTimer, restartTimer, addTime, tick } = useTimerStore();
     const insets = useSafeAreaInsets();
     const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
     const bottomOffset = (tabBarHeight ? tabBarHeight : insets.bottom) + 12;
+
+    const ss = useMemo(() => StyleSheet.create({
+        container: {
+            position: 'absolute',
+            backgroundColor: colors.iron[950],
+            borderWidth: 1,
+            borderColor: colors.iron[700],
+            borderRadius: 16,
+            flexDirection: 'row',
+            alignItems: 'center',
+            padding: 12,
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.3,
+            shadowRadius: 12,
+            elevation: 10,
+            zIndex: 50
+        },
+        label: { color: colors.iron[400], fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+        time: { color: colors.iron[100], fontWeight: '900', fontSize: 22, fontVariant: ['tabular-nums'] },
+        controls: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: colors.iron[700], paddingLeft: 12, gap: 6 },
+        addBtn: { paddingHorizontal: 8, paddingVertical: 8, backgroundColor: colors.iron[800], borderRadius: 10 },
+        addBtnText: { color: colors.iron[100], fontWeight: '800', fontSize: 12 },
+        actionBtn: { padding: 8, backgroundColor: colors.iron[800], borderRadius: 10 },
+        actionBtnPrimary: { padding: 8, backgroundColor: colors.primary.DEFAULT, borderRadius: 10 },
+        stopBtn: { padding: 8, backgroundColor: colors.red, borderRadius: 10 },
+    }), [colors]);
 
     useEffect(() => {
         let interval: any;
@@ -57,34 +85,23 @@ export function TimerOverlay() {
 
                 {timeLeft <= 0 && duration > 0 ? (
                     <TouchableOpacity onPress={restartTimer} style={ss.actionBtnPrimary} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Reiniciar descanso">
-                        <RotateCcw size={16} color={Colors.white} />
+                        <RotateCcw size={16} color={colors.white} />
                     </TouchableOpacity>
                 ) : isRunning ? (
                     <TouchableOpacity onPress={pauseTimer} style={ss.actionBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Pausar descanso">
-                        <Pause size={16} color={Colors.white} />
+                        <Pause size={16} color={colors.white} />
                     </TouchableOpacity>
                 ) : (
                     <TouchableOpacity onPress={resumeTimer} style={ss.actionBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Reanudar descanso">
-                        <Play size={16} color={Colors.white} />
+                        <Play size={16} color={colors.white} />
                     </TouchableOpacity>
                 )}
 
                 <TouchableOpacity onPress={stopTimer} style={ss.stopBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Cancelar descanso">
-                    <X size={16} color={Colors.white} />
+                    <X size={16} color={colors.white} />
                 </TouchableOpacity>
             </View>
         </View>
     );
 }
 
-const ss = StyleSheet.create({
-    container: { position: 'absolute', backgroundColor: Colors.iron[950], borderWidth: 1, borderColor: Colors.iron[600], borderRadius: 16, flexDirection: 'row', alignItems: 'center', padding: 12, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 10, zIndex: 50 },
-    label: { color: Colors.iron[400], fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
-    time: { color: Colors.iron[100], fontWeight: '900', fontSize: 22, fontVariant: ['tabular-nums'] },
-    controls: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: Colors.iron[600], paddingLeft: 12, gap: 6 },
-    addBtn: { paddingHorizontal: 8, paddingVertical: 8, backgroundColor: Colors.iron[600], borderRadius: 10 },
-    addBtnText: { color: Colors.iron[100], fontWeight: '800', fontSize: 12 },
-    actionBtn: { padding: 8, backgroundColor: Colors.iron[600], borderRadius: 10 },
-    actionBtnPrimary: { padding: 8, backgroundColor: Colors.primary.DEFAULT, borderRadius: 10 },
-    stopBtn: { padding: 8, backgroundColor: Colors.red, borderRadius: 10 },
-});

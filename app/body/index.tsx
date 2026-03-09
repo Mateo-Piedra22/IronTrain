@@ -5,7 +5,7 @@ import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { BodyMetric, bodyService } from '@/src/services/BodyService';
 import { configService } from '@/src/services/ConfigService';
 import { UnitService } from '@/src/services/UnitService';
-import { Colors, ThemeFx, withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { Measurement, MeasurementType } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { format } from 'date-fns';
@@ -15,6 +15,7 @@ import { ChevronDown, ChevronLeft, ChevronUp, Circle, Minus, Plus, Ruler, Scale,
 import { useCallback, useMemo, useState } from 'react';
 import { Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
+import { useColors } from '../../src/hooks/useColors';
 import { confirm } from '../../src/store/confirmStore';
 
 const screenWidth = Dimensions.get('window').width;
@@ -28,20 +29,6 @@ interface MeasurementConfig {
     group: 'primary' | 'upper' | 'core' | 'lower';
 }
 
-const MEASUREMENT_CONFIG: MeasurementConfig[] = [
-    { type: 'weight', label: 'Peso Corporal', Icon: Scale, color: Colors.primary.DEFAULT, unit: 'dynamic', group: 'primary' },
-    { type: 'body_fat', label: 'Grasa Corporal', Icon: TrendingDown, color: Colors.red, unit: '%', group: 'primary' },
-    { type: 'neck', label: 'Cuello', Icon: Circle, color: Colors.blue, unit: 'cm', group: 'upper' },
-    { type: 'shoulders', label: 'Hombros', Icon: Ruler, color: Colors.primary.light, unit: 'cm', group: 'upper' },
-    { type: 'chest', label: 'Pecho', Icon: Circle, color: Colors.red, unit: 'cm', group: 'upper' },
-    { type: 'bicep', label: 'Bíceps', Icon: Circle, color: Colors.yellow, unit: 'cm', group: 'upper' },
-    { type: 'forearm', label: 'Antebrazo', Icon: Ruler, color: Colors.primary.DEFAULT, unit: 'cm', group: 'upper' },
-    { type: 'waist', label: 'Cintura', Icon: Circle, color: Colors.yellow, unit: 'cm', group: 'core' },
-    { type: 'hips', label: 'Caderas', Icon: Circle, color: Colors.green, unit: 'cm', group: 'core' },
-    { type: 'thigh', label: 'Muslo', Icon: Circle, color: Colors.green, unit: 'cm', group: 'lower' },
-    { type: 'calf', label: 'Pantorrilla', Icon: Circle, color: Colors.blue, unit: 'cm', group: 'lower' },
-];
-
 const GROUP_LABELS: Record<string, string> = {
     primary: 'Métricas Principales',
     upper: 'Tren Superior',
@@ -50,7 +37,22 @@ const GROUP_LABELS: Record<string, string> = {
 };
 
 export default function BodyTrackerScreen() {
+    const colors = useColors();
     const router = useRouter();
+
+    const MEASUREMENT_CONFIG: MeasurementConfig[] = [
+        { type: 'weight', label: 'Peso Corporal', Icon: Scale, color: colors.primary.DEFAULT, unit: 'dynamic', group: 'primary' },
+        { type: 'body_fat', label: 'Grasa Corporal', Icon: TrendingDown, color: colors.red, unit: '%', group: 'primary' },
+        { type: 'neck', label: 'Cuello', Icon: Circle, color: colors.blue, unit: 'cm', group: 'upper' },
+        { type: 'shoulders', label: 'Hombros', Icon: Ruler, color: colors.primary.light, unit: 'cm', group: 'upper' },
+        { type: 'chest', label: 'Pecho', Icon: Circle, color: colors.red, unit: 'cm', group: 'upper' },
+        { type: 'bicep', label: 'Bíceps', Icon: Circle, color: colors.yellow, unit: 'cm', group: 'upper' },
+        { type: 'forearm', label: 'Antebrazo', Icon: Ruler, color: colors.primary.DEFAULT, unit: 'cm', group: 'upper' },
+        { type: 'waist', label: 'Cintura', Icon: Circle, color: colors.yellow, unit: 'cm', group: 'core' },
+        { type: 'hips', label: 'Caderas', Icon: Circle, color: colors.green, unit: 'cm', group: 'core' },
+        { type: 'thigh', label: 'Muslo', Icon: Circle, color: colors.green, unit: 'cm', group: 'lower' },
+        { type: 'calf', label: 'Pantorrilla', Icon: Circle, color: colors.blue, unit: 'cm', group: 'lower' },
+    ];
     const [metrics, setMetrics] = useState<BodyMetric[]>([]);
     const [measurements, setMeasurements] = useState<Record<MeasurementType, Measurement[]>>({} as any);
     const [loading, setLoading] = useState(true);
@@ -210,13 +212,151 @@ export default function BodyTrackerScreen() {
                 label: format(new Date(m.date), 'dd/MM'),
             }));
     }, [metrics, unit]);
+
+    const ss = useMemo(() => StyleSheet.create({
+        backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.border, elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
+        pageTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 24, letterSpacing: -1 },
+        pageSub: { color: colors.primary.DEFAULT, fontSize: 12, fontWeight: '800', marginTop: 2, letterSpacing: 0.5 },
+        quickLogCard: {
+            backgroundColor: colors.surface,
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            padding: 16,
+            marginBottom: 20,
+            elevation: 1,
+        },
+        quickLogTitle: { fontSize: 15, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.3 },
+        inputRow: { flexDirection: 'row', gap: 12 },
+        chartCard: {
+            padding: 16,
+            width: '100%',
+            backgroundColor: colors.surface,
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            elevation: 1,
+            marginBottom: 24,
+        },
+        chartTitle: { color: colors.primary.DEFAULT, fontWeight: '800', marginBottom: 14, fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 },
+
+        // Groups
+        groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+        groupAccent: { width: 3, height: 16, borderRadius: 2, backgroundColor: colors.primary.DEFAULT },
+        groupTitle: { fontSize: 15, fontWeight: '900', color: colors.primary.DEFAULT, letterSpacing: -0.3 },
+
+        // Measure Cards
+        measureCard: {
+            backgroundColor: colors.surface,
+            borderRadius: 14,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            marginBottom: 8,
+            overflow: 'hidden',
+        },
+        measureHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+        },
+        measureLabel: { fontSize: 13, fontWeight: '800', color: colors.iron[950] },
+        measureValue: { fontSize: 17, fontWeight: '900', color: colors.iron[950], marginTop: 2 },
+        measureEmpty: { fontSize: 12, fontWeight: '600', color: colors.iron[500], fontStyle: 'italic', marginTop: 2 },
+        measureIconCircle: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+        trendBadge: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 3,
+            paddingHorizontal: 6,
+            paddingVertical: 3,
+            borderRadius: 6,
+        },
+        addBtn: {
+            height: 28,
+            borderRadius: 14,
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '12'),
+            borderWidth: 1.5,
+            borderColor: withAlpha(colors.primary.DEFAULT, '30'),
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        expandedContent: {
+            paddingHorizontal: 14,
+            paddingBottom: 14,
+            borderTopWidth: 1.5,
+            borderTopColor: colors.border,
+            paddingTop: 12,
+        },
+        historyRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingVertical: 8,
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.border,
+        },
+        historyDate: { fontSize: 10, fontWeight: '700', color: colors.iron[400], textTransform: 'uppercase', letterSpacing: 0.5 },
+        historyValue: { fontSize: 14, fontWeight: '900', color: colors.iron[950], marginTop: 2 },
+
+        // Modal
+        modalOverlay: { flex: 1, backgroundColor: withAlpha(colors.black, '8C'), justifyContent: 'center', alignItems: 'center', padding: 32 },
+        modalContainer: {
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            padding: 24,
+            width: '100%',
+            maxWidth: 340,
+            shadowColor: ThemeFx.shadowColor,
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.18,
+            shadowRadius: 24,
+            elevation: 10,
+        },
+        modalTitle: { fontSize: 18, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.3 },
+        modalSub: { fontSize: 12, fontWeight: '600', color: colors.iron[400], marginTop: 4 },
+        modalInput: {
+            backgroundColor: colors.iron[200],
+            borderRadius: 12,
+            padding: 14,
+            fontSize: 18,
+            fontWeight: '800',
+            color: colors.iron[950],
+            textAlign: 'center',
+            borderWidth: 1.5,
+            borderColor: colors.border,
+        },
+        modalBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+        modalBtnCancel: { backgroundColor: colors.iron[200] },
+        modalBtnCancelText: { fontWeight: '800', fontSize: 14, color: colors.iron[950] },
+        modalBtnSave: { backgroundColor: colors.primary.DEFAULT },
+        modalBtnSaveText: { fontWeight: '800', fontSize: 14, color: colors.white },
+
+        // Selector
+        selectorItem: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            padding: 16,
+            gap: 12,
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.border,
+        },
+        selectorText: {
+            fontSize: 14,
+            fontWeight: '700',
+            color: colors.iron[950],
+            flex: 1,
+        }
+    }), [colors]);
+
     return (
-        <SafeAreaWrapper style={{ backgroundColor: Colors.iron[900] }} edges={['top', 'left', 'right']}>
+        <SafeAreaWrapper style={{ backgroundColor: colors.iron[900] }} edges={['top', 'left', 'right']}>
             <Stack.Screen options={{ headerShown: false }} />
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 60, paddingTop: 16 }}>
                 <View style={{ marginBottom: 24, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
                     <TouchableOpacity onPress={() => router.back()} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
-                        <ChevronLeft size={20} color={Colors.iron[950]} />
+                        <ChevronLeft size={20} color={colors.iron[950]} />
                     </TouchableOpacity>
                     <View>
                         <Text style={ss.pageTitle}>Evolución Física</Text>
@@ -231,15 +371,15 @@ export default function BodyTrackerScreen() {
                             onPress={() => setShowTypeSelector(true)}
                             style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
                         >
-                            <Scale size={16} color={Colors.primary.DEFAULT} />
+                            <Scale size={16} color={colors.primary.DEFAULT} />
                             <Text style={ss.quickLogTitle}>
                                 {MEASUREMENT_CONFIG.find(c => c.type === quickAddType)?.label || 'Registro'}
                             </Text>
-                            <ChevronDown size={14} color={Colors.iron[400]} />
+                            <ChevronDown size={14} color={colors.iron[400]} />
                         </TouchableOpacity>
 
                         {quickAddType === 'weight' && (
-                            <Text style={{ fontSize: 10, fontWeight: '800', color: Colors.iron[400], textTransform: 'uppercase' }}>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.iron[400], textTransform: 'uppercase' }}>
                                 + Grasa corporal
                             </Text>
                         )}
@@ -278,31 +418,31 @@ export default function BodyTrackerScreen() {
                         <Text style={ss.chartTitle}>Tendencia de peso</Text>
                         <LineChart
                             data={weightChartData}
-                            color={Colors.primary.DEFAULT}
+                            color={colors.primary.DEFAULT}
                             thickness={3}
-                            dataPointsColor={Colors.primary.DEFAULT}
+                            dataPointsColor={colors.primary.DEFAULT}
                             dataPointsRadius={4}
                             hideRules={false}
-                            rulesColor={Colors.iron[200]}
+                            rulesColor={colors.iron[200]}
                             rulesType="solid"
                             height={180}
                             width={screenWidth - 80}
                             curved
                             isAnimated
                             animationDuration={400}
-                            startFillColor={Colors.primary.DEFAULT}
-                            endFillColor={Colors.primary.DEFAULT}
+                            startFillColor={colors.primary.DEFAULT}
+                            endFillColor={colors.primary.DEFAULT}
                             startOpacity={0.15}
                             endOpacity={0}
                             areaChart
-                            yAxisTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
-                            xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                            yAxisTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                            xAxisLabelTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
                             initialSpacing={0}
                             endSpacing={0}
                             yAxisLabelSuffix={` ${unit}`}
                             yAxisLabelWidth={45}
                             xAxisThickness={1}
-                            xAxisColor={Colors.iron[200]}
+                            xAxisColor={colors.iron[200]}
                             yAxisThickness={0}
                         />
                     </View>
@@ -367,14 +507,14 @@ export default function BodyTrackerScreen() {
                                                     {/* Trend indicator */}
                                                     {trend.delta !== null && (
                                                         <View style={[ss.trendBadge, {
-                                                            backgroundColor: trend.delta > 0 ? withAlpha(Colors.green, '20') : trend.delta < 0 ? withAlpha(Colors.red, '20') : Colors.iron[200],
+                                                            backgroundColor: trend.delta > 0 ? withAlpha(colors.green, '20') : trend.delta < 0 ? withAlpha(colors.red, '20') : colors.iron[200],
                                                         }]}>
-                                                            {trend.delta > 0 ? <TrendingUp size={10} color={Colors.green} /> :
-                                                                trend.delta < 0 ? <TrendingDown size={10} color={Colors.red} /> :
-                                                                    <Minus size={10} color={Colors.iron[500]} />}
+                                                            {trend.delta > 0 ? <TrendingUp size={10} color={colors.green} /> :
+                                                                trend.delta < 0 ? <TrendingDown size={10} color={colors.red} /> :
+                                                                    <Minus size={10} color={colors.iron[500]} />}
                                                             <Text style={{
                                                                 fontSize: 10, fontWeight: '800',
-                                                                color: trend.delta > 0 ? Colors.green : trend.delta < 0 ? Colors.red : Colors.iron[500],
+                                                                color: trend.delta > 0 ? colors.green : trend.delta < 0 ? colors.red : colors.iron[500],
                                                             }}>
                                                                 {trend.delta > 0 ? '+' : ''}{trend.delta}
                                                             </Text>
@@ -386,9 +526,9 @@ export default function BodyTrackerScreen() {
                                                         style={ss.addBtn}
                                                         accessibilityLabel={`Registrar ${cfg.label}`}
                                                     >
-                                                        <Plus size={14} color={Colors.primary.DEFAULT} />
+                                                        <Plus size={14} color={colors.primary.DEFAULT} />
                                                     </Pressable>
-                                                    {isExpanded ? <ChevronUp size={16} color={Colors.iron[400]} /> : <ChevronDown size={16} color={Colors.iron[400]} />}
+                                                    {isExpanded ? <ChevronUp size={16} color={colors.iron[400]} /> : <ChevronDown size={16} color={colors.iron[400]} />}
                                                 </View>
                                             </Pressable>
 
@@ -399,25 +539,25 @@ export default function BodyTrackerScreen() {
                                                         <View style={{ marginBottom: 12 }}>
                                                             <LineChart
                                                                 data={chartData}
-                                                                color={Colors.primary.DEFAULT}
+                                                                color={colors.primary.DEFAULT}
                                                                 thickness={2}
-                                                                dataPointsColor={Colors.primary.DEFAULT}
+                                                                dataPointsColor={colors.primary.DEFAULT}
                                                                 dataPointsRadius={3}
                                                                 hideRules={false}
-                                                                rulesColor={Colors.iron[200]}
+                                                                rulesColor={colors.iron[200]}
                                                                 rulesType="solid"
                                                                 height={120}
                                                                 width={screenWidth - 100}
                                                                 curved
                                                                 isAnimated
                                                                 animationDuration={300}
-                                                                startFillColor={Colors.primary.DEFAULT}
-                                                                endFillColor={Colors.primary.DEFAULT}
+                                                                startFillColor={colors.primary.DEFAULT}
+                                                                endFillColor={colors.primary.DEFAULT}
                                                                 startOpacity={0.1}
                                                                 endOpacity={0}
                                                                 areaChart
-                                                                yAxisTextStyle={{ color: Colors.iron[400], fontSize: 9, fontWeight: '600' }}
-                                                                xAxisLabelTextStyle={{ color: Colors.iron[400], fontSize: 9, fontWeight: '600' }}
+                                                                yAxisTextStyle={{ color: colors.iron[400], fontSize: 9, fontWeight: '600' }}
+                                                                xAxisLabelTextStyle={{ color: colors.iron[400], fontSize: 9, fontWeight: '600' }}
                                                                 initialSpacing={0}
                                                                 endSpacing={0}
                                                                 xAxisThickness={0}
@@ -425,7 +565,7 @@ export default function BodyTrackerScreen() {
                                                             />
                                                         </View>
                                                     ) : (
-                                                        <Text style={{ color: Colors.iron[400], fontSize: 11, fontWeight: '600', marginBottom: 12, fontStyle: 'italic' }}>
+                                                        <Text style={{ color: colors.iron[400], fontSize: 11, fontWeight: '600', marginBottom: 12, fontStyle: 'italic' }}>
                                                             Registra al menos 2 mediciones para ver la tendencia.
                                                         </Text>
                                                     )}
@@ -444,12 +584,12 @@ export default function BodyTrackerScreen() {
                                                                 style={{ padding: 6 }}
                                                                 accessibilityLabel={`Eliminar medición`}
                                                             >
-                                                                <Trash2 size={14} color={Colors.iron[400]} />
+                                                                <Trash2 size={14} color={colors.iron[400]} />
                                                             </Pressable>
                                                         </View>
                                                     ))}
                                                     {historyList.length === 0 && (
-                                                        <Text style={{ color: Colors.iron[400], fontSize: 11, fontStyle: 'italic' }}>
+                                                        <Text style={{ color: colors.iron[400], fontSize: 11, fontStyle: 'italic' }}>
                                                             Aún no hay registros de {cfg.label.toLowerCase()}.
                                                         </Text>
                                                     )}
@@ -481,7 +621,7 @@ export default function BodyTrackerScreen() {
                                         <TextInput
                                             style={ss.modalInput}
                                             placeholder={`Valor (${displayUnit})`}
-                                            placeholderTextColor={Colors.iron[400]}
+                                            placeholderTextColor={colors.iron[400]}
                                             keyboardType="numeric"
                                             value={addValue}
                                             onChangeText={setAddValue}
@@ -506,7 +646,7 @@ export default function BodyTrackerScreen() {
             <Modal visible={showTypeSelector} transparent animationType="slide" onRequestClose={() => setShowTypeSelector(false)}>
                 <Pressable style={ss.modalOverlay} onPress={() => setShowTypeSelector(false)}>
                     <View style={[ss.modalContainer, { maxHeight: '80%', padding: 0, overflow: 'hidden' }]}>
-                        <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: Colors.iron[200] }}>
+                        <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: colors.iron[200] }}>
                             <Text style={ss.modalTitle}>Seleccionar Métrica</Text>
                         </View>
                         <ScrollView>
@@ -515,7 +655,7 @@ export default function BodyTrackerScreen() {
                                     key={cfg.type}
                                     style={[
                                         ss.selectorItem,
-                                        quickAddType === cfg.type && { backgroundColor: withAlpha(Colors.primary.DEFAULT, '10') }
+                                        quickAddType === cfg.type && { backgroundColor: withAlpha(colors.primary.DEFAULT, '10') }
                                     ]}
                                     onPress={() => {
                                         setQuickAddType(cfg.type);
@@ -528,19 +668,19 @@ export default function BodyTrackerScreen() {
                                     </View>
                                     <Text style={[
                                         ss.selectorText,
-                                        quickAddType === cfg.type && { color: Colors.primary.DEFAULT, fontWeight: '900' }
+                                        quickAddType === cfg.type && { color: colors.primary.DEFAULT, fontWeight: '900' }
                                     ]}>
                                         {cfg.label}
                                     </Text>
-                                    {quickAddType === cfg.type && <Plus size={16} color={Colors.primary.DEFAULT} />}
+                                    {quickAddType === cfg.type && <Plus size={16} color={colors.primary.DEFAULT} />}
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
                         <TouchableOpacity
-                            style={{ padding: 16, alignItems: 'center', backgroundColor: Colors.iron[100] }}
+                            style={{ padding: 16, alignItems: 'center', backgroundColor: colors.iron[100] }}
                             onPress={() => setShowTypeSelector(false)}
                         >
-                            <Text style={{ fontWeight: '800', color: Colors.iron[950] }}>Cerrar</Text>
+                            <Text style={{ fontWeight: '800', color: colors.iron[950] }}>Cerrar</Text>
                         </TouchableOpacity>
                     </View>
                 </Pressable>
@@ -548,141 +688,3 @@ export default function BodyTrackerScreen() {
         </SafeAreaWrapper >
     );
 }
-
-const ss = StyleSheet.create({
-    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
-    pageTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 24, letterSpacing: -1 },
-    pageSub: { color: Colors.primary.DEFAULT, fontSize: 12, fontWeight: '800', marginTop: 2, letterSpacing: 0.5 },
-    quickLogCard: {
-        backgroundColor: Colors.surface,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        padding: 16,
-        marginBottom: 20,
-        elevation: 1,
-    },
-    quickLogTitle: { fontSize: 15, fontWeight: '900', color: Colors.iron[950], letterSpacing: -0.3 },
-    inputRow: { flexDirection: 'row', gap: 12 },
-    chartCard: {
-        padding: 16,
-        width: '100%',
-        backgroundColor: Colors.surface,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        elevation: 1,
-        marginBottom: 24,
-    },
-    chartTitle: { color: Colors.primary.DEFAULT, fontWeight: '800', marginBottom: 14, fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 },
-
-    // Groups
-    groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-    groupAccent: { width: 3, height: 16, borderRadius: 2, backgroundColor: Colors.primary.DEFAULT },
-    groupTitle: { fontSize: 15, fontWeight: '900', color: Colors.primary.DEFAULT, letterSpacing: -0.3 },
-
-    // Measure Cards
-    measureCard: {
-        backgroundColor: Colors.surface,
-        borderRadius: 14,
-        borderWidth: 1,
-        borderColor: Colors.iron[700],
-        marginBottom: 8,
-        overflow: 'hidden',
-    },
-    measureHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-    },
-    measureLabel: { fontSize: 13, fontWeight: '800', color: Colors.iron[950] },
-    measureValue: { fontSize: 17, fontWeight: '900', color: Colors.iron[950], marginTop: 2 },
-    measureEmpty: { fontSize: 12, fontWeight: '600', color: Colors.iron[500], fontStyle: 'italic', marginTop: 2 },
-    measureIconCircle: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    trendBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 3,
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-        borderRadius: 6,
-    },
-    addBtn: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: withAlpha(Colors.primary.DEFAULT, '12'),
-        borderWidth: 1,
-        borderColor: withAlpha(Colors.primary.DEFAULT, '30'),
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    expandedContent: {
-        paddingHorizontal: 14,
-        paddingBottom: 14,
-        borderTopWidth: 1,
-        borderTopColor: Colors.iron[200],
-        paddingTop: 12,
-    },
-    historyRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.iron[200],
-    },
-    historyDate: { fontSize: 10, fontWeight: '700', color: Colors.iron[400], textTransform: 'uppercase', letterSpacing: 0.5 },
-    historyValue: { fontSize: 14, fontWeight: '900', color: Colors.iron[950], marginTop: 2 },
-
-    // Modal
-    modalOverlay: { flex: 1, backgroundColor: withAlpha(Colors.black, '8C'), justifyContent: 'center', alignItems: 'center', padding: 32 },
-    modalContainer: {
-        backgroundColor: Colors.surface,
-        borderRadius: 20,
-        padding: 24,
-        width: '100%',
-        maxWidth: 340,
-        shadowColor: ThemeFx.shadowColor,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.18,
-        shadowRadius: 24,
-        elevation: 10,
-    },
-    modalTitle: { fontSize: 18, fontWeight: '900', color: Colors.iron[950], letterSpacing: -0.3 },
-    modalSub: { fontSize: 12, fontWeight: '600', color: Colors.iron[400], marginTop: 4 },
-    modalInput: {
-        backgroundColor: Colors.iron[200],
-        borderRadius: 12,
-        padding: 14,
-        fontSize: 18,
-        fontWeight: '800',
-        color: Colors.iron[950],
-        textAlign: 'center',
-        borderWidth: 1,
-        borderColor: Colors.iron[300],
-    },
-    modalBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-    modalBtnCancel: { backgroundColor: Colors.iron[200] },
-    modalBtnCancelText: { fontWeight: '800', fontSize: 14, color: Colors.iron[950] },
-    modalBtnSave: { backgroundColor: Colors.primary.DEFAULT },
-    modalBtnSaveText: { fontWeight: '800', fontSize: 14, color: Colors.white },
-
-    // Selector
-    selectorItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        gap: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.iron[100],
-    },
-    selectorText: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: Colors.iron[950],
-        flex: 1,
-    }
-});

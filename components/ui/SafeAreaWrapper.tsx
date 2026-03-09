@@ -1,6 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { SafeAreaView, SafeAreaViewProps } from 'react-native-safe-area-context';
+import { useColors } from '../../src/hooks/useColors';
 
 interface SafeAreaWrapperProps extends SafeAreaViewProps {
   children: React.ReactNode;
@@ -10,6 +11,7 @@ interface SafeAreaWrapperProps extends SafeAreaViewProps {
 }
 
 export function SafeAreaWrapper({ children, style, edges = ['top', 'left', 'right'], centered = false, className, contentClassName, ...props }: SafeAreaWrapperProps) {
+  const colors = useColors();
   return (
     <SafeAreaView
       className={`flex-1 ${className || 'bg-iron-900'}`}

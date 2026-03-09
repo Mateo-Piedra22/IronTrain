@@ -37,6 +37,31 @@ jobs:
       - name: Generate changelog JSON
         run: npm run generate-changelog
 
+      - name: Extract release body from changelog
+        id: changelog
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const json = JSON.parse(fs.readFileSync('src/changelog.generated.json', 'utf8'));
+          const version = process.env.GITHUB_REF_NAME.replace(/^v/, '');
+          
+          const release = json.releases.find(r => r.version === version);
+          if (!release) {
+            console.error(`Version ${version} not found in changelog`);
+            process.exit(1);
+          }
+          
+          const body = [
+            `## What's New (${release.version})`,
+            release.date ? `*Released: ${release.date}*` : '',
+            '',
+            ...release.items.map(item => `- ${item}`)
+          ].filter(Boolean).join('\n');
+          
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `body=${JSON.stringify(body)}\n`);
+          NODE
+
       - name: Setup Expo and EAS
         uses: expo/expo-github-action@v8
         with:
@@ -95,7 +120,7 @@ jobs:
       - name: Create GitHub Release and upload assets
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          body: ${{ steps.changelog.outputs.body }}
           files: |
             IronTrain-${{ github.ref_name }}.apk
             IronTrain-${{ github.ref_name }}.sha256.txt

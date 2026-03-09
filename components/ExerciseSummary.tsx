@@ -1,11 +1,11 @@
 import { configService } from '@/src/services/ConfigService';
 import { UnitService } from '@/src/services/UnitService';
-import { Colors } from '@/src/theme';
 import { ExerciseType, WorkoutSet } from '@/src/types/db';
 import { formatTimeSecondsCompact } from '@/src/utils/time';
 import { ChevronRight, Trophy } from 'lucide-react-native';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useColors } from '../src/hooks/useColors';
 import { BadgePill } from './ui/BadgePill';
 
 
@@ -33,7 +33,75 @@ function formatWeight(value: number, unit: 'kg' | 'lbs'): string {
     return `${v.toFixed(decimals)} ${u}`;
 }
 
-export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [], categoryColor = Colors.primary.dark, onPress, disabled }: ExerciseSummaryProps) {
+export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [], categoryColor, onPress, disabled }: ExerciseSummaryProps) {
+    const colors = useColors();
+    const activeCategoryColor = categoryColor || colors.primary.dark;
+
+    const ss = useMemo(() => StyleSheet.create({
+        card: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: colors.surface,
+            paddingHorizontal: 14,
+            paddingVertical: 14,
+            borderRadius: 14,
+            borderWidth: 1.5,
+            borderColor: colors.iron[700],
+            elevation: 1
+        },
+        accentBar: {
+            width: 5,
+            alignSelf: 'stretch',
+            borderRadius: 3,
+            marginRight: 14,
+            backgroundColor: activeCategoryColor
+        },
+        name: {
+            color: colors.iron[950],
+            fontWeight: '800',
+            fontSize: 15
+        },
+        statsRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginTop: 4
+        },
+        statText: {
+            color: colors.iron[500],
+            fontSize: 12,
+            fontWeight: '700'
+        },
+        dotSeparator: {
+            color: colors.iron[300],
+            fontSize: 12,
+            fontWeight: '700',
+            marginHorizontal: 6
+        },
+        bestBadge: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: colors.primary.DEFAULT + '10',
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 8,
+            borderWidth: 1.5,
+            borderColor: colors.primary.DEFAULT + '20'
+        },
+        bestText: {
+            color: colors.yellow,
+            fontSize: 11,
+            fontWeight: '800'
+        },
+        confirmBtn: { backgroundColor: colors.primary.DEFAULT, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+        confirmBtnText: { color: colors.white, fontWeight: '800', fontSize: 15 },
+        badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+        badgeList: { flexDirection: 'row', gap: 4 },
+        moreBadge: { backgroundColor: colors.iron[100], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+        moreBadgeText: { fontSize: 10, fontWeight: '800', color: colors.iron[500] },
+        rightContent: { alignItems: 'flex-end', marginLeft: 12 },
+        trophyIcon: { marginRight: 5 },
+        chevron: { marginLeft: 4 }
+    }), [colors, activeCategoryColor]);
 
     const unit = configService.get('weightUnit');
     const displayWeight = (kgValue: number) => unit === 'kg' ? kgValue : UnitService.kgToLbs(kgValue);
@@ -85,14 +153,14 @@ export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [],
             activeOpacity={0.8}
             style={[ss.card, disabled && { opacity: 0.6 }]}
         >
-            <View style={[ss.accentBar, { backgroundColor: categoryColor }]} />
+            <View style={ss.accentBar} />
 
             <View style={{ flex: 1 }}>
                 <Text style={ss.name} numberOfLines={1}>{exerciseName}</Text>
 
                 {badges.length > 0 && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                        <View style={{ flexDirection: 'row', gap: 4 }}>
+                    <View style={ss.badgeRow}>
+                        <View style={ss.badgeList}>
                             {badges.slice(0, 3).map((badge, idx) => (
                                 <BadgePill
                                     key={idx}
@@ -104,8 +172,8 @@ export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [],
                             ))}
                         </View>
                         {badges.length > 3 && (
-                            <View style={{ backgroundColor: Colors.iron[100], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                                <Text style={{ fontSize: 10, fontWeight: '800', color: Colors.iron[500] }}>+{badges.length - 3}</Text>
+                            <View style={ss.moreBadge}>
+                                <Text style={ss.moreBadgeText}>+{badges.length - 3}</Text>
                             </View>
                         )}
                     </View>
@@ -122,9 +190,9 @@ export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [],
             </View>
 
             {(exerciseType === 'weight_reps' || exerciseType === 'weight_only') && bestSetByWeight && (
-                <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
+                <View style={ss.rightContent}>
                     <View style={ss.bestBadge}>
-                        <Trophy size={11} color={Colors.yellow} style={{ marginRight: 5 }} />
+                        <Trophy size={11} color={colors.yellow} style={ss.trophyIcon} />
                         <Text style={ss.bestText}>
                             {formatWeight(displayWeight(bestSetByWeight.weight), unit)}
                             {exerciseType === 'weight_reps' && bestSetByWeight.reps > 0 ? ` × ${bestSetByWeight.reps}` : ''}
@@ -133,18 +201,7 @@ export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [],
                 </View>
             )}
 
-            <ChevronRight size={18} color={Colors.iron[400]} style={{ marginLeft: 4 }} />
+            <ChevronRight size={18} color={colors.iron[400]} style={ss.chevron} />
         </TouchableOpacity>
     );
 }
-
-const ss = StyleSheet.create({
-    card: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, paddingHorizontal: 14, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: Colors.iron[700], elevation: 1 },
-    accentBar: { width: 5, alignSelf: 'stretch', borderRadius: 3, marginRight: 14 },
-    name: { color: Colors.iron[950], fontWeight: '800', fontSize: 15 },
-    statsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-    statText: { color: Colors.iron[500], fontSize: 12, fontWeight: '700' },
-    dotSeparator: { color: Colors.iron[300], fontSize: 12, fontWeight: '700', marginHorizontal: 6 },
-    bestBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primary.DEFAULT + '10', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: Colors.primary.DEFAULT + '20' },
-    bestText: { color: '#ca8a04', fontSize: 11, fontWeight: '800' },
-});

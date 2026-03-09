@@ -1,9 +1,10 @@
-import { Colors, ThemeFx } from '@/src/theme';
+import { ThemeFx } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { addDays, format, subDays } from 'date-fns';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
+import { useColors } from '../src/hooks/useColors';
 
 interface DateHeaderProps {
     date: Date;
@@ -11,6 +12,7 @@ interface DateHeaderProps {
 }
 
 export function DateHeader({ date, onChange }: DateHeaderProps) {
+    const colors = useColors();
     const [showCalendar, setShowCalendar] = useState(false);
 
     const prevDay = () => onChange(subDays(date, 1));
@@ -19,22 +21,53 @@ export function DateHeader({ date, onChange }: DateHeaderProps) {
     const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
     const dateStr = format(date, 'yyyy-MM-dd');
 
+    const ss = useMemo(() => StyleSheet.create({
+        header: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            backgroundColor: colors.background
+        },
+        arrowBtn: { padding: 8 },
+        dateText: { color: colors.iron[950], fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },
+        yearText: { color: colors.iron[400], fontSize: 11, fontWeight: '600', marginTop: 2 },
+        modalOverlay: { flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', paddingHorizontal: 16 },
+        modalSheet: {
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            overflow: 'hidden',
+            borderWidth: 1.5,
+            borderColor: colors.iron[200],
+            ...ThemeFx.shadowSm
+        },
+        closeBtn: {
+            backgroundColor: colors.surface,
+            padding: 16,
+            alignItems: 'center',
+            borderTopWidth: 1.5,
+            borderTopColor: colors.iron[100]
+        },
+        closeBtnText: { color: colors.primary.DEFAULT, fontWeight: '800', fontSize: 14 },
+    }), [colors]);
+
     return (
         <>
             <View style={ss.header}>
                 <Pressable onPress={prevDay} style={ss.arrowBtn} hitSlop={8}>
-                    <Ionicons name="chevron-back" size={22} color={Colors.primary.dark} />
+                    <Ionicons name="chevron-back" size={22} color={colors.primary.DEFAULT} />
                 </Pressable>
 
                 <Pressable onPress={() => setShowCalendar(true)} style={{ alignItems: 'center' }}>
                     <Text style={ss.dateText}>
-                        {isToday ? 'Today' : format(date, 'EEE, MMM do')} <Ionicons name="calendar-outline" size={14} color={Colors.iron[400]} />
+                        {isToday ? 'Hoy' : format(date, 'EEE, MMM do')} <Ionicons name="calendar-outline" size={14} color={colors.iron[400]} />
                     </Text>
                     <Text style={ss.yearText}>{format(date, 'yyyy')}</Text>
                 </Pressable>
 
                 <Pressable onPress={nextDay} style={ss.arrowBtn} hitSlop={8}>
-                    <Ionicons name="chevron-forward" size={22} color={Colors.primary.dark} />
+                    <Ionicons name="chevron-forward" size={22} color={colors.primary.DEFAULT} />
                 </Pressable>
             </View>
 
@@ -49,20 +82,21 @@ export function DateHeader({ date, onChange }: DateHeaderProps) {
                                 setShowCalendar(false);
                             }}
                             markedDates={{
-                                [dateStr]: { selected: true, selectedColor: Colors.primary.dark }
+                                [dateStr]: { selected: true, selectedColor: colors.primary.DEFAULT }
                             }}
                             theme={{
-                                backgroundColor: Colors.surface,
-                                calendarBackground: Colors.surface,
-                                textSectionTitleColor: Colors.iron[500],
-                                selectedDayBackgroundColor: Colors.primary.dark,
-                                selectedDayTextColor: Colors.white,
-                                todayTextColor: Colors.primary.dark,
-                                dayTextColor: Colors.iron[950],
-                                textDisabledColor: Colors.iron[400],
-                                arrowColor: Colors.primary.dark,
-                                monthTextColor: Colors.iron[950],
-                                indicatorColor: Colors.primary.dark,
+                                backgroundColor: colors.surface,
+                                calendarBackground: colors.surface,
+                                textSectionTitleColor: colors.iron[500],
+                                selectedDayBackgroundColor: colors.primary.DEFAULT,
+                                selectedDayTextColor: colors.white,
+                                todayTextColor: colors.primary.DEFAULT,
+                                dayTextColor: colors.iron[950],
+                                textDisabledColor: colors.iron[400],
+                                arrowColor: colors.primary.DEFAULT,
+                                monthTextColor: colors.iron[950],
+                                indicatorColor: colors.primary.DEFAULT,
+                                textMonthFontWeight: '900',
                             }}
                         />
                         <TouchableOpacity onPress={() => setShowCalendar(false)} style={ss.closeBtn}>
@@ -75,13 +109,3 @@ export function DateHeader({ date, onChange }: DateHeaderProps) {
     );
 }
 
-const ss = StyleSheet.create({
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: Colors.iron[900] },
-    arrowBtn: { padding: 8 },
-    dateText: { color: Colors.iron[950], fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },
-    yearText: { color: Colors.iron[400], fontSize: 11, fontWeight: '600', marginTop: 2 },
-    modalOverlay: { flex: 1, backgroundColor: ThemeFx.backdropStrong, justifyContent: 'center', paddingHorizontal: 16 },
-    modalSheet: { backgroundColor: Colors.surface, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: Colors.iron[700] },
-    closeBtn: { backgroundColor: Colors.surface, padding: 14, paddingTop: 10, alignItems: 'center', borderTopWidth: 1, borderTopColor: Colors.iron[200] },
-    closeBtnText: { color: Colors.primary.DEFAULT, fontWeight: '800', fontSize: 14 },
-});
