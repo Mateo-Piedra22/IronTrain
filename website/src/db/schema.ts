@@ -1,3 +1,4 @@
+import { relations } from 'drizzle-orm';
 import { bigint, integer, pgTable, real, text, timestamp } from 'drizzle-orm/pg-core';
 
 const commonFields = {
@@ -379,3 +380,30 @@ export const scoreEvents = pgTable('score_events', {
     deletedAt: timestamp('deleted_at'),
 });
 
+// --- RELATIONS FOR DRIZZLE QUERY API ---
+export const categoriesRelations = relations(categories, ({ many }) => ({
+    exercises: many(exercises),
+}));
+
+export const exerciseBadgesRelations = relations(exerciseBadges, ({ one }) => ({
+    exercise: one(exercises, {
+        fields: [exerciseBadges.exerciseId],
+        references: [exercises.id],
+    }),
+    badge: one(badges, {
+        fields: [exerciseBadges.badgeId],
+        references: [badges.id],
+    }),
+}));
+
+export const exercisesRelations = relations(exercises, ({ one, many }) => ({
+    category: one(categories, {
+        fields: [exercises.categoryId],
+        references: [categories.id],
+    }),
+    badges: many(exerciseBadges),
+}));
+
+export const badgesRelations = relations(badges, ({ many }) => ({
+    exerciseBadges: many(exerciseBadges),
+}));
