@@ -33,6 +33,7 @@ function getRedirectPath(formData: FormData, defaultSection?: string) {
 }
 
 export async function markFeedbackStatus(formData: FormData) {
+    let redirectPath = '';
     try {
         const adminId = await getAuthenticatedAdmin();
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
@@ -42,21 +43,23 @@ export async function markFeedbackStatus(formData: FormData) {
 
         if (!id || !status) {
             console.error('Validation failed: id or status missing in feedback');
-            redirect(getRedirectPath(formData, 'feedback'));
+            redirectPath = getRedirectPath(formData, 'feedback');
+        } else {
+            await db.update(schema.feedback).set({ status, updatedAt: new Date() }).where(eq(schema.feedback.id, id));
+            revalidatePath('/admin');
+            redirectPath = getRedirectPath(formData, 'feedback');
         }
-
-        await db.update(schema.feedback).set({ status, updatedAt: new Date() }).where(eq(schema.feedback.id, id));
-        revalidatePath('/admin');
-        redirect(getRedirectPath(formData, 'feedback'));
     } catch (error: any) {
-        if (error.message === 'NEXT_REDIRECT') throw error;
         console.error('Feedback Action Error:', error);
         revalidatePath('/admin');
-        redirect('/admin?tab=moderation&section=feedback&error=feedback_failed');
+        redirectPath = '/admin?tab=moderation&section=feedback&error=feedback_failed';
     }
+
+    if (redirectPath) redirect(redirectPath);
 }
 
 export async function handleGlobalEventDeriveAnnouncementAction(formData: FormData) {
+    let redirectPath = '';
     try {
         const adminId = await getAuthenticatedAdmin();
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
@@ -102,16 +105,18 @@ export async function handleGlobalEventDeriveAnnouncementAction(formData: FormDa
             });
 
         revalidatePath('/admin');
-        redirect(getRedirectPath(formData, 'broadcast'));
+        redirectPath = getRedirectPath(formData, 'broadcast');
     } catch (error: any) {
-        if (error.message === 'NEXT_REDIRECT') throw error;
         console.error('Derive Announcement Action Error:', error);
         revalidatePath('/admin');
-        redirect('/admin?tab=content&section=broadcast&error=derive_failed');
+        redirectPath = '/admin?tab=content&section=broadcast&error=derive_failed';
     }
+
+    if (redirectPath) redirect(redirectPath);
 }
 
 export async function handleChangelogPublishAction(formData: FormData) {
+    let redirectPath = '';
     try {
         const adminId = await getAuthenticatedAdmin();
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
@@ -125,33 +130,35 @@ export async function handleChangelogPublishAction(formData: FormData) {
         if (existing.isUnreleased !== 1) {
             console.warn('Attempted to publish an already released changelog');
             revalidatePath('/admin');
-            return;
+            redirectPath = getRedirectPath(formData, 'changelog');
+        } else {
+            await db.update(schema.changelogs)
+                .set({ isUnreleased: 0, updatedAt: new Date() })
+                .where(eq(schema.changelogs.id, id));
+
+            try {
+                await sendSegmentedPush('all', 'Nueva Versión Disponible', `Actualización v${existing.version} lista. Entra para ver qué hay de nuevo.`, {
+                    type: 'system',
+                    actionUrl: 'irontrain://changelog'
+                });
+            } catch (pushErr) {
+                console.error('Push notification failed during publish, but changelog was updated:', pushErr);
+            }
+
+            revalidatePath('/admin');
+            redirectPath = getRedirectPath(formData, 'changelog');
         }
-
-        await db.update(schema.changelogs)
-            .set({ isUnreleased: 0, updatedAt: new Date() })
-            .where(eq(schema.changelogs.id, id));
-
-        try {
-            await sendSegmentedPush('all', 'Nueva Versión Disponible', `Actualización v${existing.version} lista. Entra para ver qué hay de nuevo.`, {
-                type: 'system',
-                actionUrl: 'irontrain://changelog'
-            });
-        } catch (pushErr) {
-            console.error('Push notification failed during publish, but changelog was updated:', pushErr);
-        }
-
-        revalidatePath('/admin');
-        redirect(getRedirectPath(formData, 'changelog'));
     } catch (error: any) {
-        if (error.message === 'NEXT_REDIRECT') throw error;
         console.error('Changelog Publish Error:', error);
         revalidatePath('/admin');
-        redirect('/admin?tab=content&section=changelog&error=publish_failed');
+        redirectPath = '/admin?tab=content&section=changelog&error=publish_failed';
     }
+
+    if (redirectPath) redirect(redirectPath);
 }
 
 export async function handleRoutineAction(formData: FormData) {
+    let redirectPath = '';
     try {
         const adminId = await getAuthenticatedAdmin();
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
@@ -185,21 +192,25 @@ export async function handleRoutineAction(formData: FormData) {
                 .where(eq(schema.routines.id, id));
         } else {
             console.error('Invalid routine action:', action);
-            return;
+            redirectPath = getRedirectPath(formData, 'social');
         }
 
-        revalidatePath('/admin');
-        revalidatePath('/feed');
-        redirect(getRedirectPath(formData, 'social'));
+        if (!redirectPath) {
+            revalidatePath('/admin');
+            revalidatePath('/feed');
+            redirectPath = getRedirectPath(formData, 'social');
+        }
     } catch (error: any) {
-        if (error.message === 'NEXT_REDIRECT') throw error;
         console.error('Routine Moderation Action Error:', error);
         revalidatePath('/admin');
-        redirect('/admin?tab=social&section=moderation&error=routine_failed');
+        redirectPath = '/admin?tab=social&section=moderation&error=routine_failed';
     }
+
+    if (redirectPath) redirect(redirectPath);
 }
 
 export async function handleChangelogAction(formData: FormData) {
+    let redirectPath = '';
     try {
         const adminId = await getAuthenticatedAdmin();
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
@@ -211,63 +222,70 @@ export async function handleChangelogAction(formData: FormData) {
         const isUnreleased = formData.get('isUnreleased') === 'true' ? 1 : 0;
 
         if (action === 'delete') {
-            if (!id) redirect(getRedirectPath(formData, 'changelog'));
-            await db.delete(schema.changelogs).where(eq(schema.changelogs.id, id));
+            if (id) {
+                // Delete reactions to prevent FK violation
+                await db.delete(schema.changelogReactions).where(eq(schema.changelogReactions.changelogId, id));
+                await db.delete(schema.changelogs).where(eq(schema.changelogs.id, id));
+            }
+            redirectPath = getRedirectPath(formData, 'changelog');
         } else if (action === 'save') {
             if (!version || !itemsRaw) {
                 console.error('Validation failed: version or items missing');
-                redirect(getRedirectPath(formData, 'changelog'));
-            }
-            const items = itemsRaw.split('\n').map(i => i.trim()).filter(i => i.length > 0);
+                redirectPath = getRedirectPath(formData, 'changelog');
+            } else {
+                const items = itemsRaw.split('\n').map(i => i.trim()).filter(i => i.length > 0);
 
-            const existingList = await db.select().from(schema.changelogs).where(eq(schema.changelogs.id, id)).limit(1);
-            const existing = existingList[0];
-            const becomingReleased = isUnreleased === 0 && (!existing || existing.isUnreleased === 1);
+                const existingList = await db.select().from(schema.changelogs).where(eq(schema.changelogs.id, id)).limit(1);
+                const existing = existingList[0];
+                const becomingReleased = isUnreleased === 0 && (!existing || existing.isUnreleased === 1);
 
-            await db.insert(schema.changelogs)
-                .values({
-                    id,
-                    version,
-                    items: JSON.stringify(items),
-                    isUnreleased,
-                    date: new Date(),
-                    updatedAt: new Date(),
-                })
-                .onConflictDoUpdate({
-                    target: schema.changelogs.id,
-                    set: {
+                await db.insert(schema.changelogs)
+                    .values({
+                        id,
                         version,
                         items: JSON.stringify(items),
                         isUnreleased,
+                        date: new Date(),
                         updatedAt: new Date(),
-                    }
-                });
-
-            if (becomingReleased) {
-                try {
-                    await sendSegmentedPush('all', 'Nueva Versión Disponible', `Actualización v${version} lista. Entra para ver qué hay de nuevo.`, {
-                        type: 'system',
-                        actionUrl: 'irontrain://changelog'
+                    })
+                    .onConflictDoUpdate({
+                        target: schema.changelogs.id,
+                        set: {
+                            version,
+                            items: JSON.stringify(items),
+                            isUnreleased,
+                            updatedAt: new Date(),
+                        }
                     });
-                } catch (pushErr) {
-                    console.error('Push notification failed during changelog save:', pushErr);
+
+                if (becomingReleased) {
+                    try {
+                        await sendSegmentedPush('all', 'Nueva Versión Disponible', `Actualización v${version} lista. Entra para ver qué hay de nuevo.`, {
+                            type: 'system',
+                            actionUrl: 'irontrain://changelog'
+                        });
+                    } catch (pushErr) {
+                        console.error('Push notification failed during changelog save:', pushErr);
+                    }
                 }
+                redirectPath = getRedirectPath(formData, 'changelog');
             }
         } else {
-            redirect(getRedirectPath(formData, 'changelog'));
+            redirectPath = getRedirectPath(formData, 'changelog');
         }
 
         revalidatePath('/admin');
-        redirect(getRedirectPath(formData, 'changelog'));
     } catch (error: any) {
-        if (error.message === 'NEXT_REDIRECT') throw error;
         console.error('Changelog Action Error:', error);
         revalidatePath('/admin');
-        redirect('/admin?tab=content&section=changelog&error=action_failed');
+        redirectPath = '/admin?tab=content&section=changelog&error=action_failed';
     }
+
+    if (redirectPath) redirect(redirectPath);
 }
 
 export async function handleChangelogSyncAction() {
+    let redirectPath = '';
     try {
         const adminId = await getAuthenticatedAdmin();
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
@@ -280,16 +298,18 @@ export async function handleChangelogSyncAction() {
         query.set('changelogUpserted', String(result.upsertedCount));
         query.set('changelogSource', String(result.sourceCount));
         query.set('changelogSyncedAt', result.syncedAt);
-        redirect(`/admin?tab=content&section=changelog&${query.toString()}`);
+        redirectPath = `/admin?tab=content&section=changelog&${query.toString()}`;
     } catch (error: any) {
-        if (error.message === 'NEXT_REDIRECT') throw error;
         console.error('Changelog Sync Error:', error);
         revalidatePath('/admin');
-        redirect('/admin?tab=content&section=changelog&error=sync_failed');
+        redirectPath = '/admin?tab=content&section=changelog&error=sync_failed';
     }
+
+    if (redirectPath) redirect(redirectPath);
 }
 
 export async function handleNotificationAction(formData: FormData) {
+    let redirectPath = '';
     try {
         const adminId = await getAuthenticatedAdmin();
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
@@ -310,30 +330,21 @@ export async function handleNotificationAction(formData: FormData) {
         const metadata = actionUrl ? JSON.stringify({ actionUrl }) : null;
 
         if (action === 'delete') {
-            await db.delete(schema.adminNotifications).where(eq(schema.adminNotifications.id, id));
+            if (id) {
+                // Pre-delete logs and reactions to avoid FK violations
+                await db.delete(schema.notificationLogs).where(eq(schema.notificationLogs.notificationId, id));
+                await db.delete(schema.notificationReactions).where(eq(schema.notificationReactions.notificationId, id));
+                await db.delete(schema.adminNotifications).where(eq(schema.adminNotifications.id, id));
+            }
+            redirectPath = getRedirectPath(formData, 'broadcast');
         } else if (action === 'save') {
             if (!title || !message) {
                 console.error('Validation failed: title or message missing');
-                redirect(getRedirectPath(formData, 'broadcast'));
-            }
-            await db.insert(schema.adminNotifications)
-                .values({
-                    id,
-                    title,
-                    message,
-                    type: type || 'toast',
-                    priority,
-                    displayMode: displayMode || 'once',
-                    targetVersion: targetVersion || null,
-                    targetPlatform: targetPlatform || 'all',
-                    targetSegment: targetSegment,
-                    metadata,
-                    isActive,
-                    updatedAt: new Date(),
-                })
-                .onConflictDoUpdate({
-                    target: schema.adminNotifications.id,
-                    set: {
+                redirectPath = getRedirectPath(formData, 'broadcast');
+            } else {
+                await db.insert(schema.adminNotifications)
+                    .values({
+                        id,
                         title,
                         message,
                         type: type || 'toast',
@@ -345,35 +356,53 @@ export async function handleNotificationAction(formData: FormData) {
                         metadata,
                         isActive,
                         updatedAt: new Date(),
-                    }
-                });
-
-            if (isActive) {
-                try {
-                    await sendSegmentedPush(targetSegment, title, message, {
-                        id,
-                        type: type || 'toast',
-                        actionUrl: actionUrl || ''
+                    })
+                    .onConflictDoUpdate({
+                        target: schema.adminNotifications.id,
+                        set: {
+                            title,
+                            message,
+                            type: type || 'toast',
+                            priority,
+                            displayMode: displayMode || 'once',
+                            targetVersion: targetVersion || null,
+                            targetPlatform: targetPlatform || 'all',
+                            targetSegment: targetSegment,
+                            metadata,
+                            isActive,
+                            updatedAt: new Date(),
+                        }
                     });
-                } catch (pushErr) {
-                    console.error('Push notification failed for broadcast, but notification was saved:', pushErr);
+
+                if (isActive) {
+                    try {
+                        await sendSegmentedPush(targetSegment, title, message, {
+                            id,
+                            type: type || 'toast',
+                            actionUrl: actionUrl || ''
+                        });
+                    } catch (pushErr) {
+                        console.error('Push notification failed for broadcast, but notification was saved:', pushErr);
+                    }
                 }
+                redirectPath = getRedirectPath(formData, 'broadcast');
             }
         } else {
-            redirect(getRedirectPath(formData, 'broadcast'));
+            redirectPath = getRedirectPath(formData, 'broadcast');
         }
 
         revalidatePath('/admin');
-        redirect(getRedirectPath(formData, 'broadcast'));
     } catch (error: any) {
-        if (error.message === 'NEXT_REDIRECT') throw error;
         console.error('Notification Action Error:', error);
         revalidatePath('/admin');
-        redirect('/admin?tab=content&section=broadcast&error=action_failed');
+        redirectPath = '/admin?tab=content&section=broadcast&error=action_failed';
     }
+
+    if (redirectPath) redirect(redirectPath);
 }
 
 export async function handleScoringConfigAction(formData: FormData) {
+    let redirectPath = '';
     try {
         const adminId = await getAuthenticatedAdmin();
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
@@ -431,16 +460,18 @@ export async function handleScoringConfigAction(formData: FormData) {
 
         revalidatePath('/admin');
         revalidatePath('/feed');
-        redirect(getRedirectPath(formData, 'social'));
+        redirectPath = getRedirectPath(formData, 'social');
     } catch (error: any) {
-        if (error.message === 'NEXT_REDIRECT') throw error;
         console.error('Scoring Config Action Error:', error);
         revalidatePath('/admin');
-        redirect('/admin?tab=social&section=config&error=config_failed');
+        redirectPath = '/admin?tab=social&section=config&error=config_failed';
     }
+
+    if (redirectPath) redirect(redirectPath);
 }
 
 export async function handleGlobalEventAction(formData: FormData) {
+    let redirectPath = '';
     try {
         const adminId = await getAuthenticatedAdmin();
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
@@ -449,81 +480,83 @@ export async function handleGlobalEventAction(formData: FormData) {
         const id = String(formData.get('id') || '').trim() || crypto.randomUUID();
 
         if (action === 'delete') {
-            await db.delete(schema.globalEvents).where(eq(schema.globalEvents.id, id));
+            if (id) {
+                await db.delete(schema.globalEvents).where(eq(schema.globalEvents.id, id));
+            }
             revalidatePath('/admin');
             revalidatePath('/feed');
-            redirect(getRedirectPath(formData, 'events'));
-        }
+            redirectPath = getRedirectPath(formData, 'events');
+        } else {
+            const name = String(formData.get('name') || '').trim();
+            const multiplier = Number(formData.get('multiplier') || 1);
+            const startRaw = String(formData.get('startDate') || '');
+            const endRaw = String(formData.get('endDate') || '');
+            const isActive = formData.get('isActive') === 'true' ? 1 : 0;
+            const sendPush = formData.get('sendPush') === 'true';
 
-        const name = String(formData.get('name') || '').trim();
-        const multiplier = Number(formData.get('multiplier') || 1);
-        const startRaw = String(formData.get('startDate') || '');
-        const endRaw = String(formData.get('endDate') || '');
-        const isActive = formData.get('isActive') === 'true' ? 1 : 0;
-        const sendPush = formData.get('sendPush') === 'true';
+            if (!name || !Number.isFinite(multiplier) || multiplier <= 0 || !startRaw || !endRaw) {
+                console.error('Validation failed for Global Event');
+                redirectPath = getRedirectPath(formData, 'events');
+            } else {
+                const startDate = new Date(startRaw);
+                const endDate = new Date(endRaw);
+                if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) {
+                    console.error('Invalid dates for Global Event');
+                    redirectPath = getRedirectPath(formData, 'events');
+                } else {
+                    await db.insert(schema.globalEvents).values({
+                        id,
+                        name,
+                        multiplier,
+                        startDate,
+                        endDate,
+                        isActive,
+                        pushSent: 0,
+                        updatedAt: new Date(),
+                        createdBy: adminId,
+                    }).onConflictDoUpdate({
+                        target: schema.globalEvents.id,
+                        set: {
+                            name,
+                            multiplier,
+                            startDate,
+                            endDate,
+                            isActive,
+                            updatedAt: new Date(),
+                        }
+                    });
 
-        if (!name || !Number.isFinite(multiplier) || multiplier <= 0 || !startRaw || !endRaw) {
-            console.error('Validation failed for Global Event');
-            revalidatePath('/admin');
-            redirect(getRedirectPath(formData, 'events'));
-        }
+                    if (isActive === 1 && sendPush) {
+                        try {
+                            await sendSegmentedPush(
+                                'all',
+                                '¡Evento Global Activo!',
+                                `${name} · multiplicador x${multiplier.toFixed(2)} en todo tu puntaje.`,
+                                { type: 'system', actionUrl: 'irontrain://social' }
+                            );
+                            await db.update(schema.globalEvents).set({ pushSent: 1, updatedAt: new Date() }).where(eq(schema.globalEvents.id, id));
+                        } catch (pushErr) {
+                            console.error('Push notification failed for global event, but database was updated:', pushErr);
+                        }
+                    }
 
-        const startDate = new Date(startRaw);
-        const endDate = new Date(endRaw);
-        if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) {
-            console.error('Invalid dates for Global Event');
-            revalidatePath('/admin');
-            redirect(getRedirectPath(formData, 'events'));
-        }
-
-        await db.insert(schema.globalEvents).values({
-            id,
-            name,
-            multiplier,
-            startDate,
-            endDate,
-            isActive,
-            pushSent: 0,
-            updatedAt: new Date(),
-            createdBy: adminId,
-        }).onConflictDoUpdate({
-            target: schema.globalEvents.id,
-            set: {
-                name,
-                multiplier,
-                startDate,
-                endDate,
-                isActive,
-                updatedAt: new Date(),
+                    revalidatePath('/admin');
+                    revalidatePath('/feed');
+                    redirectPath = getRedirectPath(formData, 'events');
+                }
             }
-        });
-
-        if (isActive === 1 && sendPush) {
-            try {
-                await sendSegmentedPush(
-                    'all',
-                    '¡Evento Global Activo!',
-                    `${name} · multiplicador x${multiplier.toFixed(2)} en todo tu puntaje.`,
-                    { type: 'system', actionUrl: 'irontrain://social' }
-                );
-                await db.update(schema.globalEvents).set({ pushSent: 1, updatedAt: new Date() }).where(eq(schema.globalEvents.id, id));
-            } catch (pushErr) {
-                console.error('Push notification failed for global event, but database was updated:', pushErr);
-            }
         }
-
-        revalidatePath('/admin');
-        revalidatePath('/feed');
-        redirect(getRedirectPath(formData, 'events'));
     } catch (error: any) {
-        if (error.message === 'NEXT_REDIRECT') throw error;
         console.error('Global Event Action Error:', error);
         revalidatePath('/admin');
-        redirect('/admin?tab=content&section=events&error=action_failed');
+        redirectPath = '/admin?tab=content&section=events&error=action_failed';
     }
+
+    if (redirectPath) redirect(redirectPath);
 }
 
 export async function handleMarketplaceEntityAction(formData: FormData) {
+    let redirectPath = '';
     try {
         const adminId = await getAuthenticatedAdmin();
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
@@ -533,15 +566,16 @@ export async function handleMarketplaceEntityAction(formData: FormData) {
         const id = String(formData.get('id') || '').trim() || crypto.randomUUID();
 
         if (action === 'delete') {
-            if (table === 'exercises') await db.delete(schema.exercises).where(eq(schema.exercises.id, id));
-            if (table === 'categories') await db.delete(schema.categories).where(eq(schema.categories.id, id));
-            if (table === 'badges') await db.delete(schema.badges).where(eq(schema.badges.id, id));
-            revalidatePath('/admin');
-            revalidatePath('/feed');
-            redirect(getRedirectPath(formData, 'marketplace'));
-        }
-
-        if (action === 'save') {
+            if (id) {
+                if (table === 'exercises') {
+                    await db.delete(schema.exerciseBadges).where(eq(schema.exerciseBadges.exerciseId, id));
+                    await db.delete(schema.exercises).where(eq(schema.exercises.id, id));
+                }
+                if (table === 'categories') await db.delete(schema.categories).where(eq(schema.categories.id, id));
+                if (table === 'badges') await db.delete(schema.badges).where(eq(schema.badges.id, id));
+            }
+            redirectPath = getRedirectPath(formData, 'marketplace');
+        } else if (action === 'save') {
             if (table === 'categories') {
                 const name = String(formData.get('name') || '').trim();
                 const color = String(formData.get('color') || '').trim();
@@ -623,22 +657,24 @@ export async function handleMarketplaceEntityAction(formData: FormData) {
                     }
                 });
             }
+            redirectPath = getRedirectPath(formData, 'marketplace');
         } else {
-            redirect(getRedirectPath(formData, 'marketplace'));
+            redirectPath = getRedirectPath(formData, 'marketplace');
         }
 
         revalidatePath('/admin');
         revalidatePath('/feed');
-        redirect(getRedirectPath(formData, 'marketplace'));
     } catch (error: any) {
-        if (error.message === 'NEXT_REDIRECT') throw error;
         console.error('Marketplace Entity Action Error:', error);
         revalidatePath('/admin');
-        redirect('/admin?tab=marketplace&section=exercises&error=action_failed');
+        redirectPath = '/admin?tab=marketplace&section=exercises&error=action_failed';
     }
+
+    if (redirectPath) redirect(redirectPath);
 }
 
 export async function handleUpdateSystemStatus(formData: FormData) {
+    let redirectPath = '';
     try {
         const adminId = await getAuthenticatedAdmin();
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
@@ -667,11 +703,12 @@ export async function handleUpdateSystemStatus(formData: FormData) {
 
         revalidatePath('/admin');
         revalidatePath('/');
-        redirect(getRedirectPath(formData, 'system'));
+        redirectPath = getRedirectPath(formData, 'system');
     } catch (error: any) {
-        if (error.message === 'NEXT_REDIRECT') throw error;
         console.error('System Status Action Error:', error);
         revalidatePath('/admin');
-        redirect('/admin?tab=system&section=status&error=status_update_failed');
+        redirectPath = '/admin?tab=system&section=status&error=status_update_failed';
     }
+
+    if (redirectPath) redirect(redirectPath);
 }
