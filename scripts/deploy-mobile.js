@@ -46,7 +46,8 @@ function main() {
     // 4. Git Push
     console.log('\n\x1b[34m[4/5] Pushing to origin...\x1b[0m');
     try {
-        execSync('git push origin main', { stdio: 'inherit' });
+        const currentBranch = execSync('git branch --show-current').toString().trim();
+        execSync(`git push origin ${currentBranch}`, { stdio: 'inherit' });
         execSync('git push origin --tags', { stdio: 'inherit' });
     } catch (e) {
         console.error(`Failed to push to origin: ${e.message}`);
