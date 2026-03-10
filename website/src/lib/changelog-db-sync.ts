@@ -1,4 +1,3 @@
-import { db } from '../db';
 import * as schema from '../db/schema';
 import { getChangelog } from './changelog';
 import { runDbTransaction } from './db-transaction';
@@ -56,6 +55,10 @@ export async function syncChangelogToDatabase(options?: { force?: boolean; minIn
                 if (items.length === 0) continue;
 
                 const isUnreleased = release.unreleased === true || release.date === null ? 1 : 0;
+
+                // SKIPPED: Prevenir que forzar rebuilding traiga de vuelta la version unreleased borrada
+                if (isUnreleased) continue;
+
                 const date = toDateOrNow(release.date);
                 const now = new Date();
 

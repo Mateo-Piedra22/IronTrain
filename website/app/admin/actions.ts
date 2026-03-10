@@ -2,6 +2,7 @@
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { randomUUID } from 'node:crypto';
 import { db } from '../../src/db';
 import * as schema from '../../src/db/schema';
 import { auth } from '../../src/lib/auth/server';
@@ -216,7 +217,7 @@ export async function handleChangelogAction(formData: FormData) {
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
 
         const action = String(formData.get('action') || '');
-        const id = String(formData.get('id') || '').trim() || crypto.randomUUID();
+        const id = String(formData.get('id') || '').trim() || randomUUID();
         const version = String(formData.get('version') || '').trim();
         const itemsRaw = String(formData.get('items') || '').trim();
         const isUnreleased = formData.get('isUnreleased') === 'true' ? 1 : 0;
@@ -315,7 +316,7 @@ export async function handleNotificationAction(formData: FormData) {
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
 
         const action = String(formData.get('action') || '');
-        const id = String(formData.get('id') || '').trim() || crypto.randomUUID();
+        const id = String(formData.get('id') || '').trim() || randomUUID();
         const title = String(formData.get('title') || '').trim();
         const message = String(formData.get('message') || '').trim();
         const type = String(formData.get('type') || 'toast');
@@ -477,7 +478,7 @@ export async function handleGlobalEventAction(formData: FormData) {
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
 
         const action = String(formData.get('action') || '');
-        const id = String(formData.get('id') || '').trim() || crypto.randomUUID();
+        const id = String(formData.get('id') || '').trim() || randomUUID();
 
         if (action === 'delete') {
             if (id) {
@@ -563,16 +564,28 @@ export async function handleMarketplaceEntityAction(formData: FormData) {
 
         const table = formData.get('table') as 'exercises' | 'categories' | 'badges';
         const action = String(formData.get('action') || '');
-        const id = String(formData.get('id') || '').trim() || crypto.randomUUID();
+        const id = String(formData.get('id') || '').trim() || randomUUID();
 
         if (action === 'delete') {
             if (id) {
                 if (table === 'exercises') {
                     await db.delete(schema.exerciseBadges).where(eq(schema.exerciseBadges.exerciseId, id));
+                    await db.delete(schema.userExercisePrs).where(eq(schema.userExercisePrs.exerciseId, id));
                     await db.delete(schema.exercises).where(eq(schema.exercises.id, id));
                 }
-                if (table === 'categories') await db.delete(schema.categories).where(eq(schema.categories.id, id));
-                if (table === 'badges') await db.delete(schema.badges).where(eq(schema.badges.id, id));
+                if (table === 'categories') {
+                    const exList = await db.select({ id: schema.exercises.id }).from(schema.exercises).where(eq(schema.exercises.categoryId, id));
+                    for (const ex of exList) {
+                        await db.delete(schema.exerciseBadges).where(eq(schema.exerciseBadges.exerciseId, ex.id));
+                        await db.delete(schema.userExercisePrs).where(eq(schema.userExercisePrs.exerciseId, ex.id));
+                        await db.delete(schema.exercises).where(eq(schema.exercises.id, ex.id));
+                    }
+                    await db.delete(schema.categories).where(eq(schema.categories.id, id));
+                }
+                if (table === 'badges') {
+                    await db.delete(schema.exerciseBadges).where(eq(schema.exerciseBadges.badgeId, id));
+                    await db.delete(schema.badges).where(eq(schema.badges.id, id));
+                }
             }
             redirectPath = getRedirectPath(formData, 'marketplace');
         } else if (action === 'save') {
