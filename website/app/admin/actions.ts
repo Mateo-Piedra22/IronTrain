@@ -637,3 +637,41 @@ export async function handleMarketplaceEntityAction(formData: FormData) {
         redirect('/admin?tab=marketplace&section=exercises&error=action_failed');
     }
 }
+
+export async function handleUpdateSystemStatus(formData: FormData) {
+    try {
+        const adminId = await getAuthenticatedAdmin();
+        if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
+
+        const maintenanceMode = formData.get('maintenanceMode') === '1' ? 1 : 0;
+        const offlineOnlyMode = formData.get('offlineOnlyMode') === '1' ? 1 : 0;
+        const message = String(formData.get('message') || '').trim();
+
+        await db.insert(schema.systemStatus).values({
+            id: 'global',
+            maintenanceMode,
+            offlineOnlyMode,
+            message,
+            updatedAt: new Date(),
+            updatedBy: adminId,
+        }).onConflictDoUpdate({
+            target: schema.systemStatus.id,
+            set: {
+                maintenanceMode,
+                offlineOnlyMode,
+                message,
+                updatedAt: new Date(),
+                updatedBy: adminId,
+            }
+        });
+
+        revalidatePath('/admin');
+        revalidatePath('/');
+        redirect(getRedirectPath(formData, 'system'));
+    } catch (error: any) {
+        if (error.message === 'NEXT_REDIRECT') throw error;
+        console.error('System Status Action Error:', error);
+        revalidatePath('/admin');
+        redirect('/admin?tab=system&section=status&error=status_update_failed');
+    }
+}

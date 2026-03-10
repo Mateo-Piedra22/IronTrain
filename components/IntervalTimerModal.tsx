@@ -54,36 +54,27 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
     const ss = useMemo(() => StyleSheet.create({
         container: { flex: 1, backgroundColor: colors.surface },
         idleHeader: {
-            marginBottom: 12,
-            paddingHorizontal: 20,
-            paddingTop: 16,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 16,
-            backgroundColor: colors.surface,
-            paddingBottom: 20,
-            borderBottomWidth: 1.5,
-            borderBottomColor: colors.border,
+            flexDirection: 'row', alignItems: 'center', gap: 16,
+            paddingHorizontal: 20, paddingTop: 60, paddingBottom: 20,
+            backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border
         },
-        backBtn: {
-            width: 38, height: 38, borderRadius: 12,
-            backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
-            borderWidth: 1.5, borderColor: colors.border,
-            ...ThemeFx.shadowSm,
-        },
-        pageTitle: { color: colors.text, fontWeight: '900', fontSize: 24, letterSpacing: -1 },
-        pageSub: { color: colors.primary.DEFAULT, fontSize: 11, fontWeight: '800', marginTop: 2, letterSpacing: 0.8, textTransform: 'uppercase' },
-        closeBtn: { padding: 8 },
-        sectionLabel: { color: colors.textMuted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1.2, marginLeft: 4 },
+        backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceLighter, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.border },
+        pageTitle: { fontSize: 24, fontWeight: '900', color: colors.text, letterSpacing: -0.5 },
+        pageSub: { fontSize: 11, fontWeight: '800', color: colors.primary.DEFAULT, marginTop: 2, letterSpacing: 0.8, textTransform: 'uppercase' },
+
+        scrollContent: { padding: 20, paddingBottom: 100 },
+        sectionLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 },
+
         presetsSection: { paddingVertical: 20 },
         presetCard: {
             width: 140, backgroundColor: colors.surface, borderRadius: 16,
             borderWidth: 1.5, borderColor: colors.border, padding: 14, justifyContent: 'center',
-            ...ThemeFx.shadowSm,
+            marginRight: 10, ...ThemeFx.shadowSm,
         },
         presetCardActive: { backgroundColor: colors.primary.DEFAULT, borderColor: colors.primary.DEFAULT, ...ThemeFx.shadowMd },
         presetCardName: { fontWeight: '900', fontSize: 14, color: colors.text, marginBottom: 4 },
         presetCardDesc: { fontSize: 11, color: colors.textMuted, fontWeight: '600', lineHeight: 15 },
+
         steppersTopRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
         stepperCard: {
             flex: 1, backgroundColor: colors.surface, borderRadius: 18,
@@ -99,6 +90,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
             alignItems: 'center', justifyContent: 'center'
         },
         stepperValue: { color: colors.text, fontSize: 26, fontWeight: '900', fontVariant: ['tabular-nums'] },
+
         summaryCard: {
             backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1.5, borderColor: colors.border,
             padding: 16, ...ThemeFx.shadowSm,
@@ -109,74 +101,101 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
         detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
         detailLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
         detailValue: { color: colors.text, fontSize: 13, fontWeight: '900', textTransform: 'uppercase' },
+
         summaryRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
         dot: { width: 12, height: 12, borderRadius: 6, marginRight: 8 },
         summaryLabel: { color: colors.text, fontWeight: '700', flex: 1 },
         summaryValue: { color: colors.text, fontWeight: '800' },
         summaryTotal: { borderTopWidth: 1.5, borderTopColor: colors.border, marginTop: 4, paddingTop: 8, flexDirection: 'row', alignItems: 'center' },
+
         startBtn: {
             backgroundColor: colors.primary.DEFAULT, borderRadius: 16, paddingVertical: 18, alignItems: 'center',
             ...ThemeFx.shadowMd,
         },
         startBtnText: { color: colors.onPrimary, fontWeight: '900', fontSize: 16, textTransform: 'uppercase', letterSpacing: 1 },
+
         activeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
         activeTopBar: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, zIndex: 10 },
         activePhaseChip: {
-            flexDirection: 'row', alignItems: 'center', backgroundColor: withAlpha(colors.white, '1F'),
-            borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, gap: 8, borderWidth: 1.5, borderColor: withAlpha(colors.white, '1A')
+            flexDirection: 'row', alignItems: 'center', backgroundColor: withAlpha(colors.surface, '33'),
+            borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, gap: 8, borderWidth: 1.5, borderColor: withAlpha(colors.border, '33')
         },
         activePhaseIndicator: { width: 8, height: 8, borderRadius: 4 },
-        activePhaseChipText: { color: withAlpha(colors.white, 'D9'), fontSize: 11, fontWeight: '900', letterSpacing: 1.5 },
+        activePhaseChipText: { color: colors.text, fontSize: 11, fontWeight: '900', letterSpacing: 1.5 },
         activeCloseBtn: {
-            width: 40, height: 40, borderRadius: 20, backgroundColor: withAlpha(colors.white, '1F'),
-            alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: withAlpha(colors.white, '1A')
+            width: 40, height: 40, borderRadius: 20, backgroundColor: withAlpha(colors.surface, '33'),
+            alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: withAlpha(colors.border, '33')
         },
         pillsRow: { position: 'absolute', flexDirection: 'row', gap: 4, paddingHorizontal: 20, left: 0, right: 0 },
         pill: { height: 4, borderRadius: 2, flex: 1 },
-        phaseLabel: { color: withAlpha(colors.white, '99'), fontWeight: '900', fontSize: 14, marginBottom: 24, textTransform: 'uppercase', letterSpacing: 6 },
+
         timerBig: {
-            color: colors.white, fontWeight: '900', fontSize: 84, fontVariant: ['tabular-nums'],
-            textShadowColor: withAlpha(colors.black, '26'), textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 10
+            fontSize: 110, fontWeight: '900', color: colors.text,
+            letterSpacing: -4, includeFontPadding: false, textAlignVertical: 'center',
         },
-        roundInfo: { color: withAlpha(colors.white, '73'), fontSize: 16, fontWeight: '700', marginTop: 24 },
+        phaseLabel: {
+            fontSize: 28, fontWeight: '800', color: colors.text,
+            marginTop: -10, letterSpacing: -0.5,
+        },
+        roundInfo: { color: colors.textMuted, fontSize: 14, fontWeight: '700', marginTop: 12 },
         elapsedChip: {
-            flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12,
-            backgroundColor: withAlpha(colors.white, '14'), paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12
+            flexDirection: 'row', alignItems: 'center', gap: 6,
+            backgroundColor: withAlpha(colors.surface, '33'), paddingHorizontal: 12, paddingVertical: 6,
+            borderRadius: 20, marginTop: 16
         },
-        elapsedInfo: { color: withAlpha(colors.white, '66'), fontSize: 12, fontWeight: '800' },
-        controlsRow: { position: 'absolute', flexDirection: 'row', gap: 32, alignItems: 'center' },
+        elapsedInfo: { color: colors.text, fontSize: 12, fontWeight: '800' },
+
+        controlsRow: { position: 'absolute', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 32, left: 0, right: 0 },
         controlBtn: {
-            width: 58, height: 58, backgroundColor: withAlpha(colors.white, '1A'), borderRadius: 29,
-            alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: withAlpha(colors.white, '1F')
+            width: 56, height: 56, borderRadius: 28, backgroundColor: withAlpha(colors.surface, '33'),
+            alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: withAlpha(colors.border, '33')
         },
-        controlLabel: { color: withAlpha(colors.white, '59'), fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 },
+        controlLabel: {
+            color: colors.textMuted, fontSize: 10, fontWeight: '900',
+            marginTop: 8, letterSpacing: 1, textTransform: 'uppercase',
+        },
         pauseBtn: {
-            width: 84, height: 84, backgroundColor: colors.white, borderRadius: 42,
-            alignItems: 'center', justifyContent: 'center',
+            width: 84, height: 84, backgroundColor: colors.surface, borderRadius: 42,
+            justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: colors.border,
             ...ThemeFx.shadowLg,
         },
-        finishedControls: { position: 'absolute', width: '100%', paddingHorizontal: 20 },
+
+        finishedControls: { position: 'absolute', width: '100%', paddingHorizontal: 24 },
         finishedCard: {
-            backgroundColor: withAlpha(colors.white, '14'), borderRadius: 24, padding: 20, marginBottom: 16,
-            borderWidth: 1.5, borderColor: withAlpha(colors.white, '14')
+            backgroundColor: withAlpha(colors.surface, 'CC'), borderRadius: 24, padding: 24,
+            borderWidth: 1.5, borderColor: colors.border, marginBottom: 24,
+            ...ThemeFx.shadowLg
         },
-        finSectionLabel: { color: withAlpha(colors.white, '59'), fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 16 },
-        finishedRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-        finishedLabel: { color: withAlpha(colors.white, '80'), fontWeight: '700', fontSize: 14 },
-        finishedValue: { color: colors.white, fontWeight: '900', fontSize: 14 },
-        finishedTotalRow: { borderTopWidth: 1.5, borderTopColor: withAlpha(colors.white, '1A'), marginTop: 6, paddingTop: 16, flexDirection: 'row', justifyContent: 'space-between' },
-        finishedTotalLabel: { color: withAlpha(colors.white, 'B3'), fontWeight: '900', fontSize: 15 },
-        finishedTotalValue: { color: colors.white, fontWeight: '900', fontSize: 18 },
+        finSectionLabel: { color: colors.textMuted, fontSize: 11, fontWeight: '900', letterSpacing: 1.2, marginBottom: 16 },
+        finishedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+        finishedLabel: { color: colors.text, fontSize: 14, fontWeight: '600' },
+        finishedValue: { color: colors.text, fontSize: 14, fontWeight: '900' },
+        finishedTotalRow: {
+            flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+            marginTop: 4, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border
+        },
+        finishedTotalLabel: { color: colors.text, fontSize: 16, fontWeight: '900' },
+        finishedTotalValue: { color: colors.primary.DEFAULT, fontSize: 20, fontWeight: '900' },
+
         repeatBtn: {
-            flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', alignItems: 'center',
-            borderWidth: 1.5, borderColor: withAlpha(colors.white, '4D'), borderRadius: 16, paddingVertical: 18, backgroundColor: withAlpha(colors.white, '0F')
+            flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+            gap: 10, paddingVertical: 18, borderRadius: 20,
+            borderWidth: 2, borderColor: colors.border, backgroundColor: colors.surface,
         },
-        repeatBtnText: { color: colors.white, fontWeight: '800', fontSize: 15 },
+        repeatBtnText: {
+            color: colors.text, fontWeight: '900', letterSpacing: 1,
+            fontSize: 14, textTransform: 'uppercase',
+        },
         doneBtn: {
-            flex: 1, backgroundColor: colors.white, borderRadius: 16, paddingVertical: 18, alignItems: 'center',
-            ...ThemeFx.shadowSm,
+            flex: 1, backgroundColor: colors.primary.DEFAULT, flexDirection: 'row',
+            alignItems: 'center', justifyContent: 'center', gap: 10,
+            paddingVertical: 18, borderRadius: 20, ...ThemeFx.shadowSm,
         },
-        doneBtnText: { color: colors.black, fontWeight: '900', fontSize: 15 },
+        doneBtnText: {
+            color: colors.onPrimary, fontWeight: '900', letterSpacing: 1,
+            fontSize: 14, textTransform: 'uppercase',
+        },
+
         flex1: { flex: 1 },
         rowGap10: { flexDirection: 'row', gap: 10 },
         alignCenter: { alignItems: 'center' },
@@ -382,7 +401,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                 };
             case 'finished':
                 return {
-                    bg: colors.isDark ? colors.surface : colors.primary.dark,
+                    bg: isDark ? colors.surface : colors.primary.dark,
                     label: '¡COMPLETADO!',
                     ringColor: colors.primary.DEFAULT,
                     accentBg: withAlpha(colors.primary.DEFAULT, '26')
@@ -515,7 +534,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                         </Text>
                     </View>
                     <TouchableOpacity onPress={handleClose} style={ss.activeCloseBtn} activeOpacity={0.8}>
-                        <X color={colors.white} size={18} />
+                        <X color={colors.text} size={18} />
                     </TouchableOpacity>
                 </View>
 
@@ -540,7 +559,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                         <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
                             <View style={{ alignItems: 'center', justifyContent: 'center', width: RING_SIZE, height: RING_SIZE }}>
                                 <Svg width={RING_SIZE} height={RING_SIZE} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
-                                    <Circle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS} stroke={withAlpha(colors.white, '14')} strokeWidth={RING_STROKE} fill="none" />
+                                    <Circle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS} stroke={withAlpha(colors.text, '14')} strokeWidth={RING_STROKE} fill="none" />
                                     <AnimatedCircle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS} stroke={phaseConfig.ringColor} strokeWidth={RING_STROKE} fill="none" strokeLinecap="round" strokeDasharray={`${RING_CIRCUMFERENCE}`} strokeDashoffset={strokeDashoffset} />
                                 </Svg>
                                 <Text style={ss.timerBig}>{formatTime(timeLeft)}</Text>
@@ -557,7 +576,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                     </Text>
                     {phase !== 'prepare' && (
                         <View style={ss.elapsedChip}>
-                            <RotateCcw size={12} color={withAlpha(colors.white, '80')} />
+                            <RotateCcw size={12} color={withAlpha(colors.text, '80')} />
                             <Text style={ss.elapsedInfo}>{formatDuration(elapsedTotal)}</Text>
                         </View>
                     )}
@@ -568,16 +587,16 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                     <View style={[ss.controlsRow, { bottom: insets.bottom + 48 }]}>
                         <View style={ss.alignCenter}>
                             <TouchableOpacity onPress={handleReset} style={ss.controlBtn} activeOpacity={0.8}>
-                                <RotateCcw color={colors.white} size={22} />
+                                <RotateCcw color={colors.text} size={22} />
                             </TouchableOpacity>
                             <Text style={ss.controlLabel}>Reset</Text>
                         </View>
                         <TouchableOpacity onPress={handlePause} style={ss.pauseBtn} activeOpacity={0.9}>
-                            {isPaused ? <Play color={colors.black} size={32} fill={colors.black} /> : <Pause color={colors.black} size={32} fill={colors.black} />}
+                            {isPaused ? <Play color={colors.text} size={32} fill={colors.text} /> : <Pause color={colors.text} size={32} fill={colors.text} />}
                         </TouchableOpacity>
                         <View style={ss.alignCenter}>
                             <TouchableOpacity onPress={handleSkipPhase} style={ss.controlBtn} activeOpacity={0.8}>
-                                <ChevronDown color={colors.white} size={22} style={{ transform: [{ rotate: '-90deg' }] }} />
+                                <ChevronDown color={colors.text} size={22} style={{ transform: [{ rotate: '-90deg' }] }} />
                             </TouchableOpacity>
                             <Text style={ss.controlLabel}>Saltar</Text>
                         </View>
@@ -599,7 +618,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                         </View>
                         <View style={{ flexDirection: 'row', gap: 12 }}>
                             <Pressable onPress={handleReset} style={ss.repeatBtn}>
-                                <RotateCcw color={colors.white} size={16} />
+                                <RotateCcw color={colors.text} size={16} />
                                 <Text style={ss.repeatBtnText}>Repetir</Text>
                             </Pressable>
                             <Pressable onPress={handleClose} style={ss.doneBtn}>

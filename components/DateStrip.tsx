@@ -106,10 +106,19 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
             const centerIndex = Math.floor(viewableItems.length / 2);
             const centerItem = viewableItems[centerIndex]?.item as Date | undefined;
             if (centerItem) {
-                setVisibleMonth(centerItem);
+                // Solo actualizamos si el mes o año han cambiado realmente
+                const hasChanged = centerItem.getMonth() !== visibleMonth.getMonth() ||
+                    centerItem.getFullYear() !== visibleMonth.getFullYear();
+
+                if (hasChanged) {
+                    // Diferimos el update para evitar errores de ciclo de renderizado en FlashList
+                    Promise.resolve().then(() => {
+                        setVisibleMonth(centerItem);
+                    });
+                }
             }
         }
-    }, []);
+    }, [visibleMonth]);
 
     // --- Renderers ---
 

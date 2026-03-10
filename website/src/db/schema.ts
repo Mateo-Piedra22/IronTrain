@@ -380,6 +380,15 @@ export const scoreEvents = pgTable('score_events', {
     deletedAt: timestamp('deleted_at'),
 });
 
+export const systemStatus = pgTable('system_status', {
+    id: text('id').primaryKey(), // singleton: 'global'
+    maintenanceMode: integer('maintenance_mode').default(0).notNull(), // 0: off, 1: on
+    offlineOnlyMode: integer('offline_only_mode').default(0).notNull(), // 0: off, 1: on
+    message: text('message'), // Optional custom message for maintenance
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    updatedBy: text('updated_by'),
+});
+
 // --- RELATIONS FOR DRIZZLE QUERY API ---
 export const categoriesRelations = relations(categories, ({ many }) => ({
     exercises: many(exercises),

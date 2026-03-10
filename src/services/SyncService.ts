@@ -229,7 +229,34 @@ export class SyncService {
                 }, REQUEST_TIMEOUT_MS);
 
                 try {
-                    return await fetch(input, { ...init, signal });
+                    const response = await fetch(input, { ...init, signal });
+
+                    if (response.status === 503) {
+                        try {
+                            const data = await response.clone().json();
+                            if (data.error === 'MAINTENANCE_MODE') {
+                                useSettingsStore.getState().setServerStatus({
+                                    mode: 'maintenance',
+                                    message: data.message
+                                });
+                            } else if (data.error === 'OFFLINE_ONLY_MODE') {
+                                useSettingsStore.getState().setServerStatus({
+                                    mode: 'offline',
+                                    message: data.message
+                                });
+                            }
+                        } catch {
+                            // Silently fail if body is not JSON
+                        }
+                    } else if (response.ok) {
+                        // If sync is successful, reset status to normal
+                        const currentStatus = useSettingsStore.getState().serverStatus;
+                        if (currentStatus.mode !== 'normal') {
+                            useSettingsStore.getState().setServerStatus({ mode: 'normal' });
+                        }
+                    }
+
+                    return response;
                 } finally {
                     if (timeoutId) clearTimeout(timeoutId);
                     if (outerSignal) outerSignal.removeEventListener('abort', abortFromOuter);

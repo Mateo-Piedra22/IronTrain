@@ -2,20 +2,28 @@ import { create } from 'zustand';
 import { dataEventService } from '../services/DataEventService';
 import { settingsService } from '../services/SettingsService';
 
+export interface ServerStatus {
+    mode: 'normal' | 'maintenance' | 'offline';
+    message?: string;
+}
+
 interface SettingsState {
     unitSystem: 'metric' | 'imperial';
     alwaysOn: boolean;
     trainingDays: number[];
+    serverStatus: ServerStatus;
     loadSettings: () => Promise<void>;
     setUnitSystem: (val: 'metric' | 'imperial') => Promise<void>;
     setAlwaysOn: (val: boolean) => Promise<void>;
     setTrainingDays: (days: number[]) => Promise<void>;
+    setServerStatus: (status: ServerStatus) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
     unitSystem: 'metric',
     alwaysOn: false,
     trainingDays: [1, 2, 3, 4, 5, 6], // default to Mon-Sat 
+    serverStatus: { mode: 'normal' },
     loadSettings: async () => {
         const unitSystem = await settingsService.getSetting('unit_system');
         const alwaysOn = await settingsService.getSetting('always_on');
@@ -38,6 +46,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     setTrainingDays: async (days) => {
         await settingsService.setSetting('training_days', JSON.stringify(days));
         set({ trainingDays: days });
+    },
+    setServerStatus: (status) => {
+        set({ serverStatus: status });
     }
 }));
 

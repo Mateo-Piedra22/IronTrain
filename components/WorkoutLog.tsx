@@ -195,8 +195,8 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
                             style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
                             accessibilityRole="button" accessibilityLabel={`Mantener para reordenar ${group.exercise_name}`}
                         >
-                            <GripVertical size={20} color={colors.white} />
-                            <Text style={ss.swipeLabel}>ORDENAR</Text>
+                            <GripVertical size={20} color={colors.onPrimary} />
+                            <Text style={[ss.swipeLabel, { color: colors.onPrimary }]}>ORDENAR</Text>
                         </TouchableOpacity>
                     </Animated.View>
                 </View>

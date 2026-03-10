@@ -83,7 +83,8 @@ export default async function AdminPage({
         syncHealth,
         officialExercisesRaw,
         officialCategoriesRaw,
-        officialBadgesRaw
+        officialBadgesRaw,
+        systemStatusData
     ] = await Promise.all([
         db.select({
             id: schema.routines.id,
@@ -162,6 +163,7 @@ export default async function AdminPage({
         }),
         db.select().from(schema.categories).where(eq(schema.categories.isSystem, 1)),
         db.select().from(schema.badges).where(eq(schema.badges.isSystem, 1)),
+        db.select().from(schema.systemStatus).where(eq(schema.systemStatus.id, 'global')).limit(1),
     ]);
 
     // Data Transformation
@@ -202,6 +204,13 @@ export default async function AdminPage({
         extraDayPoints: 10,
         weatherBonusEnabled: 1,
         coldThresholdC: 3,
+    };
+
+    const systemStatus = systemStatusData?.[0] ?? {
+        id: 'global',
+        maintenanceMode: 0,
+        offlineOnlyMode: 0,
+        message: '',
     };
 
     const metrics = {
@@ -317,6 +326,7 @@ export default async function AdminPage({
                     <SystemStatusPanel
                         metrics={metrics}
                         syncHealth={syncHealth}
+                        systemStatus={systemStatus}
                     />
                 }
                 socialPanel={

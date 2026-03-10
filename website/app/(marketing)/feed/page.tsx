@@ -92,6 +92,14 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
         const userId = await verifyAuth(request);
         if (!userId) return;
 
+        // Global System Status Check
+        const { getSystemStatus } = await import('../../../src/lib/system-status');
+        const status = await getSystemStatus();
+        if (status.maintenanceMode === 1 || status.offlineOnlyMode === 1) {
+            console.warn(`Adopt Action blocked for user ${userId} due to system status.`);
+            return;
+        }
+
         const exerciseId = formData.get('exerciseId') as string;
         await MarketplaceResolver.checkoutExercises(userId, [exerciseId]);
         revalidatePath('/feed');

@@ -33,8 +33,13 @@ export async function GET(req: NextRequest) {
     const userId = await verifyAuth(req);
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const searchParams = req.nextUrl.searchParams;
-    const sinceParam = searchParams.get('since');
+    // Global System Status Check
+    const { validateSystemAccess } = await import('../../../../src/lib/system-status');
+    const { isRestricted, response } = await validateSystemAccess();
+    if (isRestricted) return response as NextResponse;
+
+    const sp = req.nextUrl.searchParams;
+    const sinceParam = sp.get('since');
     const sinceDate = sinceParam ? new Date(parseInt(sinceParam)) : new Date(0);
 
     try {

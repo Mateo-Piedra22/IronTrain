@@ -18,6 +18,11 @@ function hashIp(ip: string): string {
 
 export async function POST(req: NextRequest) {
     try {
+        // Global System Status Check
+        const { validateSystemAccess } = await import('../../../src/lib/system-status');
+        const { isRestricted, response } = await validateSystemAccess();
+        if (isRestricted) return response as NextResponse;
+
         const body = await req.json();
         const rawType = cleanText(body?.type, 32);
         const message = cleanText(body?.message, 4000);

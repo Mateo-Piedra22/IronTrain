@@ -375,7 +375,7 @@ export default function LibraryScreen() {
                         accessibilityRole="button"
                         accessibilityLabel="Crear rutina"
                     >
-                        <Plus color="white" size={24} />
+                        <Plus color={colors.onPrimary} size={24} />
                     </TouchableOpacity>
 
                     <LinearGradient

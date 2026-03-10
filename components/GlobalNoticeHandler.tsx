@@ -6,6 +6,7 @@ import { decideGlobalInterruption } from '@/src/services/BroadcastInterruptionPo
 import { ChangelogService, type ChangelogRelease } from '@/src/services/ChangelogService';
 import { configService } from '@/src/services/ConfigService';
 import { useAuthStore } from '@/src/store/authStore';
+import { useSettingsStore } from '@/src/store/useSettingsStore';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { useRouter } from 'expo-router';
 import { Bell, X } from 'lucide-react-native';
@@ -18,6 +19,7 @@ import { WhatsNewModal } from './WhatsNewModal';
 
 export const GlobalNoticeHandler: React.FC = () => {
     const colors = useColors();
+    const { serverStatus } = useSettingsStore();
     const [whatsNew, setWhatsNew] = useState<ChangelogRelease | null>(null);
     const [activeAnnouncement, setActiveAnnouncement] = useState<BroadcastItem | null>(null);
     const [showToast, setShowToast] = useState(false);
@@ -168,8 +170,34 @@ export const GlobalNoticeHandler: React.FC = () => {
             backgroundColor: colors.surfaceLighter,
             borderRadius: 10,
             marginLeft: 8,
+        },
+        // Banner specific styles
+        serverBanner: {
+            top: 60,
+            zIndex: 10000,
+        },
+        serverBannerIcon: {
+            borderColor: 'transparent',
         }
     }), [colors]);
+
+    const bannerConfig = useMemo(() => {
+        if (!serverStatus || serverStatus.mode === 'normal') return null;
+        const isMaintenance = serverStatus.mode === 'maintenance';
+        const fg = isMaintenance ? colors.white : colors.onPrimary;
+
+        return {
+            bg: isMaintenance ? colors.red : colors.primary.DEFAULT,
+            fg,
+            borderColor: withAlpha(fg, '20'),
+            iconBg: withAlpha(fg, '15'),
+            textOpacity: withAlpha(fg, '80'),
+            title: isMaintenance ? 'MODO MANTENIMIENTO' : 'MODO 100% OFFLINE',
+            message: serverStatus.message || (isMaintenance
+                ? 'El sistema se encuentra en mantenimiento.'
+                : 'El servidor se encuentra en modo offline temporalmente.')
+        };
+    }, [serverStatus, colors]);
 
     useEffect(() => {
         let cancelled = false;
@@ -408,6 +436,41 @@ export const GlobalNoticeHandler: React.FC = () => {
                     >
                         <X size={16} color={colors.textMuted} />
                     </TouchableOpacity>
+                </Animated.View>
+            )}
+
+            {/* 4. Global Server Status Banner */}
+            {bannerConfig && (
+                <Animated.View
+                    entering={SlideInUp}
+                    exiting={SlideOutUp}
+                    style={[
+                        ss.toastContainer,
+                        ss.serverBanner,
+                        {
+                            backgroundColor: bannerConfig.bg,
+                            borderColor: bannerConfig.borderColor,
+                        }
+                    ]}
+                >
+                    <View style={[
+                        ss.toastIcon,
+                        ss.serverBannerIcon,
+                        { backgroundColor: bannerConfig.iconBg }
+                    ]}>
+                        <Bell size={16} color={bannerConfig.fg} />
+                    </View>
+                    <View style={ss.toastContent}>
+                        <Text style={[ss.toastTitle, { color: bannerConfig.fg }]}>
+                            {bannerConfig.title}
+                        </Text>
+                        <Text
+                            style={[ss.toastMessage, { color: bannerConfig.textOpacity }]}
+                            numberOfLines={2}
+                        >
+                            {bannerConfig.message}
+                        </Text>
+                    </View>
                 </Animated.View>
             )}
         </>

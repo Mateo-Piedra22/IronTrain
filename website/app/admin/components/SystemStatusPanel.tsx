@@ -2,12 +2,18 @@
 
 import {
     Activity,
+    MessageSquare,
+    Power,
+    Save,
     Shield,
     Smartphone,
     Users,
+    WifiOff,
     Zap
 } from 'lucide-react';
+import { useState } from 'react';
 import { SyncHealthPanel } from '../../../src/components/admin/SyncHealthPanel';
+import { handleUpdateSystemStatus } from '../actions';
 
 interface SystemStatusPanelProps {
     metrics: {
@@ -17,12 +23,103 @@ interface SystemStatusPanelProps {
         pendingFeedback: number;
     };
     syncHealth: any;
+    systemStatus: {
+        maintenanceMode: number;
+        offlineOnlyMode: number;
+        message: string | null;
+        updatedAt?: any;
+    };
 }
 
-export default function SystemStatusPanel({ metrics, syncHealth }: SystemStatusPanelProps) {
+export default function SystemStatusPanel({ metrics, syncHealth, systemStatus }: SystemStatusPanelProps) {
+    const [maintenance, setMaintenance] = useState(systemStatus.maintenanceMode === 1);
+    const [offlineOnly, setOfflineOnly] = useState(systemStatus.offlineOnlyMode === 1);
+    const [message, setMessage] = useState(systemStatus.message || '');
+
     return (
         <div className="space-y-12 animate-in fade-in duration-500">
-            {/* Sync Health Section - Highest Priority */}
+            {/* Control Center - High Impact */}
+            <div className="border-2 border-[#1a1a2e] bg-white shadow-[12px_12px_0px_0px_rgba(26,26,46,1)] overflow-hidden">
+                <div className="p-4 bg-[#1a1a2e] text-[#f5f1e8] flex items-center gap-3">
+                    <Shield className="w-5 h-5" />
+                    <h2 className="text-sm font-black uppercase tracking-[0.2em]">GLOBAL_APP_CONTROL</h2>
+                </div>
+
+                <form action={handleUpdateSystemStatus} className="p-8 space-y-8">
+                    <input type="hidden" name="origin_tab" value="system" />
+                    <input type="hidden" name="origin_section" value="status" />
+                    <input type="hidden" name="maintenanceMode" value={maintenance ? '1' : '0'} />
+                    <input type="hidden" name="offlineOnlyMode" value={offlineOnly ? '1' : '0'} />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Maintenance Mode Toggle */}
+                        <div className={`border-2 p-6 transition-all duration-300 ${maintenance ? 'border-red-600 bg-red-50' : 'border-[#1a1a2e]/10 bg-[#f5f1e8]/30'}`}>
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <Power className={`w-6 h-6 ${maintenance ? 'text-red-600' : 'opacity-40'}`} />
+                                    <div>
+                                        <h3 className="font-black uppercase text-sm leading-none">MAINTENANCE_MODE</h3>
+                                        <p className="text-[9px] font-bold opacity-40 mt-1 uppercase">Bloquear acceso total a la app</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setMaintenance(!maintenance)}
+                                    className={`w-14 h-8 border-2 border-[#1a1a2e] relative transition-colors duration-300 ${maintenance ? 'bg-red-600' : 'bg-gray-200'}`}
+                                >
+                                    <div className={`absolute top-0.5 bottom-0.5 w-6 bg-white border border-[#1a1a2e] transition-all duration-300 ${maintenance ? 'left-6.5' : 'left-0.5'}`} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Offline Only Mode Toggle */}
+                        <div className={`border-2 p-6 transition-all duration-300 ${offlineOnly ? 'border-orange-600 bg-orange-50' : 'border-[#1a1a2e]/10 bg-[#f5f1e8]/30'}`}>
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <WifiOff className={`w-6 h-6 ${offlineOnly ? 'text-orange-600' : 'opacity-40'}`} />
+                                    <div>
+                                        <h3 className="font-black uppercase text-sm leading-none">OFFLINE_FORCED</h3>
+                                        <p className="text-[9px] font-bold opacity-40 mt-1 uppercase">Desactivar sincronización global</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setOfflineOnly(!offlineOnly)}
+                                    className={`w-14 h-8 border-2 border-[#1a1a2e] relative transition-colors duration-300 ${offlineOnly ? 'bg-orange-600' : 'bg-gray-200'}`}
+                                >
+                                    <div className={`absolute top-0.5 bottom-0.5 w-6 bg-white border border-[#1a1a2e] transition-all duration-300 ${offlineOnly ? 'left-6.5' : 'left-0.5'}`} />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase opacity-60 flex items-center gap-2">
+                            <MessageSquare className="w-3 h-3" />
+                            MAINTENANCE_LOG_MESSAGE
+                        </label>
+                        <textarea
+                            name="message"
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            placeholder="Ej: Estamos realizando mejoras en el motor de sincronización..."
+                            className="w-full border-2 border-[#1a1a2e] p-4 font-mono text-sm focus:bg-[#f5f1e8] outline-none min-h-[100px] resize-none"
+                        />
+                    </div>
+
+                    <div className="flex justify-end">
+                        <button
+                            type="submit"
+                            className="bg-[#1a1a2e] text-[#f5f1e8] px-8 py-3 font-black uppercase tracking-widest text-xs flex items-center gap-3 hover:translate-x-1 hover:-translate-y-1 transition-transform active:translate-x-0 active:translate-y-0 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)]"
+                        >
+                            <Save className="w-4 h-4" />
+                            APPLY_GLOBAL_CHANGES
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            {/* Sync Health Section */}
             <div className="border border-[#1a1a2e] bg-[#f5f1e8] shadow-[8px_8px_0px_0px_rgba(26,26,46,0.1)] mb-12">
                 <div className="p-6 border-b border-[#1a1a2e] bg-[#1a1a2e] text-[#f5f1e8] flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -35,7 +132,7 @@ export default function SystemStatusPanel({ metrics, syncHealth }: SystemStatusP
                 </div>
             </div>
 
-            {/* Metrics Breakdown (Secondary) */}
+            {/* Metrics Breakdown */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 <div className="border border-[#1a1a2e] p-6 bg-white relative group overflow-hidden">
                     <div className="absolute top-0 right-0 p-2 opacity-5">
@@ -74,7 +171,7 @@ export default function SystemStatusPanel({ metrics, syncHealth }: SystemStatusP
                 </div>
             </div>
 
-            {/* Additional Telemetry (Placeholder for future stats) */}
+            {/* Additional Telemetry */}
             <div className="border border-[#1a1a2e]/10 p-4 text-center bg-[#1a1a2e]/5">
                 <div className="text-[9px] font-black uppercase opacity-40 tracking-[0.5em]">SYSTEM_STABLE_NO_ERRORS_DETECTED_V2</div>
             </div>

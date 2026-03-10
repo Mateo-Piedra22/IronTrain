@@ -16,6 +16,11 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        // Global System Status Check
+        const { validateSystemAccess } = await import('../../../../src/lib/system-status');
+        const { isRestricted, response } = await validateSystemAccess();
+        if (isRestricted) return response as NextResponse;
+
         let body;
         try {
             body = await req.json();
