@@ -12,6 +12,7 @@
     "release:prepare": "node scripts/release-prepare.js",
     "release:finalize": "node scripts/release-finalize.js",
     "postinstall": "node scripts/patch-css-interop.js && node scripts/generate-changelog.js",
+    "eas-build-pre-install": "node scripts/recreate-secrets.js",
     "pretest": "node scripts/generate-changelog.js",
     "test": "jest"
   },

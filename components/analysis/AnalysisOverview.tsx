@@ -3,7 +3,7 @@ import { GoalsWidget } from '@/components/GoalsWidget';
 import { BodySnapshotWidget } from '@/components/analysis/BodySnapshotWidget';
 import { VolumeChart } from '@/components/analysis/VolumeChart';
 import { CardioSummary, CategoryVolumeRow, RepsOnlySummary, WeightOnlySummary, WorkoutComparison, WorkoutStreak, WorkoutSummary } from '@/src/services/AnalysisService';
-import { withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { Activity, BarChart3, Clock, Flame, TrendingDown, TrendingUp, Trophy, Zap } from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -59,28 +59,24 @@ export function AnalysisOverview({
             paddingHorizontal: 16,
             paddingVertical: 10,
             borderRadius: 12,
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
             flex: 1,
             alignItems: 'center',
         },
         rangeChipActive: {
             backgroundColor: colors.primary.DEFAULT,
             borderColor: colors.primary.DEFAULT,
-            shadowColor: colors.primary.DEFAULT,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
-            elevation: 4,
+            ...ThemeFx.shadowMd,
         },
         rangeChipText: {
             fontWeight: '900',
             fontSize: 13,
-            color: colors.iron[500],
+            color: colors.textMuted,
         },
         rangeChipTextActive: {
-            color: colors.white,
+            color: colors.onPrimary,
         },
         heroRow: {
             flexDirection: 'row',
@@ -93,12 +89,8 @@ export function AnalysisOverview({
             borderRadius: 20,
             padding: 20,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.05,
-            shadowRadius: 15,
-            elevation: 4,
+            borderColor: colors.border,
+            ...ThemeFx.shadowSm,
         },
         heroIconRow: {
             flexDirection: 'row',
@@ -116,14 +108,14 @@ export function AnalysisOverview({
         heroLabel: {
             fontSize: 12,
             fontWeight: '900',
-            color: colors.iron[500],
+            color: colors.textMuted,
             textTransform: 'uppercase',
             letterSpacing: 0.5,
         },
         heroValue: {
             fontSize: 34,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             letterSpacing: -1,
         },
         heroValueAccent: {
@@ -138,7 +130,7 @@ export function AnalysisOverview({
         heroUnit: {
             fontSize: 12,
             fontWeight: '800',
-            color: colors.iron[400],
+            color: colors.textMuted,
         },
         bestBadge: {
             flexDirection: 'row',
@@ -147,7 +139,7 @@ export function AnalysisOverview({
             backgroundColor: withAlpha(colors.yellow, '15'),
             paddingHorizontal: 8,
             paddingVertical: 3,
-            borderRadius: 8,
+            borderRadius: 12,
             borderWidth: 1,
             borderColor: withAlpha(colors.yellow, '30'),
         },
@@ -161,13 +153,9 @@ export function AnalysisOverview({
             borderRadius: 20,
             padding: 24,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
             marginBottom: 24,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.06,
-            shadowRadius: 20,
-            elevation: 5,
+            ...ThemeFx.shadowMd,
         },
         summaryHeader: {
             flexDirection: 'row',
@@ -189,7 +177,7 @@ export function AnalysisOverview({
         summaryTitle: {
             fontSize: 20,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             letterSpacing: -0.5,
         },
         changeBadge: {
@@ -206,10 +194,10 @@ export function AnalysisOverview({
             alignItems: 'center',
             marginBottom: 24,
             padding: 20,
-            backgroundColor: colors.iron[50], // Slightly lighter for inner grid
+            backgroundColor: colors.surfaceLighter,
             borderRadius: 16,
             borderWidth: 1.5,
-            borderColor: colors.iron[100],
+            borderColor: colors.border,
         },
         metricCell: {
             flex: 1,
@@ -217,7 +205,7 @@ export function AnalysisOverview({
         metricDivider: {
             width: 1.5,
             height: 44,
-            backgroundColor: colors.iron[200],
+            backgroundColor: colors.border,
             marginHorizontal: 16,
         },
         metricIconRow: {
@@ -229,20 +217,20 @@ export function AnalysisOverview({
         metricLabel: {
             fontSize: 11,
             fontWeight: '900',
-            color: colors.iron[500],
+            color: colors.textMuted,
             textTransform: 'uppercase',
             letterSpacing: 0.3,
         },
         metricValue: {
             fontSize: 26,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             letterSpacing: -0.5,
         },
         metricUnit: {
             fontSize: 12,
             fontWeight: '800',
-            color: colors.iron[400],
+            color: colors.textMuted,
             marginTop: 4,
         },
         secondaryRow: {
@@ -258,25 +246,25 @@ export function AnalysisOverview({
         secondaryLabel: {
             fontSize: 11,
             fontWeight: '900',
-            color: colors.iron[400],
+            color: colors.textMuted,
             textTransform: 'uppercase',
             letterSpacing: 0.5,
         },
         secondaryValue: {
             fontSize: 16,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
         },
         subSection: {
             marginTop: 24,
             paddingTop: 16,
             borderTopWidth: 1.5,
-            borderTopColor: colors.iron[100],
+            borderTopColor: colors.border,
         },
         subSectionTitle: {
             fontSize: 12,
             fontWeight: '900',
-            color: colors.iron[400],
+            color: colors.textMuted,
             textTransform: 'uppercase',
             marginBottom: 6,
             letterSpacing: 0.8,
@@ -288,7 +276,7 @@ export function AnalysisOverview({
         subSectionText: {
             fontSize: 15,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
         },
         sectionHeader: {
             flexDirection: 'row',
@@ -305,7 +293,7 @@ export function AnalysisOverview({
         sectionTitle: {
             fontSize: 18,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             letterSpacing: -0.3,
         },
         emptyState: {
@@ -313,23 +301,19 @@ export function AnalysisOverview({
             backgroundColor: colors.surface,
             borderRadius: 20,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
             alignItems: 'center',
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.05,
-            shadowRadius: 15,
-            elevation: 4,
+            ...ThemeFx.shadowSm,
         },
         emptyTitle: {
             fontSize: 18,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             marginBottom: 8,
         },
         emptyMessage: {
             fontSize: 14,
-            color: colors.iron[500],
+            color: colors.textMuted,
             textAlign: 'center',
             lineHeight: 20,
             fontWeight: '600',
@@ -344,13 +328,9 @@ export function AnalysisOverview({
             backgroundColor: colors.surface,
             borderRadius: 20,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
             overflow: 'hidden',
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.05,
-            shadowRadius: 15,
-            elevation: 4,
+            ...ThemeFx.shadowSm,
         },
         tableSectionHeader: {
             paddingHorizontal: 20,
@@ -364,14 +344,14 @@ export function AnalysisOverview({
             flexDirection: 'row',
             paddingHorizontal: 20,
             paddingVertical: 14,
-            backgroundColor: colors.iron[50],
+            backgroundColor: colors.surfaceLighter,
             borderBottomWidth: 1.5,
-            borderBottomColor: colors.iron[100],
+            borderBottomColor: colors.border,
         },
         tableHeaderText: {
             fontSize: 11,
             fontWeight: '900',
-            color: colors.iron[400],
+            color: colors.textMuted,
             textTransform: 'uppercase',
             letterSpacing: 0.5,
         },
@@ -381,7 +361,7 @@ export function AnalysisOverview({
         },
         tableRowBorder: {
             borderBottomWidth: 1.5,
-            borderBottomColor: colors.iron[50],
+            borderBottomColor: colors.surfaceLighter,
         },
         tableRowContent: {
             flexDirection: 'row',
@@ -402,7 +382,7 @@ export function AnalysisOverview({
         tableName: {
             fontSize: 15,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
         },
         tableMaxWeight: {
             fontSize: 14,
@@ -414,13 +394,13 @@ export function AnalysisOverview({
             textAlign: 'right',
             fontSize: 16,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
         },
         setPill: {
             backgroundColor: withAlpha(colors.primary.DEFAULT, '15'),
             paddingHorizontal: 12,
             paddingVertical: 6,
-            borderRadius: 10,
+            borderRadius: 12,
             width: 65,
             alignItems: 'center',
         },
@@ -431,7 +411,7 @@ export function AnalysisOverview({
         },
         progressTrack: {
             height: 8,
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderRadius: 4,
             marginTop: 14,
             overflow: 'hidden',
@@ -562,7 +542,7 @@ export function AnalysisOverview({
                 {/* Secondary Metrics */}
                 <View style={styles.secondaryRow}>
                     <View style={styles.secondaryCell}>
-                        <Clock size={18} color={colors.iron[400]} />
+                        <Clock size={18} color={colors.textMuted} />
                         <View>
                             <Text style={styles.secondaryLabel}>Duración Media</Text>
                             <Text style={styles.secondaryValue}>
@@ -571,7 +551,7 @@ export function AnalysisOverview({
                         </View>
                     </View>
                     <View style={styles.secondaryCell}>
-                        <Zap size={18} color={colors.iron[400]} />
+                        <Zap size={18} color={colors.textMuted} />
                         <View>
                             <Text style={styles.secondaryLabel}>Densidad</Text>
                             <Text style={styles.secondaryValue}>
@@ -639,7 +619,7 @@ export function AnalysisOverview({
                     <>
                         <View style={styles.sectionHeader}>
                             <View style={styles.sectionAccent} />
-                            <BarChart3 size={18} color={colors.iron[950]} />
+                            <BarChart3 size={18} color={colors.text} />
                             <Text style={styles.sectionTitle}>Distribución por Grupo Muscular</Text>
                         </View>
                         <View style={styles.emptyState}>
@@ -654,7 +634,7 @@ export function AnalysisOverview({
                         {/* Card-internal header */}
                         <View style={styles.tableSectionHeader}>
                             <View style={styles.sectionAccent} />
-                            <BarChart3 size={18} color={colors.iron[950]} />
+                            <BarChart3 size={18} color={colors.text} />
                             <Text style={styles.sectionTitle}>Distribución por Grupo Muscular</Text>
                         </View>
                         {/* Table Header */}
@@ -682,7 +662,7 @@ export function AnalysisOverview({
                                             <View style={styles.tableNameContainer}>
                                                 <View
                                                     style={[styles.categoryIndicator, {
-                                                        backgroundColor: c.categoryColor || colors.iron[400]
+                                                        backgroundColor: c.categoryColor || colors.textMuted
                                                     }]}
                                                 />
                                                 <Text

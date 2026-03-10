@@ -1,7 +1,7 @@
 import { EmptyChartPlaceholder } from '@/components/EmptyChartPlaceholder';
 import { configService } from '@/src/services/ConfigService';
 import { UnitService } from '@/src/services/UnitService';
-import { ThemeFx } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { formatTimeSeconds } from '@/src/utils/time';
 import { format } from 'date-fns';
 import { X } from 'lucide-react-native';
@@ -30,17 +30,13 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
         sheet: {
             backgroundColor: colors.background,
             borderWidth: 1.5,
-            borderColor: colors.iron[300],
-            borderRadius: 20,
+            borderColor: colors.border,
+            borderRadius: 24,
             flex: 1,
             maxHeight: '90%',
             width: '100%',
             overflow: 'hidden',
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.15,
-            shadowRadius: 24,
-            elevation: 10,
+            ...ThemeFx.shadowLg,
         },
         header: {
             flexDirection: 'row',
@@ -48,23 +44,19 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
             alignItems: 'center',
             padding: 16,
             borderBottomWidth: 1.5,
-            borderBottomColor: colors.iron[200],
+            borderBottomColor: colors.border,
             backgroundColor: colors.surface
         },
-        headerTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
-        headerSub: { color: colors.iron[400], fontSize: 11, marginTop: 2, fontWeight: '600' },
+        headerTitle: { color: colors.text, fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
+        headerSub: { color: colors.textMuted, fontSize: 11, marginTop: 2, fontWeight: '600' },
         closeBtn: {
             width: 34,
             height: 34,
-            borderRadius: 14,
+            borderRadius: 12,
             backgroundColor: colors.primary.DEFAULT,
             justifyContent: 'center',
             alignItems: 'center',
-            shadowColor: colors.primary.DEFAULT,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
-            elevation: 4
+            ...ThemeFx.shadowSm,
         },
         chartContainer: {
             padding: 16,
@@ -72,7 +64,7 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
             justifyContent: 'center',
             backgroundColor: colors.surface,
             borderBottomWidth: 1.5,
-            borderBottomColor: colors.iron[200],
+            borderBottomColor: colors.border,
             marginBottom: 12
         },
         chartClipping: { overflow: 'hidden' },
@@ -81,7 +73,7 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
             color: colors.primary.DEFAULT,
             fontWeight: '900',
             fontSize: 11,
-            backgroundColor: colors.primary.DEFAULT + '12',
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '12'),
             alignSelf: 'flex-start',
             paddingHorizontal: 12,
             paddingVertical: 6,
@@ -95,12 +87,8 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
             borderRadius: 16,
             padding: 12,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.05,
-            shadowRadius: 10,
-            elevation: 2,
+            borderColor: colors.border,
+            ...ThemeFx.shadowSm,
         },
         setRow: {
             flexDirection: 'row',
@@ -111,14 +99,14 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
         },
         setRowBorder: {
             borderBottomWidth: 1.5,
-            borderBottomColor: colors.iron[100]
+            borderBottomColor: colors.border
         },
         setIndexContainer: { flexDirection: 'row', alignItems: 'center', width: 44 },
-        setIndex: { color: colors.iron[400], fontSize: 11, fontWeight: '800', width: 24 },
+        setIndex: { color: colors.textMuted, fontSize: 11, fontWeight: '800', width: 24 },
         prBadge: { fontSize: 10, color: colors.yellow, fontWeight: '900', marginLeft: 4 },
-        setValue: { color: colors.iron[950], fontWeight: '800', fontSize: 13, flex: 1, textAlign: 'center' },
-        setMeta: { color: colors.iron[500], fontSize: 11, width: 88, textAlign: 'right', fontWeight: '700' },
-        emptyText: { color: colors.iron[400], textAlign: 'center', paddingVertical: 48, fontSize: 14, fontWeight: '600' },
+        setValue: { color: colors.text, fontWeight: '800', fontSize: 13, flex: 1, textAlign: 'center' },
+        setMeta: { color: colors.textMuted, fontSize: 11, width: 88, textAlign: 'right', fontWeight: '700' },
+        emptyText: { color: colors.textMuted, textAlign: 'center', paddingVertical: 48, fontSize: 14, fontWeight: '600' },
     }), [colors]);
 
     const chartData = useMemo(() => {
@@ -140,9 +128,9 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
             return {
                 value,
                 label: format(new Date(h.date), 'd/MM'),
-                labelTextStyle: { color: colors.iron[400], fontSize: 10, fontWeight: '700' as const },
+                labelTextStyle: { color: colors.textMuted, fontSize: 10, fontWeight: '700' as const },
                 dataPointText: value.toString(),
-                dataPointTextColor: colors.white,
+                dataPointTextColor: colors.onPrimary,
                 dataPointTextShiftY: -10
             };
         });
@@ -159,7 +147,7 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
                             <Text style={ss.headerSub}>Historial de progreso</Text>
                         </View>
                         <TouchableOpacity onPress={onClose} style={ss.closeBtn} accessibilityRole="button" accessibilityLabel="Cerrar historial">
-                            <X size={18} color={colors.white} />
+                            <X size={18} color={colors.onPrimary} />
                         </TouchableOpacity>
                     </View>
 
@@ -181,9 +169,9 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
                                             startOpacity={0.2}
                                             endOpacity={0.0}
                                             areaChart
-                                            yAxisTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '700' }}
-                                            xAxisLabelTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '700' }}
-                                            rulesColor={colors.iron[100]}
+                                            yAxisTextStyle={{ color: colors.textMuted, fontSize: 10, fontWeight: '700' }}
+                                            xAxisLabelTextStyle={{ color: colors.textMuted, fontSize: 10, fontWeight: '700' }}
+                                            rulesColor={colors.border}
                                             rulesType="solid"
                                             hideRules={false}
                                             width={screenWidth - 64}
@@ -198,7 +186,7 @@ export function HistoryModal({ visible, onClose, history, exerciseName, exercise
                                             yAxisLabelSuffix={exerciseType === 'distance_time' ? ' km' : exerciseType === 'reps_only' ? ' rep' : ` ${unit}`}
                                             yAxisLabelWidth={40}
                                             xAxisThickness={1.5}
-                                            xAxisColor={colors.iron[200]}
+                                            xAxisColor={colors.border}
                                             yAxisThickness={0}
                                         />
                                     </View>

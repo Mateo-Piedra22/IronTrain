@@ -44,78 +44,82 @@ export default function SocialTab() {
         loggedOutContainer: {
             alignItems: 'center',
             paddingHorizontal: 32,
+            paddingTop: 80,
         },
         loggedOutIcon: {
-            width: 96,
-            height: 96,
-            borderRadius: 48,
-            backgroundColor: colors.iron[100],
+            width: 100,
+            height: 100,
+            borderRadius: 50,
+            backgroundColor: colors.surfaceLighter,
             alignItems: 'center',
             justifyContent: 'center',
-            marginBottom: 24,
+            marginBottom: 28,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            ...ThemeFx.shadowSm,
         },
         loggedOutTitle: {
-            fontSize: 22,
+            fontSize: 28,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             textAlign: 'center',
-            marginBottom: 8,
+            marginBottom: 14,
+            letterSpacing: -1,
         },
         loggedOutSub: {
-            fontSize: 15,
-            color: colors.iron[600],
+            fontSize: 16,
+            color: colors.textMuted,
             textAlign: 'center',
-            lineHeight: 22,
-            marginBottom: 32,
+            lineHeight: 24,
+            marginBottom: 44,
         },
         loginBtn: {
             backgroundColor: colors.primary.DEFAULT,
-            paddingVertical: 14,
+            paddingVertical: 18,
             paddingHorizontal: 32,
-            borderRadius: 12,
+            borderRadius: 16,
             width: '100%',
             alignItems: 'center',
-            marginBottom: 12,
+            marginBottom: 14,
+            ...ThemeFx.shadowSm,
         },
         loginBtnText: {
-            color: colors.white,
-            fontSize: 16,
-            fontWeight: '800',
+            color: colors.onPrimary,
+            fontSize: 17,
+            fontWeight: '900',
+            letterSpacing: 0.5,
         },
         signupBtn: {
             backgroundColor: colors.surface,
-            paddingVertical: 14,
+            paddingVertical: 18,
             paddingHorizontal: 32,
-            borderRadius: 12,
+            borderRadius: 16,
             width: '100%',
             alignItems: 'center',
-            borderWidth: 1,
-            borderColor: colors.iron[300],
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         signupBtnText: {
-            color: colors.primary.DEFAULT,
-            fontSize: 16,
-            fontWeight: '700',
+            color: colors.text,
+            fontSize: 17,
+            fontWeight: '800',
         },
         header: {
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
-            paddingHorizontal: 16,
-            height: 60,
-            backgroundColor: colors.iron[900],
+            paddingHorizontal: 20,
+            height: 76,
+            backgroundColor: colors.background,
             zIndex: 10,
-            shadowColor: ThemeFx.shadowColor,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.3,
-            shadowRadius: 3,
-            elevation: 4,
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.border,
         },
         title: {
-            color: colors.iron[950],
+            color: colors.text,
             fontWeight: '900',
-            fontSize: 20,
-            letterSpacing: -0.5,
+            fontSize: 26,
+            letterSpacing: -1.2,
         },
         headerActions: {
             flexDirection: 'row',
@@ -128,124 +132,141 @@ export default function SocialTab() {
             alignItems: 'center',
             gap: 8,
             backgroundColor: colors.primary.DEFAULT,
-            paddingHorizontal: 10,
-            paddingVertical: 8,
-            borderRadius: 12,
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            borderRadius: 14,
+            ...ThemeFx.shadowSm,
+        },
+        publicBtnText: {
+            color: colors.onPrimary,
+            fontSize: 13,
+            fontWeight: '900',
+            letterSpacing: 0.5,
         },
         headerIconBtn: {
-            width: 36,
-            height: 36,
-            borderRadius: 18,
-            backgroundColor: colors.iron[800],
+            width: 48,
+            height: 48,
+            borderRadius: 16,
+            backgroundColor: colors.surface,
             alignItems: 'center',
             justifyContent: 'center',
-            borderWidth: 1,
-            borderColor: colors.iron[700],
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            ...ThemeFx.shadowSm,
         },
         scrollContent: {
             paddingHorizontal: 20,
             paddingBottom: 40,
+            paddingTop: 20,
         },
         profileCard: {
             backgroundColor: colors.surface,
-            padding: 20,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: colors.iron[700],
+            padding: 24,
+            borderRadius: 20,
+            borderWidth: 1.5,
+            borderColor: colors.border,
             marginBottom: 24,
+            ...ThemeFx.shadowSm,
         },
         profileName: {
-            fontSize: 22,
-            fontWeight: 'bold',
-            color: colors.iron[950],
-            marginBottom: 4,
+            fontSize: 26,
+            fontWeight: '900',
+            color: colors.text,
+            marginBottom: 6,
+            letterSpacing: -0.8,
         },
         profileUsername: {
-            fontSize: 16,
-            fontWeight: '900',
+            fontSize: 17,
+            fontWeight: '800',
             color: colors.primary.DEFAULT,
-            marginBottom: 8,
-            letterSpacing: 0.5,
+            marginBottom: 14,
+            letterSpacing: 0.2,
         },
         profileStats: {
             fontSize: 14,
-            color: colors.iron[600],
-            marginBottom: 12,
+            color: colors.textMuted,
+            marginBottom: 18,
+            fontWeight: '600',
         },
         profileMetaRow: {
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: 12,
-            gap: 8,
+            marginBottom: 18,
+            gap: 12,
         },
         profileVisibilityBadge: {
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 6,
-            paddingVertical: 6,
-            paddingHorizontal: 10,
-            backgroundColor: colors.iron[950],
+            gap: 8,
+            paddingVertical: 10,
+            paddingHorizontal: 16,
+            backgroundColor: colors.surfaceLighter,
             borderRadius: 999,
-            borderWidth: 1,
-            borderColor: colors.iron[700],
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         profileVisibilityText: {
-            fontSize: 11,
-            color: colors.iron[200],
-            fontWeight: '800',
+            fontSize: 12,
+            color: colors.text,
+            fontWeight: '900',
             textTransform: 'uppercase',
+            letterSpacing: 0.8,
         },
         profileEditBtn: {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 6,
+            gap: 8,
             backgroundColor: colors.primary.DEFAULT,
-            borderRadius: 10,
-            paddingHorizontal: 10,
-            paddingVertical: 8,
+            borderRadius: 16,
+            paddingHorizontal: 18,
+            paddingVertical: 12,
+            ...ThemeFx.shadowSm,
         },
         profileEditBtnText: {
-            color: colors.white,
-            fontSize: 11,
+            color: colors.onPrimary,
+            fontSize: 12,
             fontWeight: '900',
             textTransform: 'uppercase',
+            letterSpacing: 0.8,
         },
         idBox: {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: colors.iron[950],
-            padding: 12,
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: colors.iron[700],
+            backgroundColor: colors.surfaceLighter,
+            padding: 16,
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         idText: {
-            color: colors.iron[200],
+            color: colors.textMuted,
             fontFamily: 'monospace',
             fontSize: 12,
             flex: 1,
             marginRight: 10,
+            fontWeight: '700',
         },
         tabsMenuWrapper: {
-            marginBottom: 20,
+            marginBottom: 24,
         },
         tabsMenu: {
             flexDirection: 'row',
             backgroundColor: colors.surface,
-            borderRadius: 14,
+            borderRadius: 20,
             padding: 6,
-            borderWidth: 1,
-            borderColor: colors.iron[700],
+            borderWidth: 1.5,
+            borderColor: colors.border,
             gap: 6,
+            ...ThemeFx.shadowSm,
         },
         tabBtn: {
             flex: 1,
             paddingHorizontal: 10,
-            paddingVertical: 10,
-            borderRadius: 10,
+            paddingVertical: 14,
+            borderRadius: 14,
             alignItems: 'center',
             justifyContent: 'center',
         },
@@ -253,419 +274,453 @@ export default function SocialTab() {
             backgroundColor: colors.primary.DEFAULT,
         },
         tabText: {
-            color: colors.iron[600],
-            fontWeight: '800',
+            color: colors.textMuted,
+            fontWeight: '900',
             fontSize: 12,
-            letterSpacing: 0.6,
+            letterSpacing: 1,
             textTransform: 'uppercase',
         },
         tabTextActive: {
-            color: colors.white,
+            color: colors.onPrimary,
         },
         tabContent: {
             minHeight: 200,
         },
         emptyText: {
-            color: colors.iron[600],
+            color: colors.textMuted,
             textAlign: 'center',
             marginTop: 40,
-            fontSize: 15,
+            fontSize: 16,
+            fontWeight: '600',
         },
         friendRow: {
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
             backgroundColor: colors.surface,
-            padding: 16,
-            borderRadius: 14,
-            marginBottom: 8,
-            borderWidth: 1,
-            borderColor: colors.iron[700],
+            padding: 20,
+            borderRadius: 20,
+            marginBottom: 12,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            ...ThemeFx.shadowSm,
         },
         highlightRow: {
             borderColor: colors.primary.DEFAULT,
-            borderWidth: 2,
+            // Usamos el surfaceLighter (sólido) en lugar de una transparencia para evitar el bug del motor de renderizado
+            backgroundColor: colors.surfaceLighter,
+            borderWidth: 2, // Lo hacemos un poco más grueso para que resalte más
         },
         expandedComparisonBox: {
             backgroundColor: colors.surface,
             marginHorizontal: 8,
-            marginBottom: 8,
-            padding: 16,
-            borderRadius: 14,
-            borderWidth: 1,
-            borderColor: colors.iron[700],
-            marginTop: 4,
+            marginBottom: 16,
+            padding: 20,
+            borderRadius: 20,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            marginTop: -4,
         },
         compareHeader: {
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 8,
-            marginBottom: 12,
-            paddingBottom: 8,
-            borderBottomWidth: 1,
-            borderColor: colors.iron[800],
+            gap: 10,
+            marginBottom: 16,
+            paddingBottom: 12,
+            borderBottomWidth: 1.5,
+            borderColor: colors.border,
         },
         compareTitle: {
-            color: colors.iron[600],
-            fontSize: 13,
-            fontWeight: 'bold',
+            color: colors.text,
+            fontSize: 14,
+            fontWeight: '900',
             textTransform: 'uppercase',
+            letterSpacing: 0.5,
         },
         compareEmptyText: {
-            color: colors.iron[600],
-            fontSize: 13,
+            color: colors.textMuted,
+            fontSize: 14,
             fontStyle: 'italic',
             textAlign: 'center',
-            marginTop: 8,
+            marginVertical: 12,
         },
         compareRow: {
             marginBottom: 12,
-            backgroundColor: colors.iron[900],
-            borderWidth: 1,
-            borderColor: colors.iron[700],
-            borderRadius: 8,
-            padding: 12,
+            backgroundColor: colors.surfaceLighter,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            borderRadius: 16,
+            padding: 16,
         },
         compareRowHeader: {
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: 10,
+            marginBottom: 12,
         },
         compareExerciseName: {
-            color: colors.iron[950],
-            fontSize: 14,
-            fontWeight: 'bold',
+            color: colors.text,
+            fontSize: 16,
+            fontWeight: '900',
             textTransform: 'capitalize',
             flex: 1,
         },
         compareDiff: {
-            fontSize: 12,
+            fontSize: 13,
             fontWeight: '900',
         },
         compareBarContainer: {
             alignItems: 'center',
         },
         compareValueRow: {
-            paddingVertical: 4,
-            paddingHorizontal: 12,
-            borderRadius: 8,
+            paddingVertical: 8,
+            paddingHorizontal: 16,
+            borderRadius: 12,
             backgroundColor: 'transparent',
         },
         compareValueHighlightBox: {
-            backgroundColor: colors.primary.DEFAULT + '20',
-            borderColor: colors.primary.DEFAULT + '40',
-            borderWidth: 1,
+            backgroundColor: colors.isDark ? withAlpha(colors.primary.DEFAULT, '20') : withAlpha(colors.primary.DEFAULT, '15'),
+            borderColor: withAlpha(colors.primary.DEFAULT, '30'),
+            borderWidth: 1.5,
         },
         compareBars: {
             flexDirection: 'row',
             justifyContent: 'space-between',
         },
         compareValue: {
-            fontSize: 18,
-            color: colors.iron[700],
+            fontSize: 22,
+            color: colors.text,
             fontWeight: '900',
         },
         compareValueHighlight: {
             color: colors.primary.DEFAULT,
         },
         compareLabel: {
-            fontSize: 11,
-            color: colors.iron[600],
-            fontWeight: 'bold',
-            marginTop: 2,
+            fontSize: 12,
+            color: colors.textMuted,
+            fontWeight: '800',
+            marginTop: 4,
+            textTransform: 'uppercase',
         },
         rankRow: {
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 12,
+            gap: 16,
         },
         rankingHeader: {
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: 16,
+            marginBottom: 20,
         },
         rankingSegmentRow: {
             flexDirection: 'row',
-            backgroundColor: colors.iron[900],
-            borderRadius: 10,
-            padding: 4,
+            backgroundColor: colors.surfaceLighter,
+            borderRadius: 16,
+            padding: 6,
             flex: 1,
             marginRight: 12,
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         segmentBtn: {
-            backgroundColor: colors.iron[900],
+            backgroundColor: 'transparent',
             flex: 1,
-            paddingVertical: 8,
+            paddingVertical: 12,
             alignItems: 'center',
-            borderRadius: 8,
+            borderRadius: 12,
         },
         segmentBtnActive: {
-            backgroundColor: colors.iron[950],
+            backgroundColor: colors.surface,
+            ...ThemeFx.shadowSm,
         },
         segmentText: {
             fontSize: 12,
-            fontWeight: 'bold',
-            color: colors.iron[500],
+            fontWeight: '900',
+            color: colors.textMuted,
             textTransform: 'uppercase',
+            letterSpacing: 0.5,
         },
         segmentTextActive: {
-            color: colors.white,
+            color: colors.text,
         },
         infoBtn: {
-            padding: 8,
+            width: 48,
+            height: 48,
             backgroundColor: colors.surface,
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: colors.iron[700],
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+            ...ThemeFx.shadowSm,
         },
         streakBadge: {
-            backgroundColor: withAlpha(colors.red, '20'),
-            paddingHorizontal: 8,
-            paddingVertical: 4,
+            backgroundColor: withAlpha(colors.red, '15'),
+            paddingHorizontal: 12,
+            paddingVertical: 8,
             borderRadius: 12,
             borderWidth: 1,
-            borderColor: withAlpha(colors.red, '50'),
+            borderColor: withAlpha(colors.red, '30'),
             flexDirection: 'row',
             alignItems: 'center',
+            gap: 6,
         },
         streakText: {
             fontSize: 12,
-            fontWeight: 'bold',
+            fontWeight: '900',
             color: colors.red,
         },
         friendName: {
-            color: colors.iron[950],
-            fontSize: 16,
-            fontWeight: '600',
+            color: colors.text,
+            fontSize: 18,
+            fontWeight: '900',
             marginBottom: 4,
+            letterSpacing: -0.5,
         },
         friendStatus: {
-            color: colors.iron[600],
-            fontSize: 12,
+            color: colors.textMuted,
+            fontSize: 13,
             textTransform: 'uppercase',
+            fontWeight: '800',
         },
         rankNumber: {
-            fontSize: 24,
-            fontWeight: 'bold',
+            fontSize: 28,
+            fontWeight: '900',
+            color: colors.text,
+            minWidth: 32,
+            textAlign: 'center',
         },
         actionsBox: {
             flexDirection: 'row',
-            gap: 8,
+            gap: 10,
         },
         btnSmallAccept: {
             backgroundColor: colors.primary.DEFAULT,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            borderRadius: 10,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderRadius: 14,
+            ...ThemeFx.shadowSm,
         },
         btnSmallReject: {
-            backgroundColor: colors.iron[700],
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            borderRadius: 10,
+            backgroundColor: colors.surfaceLighter,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderRadius: 14,
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         btnSmallText: {
-            color: colors.white,
+            color: colors.onPrimary,
             fontWeight: '900',
-            fontSize: 12,
+            fontSize: 13,
             textTransform: 'uppercase',
         },
         btnSmallTextReject: {
-            color: colors.iron[950],
+            color: colors.text,
             fontWeight: '900',
-            fontSize: 12,
+            fontSize: 13,
             textTransform: 'uppercase',
         },
         searchBox: {
             flexDirection: 'row',
-            gap: 10,
-            marginBottom: 16,
+            gap: 12,
+            marginBottom: 24,
         },
         searchInput: {
             flex: 1,
             backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.iron[700],
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            borderRadius: 12,
-            color: colors.iron[950],
+            borderWidth: 2,
+            borderColor: colors.border,
+            paddingHorizontal: 18,
+            paddingVertical: 16,
+            borderRadius: 18,
+            color: colors.text,
+            fontSize: 16,
+            fontWeight: '600',
         },
         searchBtn: {
             backgroundColor: colors.primary.DEFAULT,
             justifyContent: 'center',
-            paddingHorizontal: 20,
-            borderRadius: 12,
+            paddingHorizontal: 28,
+            borderRadius: 18,
+            ...ThemeFx.shadowSm,
         },
         searchBtnText: {
-            color: colors.white,
-            fontWeight: 'bold',
+            color: colors.onPrimary,
+            fontWeight: '900',
+            fontSize: 16,
         },
-        // Premium Routine Card Styles
         premiumCard: {
             backgroundColor: colors.surface,
             borderRadius: 20,
-            borderWidth: 1,
-            borderColor: colors.iron[700],
+            borderWidth: 1.5,
+            borderColor: colors.border,
             overflow: 'hidden',
-            elevation: 6,
-            shadowColor: ThemeFx.shadowColor,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.25,
-            shadowRadius: 10,
+            marginBottom: 16,
+            ...ThemeFx.shadowSm,
         },
         premiumHeader: {
             flexDirection: 'row',
             alignItems: 'center',
-            padding: 16,
-            paddingBottom: 8,
-            gap: 12,
+            padding: 20,
+            paddingBottom: 12,
+            gap: 14,
         },
         premiumIconBox: {
-            width: 44,
-            height: 44,
-            borderRadius: 12,
+            width: 48,
+            height: 48,
+            borderRadius: 14,
             backgroundColor: colors.primary.DEFAULT,
             alignItems: 'center',
             justifyContent: 'center',
         },
         premiumTitle: {
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             marginBottom: 2,
+            letterSpacing: -0.5,
         },
         premiumSender: {
             fontSize: 14,
             color: colors.primary.DEFAULT,
-            fontWeight: '700',
+            fontWeight: '800',
         },
         premiumBody: {
-            paddingHorizontal: 16,
-            paddingBottom: 16,
+            paddingHorizontal: 20,
+            paddingBottom: 20,
         },
         premiumDescription: {
-            fontSize: 14,
-            color: colors.iron[600],
-            lineHeight: 20,
+            fontSize: 15,
+            color: colors.textMuted,
+            lineHeight: 22,
+            fontWeight: '500',
         },
         premiumActions: {
             flexDirection: 'row',
             padding: 16,
-            gap: 8,
-            borderTopWidth: 1,
-            borderColor: colors.iron[700],
-            backgroundColor: colors.iron[900],
+            gap: 10,
+            borderTopWidth: 1.5,
+            borderColor: colors.border,
+            backgroundColor: colors.surfaceLighter,
         },
         premiumBtnPrimary: {
             flex: 1,
             backgroundColor: colors.primary.DEFAULT,
-            paddingVertical: 12,
+            paddingVertical: 14,
             alignItems: 'center',
-            borderRadius: 12,
+            borderRadius: 14,
+            ...ThemeFx.shadowSm,
         },
         premiumBtnTextPrimary: {
-            color: colors.white,
+            color: colors.onPrimary,
             fontWeight: '900',
-            fontSize: 13,
+            fontSize: 14,
             textTransform: 'uppercase',
-            letterSpacing: 0.5,
+            letterSpacing: 1,
         },
         premiumBtnSecondary: {
-            backgroundColor: colors.iron[800],
-            paddingVertical: 12,
-            paddingHorizontal: 20,
+            backgroundColor: colors.surface,
+            paddingVertical: 14,
+            paddingHorizontal: 24,
             alignItems: 'center',
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: colors.iron[600],
+            borderRadius: 14,
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         premiumBtnTextSecondary: {
-            color: colors.iron[950],
+            color: colors.text,
             fontWeight: '900',
-            fontSize: 13,
+            fontSize: 14,
             textTransform: 'uppercase',
         },
         premiumResolved: {
             padding: 16,
             alignItems: 'center',
-            borderTopWidth: 1,
-            borderColor: colors.iron[700],
-            backgroundColor: colors.iron[900],
+            borderTopWidth: 1.5,
+            borderColor: colors.border,
+            backgroundColor: colors.background,
         },
         premiumStatusText: {
-            color: colors.iron[600],
+            color: colors.textMuted,
             fontWeight: '800',
             fontStyle: 'italic',
+            fontSize: 13,
         },
-        // Activity Log Styles
         activityRow: {
             backgroundColor: colors.surface,
-            borderRadius: 16,
-            padding: 16,
-            borderWidth: 1,
-            borderColor: colors.iron[700],
+            borderRadius: 20,
+            padding: 20,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            marginBottom: 16,
+            ...ThemeFx.shadowSm,
         },
         activityHeader: {
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 12,
-            marginBottom: 12,
+            gap: 14,
+            marginBottom: 16,
         },
         activityIconBox: {
-            width: 36,
-            height: 36,
-            borderRadius: 18,
-            backgroundColor: colors.iron[800],
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            backgroundColor: colors.surfaceLighter,
             alignItems: 'center',
             justifyContent: 'center',
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         activityUser: {
-            fontSize: 15,
+            fontSize: 16,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
+            marginBottom: 2,
         },
         activityDesc: {
-            fontSize: 13,
-            color: colors.iron[600],
+            fontSize: 14,
+            color: colors.textMuted,
+            fontWeight: '600',
         },
         activityDate: {
             fontSize: 11,
-            color: colors.iron[600],
+            color: colors.textMuted,
             textTransform: 'uppercase',
-            fontWeight: '600',
+            fontWeight: '800',
+            letterSpacing: 0.5,
         },
         activityFooter: {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            borderTopWidth: 1,
-            borderColor: colors.iron[700],
-            paddingTop: 12,
+            borderTopWidth: 1.5,
+            borderColor: colors.border,
+            paddingTop: 16,
             marginTop: 4,
         },
         kudoBtn: {
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 6,
-            paddingVertical: 4,
-            paddingHorizontal: 8,
-            borderRadius: 20,
-            backgroundColor: colors.iron[800],
+            gap: 8,
+            paddingVertical: 8,
+            paddingHorizontal: 16,
+            borderRadius: 999,
+            backgroundColor: colors.surfaceLighter,
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         kudoBtnActive: {
             backgroundColor: withAlpha(colors.yellow, '15'),
             borderColor: withAlpha(colors.yellow, '40'),
-            borderWidth: 1,
         },
         kudoBtnDisabled: {
-            opacity: 0.45,
+            opacity: 0.5,
         },
         kudoText: {
-            color: colors.iron[600],
-            fontSize: 13,
+            color: colors.textMuted,
+            fontSize: 14,
             fontWeight: '900',
         },
         kudoTextActive: {
@@ -673,517 +728,401 @@ export default function SocialTab() {
         },
         ownActivityHint: {
             marginLeft: 10,
-            color: colors.iron[600],
-            fontSize: 11,
+            color: colors.textMuted,
+            fontSize: 12,
             fontWeight: '700',
-            alignSelf: 'center',
+            fontStyle: 'italic',
         },
         modalOverlay: {
             flex: 1,
             backgroundColor: ThemeFx.backdrop,
-            alignItems: 'center',
             justifyContent: 'center',
-            paddingHorizontal: 20,
+            alignItems: 'center',
+            padding: 24,
         },
         modalCard: {
             width: '100%',
-            maxWidth: 430,
+            maxWidth: 450,
             backgroundColor: colors.surface,
             borderRadius: 20,
-            borderWidth: 1,
-            borderColor: colors.iron[700],
+            borderWidth: 1.5,
+            borderColor: colors.border,
             overflow: 'hidden',
+            ...ThemeFx.shadowLg,
         },
         modalHeader: {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            paddingHorizontal: 16,
-            paddingVertical: 14,
-            borderBottomWidth: 1,
-            borderColor: colors.iron[700],
+            paddingHorizontal: 24,
+            paddingVertical: 20,
+            borderBottomWidth: 1.5,
+            borderColor: colors.border,
         },
         modalTitle: {
-            color: colors.iron[950],
-            fontSize: 18,
+            color: colors.text,
+            fontSize: 20,
             fontWeight: '900',
+            letterSpacing: -0.5,
         },
         modalCloseBtn: {
-            width: 30,
-            height: 30,
-            borderRadius: 15,
+            width: 40,
+            height: 40,
+            borderRadius: 12,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: colors.iron[900],
-            borderWidth: 1,
-            borderColor: colors.iron[700],
+            backgroundColor: colors.surfaceLighter,
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         modalBody: {
-            paddingHorizontal: 16,
-            paddingVertical: 14,
-            gap: 10,
+            padding: 24,
+            gap: 16,
         },
         modalLabel: {
-            color: colors.iron[600],
-            fontSize: 12,
-            fontWeight: '800',
+            color: colors.textMuted,
+            fontSize: 13,
+            fontWeight: '900',
             textTransform: 'uppercase',
+            letterSpacing: 1,
         },
         modalFieldHint: {
-            color: colors.iron[600],
-            fontSize: 11,
+            color: colors.textMuted,
+            fontSize: 12,
             fontWeight: '700',
-            marginTop: -6,
-            marginBottom: 2,
+            marginTop: -8,
+            marginBottom: 4,
+            fontStyle: 'italic',
         },
         modalInput: {
-            backgroundColor: colors.white,
-            borderWidth: 1,
-            borderColor: colors.iron[300],
-            borderRadius: 12,
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            color: colors.iron[950],
+            backgroundColor: colors.surfaceLighter,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            borderRadius: 14,
+            paddingHorizontal: 18,
+            paddingVertical: 16,
+            color: colors.text,
+            fontSize: 16,
             fontWeight: '700',
         },
         privacyRow: {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginTop: 2,
+            marginTop: 4,
             gap: 12,
         },
         privacyHint: {
-            color: colors.iron[600],
-            fontSize: 12,
+            color: colors.textMuted,
+            fontSize: 13,
+            fontWeight: '600',
         },
         modalActions: {
             flexDirection: 'row',
-            gap: 10,
-            paddingHorizontal: 16,
-            paddingBottom: 16,
-            paddingTop: 4,
+            gap: 12,
+            padding: 24,
+            paddingTop: 8,
         },
         modalActionsStack: {
-            paddingHorizontal: 16,
-            paddingBottom: 16,
-            paddingTop: 4,
-            gap: 8,
+            padding: 24,
+            paddingTop: 8,
+            gap: 10,
         },
         modalCancelBtn: {
             flex: 1,
-            backgroundColor: colors.iron[800],
-            borderWidth: 1,
-            borderColor: colors.iron[700],
-            borderRadius: 12,
+            backgroundColor: colors.surfaceLighter,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            borderRadius: 14,
             alignItems: 'center',
             justifyContent: 'center',
-            paddingVertical: 12,
+            paddingVertical: 14,
         },
         modalCancelText: {
-            color: colors.iron[500],
-            fontSize: 13,
-            fontWeight: 'bold',
+            color: colors.text,
+            fontSize: 14,
+            fontWeight: '900',
             textTransform: 'uppercase',
         },
         modalPrimaryBtn: {
             flex: 1,
             backgroundColor: colors.primary.DEFAULT,
-            borderRadius: 12,
+            borderRadius: 14,
             alignItems: 'center',
             justifyContent: 'center',
-            paddingVertical: 12,
+            paddingVertical: 14,
+            ...ThemeFx.shadowSm,
         },
         modalPrimaryText: {
-            color: colors.white,
-            fontSize: 13,
+            color: colors.onPrimary,
+            fontSize: 14,
             fontWeight: '900',
             textTransform: 'uppercase',
+            letterSpacing: 1,
         },
         friendModalUsername: {
-            fontSize: 16,
+            fontSize: 18,
             fontWeight: '900',
             color: colors.primary.DEFAULT,
+            letterSpacing: -0.5,
         },
         friendModalStatus: {
-            color: colors.iron[600],
-            fontSize: 13,
+            color: colors.textMuted,
+            fontSize: 14,
             textTransform: 'uppercase',
             fontWeight: '800',
         },
         friendInfoCard: {
-            marginTop: 8,
-            borderWidth: 1,
-            borderColor: colors.iron[700],
-            borderRadius: 12,
-            padding: 10,
-            backgroundColor: colors.iron[900],
-            gap: 8,
+            marginTop: 12,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            borderRadius: 16,
+            padding: 16,
+            backgroundColor: colors.surfaceLighter,
+            gap: 12,
         },
         friendInfoLabel: {
-            color: colors.iron[600],
-            fontSize: 11,
-            fontWeight: '800',
+            color: colors.textMuted,
+            fontSize: 12,
+            fontWeight: '900',
             textTransform: 'uppercase',
+            letterSpacing: 1,
         },
         friendInfoCopyBtn: {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: 8,
-            borderWidth: 1,
-            borderColor: colors.iron[300],
-            borderRadius: 10,
-            paddingHorizontal: 10,
-            paddingVertical: 8,
-            backgroundColor: colors.white,
+            gap: 12,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            borderRadius: 14,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            backgroundColor: colors.surface,
         },
         friendInfoId: {
             flex: 1,
-            color: colors.iron[950],
-            fontSize: 12,
-            fontFamily: 'monospace',
-        },
-        friendInfoActionBtn: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 8,
-            borderWidth: 1,
-            borderColor: withAlpha(colors.primary.DEFAULT, '40'),
-            borderRadius: 10,
-            paddingHorizontal: 10,
-            paddingVertical: 8,
-            backgroundColor: withAlpha(colors.primary.DEFAULT, '10'),
-        },
-        friendInfoActionText: {
-            color: colors.primary.DEFAULT,
-            fontSize: 12,
-            fontWeight: '800',
-        },
-        dualActionRow: {
-            flexDirection: 'row',
-            gap: 10,
-        },
-        modalSecondaryBtn: {
-            flex: 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            backgroundColor: colors.iron[800],
-            borderWidth: 1,
-            borderColor: colors.iron[700],
-            borderRadius: 12,
-            paddingVertical: 12,
-        },
-        modalSecondaryText: {
-            color: colors.iron[950],
-            fontSize: 12,
-            fontWeight: '800',
-            textTransform: 'uppercase',
-        },
-        modalDangerBtn: {
-            flex: 1,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: withAlpha(colors.red, '40'),
-            borderWidth: 1,
-            borderColor: withAlpha(colors.red, '55'),
-            borderRadius: 12,
-            paddingVertical: 12,
-        },
-        modalDangerText: {
-            color: colors.red,
-            fontSize: 12,
-            fontWeight: '900',
-            textTransform: 'uppercase',
-        },
-        goalsTrigger: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: colors.surface,
-            marginTop: 12,
-            padding: 14,
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: colors.iron[700],
-        },
-        goalsTriggerLeft: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 10,
-        },
-        goalsTriggerTitle: {
             fontSize: 14,
-            fontWeight: 'bold',
-            color: colors.iron[950],
+            color: colors.text,
+            fontWeight: '800',
+            fontFamily: 'System',
         },
-        goalsTriggerRight: {
+        infoFooterBox: {
             flexDirection: 'row',
-            alignItems: 'center',
-            gap: 8,
-        },
-        goalsSummaryText: {
-            fontSize: 12,
-            fontWeight: '900',
-            color: colors.primary.DEFAULT,
-        },
-        goalsExpanded: {
-            marginTop: 8,
-            padding: 14,
-            backgroundColor: colors.iron[950],
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: withAlpha(colors.primary.DEFAULT, '30'),
-        },
-        goalsDesc: {
-            fontSize: 12,
-            color: colors.iron[200],
-            lineHeight: 18,
-            marginBottom: 12,
-        },
-        daysRow: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            gap: 4,
-        },
-        dayChip: {
-            width: 36,
-            height: 36,
-            borderRadius: 18,
-            backgroundColor: colors.iron[900],
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: 1,
-            borderColor: colors.iron[800],
-        },
-        dayChipActive: {
-            backgroundColor: colors.primary.DEFAULT,
-            borderColor: colors.primary.DEFAULT,
-        },
-        dayChipText: {
-            fontSize: 12,
-            fontWeight: 'bold',
-            color: colors.iron[600],
-        },
-        dayChipTextActive: {
-            color: colors.white,
-        },
-        // Score Info Modal Styles
-        infoSectionTitle: {
-            fontSize: 16,
-            fontWeight: '900',
-            color: colors.iron[950],
-            marginBottom: 4,
-        },
-        infoSectionDesc: {
-            fontSize: 13,
-            color: colors.iron[500],
-            marginBottom: 16,
-            lineHeight: 18,
-        },
-        infoPointRow: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingVertical: 12,
-            borderBottomWidth: 1,
-            borderColor: colors.border,
+            backgroundColor: colors.isDark ? withAlpha(colors.primary.DEFAULT, '10') : colors.surfaceLighter,
+            padding: 16,
+            borderRadius: 16,
             gap: 12,
+            borderWidth: 1.5,
+            borderColor: colors.isDark ? withAlpha(colors.primary.DEFAULT, '20') : colors.border,
         },
-        infoPointText: {
+        infoFooterText: {
             flex: 1,
-            fontSize: 15,
-            color: colors.iron[950],
-            fontWeight: '900',
+            fontSize: 12,
+            color: colors.textMuted,
+            lineHeight: 18,
+            fontWeight: '600',
+            fontStyle: 'italic',
         },
-        infoPointValue: {
-            fontSize: 14,
+        bonusColumn: {
+            alignItems: 'flex-end',
+            gap: 8,
+        },
+        refreshBadgeBtn: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '12'),
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            borderRadius: 24,
+            gap: 8,
+            marginBottom: 24,
+            borderWidth: 1,
+            borderColor: withAlpha(colors.primary.DEFAULT, '20'),
+        },
+        refreshBadgeText: {
+            fontSize: 13,
             fontWeight: '900',
             color: colors.primary.DEFAULT,
         },
         infoDivider: {
             height: 1,
             backgroundColor: colors.border,
-            marginVertical: 20,
+            marginVertical: 24,
+            width: '100%',
         },
         infoStreakRow: {
             flexDirection: 'row',
-            justifyContent: 'space-between',
             alignItems: 'center',
-            paddingVertical: 8,
-            paddingHorizontal: 12,
-            backgroundColor: colors.iron[900],
-            borderRadius: 8,
-            marginBottom: 6,
-        },
-        infoStreakBestia: {
-            backgroundColor: colors.iron[950],
-            borderWidth: 1,
-            borderColor: withAlpha(colors.red, '40'),
+            justifyContent: 'space-between',
+            paddingVertical: 10,
+            paddingHorizontal: 4,
         },
         infoStreakLabel: {
-            fontSize: 13,
-            color: colors.iron[950],
-            fontWeight: '700',
+            fontSize: 14,
+            color: colors.text,
+            fontWeight: '600',
         },
         infoStreakValue: {
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: '900',
             color: colors.primary.DEFAULT,
         },
-        infoIconBox: {
-            width: 40,
-            height: 40,
+        infoStreakBestia: {
+            backgroundColor: colors.red,
             borderRadius: 12,
-            backgroundColor: colors.iron[950],
+            paddingHorizontal: 12,
+            paddingVertical: 12,
+            marginTop: 8,
+            ...ThemeFx.shadowSm,
+        },
+        infoIconBox: {
+            width: 48,
+            height: 48,
+            borderRadius: 14,
+            backgroundColor: withAlpha(colors.yellow, '15'),
             alignItems: 'center',
             justifyContent: 'center',
-        },
-        infoFooterBox: {
-            flexDirection: 'row',
-            backgroundColor: colors.iron[900],
-            padding: 12,
-            borderRadius: 10,
-            gap: 10,
             borderWidth: 1,
-            borderColor: colors.iron[800],
+            borderColor: withAlpha(colors.yellow, '20'),
         },
-        infoFooterText: {
-            flex: 1,
-            fontSize: 11,
-            color: colors.iron[600],
-            lineHeight: 16,
-            fontStyle: 'italic',
-        },
-        bonusColumn: {
-            alignItems: 'flex-end',
-            gap: 6,
-        },
-        refreshBadgeBtn: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 8,
-            backgroundColor: withAlpha(colors.primary.DEFAULT, '10'),
-            paddingHorizontal: 12,
-            paddingVertical: 6,
+        formulaBox: {
+            backgroundColor: colors.surface,
             borderRadius: 20,
-            marginBottom: 16,
-            borderWidth: 1,
-            borderColor: withAlpha(colors.primary.DEFAULT, '20'),
+            padding: 24,
+            alignItems: 'center',
+            borderWidth: 1.5,
+            borderStyle: 'dashed',
+            borderColor: colors.border,
+            marginVertical: 12,
         },
-        refreshBadgeText: {
+        formulaTitle: {
             fontSize: 12,
-            color: colors.primary.DEFAULT,
-            fontWeight: 'bold',
+            fontWeight: '900',
+            color: colors.textMuted,
+            textTransform: 'uppercase',
+            marginBottom: 10,
+            letterSpacing: 1,
+        },
+        formulaText: {
+            fontSize: 16,
+            fontWeight: '900',
+            color: colors.text,
+            textAlign: 'center',
+            lineHeight: 24,
         },
         eventBadge: {
             flexDirection: 'row',
             alignItems: 'center',
             backgroundColor: colors.yellow,
-            paddingHorizontal: 10,
-            paddingVertical: 6,
-            borderRadius: 20,
-            gap: 6,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 12,
+            gap: 8,
         },
         eventBadgeText: {
-            color: colors.iron[950],
-            fontSize: 11,
+            color: colors.black,
+            fontSize: 12,
             fontWeight: '900',
             textTransform: 'uppercase',
+            letterSpacing: 0.5,
         },
         weatherBadge: {
             flexDirection: 'row',
             alignItems: 'center',
             backgroundColor: colors.primary.DEFAULT,
-            paddingHorizontal: 10,
-            paddingVertical: 6,
-            borderRadius: 20,
-            gap: 6,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 12,
+            gap: 8,
         },
         weatherBadgeText: {
-            color: colors.white,
-            fontSize: 11,
+            color: colors.onPrimary,
+            fontSize: 12,
             fontWeight: '900',
             textTransform: 'uppercase',
+            letterSpacing: 0.5,
         },
         locationBadge: {
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: colors.iron[200], // Fondo un poco más oscuro para que se vea como un badge
-            paddingHorizontal: 10,
-            paddingVertical: 6,
-            borderRadius: 20,
-            gap: 6,
-            borderWidth: 1,
-            borderColor: colors.iron[300], // Borde más marcado
-            minWidth: 80,
+            backgroundColor: colors.surfaceLighter,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 12,
+            gap: 8,
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         locationBadgeText: {
-            color: colors.iron[950], // Texto más oscuro para lectura
-            fontSize: 11,
-            fontWeight: 'bold',
+            color: colors.text,
+            fontSize: 12,
+            fontWeight: '700',
             textTransform: 'uppercase',
         },
         activeEventBadge: {
-            flexDirection: 'row',
-            alignItems: 'center',
             backgroundColor: colors.yellow,
             paddingHorizontal: 12,
-            paddingVertical: 5,
-            borderRadius: 12,
-            marginBottom: 8,
+            paddingVertical: 6,
+            borderRadius: 20,
+            flexDirection: 'row',
+            alignItems: 'center',
             gap: 6,
+            marginBottom: 8,
         },
         activeEventBadgeText: {
-            color: colors.iron[950],
+            color: colors.onPrimary,
             fontSize: 10,
             fontWeight: '900',
             textTransform: 'uppercase',
+            letterSpacing: 1,
         },
         detailModalCard: {
-            width: '88%',
+            width: '90%',
+            maxWidth: 400,
             backgroundColor: colors.surface,
-            borderRadius: 28,
-            padding: 24,
-            borderWidth: 1,
+            borderRadius: 20,
+            padding: 28,
+            borderWidth: 1.5,
             borderColor: colors.border,
             alignItems: 'center',
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 10 },
-            shadowOpacity: 0.3,
-            shadowRadius: 20,
-            elevation: 10,
+            ...ThemeFx.shadowLg,
         },
         detailIconCircle: {
-            width: 72,
-            height: 72,
-            borderRadius: 36,
+            width: 80,
+            height: 80,
+            borderRadius: 40,
             alignItems: 'center',
             justifyContent: 'center',
-            marginBottom: 16,
-            borderWidth: 2,
+            marginBottom: 20,
+            borderWidth: 1.5,
+            borderColor: colors.primary.DEFAULT,
+            backgroundColor: colors.isDark ? withAlpha(colors.primary.DEFAULT, '15') : colors.surfaceLighter,
         },
         detailTitle: {
-            fontSize: 22,
+            fontSize: 24,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             textAlign: 'center',
             marginBottom: 8,
+            letterSpacing: -0.5,
         },
         detailDesc: {
-            fontSize: 14,
-            color: colors.iron[600],
+            fontSize: 15,
+            color: colors.textMuted,
             textAlign: 'center',
-            lineHeight: 20,
-            marginBottom: 24,
+            lineHeight: 22,
+            fontWeight: '500',
+            marginBottom: 28,
         },
         detailInfoGrid: {
             width: '100%',
-            backgroundColor: colors.iron[900],
+            backgroundColor: colors.surfaceLighter,
             borderRadius: 20,
-            padding: 20,
-            gap: 14,
+            padding: 24,
+            gap: 16,
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         detailInfoRow: {
             flexDirection: 'row',
@@ -1191,52 +1130,201 @@ export default function SocialTab() {
             alignItems: 'center',
         },
         detailInfoLabel: {
-            fontSize: 11,
-            color: colors.iron[600],
-            fontWeight: '800',
+            fontSize: 12,
+            color: colors.textMuted,
+            fontWeight: '900',
             textTransform: 'uppercase',
-            letterSpacing: 0.5,
+            letterSpacing: 1,
         },
         detailInfoValue: {
-            fontSize: 15,
-            color: colors.iron[950],
+            fontSize: 16,
+            color: colors.text,
             fontWeight: '900',
         },
         detailCloseBtn: {
-            marginTop: 24,
+            marginTop: 28,
             width: '100%',
-            paddingVertical: 16,
+            paddingVertical: 18,
             borderRadius: 16,
-            backgroundColor: colors.iron[950],
+            backgroundColor: colors.primary.DEFAULT,
             alignItems: 'center',
+            ...ThemeFx.shadowSm,
         },
         detailCloseText: {
-            color: colors.white,
+            color: colors.onPrimary,
+            fontSize: 15,
+            fontWeight: '900',
+            textTransform: 'uppercase',
+            letterSpacing: 1,
+        },
+        // Goal System
+        goalsTrigger: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: colors.surfaceLighter,
+            padding: 18,
+            borderRadius: 20,
+            marginTop: 18,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+        },
+        goalsTriggerLeft: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+        },
+        goalsTriggerTitle: {
+            fontSize: 15,
+            fontWeight: '900',
+            color: colors.text,
+            letterSpacing: -0.3,
+        },
+        goalsTriggerRight: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+        },
+        goalsSummaryText: {
+            fontSize: 13,
+            fontWeight: '800',
+            color: colors.primary.DEFAULT,
+            textTransform: 'uppercase',
+        },
+        goalsExpanded: {
+            marginTop: 12,
+            backgroundColor: colors.surfaceLighter,
+            borderRadius: 16,
+            padding: 16,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+        },
+        goalsDesc: {
+            fontSize: 13,
+            color: colors.textMuted,
+            lineHeight: 18,
+            marginBottom: 16,
+            fontWeight: '500',
+        },
+        daysRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            gap: 6,
+        },
+        dayChip: {
+            flex: 1,
+            height: 44,
+            borderRadius: 12,
+            backgroundColor: colors.surface,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1.5,
+            borderColor: colors.border,
+        },
+        dayChipActive: {
+            backgroundColor: colors.primary.DEFAULT,
+            borderColor: colors.primary.DEFAULT,
+        },
+        dayChipText: {
+            fontSize: 14,
+            fontWeight: '900',
+            color: colors.textMuted,
+        },
+        dayChipTextActive: {
+            color: colors.onPrimary,
+        },
+        // Action Rows & Buttons
+        dualActionRow: {
+            flexDirection: 'row',
+            gap: 12,
+            marginTop: 8,
+        },
+        modalDangerBtn: {
+            flex: 1,
+            backgroundColor: withAlpha(colors.red, '10'),
+            borderWidth: 1.5,
+            borderColor: withAlpha(colors.red, '30'),
+            borderRadius: 14,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 14,
+        },
+        modalDangerText: {
+            color: colors.red,
             fontSize: 14,
             fontWeight: '900',
             textTransform: 'uppercase',
-        },
-        formulaBox: {
-            backgroundColor: colors.iron[950],
-            padding: 16,
-            borderRadius: 12,
-            marginVertical: 10,
-            borderWidth: 1,
-            borderColor: withAlpha(colors.primary.DEFAULT, '30'),
-        },
-        formulaTitle: {
-            fontSize: 10,
-            color: colors.iron[500],
-            fontWeight: 'bold',
-            textTransform: 'uppercase',
-            marginBottom: 4,
             letterSpacing: 1,
         },
-        formulaText: {
+        modalSecondaryBtn: {
+            flex: 1,
+            backgroundColor: colors.surfaceLighter,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            borderRadius: 14,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 14,
+        },
+        modalSecondaryText: {
+            color: colors.text,
+            fontSize: 14,
+            fontWeight: '900',
+            textTransform: 'uppercase',
+            letterSpacing: 1,
+        },
+        friendInfoActionBtn: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+            backgroundColor: colors.primary.DEFAULT,
+            paddingVertical: 16,
+            borderRadius: 16,
+            marginTop: 4,
+            ...ThemeFx.shadowSm,
+        },
+        friendInfoActionText: {
+            color: colors.onPrimary,
+            fontSize: 15,
+            fontWeight: '900',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+        },
+        // Info Sections
+        infoSectionTitle: {
             fontSize: 13,
+            fontWeight: '900',
+            color: colors.primary.DEFAULT,
+            textTransform: 'uppercase',
+            letterSpacing: 1.2,
+            marginBottom: 8,
+            marginTop: 12,
+        },
+        infoSectionDesc: {
+            fontSize: 14,
+            color: colors.textMuted,
+            lineHeight: 20,
+            fontWeight: '500',
+            marginBottom: 16,
+        },
+        infoPointRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: withAlpha(colors.border, '50'),
+        },
+        infoPointText: {
+            fontSize: 14,
+            color: colors.text,
+            fontWeight: '700',
+        },
+        infoPointValue: {
+            fontSize: 14,
             color: colors.primary.DEFAULT,
             fontWeight: '900',
-            fontStyle: 'italic',
         },
     }), [colors]);
     const [profile, setProfile] = useState<SocialProfile | null>(null);
@@ -1659,7 +1747,7 @@ export default function SocialTab() {
             <SafeAreaWrapper style={styles.container} centered contentClassName="items-center justify-center">
                 <View style={styles.loggedOutContainer}>
                     <View style={styles.loggedOutIcon}>
-                        <Globe size={48} color={colors.iron[400]} />
+                        <Globe size={48} color={colors.textMuted} />
                     </View>
                     <Text style={styles.loggedOutTitle}>Conectate a IronSocial</Text>
                     <Text style={styles.loggedOutSub}>
@@ -1702,7 +1790,8 @@ export default function SocialTab() {
                         <Settings size={20} color={colors.primary.DEFAULT} />
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.publicBtn} onPress={handleOpenPublicRoutines}>
-                        <Globe size={16} color={colors.white} />
+                        <Globe size={16} color={colors.onPrimary} />
+                        <Text style={styles.publicBtnText}>Públicas</Text>
                     </TouchableOpacity>
                     {loading && <ActivityIndicator size="small" color={colors.primary.DEFAULT} />}
                 </View>
@@ -1729,7 +1818,7 @@ export default function SocialTab() {
                                         onPress={() => setIsEventModalVisible(true)}
                                         activeOpacity={0.7}
                                     >
-                                        <Zap size={10} color={colors.iron[950]} fill={colors.iron[950]} />
+                                        <Zap size={10} color={colors.text} fill={colors.text} />
                                         <Text style={styles.eventBadgeText}>Evento {profile.activeEvent.multiplier}x</Text>
                                     </TouchableOpacity>
                                 )}
@@ -1740,13 +1829,13 @@ export default function SocialTab() {
                                     disabled={refreshingLocation}
                                 >
                                     {refreshingLocation ? (
-                                        <ActivityIndicator size={10} color={colors.iron[500]} />
+                                        <ActivityIndicator size={10} color={colors.textMuted} />
                                     ) : profile.weatherBonus?.isActive ? (
-                                        <CloudRain size={10} color={colors.white} />
+                                        <CloudRain size={10} color={colors.onPrimary} />
                                     ) : locationPermissionDenied ? (
-                                        <MapPinOff size={10} color={colors.iron[500]} />
+                                        <MapPinOff size={10} color={colors.textMuted} />
                                     ) : (
-                                        <MapPin size={10} color={colors.iron[500]} />
+                                        <MapPin size={10} color={colors.textMuted} />
                                     )}
                                     <Text style={profile.weatherBonus?.isActive ? styles.weatherBadgeText : styles.locationBadgeText}>
                                         {refreshingLocation ? 'Localizando...' :
@@ -1761,18 +1850,18 @@ export default function SocialTab() {
                         <Text style={styles.profileStats}>Rutinas compartidas: {profile.shareStats || 0}</Text>
                         <View style={styles.profileMetaRow}>
                             <View style={styles.profileVisibilityBadge}>
-                                {profile.isPublic === 0 ? <LockIcon size={14} color={colors.iron[500]} /> : <Globe size={14} color={colors.primary.DEFAULT} />}
+                                {profile.isPublic === 0 ? <LockIcon size={14} color={colors.textMuted} /> : <Globe size={14} color={colors.primary.DEFAULT} />}
                                 <Text style={styles.profileVisibilityText}>{profile.isPublic === 0 ? 'Perfil Privado' : 'Perfil Público'}</Text>
                             </View>
                             <TouchableOpacity style={styles.profileEditBtn} onPress={openProfileModal}>
-                                <ShieldIcon size={14} color={colors.white} />
+                                <ShieldIcon size={14} color={colors.onPrimary} />
                                 <Text style={styles.profileEditBtnText}>Editar Perfil</Text>
                             </TouchableOpacity>
                         </View>
 
                         <TouchableOpacity style={styles.idBox} onPress={handleCopyId}>
                             <Text style={styles.idText} numberOfLines={1} ellipsizeMode="middle">ID: {profile.id}</Text>
-                            <Copy size={16} color={colors.iron[500]} />
+                            <Copy size={16} color={colors.textMuted} />
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -1785,7 +1874,7 @@ export default function SocialTab() {
                             </View>
                             <View style={styles.goalsTriggerRight}>
                                 <Text style={styles.goalsSummaryText}>{trainingDays.length} días</Text>
-                                {isGoalsExpanded ? <ChevronUp size={18} color={colors.iron[400]} /> : <ChevronDown size={18} color={colors.iron[400]} />}
+                                {isGoalsExpanded ? <ChevronUp size={18} color={colors.textMuted} /> : <ChevronDown size={18} color={colors.textMuted} />}
                             </View>
                         </TouchableOpacity>
 
@@ -1855,7 +1944,7 @@ export default function SocialTab() {
                                     ))}
                                 </View>
                                 <TouchableOpacity onPress={handleShowScoreInfo} style={styles.infoBtn}>
-                                    <Info size={20} color={colors.iron[400]} />
+                                    <Info size={20} color={colors.textMuted} />
                                 </TouchableOpacity>
                             </View>
 
@@ -1874,7 +1963,7 @@ export default function SocialTab() {
                                                 activeOpacity={0.7}
                                             >
                                                 <View style={styles.rankRow}>
-                                                    <Text style={[styles.rankNumber, { color: i === 0 ? colors.yellow : i === 1 ? colors.iron[300] : i === 2 ? colors.primary.light : colors.iron[500] }]}>
+                                                    <Text style={[styles.rankNumber, { color: i === 0 ? colors.yellow : i === 1 ? colors.textMuted : i === 2 ? colors.primary.light : colors.textMuted }]}>
                                                         {i + 1}
                                                     </Text>
                                                     <View>
@@ -1893,7 +1982,7 @@ export default function SocialTab() {
                                             {isExpanded && (
                                                 <View style={styles.expandedComparisonBox}>
                                                     <View style={styles.compareHeader}>
-                                                        <Scale size={18} color={colors.iron[400]} />
+                                                        <Scale size={18} color={colors.textMuted} />
                                                         <Text style={styles.compareTitle}>Comparación de Fuerza (1RM)</Text>
                                                     </View>
                                                     {loadingCompare ? (
@@ -1986,7 +2075,7 @@ export default function SocialTab() {
                                             <View key={item.id} style={styles.premiumCard}>
                                                 <View style={styles.premiumHeader}>
                                                     <View style={styles.premiumIconBox}>
-                                                        <Dumbbell size={24} color={colors.white} />
+                                                        <Dumbbell size={24} color={colors.onPrimary} />
                                                     </View>
                                                     <View style={{ flex: 1 }}>
                                                         <Text style={styles.premiumTitle}>Invitación a Entrenar</Text>
@@ -2059,7 +2148,7 @@ export default function SocialTab() {
                                                         onPress={() => !isOwnActivity && handleToggleKudo(item.id)}
                                                         disabled={!!isOwnActivity}
                                                     >
-                                                        <Flame size={18} color={item.hasKudoed ? colors.yellow : colors.iron[600]} fill={item.hasKudoed ? colors.yellow : "transparent"} />
+                                                        <Flame size={18} color={item.hasKudoed ? colors.yellow : colors.textMuted} fill={item.hasKudoed ? colors.yellow : "transparent"} />
                                                         <Text style={[styles.kudoText, item.hasKudoed && styles.kudoTextActive]}>
                                                             {item.kudosCount || 0} Kudos
                                                         </Text>
@@ -2081,7 +2170,7 @@ export default function SocialTab() {
                                 <TextInput
                                     style={styles.searchInput}
                                     placeholder="Buscar por ID o username..."
-                                    placeholderTextColor={colors.iron[500]}
+                                    placeholderTextColor={colors.textMuted}
                                     value={searchQuery}
                                     onChangeText={setSearchQuery}
                                     autoCapitalize="none"
@@ -2118,7 +2207,7 @@ export default function SocialTab() {
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Perfil Social</Text>
                             <TouchableOpacity onPress={() => setIsProfileModalVisible(false)} style={styles.modalCloseBtn}>
-                                <XIcon size={18} color={colors.iron[500]} />
+                                <XIcon size={18} color={colors.textMuted} />
                             </TouchableOpacity>
                         </View>
 
@@ -2130,7 +2219,7 @@ export default function SocialTab() {
                                 onChangeText={setProfileFormDisplayName}
                                 maxLength={64}
                                 placeholder="Tu nombre visible"
-                                placeholderTextColor={colors.iron[500]}
+                                placeholderTextColor={colors.textMuted}
                             />
                             <Text style={styles.modalFieldHint}>
                                 Entre 2 y 64 caracteres. Evitá datos sensibles.
@@ -2142,7 +2231,7 @@ export default function SocialTab() {
                                     styles.modalInput,
                                     profile?.lastUsernameChangeAt &&
                                     (Date.now() - new Date(profile.lastUsernameChangeAt).getTime() < 30 * 24 * 60 * 60 * 1000) &&
-                                    { backgroundColor: colors.iron[100], color: colors.iron[500] }
+                                    { backgroundColor: colors.surface, color: colors.textMuted }
                                 ]}
                                 value={profileFormUsername}
                                 onChangeText={(value) => setProfileFormUsername(value.replace(/\s+/g, '').toLowerCase())}
@@ -2150,7 +2239,7 @@ export default function SocialTab() {
                                 autoCapitalize="none"
                                 autoCorrect={false}
                                 placeholder="sin espacios"
-                                placeholderTextColor={colors.iron[500]}
+                                placeholderTextColor={colors.textMuted}
                                 editable={!profile?.lastUsernameChangeAt || (Date.now() - new Date(profile.lastUsernameChangeAt).getTime() >= 30 * 24 * 60 * 60 * 1000)}
                             />
                             {profile?.lastUsernameChangeAt && (Date.now() - new Date(profile.lastUsernameChangeAt).getTime() < 30 * 24 * 60 * 60 * 1000) ? (
@@ -2173,8 +2262,8 @@ export default function SocialTab() {
                                 <Switch
                                     value={profileFormPublic}
                                     onValueChange={setProfileFormPublic}
-                                    trackColor={{ false: colors.iron[700], true: colors.primary.DEFAULT + '66' }}
-                                    thumbColor={profileFormPublic ? colors.primary.DEFAULT : colors.iron[500]}
+                                    trackColor={{ false: colors.border, true: withAlpha(colors.primary.DEFAULT, '66') }}
+                                    thumbColor={profileFormPublic ? colors.primary.DEFAULT : colors.textMuted}
                                 />
                             </View>
                         </View>
@@ -2184,7 +2273,7 @@ export default function SocialTab() {
                                 <Text style={styles.modalCancelText}>Cancelar</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.modalPrimaryBtn} onPress={handleSaveProfile} disabled={profileSaving}>
-                                {profileSaving ? <ActivityIndicator size="small" color={colors.white} /> : <Text style={styles.modalPrimaryText}>Guardar</Text>}
+                                {profileSaving ? <ActivityIndicator size="small" color={colors.onPrimary} /> : <Text style={styles.modalPrimaryText}>Guardar</Text>}
                             </TouchableOpacity>
                         </View>
                     </Pressable>
@@ -2197,7 +2286,7 @@ export default function SocialTab() {
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>{activeFriend?.displayName || 'Amigo'}</Text>
                             <TouchableOpacity onPress={closeFriendModal} style={styles.modalCloseBtn}>
-                                <XIcon size={18} color={colors.iron[500]} />
+                                <XIcon size={18} color={colors.textMuted} />
                             </TouchableOpacity>
                         </View>
 
@@ -2222,11 +2311,11 @@ export default function SocialTab() {
                                         confirm.success('Copiado', 'ID del amigo copiado al portapapeles.');
                                     }}>
                                         <Text style={styles.friendInfoId} numberOfLines={1} ellipsizeMode="middle">{activeFriend.friendId}</Text>
-                                        <Copy size={14} color={colors.iron[600]} />
+                                        <Copy size={14} color={colors.textMuted} />
                                     </TouchableOpacity>
                                     {activeFriend.status === 'accepted' ? (
                                         <TouchableOpacity style={styles.friendInfoActionBtn} onPress={handleOpenFriendInRanking}>
-                                            <Scale size={14} color={colors.primary.DEFAULT} />
+                                            <Scale size={14} color={colors.onPrimary} />
                                             <Text style={styles.friendInfoActionText}>Ver comparación en ranking</Text>
                                         </TouchableOpacity>
                                     ) : null}
@@ -2247,7 +2336,7 @@ export default function SocialTab() {
                             )}
                             {activeFriend?.status === 'pending' && activeFriend?.isSender && (
                                 <TouchableOpacity style={styles.modalSecondaryBtn} disabled={friendActionLoading} onPress={() => handleFriendAction('reject')}>
-                                    <XCircle size={14} color={colors.iron[600]} />
+                                    <XCircle size={14} color={colors.text} />
                                     <Text style={styles.modalSecondaryText}>Cancelar solicitud</Text>
                                 </TouchableOpacity>
                             )}
@@ -2255,7 +2344,7 @@ export default function SocialTab() {
                             {activeFriend?.status === 'accepted' && (
                                 <View style={styles.dualActionRow}>
                                     <TouchableOpacity style={styles.modalSecondaryBtn} disabled={friendActionLoading} onPress={() => handleFriendAction('remove')}>
-                                        <UserMinusIcon size={14} color={colors.iron[500]} />
+                                        <UserMinusIcon size={14} color={colors.textMuted} />
                                         <Text style={styles.modalSecondaryText}>Eliminar amigo</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity style={styles.modalDangerBtn} disabled={friendActionLoading} onPress={() => handleFriendAction('block')}>
@@ -2285,7 +2374,7 @@ export default function SocialTab() {
                                 <Text style={styles.modalTitle}>Sistema IronScore</Text>
                             </View>
                             <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsScoreModalVisible(false)}>
-                                <XIcon size={16} color={colors.iron[600]} />
+                                <XIcon size={16} color={colors.textMuted} />
                             </TouchableOpacity>
                         </View>
 
@@ -2352,10 +2441,10 @@ export default function SocialTab() {
                             </View>
                             <View style={[styles.infoStreakRow, styles.infoStreakBestia]}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Flame size={14} color={colors.red} />
-                                    <Text style={[styles.infoStreakLabel, { color: colors.white }]}>Semanas {profile?.scoreConfig?.weekTier4Min || 10}+ (Bestia)</Text>
+                                    <Flame size={14} color={colors.onPrimary} />
+                                    <Text style={[styles.infoStreakLabel, { color: colors.onPrimary }]}>Semanas {profile?.scoreConfig?.weekTier4Min || 10}+ (Bestia)</Text>
                                 </View>
-                                <Text style={[styles.infoStreakValue, { color: colors.white }]}>x{(profile?.scoreConfig?.tier4Multiplier || 1.5).toFixed(2)}</Text>
+                                <Text style={[styles.infoStreakValue, { color: colors.onPrimary }]}>x{(profile?.scoreConfig?.tier4Multiplier || 1.5).toFixed(2)}</Text>
                             </View>
 
                             <View style={styles.infoDivider} />
@@ -2382,7 +2471,7 @@ export default function SocialTab() {
                             </View>
 
                             <View style={styles.infoFooterBox}>
-                                <Info size={14} color={colors.iron[600]} />
+                                <Info size={14} color={colors.textMuted} />
                                 <Text style={styles.infoFooterText}>
                                     El puntaje se calcula en tiempo real al finalizar cada entrenamiento. Los PRs se validan contra tu historial completo.
                                 </Text>
@@ -2408,7 +2497,7 @@ export default function SocialTab() {
                             <Zap size={32} color={colors.yellow} fill={colors.yellow} />
                         </View>
                         <View style={styles.activeEventBadge}>
-                            <Zap size={10} color={colors.white} fill={colors.white} />
+                            <Zap size={10} color={colors.onPrimary} fill={colors.onPrimary} />
                             <Text style={styles.activeEventBadgeText}>Evento Global Activo</Text>
                         </View>
                         <Text style={styles.detailTitle}>{profile?.activeEvent?.title || 'Evento Especial'}</Text>
@@ -2451,14 +2540,14 @@ export default function SocialTab() {
                         <View style={[
                             styles.detailIconCircle,
                             {
-                                borderColor: profile?.weatherBonus?.isActive ? colors.primary.DEFAULT : colors.iron[400],
-                                backgroundColor: withAlpha(profile?.weatherBonus?.isActive ? colors.primary.DEFAULT : colors.iron[400], '15')
+                                borderColor: profile?.weatherBonus?.isActive ? colors.primary.DEFAULT : colors.border,
+                                backgroundColor: withAlpha(profile?.weatherBonus?.isActive ? colors.primary.DEFAULT : colors.border, '15')
                             }
                         ]}>
                             {profile?.weatherBonus?.isActive ? (
                                 <CloudRain size={32} color={colors.primary.DEFAULT} />
                             ) : (
-                                <MapPin size={32} color={colors.iron[500]} />
+                                <MapPin size={32} color={colors.textMuted} />
                             )}
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
@@ -2500,7 +2589,7 @@ export default function SocialTab() {
                                 <Text style={styles.detailInfoLabel}>Bonus</Text>
                                 <Text style={[
                                     styles.detailInfoValue,
-                                    { color: profile?.weatherBonus?.isActive ? colors.primary.DEFAULT : colors.iron[500] }
+                                    { color: profile?.weatherBonus?.isActive ? colors.primary.DEFAULT : colors.textMuted }
                                 ]}>
                                     {profile?.weatherBonus?.isActive ? '+15 pts' : 'Inactivo'}
                                 </Text>
@@ -2518,4 +2607,3 @@ export default function SocialTab() {
         </SafeAreaWrapper >
     );
 }
-

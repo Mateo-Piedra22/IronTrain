@@ -1,5 +1,6 @@
 import { configService } from '@/src/services/ConfigService';
 import { UnitService } from '@/src/services/UnitService';
+import { withAlpha } from '@/src/theme';
 import { ExerciseType, WorkoutSet } from '@/src/types/db';
 import { formatTimeSecondsCompact } from '@/src/utils/time';
 import { ChevronRight, Trophy } from 'lucide-react-native';
@@ -46,7 +47,7 @@ export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [],
             paddingVertical: 14,
             borderRadius: 14,
             borderWidth: 1.5,
-            borderColor: colors.iron[700],
+            borderColor: colors.border,
             elevation: 1
         },
         accentBar: {
@@ -57,7 +58,7 @@ export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [],
             backgroundColor: activeCategoryColor
         },
         name: {
-            color: colors.iron[950],
+            color: colors.text,
             fontWeight: '800',
             fontSize: 15
         },
@@ -67,12 +68,12 @@ export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [],
             marginTop: 4
         },
         statText: {
-            color: colors.iron[500],
+            color: colors.textMuted,
             fontSize: 12,
             fontWeight: '700'
         },
         dotSeparator: {
-            color: colors.iron[300],
+            color: colors.border,
             fontSize: 12,
             fontWeight: '700',
             marginHorizontal: 6
@@ -80,12 +81,12 @@ export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [],
         bestBadge: {
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: colors.primary.DEFAULT + '10',
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '10'),
             paddingHorizontal: 8,
             paddingVertical: 4,
             borderRadius: 8,
             borderWidth: 1.5,
-            borderColor: colors.primary.DEFAULT + '20'
+            borderColor: withAlpha(colors.primary.DEFAULT, '20')
         },
         bestText: {
             color: colors.yellow,
@@ -93,11 +94,11 @@ export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [],
             fontWeight: '800'
         },
         confirmBtn: { backgroundColor: colors.primary.DEFAULT, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-        confirmBtnText: { color: colors.white, fontWeight: '800', fontSize: 15 },
+        confirmBtnText: { color: colors.onPrimary, fontWeight: '800', fontSize: 15 },
         badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
         badgeList: { flexDirection: 'row', gap: 4 },
-        moreBadge: { backgroundColor: colors.iron[100], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-        moreBadgeText: { fontSize: 10, fontWeight: '800', color: colors.iron[500] },
+        moreBadge: { backgroundColor: colors.surfaceLighter, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+        moreBadgeText: { fontSize: 10, fontWeight: '800', color: colors.textMuted },
         rightContent: { alignItems: 'flex-end', marginLeft: 12 },
         trophyIcon: { marginRight: 5 },
         chevron: { marginLeft: 4 }
@@ -201,7 +202,7 @@ export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [],
                 </View>
             )}
 
-            <ChevronRight size={18} color={colors.iron[400]} style={ss.chevron} />
+            <ChevronRight size={18} color={colors.textMuted} style={ss.chevron} />
         </TouchableOpacity>
     );
 }

@@ -15,7 +15,7 @@ export function IronInput({ label, error, className, value, onChangeText, ...pro
     const ss = useMemo(() => StyleSheet.create({
         container: { width: '100%', marginBottom: 16 },
         label: {
-            color: colors.iron[500],
+            color: colors.textMuted,
             marginBottom: 8,
             fontSize: 12,
             fontWeight: '800',
@@ -27,7 +27,7 @@ export function IronInput({ label, error, className, value, onChangeText, ...pro
             flexDirection: 'row',
             alignItems: 'center',
             backgroundColor: colors.surface,
-            borderRadius: 16,
+            borderRadius: 14,
             borderWidth: 1.5,
             borderColor: error ? colors.red : (isFocused ? colors.primary.DEFAULT : colors.border),
             overflow: 'hidden'
@@ -36,7 +36,7 @@ export function IronInput({ label, error, className, value, onChangeText, ...pro
             flex: 1,
             paddingHorizontal: 16,
             paddingVertical: 14,
-            color: colors.iron[950],
+            color: colors.text,
             fontSize: 16,
             fontWeight: '600'
         },
@@ -55,7 +55,7 @@ export function IronInput({ label, error, className, value, onChangeText, ...pro
                 <TextInput
                     value={value}
                     onChangeText={onChangeText}
-                    placeholderTextColor={colors.iron[400]}
+                    placeholderTextColor={colors.textMuted}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
                     accessibilityLabel={props.accessibilityLabel || label}
@@ -68,7 +68,7 @@ export function IronInput({ label, error, className, value, onChangeText, ...pro
                         activeOpacity={0.5}
                         style={ss.clearBtn}
                     >
-                        <X size={18} color={colors.iron[400]} strokeWidth={2.5} />
+                        <X size={18} color={colors.textMuted} strokeWidth={2.5} />
                     </TouchableOpacity>
                 )}
             </View>

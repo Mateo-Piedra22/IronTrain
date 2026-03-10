@@ -1,4 +1,4 @@
-import { withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { useRouter } from 'expo-router';
 import { Ruler, Scale, TrendingDown, TrendingUp } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -22,12 +22,8 @@ export function BodySnapshotWidget({ unit, displayWeight }: BodySnapshotWidgetPr
             borderRadius: 20,
             padding: 24,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.06,
-            shadowRadius: 16,
-            elevation: 4,
+            borderColor: colors.border,
+            ...ThemeFx.shadowSm,
         },
         bodyHeader: {
             flexDirection: 'row',
@@ -38,7 +34,7 @@ export function BodySnapshotWidget({ unit, displayWeight }: BodySnapshotWidgetPr
         bodyIconCircle: {
             width: 32,
             height: 32,
-            borderRadius: 10,
+            borderRadius: 12,
             backgroundColor: withAlpha(colors.primary.DEFAULT, '15'),
             justifyContent: 'center',
             alignItems: 'center',
@@ -46,7 +42,7 @@ export function BodySnapshotWidget({ unit, displayWeight }: BodySnapshotWidgetPr
         bodyTitle: {
             fontSize: 18,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             letterSpacing: -0.4,
         },
         bodyGrid: {
@@ -55,23 +51,23 @@ export function BodySnapshotWidget({ unit, displayWeight }: BodySnapshotWidgetPr
         },
         bodyMetric: {
             flex: 1,
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             padding: 16,
             borderRadius: 16,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
         },
         bodyMetricLabel: {
             fontSize: 11,
             fontWeight: '900',
-            color: colors.iron[500],
+            color: colors.textMuted,
             textTransform: 'uppercase',
             letterSpacing: 0.5,
         },
         bodyMetricValue: {
             fontSize: 22,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             marginTop: 6,
             letterSpacing: -0.5,
         },
@@ -82,7 +78,7 @@ export function BodySnapshotWidget({ unit, displayWeight }: BodySnapshotWidgetPr
             marginTop: 4,
             paddingHorizontal: 8,
             paddingVertical: 2,
-            borderRadius: 6,
+            borderRadius: 8,
             alignSelf: 'flex-start',
         }
     }), [colors]);
@@ -120,13 +116,13 @@ export function BodySnapshotWidget({ unit, displayWeight }: BodySnapshotWidgetPr
                     </View>
                     <Text style={styles.bodyTitle}>Evolución física</Text>
                 </View>
-                <TrendingUp size={18} color={colors.iron[300]} />
+                <TrendingUp size={18} color={colors.textMuted} />
             </View>
             <View style={styles.bodyGrid}>
                 {latestWeight && (
                     <View style={styles.bodyMetric}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Scale size={14} color={colors.iron[500]} />
+                            <Scale size={14} color={colors.textMuted} />
                             <Text style={styles.bodyMetricLabel}>Peso</Text>
                         </View>
                         <Text style={styles.bodyMetricValue}>
@@ -140,7 +136,7 @@ export function BodySnapshotWidget({ unit, displayWeight }: BodySnapshotWidgetPr
                                 {latestWeight.delta > 0
                                     ? <TrendingUp size={10} color={colors.green} />
                                     : latestWeight.delta < 0 ? <TrendingDown size={10} color={colors.red} /> : null}
-                                <Text style={{ fontSize: 10, fontWeight: '900', color: latestWeight.delta > 0 ? colors.green : latestWeight.delta < 0 ? colors.red : colors.iron[500] }}>
+                                <Text style={{ fontSize: 10, fontWeight: '900', color: latestWeight.delta > 0 ? colors.green : latestWeight.delta < 0 ? colors.red : colors.textMuted }}>
                                     {latestWeight.delta > 0 ? '+' : ''}{Math.round(displayWeight(latestWeight.delta) * 10) / 10} {unit}
                                 </Text>
                             </View>
@@ -150,7 +146,7 @@ export function BodySnapshotWidget({ unit, displayWeight }: BodySnapshotWidgetPr
                 {latestFat && (
                     <View style={styles.bodyMetric}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <TrendingDown size={14} color={colors.iron[500]} />
+                            <TrendingDown size={14} color={colors.textMuted} />
                             <Text style={styles.bodyMetricLabel}>Grasa</Text>
                         </View>
                         <Text style={styles.bodyMetricValue}>{latestFat.value}%</Text>
@@ -162,7 +158,7 @@ export function BodySnapshotWidget({ unit, displayWeight }: BodySnapshotWidgetPr
                                 {latestFat.delta > 0
                                     ? <TrendingUp size={10} color={colors.red} />
                                     : latestFat.delta < 0 ? <TrendingDown size={10} color={colors.green} /> : null}
-                                <Text style={{ fontSize: 10, fontWeight: '900', color: latestFat.delta < 0 ? colors.green : latestFat.delta > 0 ? colors.red : colors.iron[500] }}>
+                                <Text style={{ fontSize: 10, fontWeight: '900', color: latestFat.delta < 0 ? colors.green : latestFat.delta > 0 ? colors.red : colors.textMuted }}>
                                     {latestFat.delta > 0 ? '+' : ''}{latestFat.delta}%
                                 </Text>
                             </View>

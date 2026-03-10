@@ -2,7 +2,7 @@ import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { workoutService } from '@/src/services/WorkoutService';
-import { ThemeFx } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { Workout } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { FlashList } from '@shopify/flash-list';
@@ -77,27 +77,137 @@ export default function TemplatesScreen() {
     };
 
     const ss = useMemo(() => StyleSheet.create({
-        header: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1.5, borderBottomColor: colors.iron[200], flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.iron[900] },
-        headerTitle: { fontSize: 26, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.5 },
-        addBtn: { backgroundColor: colors.surface, padding: 10, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, elevation: 1 },
-        templateCard: { backgroundColor: colors.surface, padding: 14, borderRadius: 16, marginBottom: 12, borderWidth: 1.5, borderColor: colors.border, elevation: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-        templateInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14 },
-        templateIcon: { width: 48, height: 48, backgroundColor: colors.primary.DEFAULT + '10', borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.primary.DEFAULT + '20' },
-        templateName: { color: colors.iron[950], fontWeight: '800', fontSize: 16 },
-        templateSub: { color: colors.iron[400], fontSize: 11, marginTop: 2, fontWeight: '600' },
-        templateActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-        playBtn: { width: 40, height: 40, backgroundColor: colors.primary.DEFAULT, borderRadius: 20, alignItems: 'center', justifyContent: 'center', shadowColor: colors.primary.DEFAULT, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2 },
-        deleteBtn: { width: 40, height: 40, backgroundColor: colors.iron[200], borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-        emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80 },
-        emptyText: { color: colors.iron[400], textAlign: 'center', marginBottom: 16, fontWeight: '600' },
-        modalOverlay: { flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center', padding: 16 },
-        modalSheet: { backgroundColor: colors.surface, width: '100%', maxWidth: 380, borderRadius: 20, padding: 24, borderWidth: 1.5, borderColor: colors.border, elevation: 2 },
-        modalTitle: { fontSize: 18, fontWeight: '900', color: colors.iron[950], marginBottom: 20 },
-        modalActions: { flexDirection: 'row', gap: 12, marginTop: 16 },
+        header: {
+            paddingTop: 16,
+            paddingHorizontal: 16,
+            paddingBottom: 14,
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.border,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            backgroundColor: colors.background
+        },
+        headerTitle: {
+            fontSize: 26,
+            fontWeight: '900',
+            color: colors.text,
+            letterSpacing: -0.5
+        },
+        addBtn: {
+            backgroundColor: colors.surface,
+            padding: 10,
+            borderRadius: 12,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            ...ThemeFx.shadowSm,
+        },
+        templateCard: {
+            backgroundColor: colors.surface,
+            padding: 14,
+            borderRadius: 20,
+            marginBottom: 12,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            ...ThemeFx.shadowSm,
+        },
+        templateInfo: {
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 14
+        },
+        templateIcon: {
+            width: 48,
+            height: 48,
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '10'),
+            borderRadius: 14,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1.5,
+            borderColor: withAlpha(colors.primary.DEFAULT, '20')
+        },
+        templateName: {
+            color: colors.text,
+            fontWeight: '800',
+            fontSize: 16
+        },
+        templateSub: {
+            color: colors.textMuted,
+            fontSize: 11,
+            marginTop: 2,
+            fontWeight: '600'
+        },
+        templateActions: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8
+        },
+        playBtn: {
+            width: 40,
+            height: 40,
+            backgroundColor: colors.primary.DEFAULT,
+            borderRadius: 20,
+            alignItems: 'center',
+            justifyContent: 'center',
+            ...ThemeFx.shadowSm,
+            shadowColor: colors.primary.DEFAULT,
+        },
+        deleteBtn: {
+            width: 40,
+            height: 40,
+            backgroundColor: colors.surfaceLighter,
+            borderRadius: 20,
+            alignItems: 'center',
+            justifyContent: 'center'
+        },
+        emptyContainer: {
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: 80
+        },
+        emptyText: {
+            color: colors.textMuted,
+            textAlign: 'center',
+            marginBottom: 16,
+            fontWeight: '600'
+        },
+        modalOverlay: {
+            flex: 1,
+            backgroundColor: ThemeFx.backdrop,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 16
+        },
+        modalSheet: {
+            backgroundColor: colors.surface,
+            width: '100%',
+            maxWidth: 380,
+            borderRadius: 24,
+            padding: 24,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            ...ThemeFx.shadowLg,
+        },
+        modalTitle: {
+            fontSize: 20,
+            fontWeight: '900',
+            color: colors.text,
+            marginBottom: 20,
+            letterSpacing: -0.5,
+        },
+        modalActions: {
+            flexDirection: 'row',
+            gap: 12,
+            marginTop: 16
+        },
     }), [colors]);
 
     return (
-        <SafeAreaWrapper style={{ backgroundColor: colors.iron[900] }} edges={['top', 'left', 'right']}>
+        <SafeAreaWrapper style={{ backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
             <Stack.Screen options={{ headerShown: false }} />
 
             {/* Header */}
@@ -126,7 +236,7 @@ export default function TemplatesScreen() {
 
                         <View style={ss.templateActions}>
                             <TouchableOpacity onPress={() => handleLoad(item.id)} style={ss.playBtn} activeOpacity={0.8}>
-                                <Play size={18} color="white" fill="white" />
+                                <Play size={18} color={colors.onPrimary} fill={colors.onPrimary} />
                             </TouchableOpacity>
                             <TouchableOpacity onPress={() => handleDelete(item.id)} style={ss.deleteBtn} activeOpacity={0.8}>
                                 <Trash2 size={18} color={colors.red} />

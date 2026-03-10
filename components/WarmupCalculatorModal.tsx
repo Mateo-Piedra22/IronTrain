@@ -35,32 +35,28 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
             backgroundColor: colors.surface,
             width: '100%',
             maxWidth: 380,
-            borderRadius: 20,
+            borderRadius: 24,
             padding: 24,
             borderWidth: 1.5,
             borderColor: colors.border,
-            elevation: 12,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.15,
-            shadowRadius: 24,
+            ...ThemeFx.shadowLg,
         },
         title: {
             fontSize: 22,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             marginBottom: 8,
             letterSpacing: -0.6
         },
         description: {
             fontSize: 14,
-            color: colors.iron[500],
+            color: colors.textMuted,
             marginBottom: 24,
             lineHeight: 20,
             fontWeight: '500'
         },
         label: {
-            color: colors.iron[500],
+            color: colors.textMuted,
             fontSize: 10,
             fontWeight: '800',
             marginBottom: 10,
@@ -69,18 +65,18 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
             marginLeft: 2
         },
         input: {
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderRadius: 14,
             padding: 16,
             fontSize: 17,
-            color: colors.iron[950],
+            color: colors.text,
             borderWidth: 1.5,
             borderColor: colors.border,
             fontWeight: '700',
             marginBottom: 24
         },
         progressionCard: {
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderRadius: 16,
             padding: 8,
             borderWidth: 1.5,
@@ -112,12 +108,12 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
             fontWeight: '900'
         },
         weightText: {
-            color: colors.iron[950],
+            color: colors.text,
             fontWeight: '800',
             fontSize: 15
         },
         repsText: {
-            color: colors.iron[500],
+            color: colors.textMuted,
             fontWeight: '700',
             fontSize: 14
         },
@@ -136,7 +132,7 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
             backgroundColor: colors.surface
         },
         cancelBtnText: {
-            color: colors.iron[600],
+            color: colors.textMuted,
             fontWeight: '800',
             fontSize: 15
         },
@@ -145,10 +141,11 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
             height: 52,
             borderRadius: 16,
             justifyContent: 'center',
-            alignItems: 'center'
+            alignItems: 'center',
+            ...ThemeFx.shadowSm,
         },
         addBtnText: {
-            color: colors.white,
+            color: colors.onPrimary,
             fontWeight: '900',
             fontSize: 15,
             textTransform: 'uppercase',
@@ -180,7 +177,7 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
                         value={targetWeight}
                         onChangeText={setTargetWeight}
                         placeholder={unit === 'kg' ? '100' : '225'}
-                        placeholderTextColor={colors.iron[400]}
+                        placeholderTextColor={colors.textMuted}
                         keyboardType="numeric"
                         autoFocus
                         style={st.input}
@@ -219,7 +216,7 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
                             disabled={calculatedSets.length === 0}
                             style={[
                                 st.addBtn,
-                                { backgroundColor: calculatedSets.length > 0 ? colors.primary.DEFAULT : colors.iron[300] }
+                                { backgroundColor: calculatedSets.length > 0 ? colors.primary.DEFAULT : colors.border }
                             ]}
                         >
                             <Text style={st.addBtnText}>Agregar series</Text>

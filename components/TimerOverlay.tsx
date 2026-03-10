@@ -16,9 +16,9 @@ export function TimerOverlay() {
     const ss = useMemo(() => StyleSheet.create({
         container: {
             position: 'absolute',
-            backgroundColor: colors.iron[950],
-            borderWidth: 1,
-            borderColor: colors.iron[700],
+            backgroundColor: colors.surface,
+            borderWidth: 1.5,
+            borderColor: colors.border,
             borderRadius: 16,
             flexDirection: 'row',
             alignItems: 'center',
@@ -30,12 +30,12 @@ export function TimerOverlay() {
             elevation: 10,
             zIndex: 50
         },
-        label: { color: colors.iron[400], fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
-        time: { color: colors.iron[100], fontWeight: '900', fontSize: 22, fontVariant: ['tabular-nums'] },
-        controls: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: colors.iron[700], paddingLeft: 12, gap: 6 },
-        addBtn: { paddingHorizontal: 8, paddingVertical: 8, backgroundColor: colors.iron[800], borderRadius: 10 },
-        addBtnText: { color: colors.iron[100], fontWeight: '800', fontSize: 12 },
-        actionBtn: { padding: 8, backgroundColor: colors.iron[800], borderRadius: 10 },
+        label: { color: colors.textMuted, fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+        time: { color: colors.text, fontWeight: '900', fontSize: 22, fontVariant: ['tabular-nums'] },
+        controls: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 12, gap: 6 },
+        addBtn: { paddingHorizontal: 8, paddingVertical: 8, backgroundColor: colors.surfaceLighter, borderRadius: 10 },
+        addBtnText: { color: colors.text, fontWeight: '800', fontSize: 12 },
+        actionBtn: { padding: 8, backgroundColor: colors.surfaceLighter, borderRadius: 10 },
         actionBtnPrimary: { padding: 8, backgroundColor: colors.primary.DEFAULT, borderRadius: 10 },
         stopBtn: { padding: 8, backgroundColor: colors.red, borderRadius: 10 },
     }), [colors]);
@@ -85,7 +85,7 @@ export function TimerOverlay() {
 
                 {timeLeft <= 0 && duration > 0 ? (
                     <TouchableOpacity onPress={restartTimer} style={ss.actionBtnPrimary} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Reiniciar descanso">
-                        <RotateCcw size={16} color={colors.white} />
+                        <RotateCcw size={16} color={colors.onPrimary} />
                     </TouchableOpacity>
                 ) : isRunning ? (
                     <TouchableOpacity onPress={pauseTimer} style={ss.actionBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Pausar descanso">

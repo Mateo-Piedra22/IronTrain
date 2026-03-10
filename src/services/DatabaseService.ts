@@ -1,6 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
+import { useAuthStore } from '../store/authStore';
 import { Category, Exercise, ExerciseType, Workout, WorkoutSet } from '../types/db';
+
 import { logger } from '../utils/logger';
 import { uuidV4 } from '../utils/uuid';
 
@@ -223,7 +225,7 @@ export class DatabaseService {
         id TEXT PRIMARY KEY NOT NULL,
         exercise_id TEXT NOT NULL,
         badge_id TEXT NOT NULL,
-        user_id TEXT NOT NULL,
+        user_id TEXT,
         is_system INTEGER DEFAULT 0,
         updated_at INTEGER DEFAULT 0,
         deleted_at INTEGER,
@@ -959,10 +961,31 @@ export class DatabaseService {
             if (!ebCols.includes('user_id')) {
                 await this.executeRaw('ALTER TABLE exercise_badges ADD COLUMN user_id TEXT');
                 await this.executeRaw('ALTER TABLE exercise_badges ADD COLUMN is_system INTEGER DEFAULT 0');
-                // Backfill user_id from an existing session if possible or leave for first sync
             }
         } catch (e) {
             logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 20 failed' });
+        }
+
+        // Migration 21: Systemic Zero Trust alignment of user_id across all syncable tables
+        try {
+            logger.info('[Migration] Running Migration 21: Systemic user_id alignment');
+            const syncableTables = [
+                'exercises', 'categories', 'workouts', 'workout_sets',
+                'routines', 'routine_days', 'routine_exercises',
+                'measurements', 'goals', 'plate_inventory', 'settings',
+                'body_metrics', 'badges', 'exercise_badges'
+            ];
+
+            for (const table of syncableTables) {
+                const info = await this.getAll<{ name: string }>(`PRAGMA table_info('${table}')`);
+                const cols = info.map(c => c.name);
+                if (!cols.includes('user_id')) {
+                    logger.info(`[Migration 21] Adding user_id to ${table}`);
+                    await this.executeRaw(`ALTER TABLE ${table} ADD COLUMN user_id TEXT`);
+                }
+            }
+        } catch (e) {
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 21 failed' });
         }
     }
 
@@ -1164,6 +1187,33 @@ export class DatabaseService {
                 // 12. Junction Table Cleanup (Final physical safety, no sync needed as it's a junction)
                 await this.executeRaw(`DELETE FROM exercise_badges WHERE rowid NOT IN (SELECT MIN(rowid) FROM exercise_badges GROUP BY exercise_id, badge_id)`);
                 await this.executeRaw(`DELETE FROM routine_exercises WHERE rowid NOT IN (SELECT MIN(rowid) FROM routine_exercises GROUP BY routine_day_id, exercise_id, order_index)`);
+
+                // 13. Systemic Backfill of user_id for all syncable tables (Zero Trust)
+                const userId = useAuthStore.getState().user?.id;
+                if (userId) {
+                    const syncableTables = [
+                        'exercises', 'categories', 'workouts', 'workout_sets',
+                        'routines', 'routine_days', 'routine_exercises',
+                        'measurements', 'goals', 'plate_inventory', 'settings',
+                        'body_metrics', 'badges', 'exercise_badges',
+                        'user_exercise_prs', 'score_events', 'activity_feed',
+                        'notification_reactions', 'changelog_reactions', 'kudos'
+                    ];
+
+                    for (const table of syncableTables) {
+                        try {
+                            const info = await this.getAll<{ name: string }>(`PRAGMA table_info('${table}')`);
+                            const cols = info.map(c => c.name);
+                            if (cols.includes('user_id')) {
+                                await this.run(`UPDATE ${table} SET user_id = ? WHERE user_id IS NULL OR user_id = ''`, [userId]);
+                            } else if (table === 'kudos' && cols.includes('giver_id')) {
+                                await this.run(`UPDATE kudos SET giver_id = ? WHERE giver_id IS NULL OR giver_id = ''`, [userId]);
+                            }
+                        } catch (e) {
+                            // Silent catch for individual tables
+                        }
+                    }
+                }
             });
         } finally {
             await this.executeRaw('PRAGMA foreign_keys = ON;');
@@ -1460,6 +1510,15 @@ export class DatabaseService {
     ): Promise<void> {
         if (!this.db) return;
         try {
+            // --- Zero Trust: Automatic user_id injection for sync payloads ---
+            let finalPayload = payload;
+            if (operation !== 'DELETE' && payload && typeof payload === 'object') {
+                const userId = useAuthStore.getState().user?.id;
+                if (userId && !payload.user_id && !payload.userId) {
+                    finalPayload = { ...payload, user_id: userId };
+                }
+            }
+
             await this.run(
                 `INSERT INTO sync_queue (id, table_name, record_id, operation, payload, created_at, status, retry_count)
                  VALUES (?, ?, ?, ?, ?, ?, 'pending', 0)`,
@@ -1468,7 +1527,7 @@ export class DatabaseService {
                     tableName,
                     recordId,
                     operation,
-                    payload ? JSON.stringify(payload) : null,
+                    finalPayload ? JSON.stringify(finalPayload) : null,
                     Date.now()
                 ]
             );

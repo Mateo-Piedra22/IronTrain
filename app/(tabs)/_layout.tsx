@@ -12,10 +12,10 @@ export default function TabLayout() {
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: colors.primary.DEFAULT,
-          tabBarInactiveTintColor: colors.iron[400],
+          tabBarInactiveTintColor: colors.textMuted,
           tabBarStyle: {
-            backgroundColor: colors.iron[900],
-            borderTopColor: colors.iron[700],
+            backgroundColor: colors.background,
+            borderTopColor: colors.border,
             elevation: 8,
             shadowColor: colors.black,
             shadowOffset: { width: 0, height: -2 },
@@ -24,16 +24,16 @@ export default function TabLayout() {
           },
           headerShown: useClientOnlyValue(false, true),
           headerStyle: {
-            backgroundColor: colors.iron[900],
+            backgroundColor: colors.background,
             elevation: 0,
             shadowOpacity: 0,
             borderBottomWidth: 1,
-            borderBottomColor: colors.iron[700],
+            borderBottomColor: colors.border,
           },
-          headerTintColor: colors.iron[950],
+          headerTintColor: colors.text,
           headerTitleStyle: {
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             fontSize: 18,
           },
           tabBarLabelStyle: { fontWeight: 'bold' },

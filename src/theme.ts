@@ -24,8 +24,11 @@ export type PrimaryScale = {
 };
 
 export type ThemeColors = {
+    isDark: boolean;
     iron: IronScale;
     primary: PrimaryScale;
+    /** Foreground color for content placed on top of a primary-colored background. */
+    onPrimary: string;
     white: string;
     black: string;
     blue: string;
@@ -34,6 +37,7 @@ export type ThemeColors = {
     yellow: string;
     background: string;
     surface: string;
+    surfaceLighter: string;
     text: string;
     textMuted: string;
     border: string;
@@ -58,41 +62,64 @@ export type SubthemePack = {
     updatedAt: string;
 };
 
+// --- CORE DESIGN SCALES ---
+
+const LIGHT_IRON: IronScale = {
+    50: '#fff7f1',  // Fondo base (Cálido)
+    100: '#fcfcfc', // Superficie secundaria
+    200: '#efebe9', // Bordes suaves
+    300: '#e0e0e0', // Divisores estándar
+    400: '#d7ccc8', // Marrón pálido
+    500: '#8d6e63', // Texto mutado / Íconos secundarios
+    600: '#795548', // Marrón medio
+    700: '#5d4037', // Marrón oscuro
+    800: '#4e342e', // Marrón profundo
+    900: '#382721', // Marrón contraste
+    950: '#321414', // Texto principal (Contraste máximo)
+};
+
+const DARK_IRON: IronScale = {
+    50: '#0a0a0a',  // Fondo base
+    100: '#171717', // Superficie principal
+    200: '#262626', // Superficie secundaria / Bordes
+    300: '#404040', // Bordes activos
+    400: '#525252', // Gris medio
+    500: '#737373', // Gris mutado
+    600: '#a1a1aa', // Texto secundario
+    700: '#d4d4d8', // Texto medio
+    800: '#e5e5e5', // Texto claro
+    900: '#f5f5f5', // Casi blanco
+    950: '#fafafa', // Contraste máximo
+};
+
+// --- PRESET TOKENS ---
+
 export const LightThemeTokens: ThemeTokens = {
     id: 'core-light',
     label: 'Core Light',
     mode: 'light',
     variant: 'core',
     colors: {
-        iron: {
-            50: '#fffcf9',
-            100: '#fcfcfc',
-            200: '#fafafa',
-            300: '#e0e0e0',
-            400: '#8d6e63',
-            500: '#5d4037',
-            600: '#4e342e',
-            700: '#efebe9',
-            800: '#ffffff',
-            900: '#fff7f1',
-            950: '#321414',
-        },
+        isDark: false,
+        iron: LIGHT_IRON,
         primary: {
             DEFAULT: '#5c2e2e',
-            light: '#8d6e63',
+            light: LIGHT_IRON[500],
             dark: '#3e1c1c',
         },
+        onPrimary: '#ffffff', // White on dark-brown primary
         white: '#ffffff',
         black: '#000000',
         blue: '#3b82f6',
         red: '#ef4444',
         green: '#22c55e',
         yellow: '#d97706',
-        background: '#fff7f1',
+        background: LIGHT_IRON[50],
         surface: '#ffffff',
-        text: '#321414',
-        textMuted: '#8d6e63',
-        border: '#efebe9',
+        surfaceLighter: LIGHT_IRON[100],
+        text: LIGHT_IRON[950],
+        textMuted: LIGHT_IRON[500],
+        border: LIGHT_IRON[200],
     },
 };
 
@@ -102,35 +129,26 @@ export const DarkThemeTokens: ThemeTokens = {
     mode: 'dark',
     variant: 'core',
     colors: {
-        iron: {
-            50: '#0a0a0a',
-            100: '#171717',
-            200: '#262626',
-            300: '#404040',
-            400: '#525252',
-            500: '#737373',
-            600: '#a1a1aa',
-            700: '#d4d4d8',
-            800: '#e5e5e5',
-            900: '#f5f5f5',
-            950: '#fafafa',
-        },
+        isDark: true,
+        iron: DARK_IRON,
         primary: {
             DEFAULT: '#d4ff3f', // Cyber Volt
             light: '#e1ff70',
             dark: '#aacc00',
         },
+        onPrimary: '#000000', // Black on volt-green primary for maximum contrast
         white: '#ffffff',
         black: '#000000',
         blue: '#38bdf8',
         red: '#fb7185',
         green: '#4ade80',
         yellow: '#fbbf24',
-        background: '#0a0a0a',
-        surface: '#171717',
-        text: '#fafafa',
-        textMuted: '#a1a1aa',
-        border: '#262626',
+        background: DARK_IRON[50],
+        surface: DARK_IRON[100],
+        surfaceLighter: DARK_IRON[200],
+        text: DARK_IRON[950],
+        textMuted: DARK_IRON[600],
+        border: DARK_IRON[200],
     },
 };
 
@@ -241,4 +259,3 @@ export function resolveNavigationTheme(tokens: ThemeTokens): NavTheme {
         },
     };
 }
-

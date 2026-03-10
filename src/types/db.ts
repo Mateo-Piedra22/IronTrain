@@ -134,6 +134,79 @@ export interface ExerciseBadge {
     id: string; // UUID
     exercise_id: string;
     badge_id: string;
+    user_id: string;
+    is_system?: number;
     updated_at: number;
     deleted_at?: number;
+}
+
+export interface UserProfile {
+    id: string;
+    username?: string;
+    display_name?: string;
+    is_public: number;
+    share_stats: number;
+    current_streak: number;
+    highest_streak: number;
+    score_lifetime: number;
+    streak_weeks: number;
+    streak_multiplier: number;
+    streak_week_evaluated_at?: string;
+    last_active_date?: number;
+    push_token?: string;
+    updated_at: number;
+    deleted_at?: number;
+}
+
+export interface UserExercisePR {
+    id: string;
+    user_id: string;
+    exercise_id: string;
+    weight?: number;
+    reps?: number;
+    one_rep_max?: number;
+    date: number;
+    updated_at: number;
+    deleted_at?: number;
+}
+
+export interface ScoreEvent {
+    id: string;
+    user_id: string;
+    type: string;
+    points: number;
+    date: number;
+    reference_id?: string;
+    metadata?: string;
+    created_at: number;
+    deleted_at?: number;
+}
+
+export interface ChangelogReaction {
+    id: string;
+    changelog_id: string;
+    user_id: string;
+    type: string;
+    updated_at: number;
+    deleted_at?: number;
+}
+
+export interface Kudo {
+    id: string;
+    feed_id: string;
+    giver_id: string;
+    updated_at: number;
+    deleted_at?: number;
+}
+
+export interface ActivityFeed {
+    id: string;
+    user_id: string;
+    action_type: string;
+    reference_id?: string;
+    metadata?: string;
+    created_at: number;
+    updated_at: number;
+    deleted_at?: number;
+    kudo_count: number;
 }

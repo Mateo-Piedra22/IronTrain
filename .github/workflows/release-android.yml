@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
+      IOS_GOOGLE_SERVICES_INFO_PLIST_BASE64: ${{ secrets.IOS_GOOGLE_SERVICES_INFO_PLIST_BASE64 }}
     steps:
       - name: Check EXPO_TOKEN
         shell: bash
@@ -34,6 +36,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Restore Firebase Secrets
+        run: node scripts/recreate-secrets.js
+
       - name: Generate changelog JSON
         run: npm run generate-changelog
 
@@ -45,20 +50,20 @@ jobs:
           const fs = require('fs');
           const json = JSON.parse(fs.readFileSync('src/changelog.generated.json', 'utf8'));
           const version = process.env.GITHUB_REF_NAME.replace(/^v/, '');
-          
+
           const release = json.releases.find(r => r.version === version);
           if (!release) {
             console.error(`Version ${version} not found in changelog`);
             process.exit(1);
           }
-          
+
           const body = [
             `## What's New (${release.version})`,
             release.date ? `*Released: ${release.date}*` : '',
             '',
             ...release.items.map(item => `- ${item}`)
           ].filter(Boolean).join('\n');
-          
+
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `body=${JSON.stringify(body)}\n`);
           NODE
 

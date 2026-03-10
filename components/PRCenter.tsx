@@ -1,6 +1,6 @@
 import { BadgePill } from '@/components/ui/BadgePill';
 import { AnalysisService, PowerliftingPRs } from '@/src/services/AnalysisService';
-import { withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { AlertCircle, Crown, Info, Trophy } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -46,16 +46,12 @@ export function PRCenter() {
     const styles = useMemo(() => StyleSheet.create({
         container: {
             backgroundColor: colors.surface,
-            borderRadius: 20,
+            borderRadius: 24,
             borderWidth: 1.5,
             borderColor: withAlpha(colors.yellow, '30'),
             padding: 20,
             marginBottom: 16,
-            shadowColor: colors.yellow,
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.08,
-            shadowRadius: 15,
-            elevation: 4,
+            ...ThemeFx.shadowSm,
         },
         header: {
             flexDirection: 'row',
@@ -92,7 +88,7 @@ export function PRCenter() {
         subtitle: {
             fontSize: 11,
             fontWeight: '700',
-            color: colors.iron[400],
+            color: colors.textMuted,
             textTransform: 'uppercase',
             letterSpacing: 0.8,
             marginTop: 2,
@@ -101,9 +97,9 @@ export function PRCenter() {
             width: 32,
             height: 32,
             borderRadius: 16,
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
             justifyContent: 'center',
             alignItems: 'center',
         },
@@ -117,11 +113,7 @@ export function PRCenter() {
             borderRadius: 12,
             borderWidth: 1.5,
             borderColor: withAlpha(colors.yellow, '30'),
-            shadowColor: colors.yellow,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            elevation: 2,
+            ...ThemeFx.shadowSm,
         },
         totalValue: {
             fontSize: 18,
@@ -131,7 +123,7 @@ export function PRCenter() {
         totalUnit: {
             fontSize: 11,
             fontWeight: '800',
-            color: colors.iron[600],
+            color: colors.textMuted,
             textTransform: 'uppercase',
         },
         infoPanel: {
@@ -155,7 +147,7 @@ export function PRCenter() {
         },
         infoPanelText: {
             fontSize: 12,
-            color: colors.iron[500],
+            color: colors.textMuted,
             lineHeight: 18,
             fontWeight: '600',
             marginBottom: 12,
@@ -168,9 +160,10 @@ export function PRCenter() {
             alignItems: 'center',
             gap: 8,
             backgroundColor: colors.surface,
-            padding: 8,
-            borderRadius: 10,
-            borderWidth: 1,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            borderRadius: 12,
+            borderWidth: 1.5,
             borderColor: withAlpha(colors.yellow, '10'),
         },
         detectionDot: {
@@ -181,7 +174,7 @@ export function PRCenter() {
         detectionLabel: {
             fontSize: 11,
             fontWeight: '900',
-            color: colors.iron[400],
+            color: colors.textMuted,
             width: 75,
         },
         detectionValue: {
@@ -191,7 +184,7 @@ export function PRCenter() {
         },
         infoPanelHint: {
             fontSize: 11,
-            color: colors.iron[400],
+            color: colors.textMuted,
             marginTop: 12,
             fontStyle: 'italic',
             lineHeight: 16,
@@ -201,18 +194,18 @@ export function PRCenter() {
             alignItems: 'center',
             paddingVertical: 24,
             gap: 8,
-            backgroundColor: colors.iron[50],
+            backgroundColor: colors.surfaceLighter,
             borderRadius: 16,
             borderWidth: 1.5,
-            borderColor: colors.iron[100],
+            borderColor: colors.border,
         },
         emptyTitle: {
-            color: colors.iron[500],
+            color: colors.textMuted,
             fontWeight: '900',
             fontSize: 14,
         },
         emptyMessage: {
-            color: colors.iron[400],
+            color: colors.textMuted,
             fontSize: 12,
             textAlign: 'center',
             lineHeight: 18,
@@ -225,7 +218,7 @@ export function PRCenter() {
             justifyContent: 'center',
         },
         loadingText: {
-            color: colors.iron[500],
+            color: colors.textMuted,
             marginTop: 12,
             fontSize: 13,
             fontWeight: '700',
@@ -239,10 +232,10 @@ export function PRCenter() {
             fontWeight: '700'
         },
         liftsContainer: {
-            backgroundColor: colors.iron[50],
+            backgroundColor: colors.surfaceLighter,
             borderRadius: 16,
             borderWidth: 1.5,
-            borderColor: colors.iron[100],
+            borderColor: colors.border,
             overflow: 'hidden',
         },
         liftRow: {
@@ -253,7 +246,7 @@ export function PRCenter() {
         },
         liftRowBorder: {
             borderBottomWidth: 1.5,
-            borderBottomColor: colors.iron[100],
+            borderBottomColor: colors.border,
         },
         liftInfo: {
             flexDirection: 'row',
@@ -269,13 +262,13 @@ export function PRCenter() {
         liftLabel: {
             fontSize: 12,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             letterSpacing: 0.5,
         },
         liftExName: {
             fontSize: 10,
             fontWeight: '600',
-            color: colors.iron[500],
+            color: colors.textMuted,
             marginTop: 2,
         },
         liftBadges: {
@@ -287,7 +280,7 @@ export function PRCenter() {
         liftBarTrack: {
             flex: 1,
             height: 10,
-            backgroundColor: colors.iron[200],
+            backgroundColor: colors.border,
             borderRadius: 5,
             overflow: 'hidden',
             marginHorizontal: 16,
@@ -306,12 +299,12 @@ export function PRCenter() {
         liftValue: {
             fontSize: 20,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
         },
         liftUnit: {
             fontSize: 11,
             fontWeight: '800',
-            color: colors.iron[400],
+            color: colors.textMuted,
         },
     }), [colors]);
 
@@ -335,7 +328,7 @@ export function PRCenter() {
                         accessibilityRole="button"
                         accessibilityLabel="Info sobre sala de trofeos"
                     >
-                        <Info size={16} color={showInfo ? colors.yellow : colors.iron[400]} />
+                        <Info size={16} color={showInfo ? colors.yellow : colors.textMuted} />
                     </TouchableOpacity>
                     <View style={styles.totalBadge}>
                         <Crown size={14} color={colors.yellow} />
@@ -363,7 +356,7 @@ export function PRCenter() {
                                 <Text style={styles.detectionLabel}>{l.label}:</Text>
                                 <Text style={[
                                     styles.detectionValue,
-                                    { color: l.name ? colors.iron[950] : colors.iron[400] }
+                                    { color: l.name ? colors.text : colors.textMuted }
                                 ]}>
                                     {l.name ?? 'No detectado'}
                                 </Text>
@@ -389,7 +382,7 @@ export function PRCenter() {
                 </View>
             ) : noneDetected ? (
                 <View style={styles.emptyState}>
-                    <Trophy size={32} color={colors.iron[300]} />
+                    <Trophy size={32} color={colors.textMuted} />
                     <Text style={styles.emptyTitle}>Sin ejercicios detectados</Text>
                     <Text style={styles.emptyMessage}>
                         Agrega ejercicios con nombres como "Sentadilla", "Press Banca" o "Peso Muerto" para ver tu total.

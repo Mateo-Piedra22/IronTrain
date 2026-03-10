@@ -124,7 +124,7 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
         ];
 
         const dayNameStyle = [styles.stripDayName, isSelected ? styles.textWhite : styles.textMuted];
-        const dayNumStyle = [styles.stripDayNum, isSelected ? styles.textWhite : isToday ? styles.textPrimary : styles.textIron200];
+        const dayNumStyle = [styles.stripDayNum, isSelected ? styles.textWhite : isToday ? styles.textPrimary : styles.textMuted];
 
         return (
             <TouchableOpacity onPress={() => handleDateSelect(item)} style={containerStyle} activeOpacity={0.7}>
@@ -153,12 +153,12 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
         const containerStyle = [
             styles.calendarDay,
             isSelected ? (isCompleted ? styles.bgPrimaryCompleted : styles.bgPrimary) :
-                isCompleted ? styles.bgIron800Completed : {}
+                isCompleted ? styles.bgSurfaceCompleted : {}
         ];
 
         const textStyle = [
             styles.calendarDayText,
-            isSelected ? styles.textWhiteBold : isToday ? styles.textPrimaryBold : styles.textIron200
+            isSelected ? styles.textWhiteBold : isToday ? styles.textPrimaryBold : styles.textMuted
         ];
 
         return (
@@ -184,7 +184,7 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
             backgroundColor: colors.background,
             zIndex: 10,
             borderBottomWidth: 1.5,
-            borderBottomColor: colors.iron[200],
+            borderBottomColor: colors.border,
             ...ThemeFx.shadowSm,
         },
         header: {
@@ -196,7 +196,7 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
             backgroundColor: colors.background,
         },
         monthTitle: {
-            color: colors.iron[950],
+            color: colors.text,
             fontWeight: '900',
             fontSize: 20,
             textTransform: 'capitalize',
@@ -207,7 +207,7 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
             backgroundColor: colors.surface,
             borderRadius: 14,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
             ...ThemeFx.shadowSm,
         },
         stripContainer: {
@@ -246,12 +246,11 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
         },
         stripItemDefault: {
             backgroundColor: colors.surface,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
         },
-        textWhite: { color: colors.white },
-        textMuted: { color: colors.iron[500] },
+        textWhite: { color: colors.onPrimary },
+        textMuted: { color: colors.textMuted },
         textPrimary: { color: colors.primary.DEFAULT },
-        textIron200: { color: colors.iron[400] },
 
         stripDayName: {
             fontSize: 10,
@@ -309,7 +308,7 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
             backgroundColor: colors.primary.DEFAULT,
             borderColor: colors.green
         },
-        bgIron800Completed: {
+        bgSurfaceCompleted: {
             backgroundColor: colors.surface,
             borderColor: withAlpha(colors.green, '40'),
         },
@@ -317,9 +316,9 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
             fontSize: 15,
             fontWeight: '600',
         },
-        textWhiteBold: { color: colors.white, fontWeight: '900' },
+        textWhiteBold: { color: colors.onPrimary, fontWeight: '900' },
         textPrimaryBold: { color: colors.primary.DEFAULT, fontWeight: '900' },
-        textIron700: { color: colors.iron[700] },
+        textMutedBold: { color: colors.textMuted, fontWeight: '700' },
 
         calendarDotsContainer: {
             flexDirection: 'row',
@@ -363,7 +362,7 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
                         {isExpanded ? (
                             <ChevronUp color={colors.primary.DEFAULT} size={20} />
                         ) : (
-                            <CalendarIcon color={colors.iron[400]} size={20} />
+                            <CalendarIcon color={colors.textMuted} size={20} />
                         )}
                     </TouchableOpacity>
                 </View>
@@ -387,15 +386,15 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
                         setVisibleMonth(new Date(date.year, date.month - 1, date.day));
                     }}
                     dayComponent={renderCalendarDay}
-                    renderArrow={(direction: string) => (direction === 'left' ? <ChevronLeft color={colors.iron[400]} size={24} /> : <ChevronRight color={colors.iron[400]} size={24} />)}
+                    renderArrow={(direction: string) => (direction === 'left' ? <ChevronLeft color={colors.textMuted} size={24} /> : <ChevronRight color={colors.textMuted} size={24} />)}
                     enableSwipeMonths={true}
                     theme={{
-                        backgroundColor: colors.iron[900],
-                        calendarBackground: colors.iron[900],
-                        textSectionTitleColor: colors.iron[500],
+                        backgroundColor: colors.background,
+                        calendarBackground: colors.background,
+                        textSectionTitleColor: colors.textMuted,
                         todayTextColor: colors.primary.DEFAULT,
-                        dayTextColor: colors.iron[50],
-                        monthTextColor: colors.iron[950],
+                        dayTextColor: colors.text,
+                        monthTextColor: colors.text,
                         textMonthFontWeight: '900',
                         textMonthFontSize: 16,
                         'stylesheet.calendar.header': {

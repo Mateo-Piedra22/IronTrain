@@ -40,28 +40,28 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
     const ss = useMemo(() => StyleSheet.create({
         container: { flex: 1, paddingHorizontal: 16, paddingTop: 8, position: 'relative' },
         empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-        emptyTitle: { color: colors.iron[400], textAlign: 'center', fontSize: 16, marginTop: 16, fontWeight: '700' },
-        emptySub: { color: colors.iron[400], textAlign: 'center', marginTop: 8, fontSize: 13 },
-        emptySeparator: { width: 40, marginVertical: 16, borderBottomWidth: 1, borderStyle: 'dashed', borderBottomColor: colors.iron[300] },
+        emptyTitle: { color: colors.textMuted, textAlign: 'center', fontSize: 16, marginTop: 16, fontWeight: '700' },
+        emptySub: { color: colors.textMuted, textAlign: 'center', marginTop: 8, fontSize: 13 },
+        emptySeparator: { width: 40, marginVertical: 16, borderBottomWidth: 1.5, borderStyle: 'dashed', borderBottomColor: colors.border },
         emptyActions: { flexDirection: 'row', gap: 12 },
 
-        swipeRight: { justifyContent: 'center', alignItems: 'flex-end', borderTopRightRadius: 14, borderBottomRightRadius: 14, marginVertical: 1, marginLeft: -20, width: 96, backgroundColor: colors.red, shadowColor: ThemeFx.shadowColor, shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
-        swipeLeft: { justifyContent: 'center', alignItems: 'flex-start', width: 96, borderTopLeftRadius: 14, borderBottomLeftRadius: 14, marginVertical: 1, marginRight: -20, backgroundColor: colors.primary.dark, shadowColor: ThemeFx.shadowColor, shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+        swipeRight: { justifyContent: 'center', alignItems: 'flex-end', borderRadius: 24, marginVertical: 1, marginLeft: -20, width: 96, backgroundColor: colors.red, ...ThemeFx.shadowSm },
+        swipeLeft: { justifyContent: 'center', alignItems: 'flex-start', width: 96, borderRadius: 24, marginVertical: 1, marginRight: -20, backgroundColor: colors.primary.dark, ...ThemeFx.shadowSm },
         swipeLabel: { color: colors.white, fontSize: 9, fontWeight: '900', marginTop: 4, letterSpacing: 0.5 },
 
         actionBtn: {
             flexDirection: 'row', alignItems: 'center', gap: 6,
             paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100,
-            backgroundColor: colors.surface, borderWidth: 1,
-            borderColor: colors.iron[300], borderStyle: 'dashed',
+            backgroundColor: colors.surface, borderWidth: 1.5,
+            borderColor: colors.border, borderStyle: 'dashed',
         },
-        actionBtnText: { fontSize: 11, fontWeight: '700', color: colors.iron[500], textTransform: 'uppercase' },
+        actionBtnText: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' },
 
         reorderItem: { marginBottom: 10 },
         listContent: { paddingBottom: 100 },
 
         footerWrapper: { paddingTop: 4 },
-        footerSeparator: { marginHorizontal: 24, marginBottom: 16, borderBottomWidth: 1, borderStyle: 'dashed', borderBottomColor: colors.iron[300] },
+        footerSeparator: { marginHorizontal: 24, marginBottom: 16, borderBottomWidth: 1.5, borderStyle: 'dashed', borderBottomColor: colors.border },
         footerActions: { alignItems: 'center', paddingBottom: 96, flexDirection: 'row', justifyContent: 'center', gap: 12 },
 
         topGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 16, zIndex: 1 },
@@ -128,7 +128,7 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
     if (localGroups.length === 0) {
         return (
             <View style={ss.empty}>
-                <Dumbbell size={48} color={colors.iron[300]} />
+                <Dumbbell size={48} color={colors.textMuted} />
                 <Text style={ss.emptyTitle}>Todavía no registraste ejercicios.</Text>
                 <Text style={ss.emptySub}>Tocá "+" para agregar uno.</Text>
                 {(onCopyPress || onLoadRoutinePress) && (
@@ -140,7 +140,7 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
                                     onPress={onLoadRoutinePress}
                                     style={ss.actionBtn}
                                 >
-                                    <BookOpen size={12} color={colors.iron[400]} />
+                                    <BookOpen size={12} color={colors.textMuted} />
                                     <Text style={ss.actionBtnText}>
                                         Cargar Rutina
                                     </Text>
@@ -152,7 +152,7 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
                                     onPress={onCopyPress}
                                     style={ss.actionBtn}
                                 >
-                                    <Copy size={12} color={colors.iron[400]} />
+                                    <Copy size={12} color={colors.textMuted} />
                                     <Text style={ss.actionBtnText}>
                                         Copiar historial
                                     </Text>
@@ -248,7 +248,7 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
                                         onPress={onLoadRoutinePress}
                                         style={ss.actionBtn}
                                     >
-                                        <BookOpen size={12} color={colors.iron[400]} />
+                                        <BookOpen size={12} color={colors.textMuted} />
                                         <Text style={ss.actionBtnText}>
                                             Cargar Rutina
                                         </Text>
@@ -262,7 +262,7 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
                                         accessibilityRole="button"
                                         accessibilityLabel="Copiar ejercicios desde otro día"
                                     >
-                                        <Copy size={12} color={colors.iron[400]} />
+                                        <Copy size={12} color={colors.textMuted} />
                                         <Text style={ss.actionBtnText}>
                                             Copiar historial
                                         </Text>

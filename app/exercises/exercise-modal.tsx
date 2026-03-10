@@ -1,6 +1,7 @@
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
 import { ExerciseService } from '@/src/services/ExerciseService';
+import { withAlpha } from '@/src/theme';
 import { ExerciseType } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -58,16 +59,16 @@ export default function ExerciseModal() {
     ];
 
     const s = useMemo(() => StyleSheet.create({
-        container: { flex: 1, backgroundColor: colors.iron[900], padding: 16 },
+        container: { flex: 1, backgroundColor: colors.background, padding: 16 },
         section: { marginBottom: 20 },
         sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-        sectionIconCircle: { width: 28, height: 28, borderRadius: 8, backgroundColor: colors.primary.DEFAULT + '15', justifyContent: 'center', alignItems: 'center' },
-        sectionLabel: { fontSize: 12, fontWeight: '800', color: colors.iron[500], textTransform: 'uppercase', letterSpacing: 0.5 },
+        sectionIconCircle: { width: 28, height: 28, borderRadius: 8, backgroundColor: withAlpha(colors.primary.DEFAULT, '15'), justifyContent: 'center', alignItems: 'center' },
+        sectionLabel: { fontSize: 12, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
         typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
         typeCard: { width: '48%' as any, flexBasis: '48%', flexGrow: 0, paddingVertical: 14, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: 10 },
-        typeCardActive: { borderColor: colors.primary.DEFAULT, backgroundColor: colors.primary.DEFAULT + '12' },
+        typeCardActive: { borderColor: colors.primary.DEFAULT, backgroundColor: withAlpha(colors.primary.DEFAULT, '12') },
         typeIcon: { fontSize: 18 },
-        typeLabel: { fontSize: 12, fontWeight: '700', color: colors.iron[500], flex: 1 },
+        typeLabel: { fontSize: 12, fontWeight: '700', color: colors.textMuted, flex: 1 },
         typeLabelActive: { color: colors.primary.DEFAULT, fontWeight: '800' },
     }), [colors]);
 
@@ -76,8 +77,8 @@ export default function ExerciseModal() {
             <Stack.Screen options={{
                 title: exerciseId ? 'Editar ejercicio' : 'Nuevo ejercicio',
                 presentation: 'modal',
-                headerTitleStyle: { fontWeight: '900', color: colors.iron[950] },
-                headerStyle: { backgroundColor: colors.iron[900] },
+                headerTitleStyle: { fontWeight: '900', color: colors.text },
+                headerStyle: { backgroundColor: colors.background },
                 headerTintColor: colors.primary.DEFAULT,
             }} />
 

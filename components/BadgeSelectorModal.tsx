@@ -61,10 +61,10 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
             borderBottomColor: colors.border,
             backgroundColor: colors.surface,
         },
-        headerTitle: { fontSize: 18, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.6 },
+        headerTitle: { fontSize: 18, fontWeight: '900', color: colors.text, letterSpacing: -0.6 },
         headerBtn: {
             width: 36, height: 36, borderRadius: 12,
-            backgroundColor: colors.iron[100], justifyContent: 'center', alignItems: 'center',
+            backgroundColor: colors.surfaceLighter, justifyContent: 'center', alignItems: 'center',
             borderWidth: 1.5, borderColor: colors.border
         },
 
@@ -74,19 +74,19 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
             flex: 1,
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             paddingHorizontal: 14,
             height: 48,
             borderRadius: 14,
             borderWidth: 1.5,
             borderColor: colors.border
         },
-        searchInput: { flex: 1, marginLeft: 10, fontSize: 14, color: colors.iron[950], fontWeight: '700' },
+        searchInput: { flex: 1, marginLeft: 10, fontSize: 14, color: colors.text, fontWeight: '700' },
         addBtn: { width: 48, height: 48, backgroundColor: colors.primary.DEFAULT, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
 
         listContent: { padding: 16, paddingTop: 4 },
         section: { marginBottom: 24 },
-        sectionTitle: { fontSize: 10, fontWeight: '800', color: colors.iron[500], textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 12, marginLeft: 4 },
+        sectionTitle: { fontSize: 10, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 12, marginLeft: 4 },
         badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
         badgeItem: { position: 'relative' },
         badgeItemSelected: { transform: [{ scale: 1.05 }] },
@@ -94,45 +94,45 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
 
         footer: { padding: 16, borderTopWidth: 1.5, borderTopColor: colors.border, backgroundColor: colors.surface },
         confirmBtn: { backgroundColor: colors.primary.DEFAULT, height: 54, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-        confirmBtnText: { color: colors.white, fontWeight: '900', fontSize: 15, textTransform: 'uppercase', letterSpacing: 0.5 },
+        confirmBtnText: { color: colors.onPrimary, fontWeight: '900', fontSize: 15, textTransform: 'uppercase', letterSpacing: 0.5 },
 
         // Form View
         formContent: { padding: 20 },
-        label: { fontSize: 10, fontWeight: '800', color: colors.iron[500], textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, marginLeft: 2 },
+        label: { fontSize: 10, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, marginLeft: 2 },
         input: {
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderRadius: 14,
             padding: 16,
             fontSize: 16,
-            color: colors.iron[950],
+            color: colors.text,
             borderWidth: 1.5,
             borderColor: colors.border,
             fontWeight: '700',
             marginBottom: 20
         },
         groupPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-        groupChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: colors.iron[100], borderWidth: 1.5, borderColor: colors.border },
+        groupChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: colors.surfaceLighter, borderWidth: 1.5, borderColor: colors.border },
         groupChipActive: { backgroundColor: withAlpha(colors.primary.DEFAULT, '12'), borderColor: colors.primary.DEFAULT },
-        groupChipText: { color: colors.iron[500], fontSize: 12, fontWeight: '700' },
+        groupChipText: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
         groupChipTextActive: { color: colors.primary.DEFAULT },
         colorSelector: {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             padding: 14,
             borderRadius: 14,
             borderWidth: 1.5,
             borderColor: colors.border
         },
         colorDot: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: colors.white },
-        colorHex: { color: colors.iron[950], fontWeight: '800', fontSize: 14 },
-        previewContainer: { marginTop: 24, alignItems: 'center', backgroundColor: colors.iron[100], padding: 24, borderRadius: 20, borderStyle: 'dashed', borderWidth: 2, borderColor: withAlpha(colors.border, '50') },
+        colorHex: { color: colors.text, fontWeight: '800', fontSize: 14 },
+        previewContainer: { marginTop: 24, alignItems: 'center', backgroundColor: colors.surfaceLighter, padding: 24, borderRadius: 20, borderStyle: 'dashed', borderWidth: 2, borderColor: withAlpha(colors.border, '50') },
         formFooter: { flexDirection: 'row', gap: 12, marginTop: 32 },
         deleteBtn: { width: 54, height: 54, borderRadius: 16, backgroundColor: withAlpha(colors.red, '10'), borderWidth: 1.5, borderColor: withAlpha(colors.red, '25'), justifyContent: 'center', alignItems: 'center' },
         saveBtn: { flex: 1, height: 54, backgroundColor: colors.primary.DEFAULT, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
         disabledBtn: { opacity: 0.5 },
-        saveBtnText: { color: colors.white, fontWeight: '900', fontSize: 15, textTransform: 'uppercase', letterSpacing: 0.5 }
+        saveBtnText: { color: colors.onPrimary, fontWeight: '900', fontSize: 15, textTransform: 'uppercase', letterSpacing: 0.5 }
     }), [colors]);
 
     useEffect(() => {
@@ -238,7 +238,7 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
                                 onPress={() => { setIsCreating(false); setEditingBadge(null); }}
                                 style={styles.headerBtn}
                             >
-                                <ChevronLeft size={20} color={colors.iron[950]} />
+                                <ChevronLeft size={20} color={colors.text} />
                             </TouchableOpacity>
                         ) : (
                             <View style={{ width: 36 }} />
@@ -247,7 +247,7 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
                             {isCreating ? (editingBadge ? 'Editar Badge' : 'Nuevo Badge') : 'Badges'}
                         </Text>
                         <TouchableOpacity onPress={onClose} style={styles.headerBtn}>
-                            <X size={20} color={colors.iron[950]} />
+                            <X size={20} color={colors.text} />
                         </TouchableOpacity>
                     </View>
 
@@ -259,7 +259,7 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
                                 value={newName}
                                 onChangeText={setNewName}
                                 placeholder="Ej: Barra Z"
-                                placeholderTextColor={colors.iron[400]}
+                                placeholderTextColor={colors.textMuted}
                                 autoFocus
                             />
 
@@ -287,7 +287,7 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
                                     <View style={[styles.colorDot, { backgroundColor: newColor }]} />
                                     <Text style={styles.colorHex}>{newColor.toUpperCase()}</Text>
                                 </View>
-                                <Palette size={18} color={colors.iron[400]} />
+                                <Palette size={18} color={colors.textMuted} />
                             </TouchableOpacity>
 
                             <View style={styles.previewContainer}>
@@ -314,10 +314,10 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
                         <>
                             <View style={styles.listHeader}>
                                 <View style={styles.searchBar}>
-                                    <Search size={16} color={colors.iron[400]} />
+                                    <Search size={16} color={colors.textMuted} />
                                     <TextInput
                                         placeholder="Buscar..."
-                                        placeholderTextColor={colors.iron[400]}
+                                        placeholderTextColor={colors.textMuted}
                                         value={search}
                                         onChangeText={setSearch}
                                         style={styles.searchInput}
@@ -333,7 +333,7 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
                                     }}
                                     style={styles.addBtn}
                                 >
-                                    <Plus size={20} color={colors.white} />
+                                    <Plus size={20} color={colors.onPrimary} />
                                 </TouchableOpacity>
                             </View>
 
@@ -365,7 +365,7 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
                                                         />
                                                         {!badge.is_system && isSelected && (
                                                             <TouchableOpacity onPress={() => startEditing(badge)} style={styles.editBadgeIndicator}>
-                                                                <Edit2 size={8} color={colors.iron[600]} />
+                                                                <Edit2 size={8} color={colors.text} />
                                                             </TouchableOpacity>
                                                         )}
                                                     </TouchableOpacity>

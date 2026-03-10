@@ -1,3 +1,4 @@
+import { useAuthStore } from '../store/authStore';
 import { Badge, ExerciseBadge } from '../types/db';
 import { uuidV4 } from '../utils/uuid';
 import { dbService } from './DatabaseService';
@@ -29,8 +30,10 @@ class BadgeService {
         const currentIds = new Set(current.map(a => a.badge_id));
         const targetIds = new Set(badgeIds);
         const now = Date.now();
+        const userId = useAuthStore.getState().user?.id;
 
         // Detect additions
+
         const toAdd = badgeIds.filter(id => !currentIds.has(id));
         // Detect removals
         const toRemove = current.filter(a => !targetIds.has(a.badge_id));
@@ -54,18 +57,18 @@ class BadgeService {
 
                 if (existing) {
                     await dbService.run(
-                        'UPDATE exercise_badges SET deleted_at = NULL, updated_at = ? WHERE id = ?',
-                        [now, existing.id]
+                        'UPDATE exercise_badges SET deleted_at = NULL, updated_at = ?, user_id = ? WHERE id = ?',
+                        [now, userId, existing.id]
                     );
-                    await dbService.queueSyncMutation('exercise_badges', existing.id, 'UPDATE', { deleted_at: null, updated_at: now });
+                    await dbService.queueSyncMutation('exercise_badges', existing.id, 'UPDATE', { deleted_at: null, updated_at: now, user_id: userId });
                 } else {
                     const id = uuidV4();
                     await dbService.run(
-                        'INSERT INTO exercise_badges (id, exercise_id, badge_id, updated_at) VALUES (?, ?, ?, ?)',
-                        [id, exerciseId, bId, now]
+                        'INSERT INTO exercise_badges (id, exercise_id, badge_id, user_id, updated_at) VALUES (?, ?, ?, ?, ?)',
+                        [id, exerciseId, bId, userId, now]
                     );
                     await dbService.queueSyncMutation('exercise_badges', id, 'INSERT', {
-                        id, exercise_id: exerciseId, badge_id: bId, updated_at: now
+                        id, exercise_id: exerciseId, badge_id: bId, user_id: userId, updated_at: now
                     });
                 }
             }

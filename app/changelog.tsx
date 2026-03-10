@@ -4,7 +4,7 @@ import { es } from 'date-fns/locale';
 import Constants from 'expo-constants';
 import { Stack, useRouter } from 'expo-router';
 import { Bell, ChevronDown, ChevronLeft, ChevronUp } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     ScrollView,
@@ -15,9 +15,10 @@ import {
 } from 'react-native';
 import { KudosButton } from '../components/ui/KudosButton';
 import { SafeAreaWrapper } from '../components/ui/SafeAreaWrapper';
+import { useColors } from '../src/hooks/useColors';
 import { BroadcastFeedService, type BroadcastItem } from '../src/services/BroadcastFeedService';
 import { configService } from '../src/services/ConfigService';
-import { Colors } from '../src/theme';
+import { ThemeFx, withAlpha } from '../src/theme';
 
 function isSameVersion(v1: string, v2: string) {
     return String(v1).trim() === String(v2).trim();
@@ -44,10 +45,246 @@ function renderFormattedText(text: string, textStyle: any, boldStyle: any) {
 
 export default function ChangelogScreen() {
     const router = useRouter();
+    const colors = useColors();
     const [items, setItems] = useState<BroadcastItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
     const appVersion = Constants.expoConfig?.version ?? '0.0.0';
+
+    const ss = useMemo(() => StyleSheet.create({
+        container: {
+            flex: 1,
+            backgroundColor: colors.background,
+        },
+        scrollContent: {
+            padding: 16,
+            paddingBottom: 40,
+        },
+        headerContainer: {
+            marginBottom: 20,
+            paddingHorizontal: 4,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 16
+        },
+        backBtn: {
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: colors.surface,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            ...ThemeFx.shadowSm
+        },
+        pageTitle: {
+            color: colors.text,
+            fontWeight: '900',
+            fontSize: 28,
+            letterSpacing: -1.2
+        },
+        pageSub: {
+            color: colors.primary.DEFAULT,
+            fontSize: 13,
+            fontWeight: '800',
+            marginTop: 0,
+            letterSpacing: 0.2,
+            textTransform: 'uppercase'
+        },
+        loadingWrapper: {
+            padding: 40,
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 16
+        },
+        loadingText: {
+            color: colors.textMuted,
+            fontWeight: '600',
+            fontSize: 14
+        },
+        releaseCard: {
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            marginBottom: 20,
+            overflow: 'hidden',
+            ...ThemeFx.shadowSm
+        },
+        newsCard: {
+            borderColor: withAlpha(colors.primary.DEFAULT, '40'),
+        },
+        newsHeader: {
+            padding: 20,
+            paddingBottom: 12,
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: 14
+        },
+        newsIconWrapper: {
+            width: 40,
+            height: 40,
+            borderRadius: 14,
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '15'),
+            alignItems: 'center',
+            justifyContent: 'center'
+        },
+        newsLabel: {
+            color: colors.primary.DEFAULT,
+            fontSize: 10,
+            fontWeight: '900',
+            letterSpacing: 1.5,
+            marginBottom: 4,
+            textTransform: 'uppercase'
+        },
+        newsTitle: {
+            color: colors.text,
+            fontWeight: '900',
+            fontSize: 20,
+            letterSpacing: -0.5,
+            lineHeight: 24
+        },
+        newsBody: {
+            paddingHorizontal: 20,
+            paddingBottom: 20
+        },
+        newsMessage: {
+            color: colors.textMuted,
+            fontSize: 15,
+            lineHeight: 22,
+            fontWeight: '500'
+        },
+        releaseHeader: {
+            paddingHorizontal: 20,
+            paddingVertical: 18,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: colors.surfaceLighter
+        },
+        releaseTop: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10
+        },
+        releaseVersion: {
+            color: colors.text,
+            fontWeight: '900',
+            fontSize: 22,
+            letterSpacing: -0.8
+        },
+        currentBadge: {
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 8,
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '20'),
+            borderWidth: 1,
+            borderColor: withAlpha(colors.primary.DEFAULT, '40')
+        },
+        currentBadgeText: {
+            color: colors.primary.DEFAULT,
+            fontSize: 9,
+            fontWeight: '900',
+            letterSpacing: 1
+        },
+        releaseDate: {
+            color: colors.textMuted,
+            fontSize: 13,
+            fontWeight: '600',
+            marginTop: 2
+        },
+        releaseBody: {
+            paddingHorizontal: 20,
+            paddingVertical: 20
+        },
+        itemRow: {
+            flexDirection: 'row',
+            alignItems: 'flex-start'
+        },
+        itemBulletWrapper: {
+            width: 18,
+            alignItems: 'flex-start',
+            paddingTop: 8
+        },
+        itemBulletDot: {
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: colors.primary.DEFAULT
+        },
+        itemText: {
+            color: colors.textMuted,
+            flex: 1,
+            fontSize: 14,
+            lineHeight: 22
+        },
+        itemBold: {
+            color: colors.text,
+            fontWeight: '900'
+        },
+        releaseSummary: {
+            color: colors.textMuted,
+            fontSize: 13,
+            marginTop: 6,
+            fontWeight: '500',
+            fontStyle: 'italic'
+        },
+        expandIconWrapper: {
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            backgroundColor: colors.surfaceLighter,
+            alignItems: 'center',
+            justifyContent: 'center'
+        },
+        releaseFooter: {
+            marginTop: 16,
+            paddingTop: 16,
+            borderTopWidth: 1.5,
+            borderTopColor: colors.border,
+            alignItems: 'flex-end'
+        },
+        sectionHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            marginBottom: 16,
+            marginTop: 8,
+            paddingHorizontal: 4
+        },
+        sectionTitle: {
+            color: colors.textMuted,
+            fontSize: 11,
+            fontWeight: '900',
+            letterSpacing: 1.2
+        },
+        sectionLine: {
+            flex: 1,
+            height: 1.5,
+            backgroundColor: colors.border,
+        },
+        emptyCard: {
+            backgroundColor: colors.surface,
+            padding: 32,
+            borderRadius: 20,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            alignItems: 'center'
+        },
+        emptyTitle: {
+            color: colors.text,
+            fontWeight: '800',
+            fontSize: 17,
+            marginBottom: 8
+        },
+        emptySub: {
+            color: colors.textMuted,
+            fontSize: 14,
+            textAlign: 'center',
+            lineHeight: 20
+        },
+    }), [colors]);
 
     const fetchItems = useCallback(async () => {
         setIsLoading(true);
@@ -93,7 +330,7 @@ export default function ChangelogScreen() {
             <View key={n.id} style={[ss.releaseCard, ss.newsCard]}>
                 <View style={ss.newsHeader}>
                     <View style={ss.newsIconWrapper}>
-                        <Bell size={18} color={Colors.primary.DEFAULT} />
+                        <Bell size={18} color={colors.primary.DEFAULT} />
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={ss.newsLabel}>NOTICIA OFICIAL</Text>
@@ -157,9 +394,9 @@ export default function ChangelogScreen() {
                     </View>
                     <View style={ss.expandIconWrapper}>
                         {isExpanded ? (
-                            <ChevronUp size={20} color={Colors.primary.DEFAULT} />
+                            <ChevronUp size={20} color={colors.primary.DEFAULT} />
                         ) : (
-                            <ChevronDown size={20} color={Colors.iron[400]} />
+                            <ChevronDown size={20} color={colors.textMuted} />
                         )}
                     </View>
                 </TouchableOpacity>
@@ -200,10 +437,10 @@ export default function ChangelogScreen() {
 
     const renderGlobalEvent = (e: BroadcastItem) => {
         return (
-            <View key={e.id} style={[ss.releaseCard, { borderColor: Colors.primary.DEFAULT + '20' }]}>
+            <View key={e.id} style={[ss.releaseCard, { borderColor: withAlpha(colors.primary.DEFAULT, '20') }]}>
                 <View style={ss.newsHeader}>
-                    <View style={[ss.newsIconWrapper, { backgroundColor: Colors.primary.DEFAULT + '10' }]}>
-                        <Bell size={18} color={Colors.primary.DEFAULT} />
+                    <View style={[ss.newsIconWrapper, { backgroundColor: withAlpha(colors.primary.DEFAULT, '10') }]}>
+                        <Bell size={18} color={colors.primary.DEFAULT} />
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={ss.newsLabel}>EVENTO GLOBAL</Text>
@@ -223,12 +460,12 @@ export default function ChangelogScreen() {
     };
 
     return (
-        <SafeAreaWrapper style={{ flex: 1, backgroundColor: Colors.iron[900] }} edges={['top', 'left', 'right', 'bottom']}>
+        <SafeAreaWrapper style={ss.container} edges={['top', 'left', 'right', 'bottom']}>
             <Stack.Screen options={{ headerShown: false }} />
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-                <View style={{ marginBottom: 20, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={ss.scrollContent}>
+                <View style={ss.headerContainer}>
                     <TouchableOpacity onPress={() => router.back()} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
-                        <ChevronLeft size={20} color={Colors.iron[950]} />
+                        <ChevronLeft size={22} color={colors.text} strokeWidth={2.5} />
                     </TouchableOpacity>
                     <View>
                         <Text style={ss.pageTitle}>Novedades</Text>
@@ -238,7 +475,7 @@ export default function ChangelogScreen() {
 
                 {isLoading ? (
                     <View style={ss.loadingWrapper}>
-                        <ActivityIndicator size="large" color={Colors.primary.DEFAULT} />
+                        <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
                         <Text style={ss.loadingText}>Sincronizando novedades...</Text>
                     </View>
                 ) : (
@@ -286,39 +523,3 @@ export default function ChangelogScreen() {
     );
 }
 
-const ss = StyleSheet.create({
-    backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.iron[300], elevation: 2, shadowColor: Colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
-    pageTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 28, letterSpacing: -1.2 },
-    pageSub: { color: Colors.primary.DEFAULT, fontSize: 13, fontWeight: '700', marginTop: 0, letterSpacing: 0.2 },
-    loadingWrapper: { padding: 40, alignItems: 'center', justifyContent: 'center', gap: 16 },
-    loadingText: { color: Colors.iron[500], fontWeight: '600', fontSize: 14 },
-    releaseCard: { backgroundColor: Colors.surface, borderRadius: 24, borderWidth: 1, borderColor: Colors.iron[300], marginBottom: 20, overflow: 'hidden', elevation: 3, shadowColor: Colors.black, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16 },
-    newsCard: { borderColor: Colors.primary.DEFAULT + '30', backgroundColor: Colors.white },
-    newsHeader: { padding: 20, paddingBottom: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
-    newsIconWrapper: { width: 40, height: 40, borderRadius: 14, backgroundColor: Colors.primary.DEFAULT + '15', alignItems: 'center', justifyContent: 'center' },
-    newsLabel: { color: Colors.primary.DEFAULT, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 4 },
-    newsTitle: { color: Colors.iron[950], fontWeight: '900', fontSize: 20, letterSpacing: -0.5, lineHeight: 24 },
-    newsBody: { paddingHorizontal: 20, paddingBottom: 20 },
-    newsMessage: { color: Colors.iron[600], fontSize: 15, lineHeight: 22, fontWeight: '500' },
-    releaseHeader: { paddingHorizontal: 20, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.iron[50] },
-    releaseTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    releaseVersion: { color: Colors.iron[950], fontWeight: '900', fontSize: 22, letterSpacing: -0.8 },
-    currentBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: Colors.primary.DEFAULT + '20', borderWidth: 1, borderColor: Colors.primary.DEFAULT + '40' },
-    currentBadgeText: { color: Colors.primary.dark, fontSize: 9, fontWeight: '900', letterSpacing: 1 },
-    releaseDate: { color: Colors.iron[500], fontSize: 13, fontWeight: '600', marginTop: 2 },
-    releaseBody: { paddingHorizontal: 20, paddingVertical: 20 },
-    itemRow: { flexDirection: 'row', alignItems: 'flex-start' },
-    itemBulletWrapper: { width: 18, alignItems: 'flex-start', paddingTop: 8 },
-    itemBulletDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary.DEFAULT },
-    itemText: { color: Colors.iron[500], flex: 1, fontSize: 14, lineHeight: 22 },
-    itemBold: { color: Colors.black, fontWeight: '900' },
-    releaseSummary: { color: Colors.iron[400], fontSize: 13, marginTop: 6, fontWeight: '500', fontStyle: 'italic' },
-    expandIconWrapper: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.iron[100] + '40', alignItems: 'center', justifyContent: 'center' },
-    releaseFooter: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.iron[100], alignItems: 'flex-end' },
-    sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16, marginTop: 8, paddingHorizontal: 4 },
-    sectionTitle: { color: Colors.iron[400], fontSize: 11, fontWeight: '900', letterSpacing: 1.2 },
-    sectionLine: { flex: 1, height: 1, backgroundColor: Colors.iron[200], opacity: 0.5 },
-    emptyCard: { backgroundColor: Colors.surface, padding: 32, borderRadius: 24, borderWidth: 1, borderColor: Colors.iron[300], alignItems: 'center' },
-    emptyTitle: { color: Colors.iron[950], fontWeight: '800', fontSize: 17, marginBottom: 8 },
-    emptySub: { color: Colors.iron[500], fontSize: 14, textAlign: 'center', lineHeight: 20 },
-});

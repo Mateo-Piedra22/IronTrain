@@ -36,7 +36,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             paddingVertical: 48,
         },
         sheet: {
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderWidth: 1.5,
             borderColor: colors.border,
             borderRadius: 20,
@@ -44,11 +44,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             maxHeight: '95%',
             width: '100%',
             overflow: 'hidden',
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.15,
-            shadowRadius: 20,
-            elevation: 12,
+            ...ThemeFx.shadowLg,
         },
         header: {
             flexDirection: 'row',
@@ -60,23 +56,23 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             backgroundColor: colors.surface,
         },
         headerTextContainer: { flex: 1 },
-        headerTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 17, letterSpacing: -0.4 },
-        headerSub: { color: colors.iron[500], fontSize: 12, fontWeight: '700', marginTop: 2 },
+        headerTitle: { color: colors.text, fontWeight: '900', fontSize: 17, letterSpacing: -0.4 },
+        headerSub: { color: colors.textMuted, fontSize: 12, fontWeight: '700', marginTop: 2 },
         closeBtn: {
             width: 32, height: 32, borderRadius: 10,
-            backgroundColor: colors.iron[100], justifyContent: 'center', alignItems: 'center',
+            backgroundColor: colors.surfaceLighter, justifyContent: 'center', alignItems: 'center',
             borderWidth: 1, borderColor: colors.border,
         },
         centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
         contentArea: {
             padding: 16,
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             minHeight: '100%',
         },
         scrollContent: { paddingBottom: 40 },
         sectionLabel: {
-            color: colors.iron[400],
+            color: colors.textMuted,
             fontSize: 10,
             marginBottom: 12,
             marginTop: 20,
@@ -94,7 +90,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             borderLeftWidth: 4,
             borderLeftColor: colors.primary.DEFAULT,
         },
-        infoCardText: { fontSize: 14, color: colors.iron[600], lineHeight: 20, fontWeight: '600' },
+        infoCardText: { fontSize: 14, color: colors.textMuted, lineHeight: 20, fontWeight: '600' },
         warningCard: {
             backgroundColor: withAlpha(colors.yellow, '15'),
             borderColor: withAlpha(colors.yellow, '40'),
@@ -128,7 +124,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             backgroundColor: withAlpha(colors.red, '05'),
         },
         smallBtnText: { fontSize: 12, fontWeight: '800', color: colors.primary.DEFAULT, textTransform: 'uppercase' },
-        smallBtnTextWhite: { color: colors.white },
+        smallBtnTextWhite: { color: colors.onPrimary },
         smallBtnTextDanger: { color: colors.red },
 
         dayBlockOuter: {
@@ -137,14 +133,10 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             borderRadius: 20,
             borderWidth: 1.5,
             borderColor: colors.border,
-            elevation: 2,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.05,
-            shadowRadius: 8,
+            ...ThemeFx.shadowSm,
             overflow: 'hidden',
         },
-        dayBlockActive: { borderColor: colors.primary.DEFAULT, elevation: 6, shadowOpacity: 0.12 },
+        dayBlockActive: { borderColor: colors.primary.DEFAULT, ...ThemeFx.shadowMd },
         dayBlockHeader: {
             flexDirection: 'row',
             alignItems: 'center',
@@ -161,30 +153,30 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             borderWidth: 1, borderColor: withAlpha(colors.primary.DEFAULT, '25'),
             justifyContent: 'center', alignItems: 'center',
         },
-        dayTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3, flex: 1 },
+        dayTitle: { color: colors.text, fontWeight: '900', fontSize: 16, letterSpacing: -0.3, flex: 1 },
         arrowCircle: {
             width: 28, height: 28, borderRadius: 14,
-            backgroundColor: colors.iron[100], alignItems: 'center', justifyContent: 'center',
+            backgroundColor: colors.surfaceLighter, alignItems: 'center', justifyContent: 'center',
             borderWidth: 1, borderColor: colors.border,
         },
         dayBlockInner: {
             padding: 16,
             backgroundColor: colors.surface,
         },
-        dayMetaEmpty: { color: colors.iron[400], fontSize: 13, fontStyle: 'italic', paddingVertical: 8 },
+        dayMetaEmpty: { color: colors.textMuted, fontSize: 13, fontStyle: 'italic', paddingVertical: 8 },
         dayInnerExRow: {
             flexDirection: 'row',
             alignItems: 'center',
             gap: 8,
             paddingVertical: 10,
             borderBottomWidth: 1,
-            borderBottomColor: colors.iron[100],
+            borderBottomColor: colors.border,
         },
         dayInnerExNum: { color: colors.primary.DEFAULT, fontWeight: '900', fontSize: 13, width: 22 },
-        dayInnerExText: { flex: 1, color: colors.iron[950], fontSize: 14, fontWeight: '800' },
+        dayInnerExText: { flex: 1, color: colors.text, fontSize: 14, fontWeight: '800' },
         dayBadgeContainer: { flexDirection: 'row', gap: 4, marginTop: 4 },
-        dayMoreBadge: { backgroundColor: colors.iron[200], paddingHorizontal: 6, borderRadius: 6, justifyContent: 'center', height: 16 },
-        dayMoreBadgeText: { fontSize: 9, fontWeight: '900', color: colors.iron[500] },
+        dayMoreBadge: { backgroundColor: colors.border, paddingHorizontal: 6, borderRadius: 6, justifyContent: 'center', height: 16 },
+        dayMoreBadgeText: { fontSize: 9, fontWeight: '900', color: colors.textMuted },
 
         addInnerBtn: {
             flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 14, marginTop: 6, justifyContent: 'center'
@@ -201,14 +193,10 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             borderRadius: 20,
             borderWidth: 1.5,
             borderColor: colors.border,
-            elevation: 3,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.08,
-            shadowRadius: 10,
+            ...ThemeFx.shadowSm,
             gap: 12,
         },
-        exCardActive: { borderColor: colors.primary.DEFAULT, elevation: 8, shadowOpacity: 0.15 },
+        exCardActive: { borderColor: colors.primary.DEFAULT, ...ThemeFx.shadowMd },
         exDragHandle: { paddingVertical: 6, paddingHorizontal: 4 },
         exIconBox: {
             width: 38, height: 38, borderRadius: 12,
@@ -217,9 +205,9 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             alignItems: 'center', justifyContent: 'center',
         },
         exContent: { flex: 1, overflow: 'hidden' },
-        exCardTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
+        exCardTitle: { color: colors.text, fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
         exMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' },
-        exCardMeta: { color: colors.iron[500], fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.8 },
+        exCardMeta: { color: colors.textMuted, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.8 },
         exBadgeRow: { flexDirection: 'row', gap: 4, alignItems: 'center' },
         exDeleteBtn: { padding: 10, backgroundColor: withAlpha(colors.red, '10'), borderRadius: 12, borderWidth: 1, borderColor: withAlpha(colors.red, '20') },
 
@@ -249,8 +237,8 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             gap: 12,
             marginTop: 8,
         },
-        emptyTitle: { fontSize: 16, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.2 },
-        emptyText: { fontSize: 14, color: colors.iron[500], textAlign: 'center', paddingHorizontal: 32, lineHeight: 20 },
+        emptyTitle: { fontSize: 16, fontWeight: '900', color: colors.text, letterSpacing: -0.2 },
+        emptyText: { fontSize: 14, color: colors.textMuted, textAlign: 'center', paddingHorizontal: 32, lineHeight: 20 },
 
         innerOverlay: {
             flex: 1,
@@ -267,21 +255,17 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             padding: 24,
             borderWidth: 1.5,
             borderColor: colors.border,
-            elevation: 12,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 16 },
-            shadowOpacity: 0.25,
-            shadowRadius: 32,
+            ...ThemeFx.shadowLg,
         },
-        formTitle: { fontSize: 22, fontWeight: '900', color: colors.iron[950], marginBottom: 24, letterSpacing: -0.5 },
+        formTitle: { fontSize: 22, fontWeight: '900', color: colors.text, marginBottom: 24, letterSpacing: -0.5 },
         formControlRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, paddingHorizontal: 4 },
         formLabelCol: { flex: 1, paddingRight: 16 },
-        formLabelMain: { color: colors.iron[950], fontWeight: '800', fontSize: 15 },
-        formLabelSub: { color: colors.iron[500], fontSize: 12, marginTop: 2, lineHeight: 16 },
+        formLabelMain: { color: colors.text, fontWeight: '800', fontSize: 15 },
+        formLabelSub: { color: colors.textMuted, fontSize: 12, marginTop: 2, lineHeight: 16 },
         formActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
         formActionBtn: { flex: 1 },
 
-        friendPickerContent: { flex: 1, padding: 16, backgroundColor: colors.iron[100] },
+        friendPickerContent: { flex: 1, padding: 16, backgroundColor: colors.surfaceLighter },
         friendItem: {
             flexDirection: 'row',
             alignItems: 'center',
@@ -292,11 +276,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             marginBottom: 12,
             borderWidth: 1.5,
             borderColor: colors.border,
-            elevation: 2,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.05,
-            shadowRadius: 10
+            ...ThemeFx.shadowSm,
         },
         friendInfo: { flexDirection: 'row', alignItems: 'center', gap: 14 },
         friendAvatar: {
@@ -305,10 +285,10 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             alignItems: 'center', justifyContent: 'center',
             borderWidth: 1.5, borderColor: withAlpha(colors.primary.DEFAULT, '25')
         },
-        friendName: { color: colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
+        friendName: { color: colors.text, fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
         friendSendBtn: {
             width: 36, height: 36, borderRadius: 12,
-            backgroundColor: colors.iron[100], alignItems: 'center', justifyContent: 'center',
+            backgroundColor: colors.surfaceLighter, alignItems: 'center', justifyContent: 'center',
             borderWidth: 1, borderColor: colors.border
         },
 
@@ -317,8 +297,8 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
         loadingContainer: { paddingVertical: 40, alignItems: 'center' },
         utilWidth32: { width: 32 },
         utilGripPad: { paddingRight: 8, paddingVertical: 4 },
-        utilBadgePillGap: { backgroundColor: colors.iron[200], paddingHorizontal: 4, borderRadius: 4, justifyContent: 'center' },
-        utilBadgePillText: { fontSize: 8, fontWeight: '800', color: colors.iron[500] },
+        utilBadgePillGap: { backgroundColor: colors.border, paddingHorizontal: 4, borderRadius: 4, justifyContent: 'center' },
+        utilBadgePillText: { fontSize: 8, fontWeight: '800', color: colors.textMuted },
     }), [colors]);
 
     const [routine, setRoutine] = useState<Routine | null>(null);
@@ -513,7 +493,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                     activeOpacity={0.7}
                 >
                     <View style={ss.utilGripPad}>
-                        <GripVertical color={colors.iron[400]} size={16} />
+                        <GripVertical color={colors.textMuted} size={16} />
                     </View>
                     <View style={ss.dayHeaderContent}>
                         <View style={ss.dayIconBox}>
@@ -524,7 +504,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                         </View>
                     </View>
                     <View style={ss.arrowCircle}>
-                        <ChevronRight size={16} color={colors.iron[500]} />
+                        <ChevronRight size={16} color={colors.textMuted} />
                     </View>
                 </TouchableOpacity>
 
@@ -567,7 +547,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
         <ScaleDecorator>
             <View style={[ss.exCard, isActive && ss.exCardActive]}>
                 <Pressable onLongPress={drag} delayLongPress={200} style={ss.exDragHandle}>
-                    <GripVertical color={colors.iron[600]} size={16} />
+                    <GripVertical color={colors.textMuted} size={16} />
                 </Pressable>
                 <View style={ss.exIconBox}>
                     <Dumbbell color={colors.primary.DEFAULT} size={16} />
@@ -616,7 +596,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                             </Text>
                         </View>
                         <TouchableOpacity onPress={handleClose} style={ss.closeBtn}>
-                            <X size={18} color={colors.iron[950]} />
+                            <X size={18} color={colors.text} />
                         </TouchableOpacity>
                     </View>
 
@@ -642,7 +622,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                 <View style={ss.btnRow}>
                                     <View style={ss.btnCol}>
                                         <TouchableOpacity style={[ss.smallBtn, ss.smallBtnPrimary]} onPress={handleShareRoutine}>
-                                            <Share2 size={12} color={colors.white} />
+                                            <Share2 size={12} color={colors.onPrimary} />
                                             <Text style={[ss.smallBtnText, ss.smallBtnTextWhite]}>Link</Text>
                                         </TouchableOpacity>
                                     </View>
@@ -674,7 +654,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                 {/* Days */}
                                 {days.length === 0 ? (
                                     <View style={ss.emptyBlock}>
-                                        <Calendar size={28} color={colors.iron[400]} />
+                                        <Calendar size={28} color={colors.textMuted} />
                                         <Text style={ss.emptyTitle}>Sin días definidos</Text>
                                         <Text style={ss.emptyText}>Tocá el botón para agregar estructura.</Text>
                                     </View>
@@ -721,7 +701,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                     <View style={ss.loadingContainer}><ActivityIndicator color={colors.primary.DEFAULT} /></View>
                                 ) : (selectedDay?.exercises || []).length === 0 ? (
                                     <View style={ss.emptyBlock}>
-                                        <Dumbbell size={28} color={colors.iron[400]} />
+                                        <Dumbbell size={28} color={colors.textMuted} />
                                         <Text style={ss.emptyTitle}>Sin ejercicios</Text>
                                         <Text style={ss.emptyText}>Agregá ejercicios a este día.</Text>
                                     </View>
@@ -799,7 +779,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                     <Text style={ss.headerSub}>Tocá uno para agregarlo a {selectedDay?.name}</Text>
                                 </View>
                                 <TouchableOpacity onPress={() => setAddExerciseVisible(false)} style={ss.closeBtn}>
-                                    <X size={18} color={colors.iron[950]} />
+                                    <X size={18} color={colors.text} />
                                 </TouchableOpacity>
                             </View>
                             <View style={ss.flex1}>
@@ -820,13 +800,13 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                     <Text style={ss.headerSub}>Comparte esta rutina al inbox de un amigo</Text>
                                 </View>
                                 <TouchableOpacity onPress={() => setFriendPickerVisible(false)} style={ss.closeBtn}>
-                                    <X size={18} color={colors.iron[950]} />
+                                    <X size={18} color={colors.text} />
                                 </TouchableOpacity>
                             </View>
                             <View style={ss.friendPickerContent}>
                                 {friends.length === 0 ? (
                                     <View style={ss.centered}>
-                                        <Users size={40} color={colors.iron[300]} strokeWidth={1} />
+                                        <Users size={40} color={colors.textMuted} strokeWidth={1} />
                                         <Text style={ss.dayMetaEmpty}>No tienes amigos agregados.</Text>
                                     </View>
                                 ) : (

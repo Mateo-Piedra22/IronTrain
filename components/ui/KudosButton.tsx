@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { useColors } from '../../src/hooks/useColors';
 import { BroadcastEngagementService } from '../../src/services/BroadcastEngagementService';
+import { ThemeFx } from '../../src/theme';
 
 interface KudosButtonProps {
     id: string;
@@ -30,27 +31,24 @@ export const KudosButton: React.FC<KudosButtonProps> = ({
             paddingHorizontal: 14,
             paddingVertical: 8,
             borderRadius: 20,
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
         },
         containerReacted: {
             backgroundColor: colors.primary.DEFAULT,
             borderColor: colors.primary.DEFAULT,
+            ...ThemeFx.shadowMd,
             shadowColor: colors.primary.DEFAULT,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
-            elevation: 4,
         },
         count: {
             fontSize: 14,
             fontWeight: '900',
-            color: colors.iron[600],
+            color: colors.textMuted,
             letterSpacing: -0.2,
         },
         countReacted: {
-            color: colors.white,
+            color: colors.onPrimary,
         },
     }), [colors]);
 
@@ -85,12 +83,12 @@ export const KudosButton: React.FC<KudosButtonProps> = ({
             ]}
         >
             {isLoading ? (
-                <ActivityIndicator size="small" color={initialReacted ? colors.white : colors.primary.DEFAULT} />
+                <ActivityIndicator size="small" color={initialReacted ? colors.onPrimary : colors.primary.DEFAULT} />
             ) : (
                 <Heart
                     size={16}
-                    color={initialReacted ? colors.white : colors.iron[500]}
-                    fill={initialReacted ? colors.white : 'transparent'}
+                    color={initialReacted ? colors.onPrimary : colors.textMuted}
+                    fill={initialReacted ? colors.onPrimary : 'transparent'}
                 />
             )}
             <Text style={[

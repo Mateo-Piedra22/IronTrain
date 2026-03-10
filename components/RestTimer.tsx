@@ -48,7 +48,7 @@ export function RestTimer() {
             borderWidth: 1,
             borderColor: colors.primary.DEFAULT
         },
-        timerText: { color: colors.iron[950], fontSize: 18, fontWeight: '900', marginRight: 14, fontVariant: ['tabular-nums'] },
+        timerText: { color: colors.text, fontSize: 18, fontWeight: '900', marginRight: 14, fontVariant: ['tabular-nums'] },
     }), [colors]);
 
     useEffect(() => {

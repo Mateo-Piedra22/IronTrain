@@ -15,6 +15,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { useColors } from '../../src/hooks/useColors';
+import { ThemeFx } from '../../src/theme';
 
 interface RangeAnalysisState {
     summary7: WorkoutSummary | null;
@@ -192,23 +193,21 @@ export default function AnalysisScreen() {
 
     return (
         <SafeAreaWrapper style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
-            {/* Unified Header */}
             <View style={{
                 flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-                paddingHorizontal: 16, height: 60,
-                backgroundColor: colors.iron[900],
-                zIndex: 10, shadowColor: colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 4
+                paddingHorizontal: 16, height: 64,
+                backgroundColor: colors.background,
+                zIndex: 10, borderBottomWidth: 1.5, borderBottomColor: colors.border,
+                ...ThemeFx.shadowSm,
             }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
-                    <Text style={{ color: colors.iron[950], fontWeight: '900', fontSize: 20, letterSpacing: -0.5 }}>Análisis</Text>
+                    <Text style={{ color: colors.text, fontWeight: '900', fontSize: 20, letterSpacing: -0.5 }}>Análisis</Text>
                 </View>
                 <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                    <View style={{ width: 100, height: 100, alignItems: 'center', justifyContent: 'center' }}>
-                        <Image
-                            source={require('../../assets/images/icon.png')}
-                            style={{ width: 100, height: 100, resizeMode: 'contain' }}
-                        />
-                    </View>
+                    <Image
+                        source={require('../../assets/images/icon.png')}
+                        style={{ width: 100, height: 100, resizeMode: 'contain' }}
+                    />
                 </View>
                 <View style={{ zIndex: 10, width: 40 }} />
             </View>
@@ -231,14 +230,14 @@ export default function AnalysisScreen() {
                                         paddingVertical: 8,
                                         borderRadius: 20,
                                         borderWidth: 1.5,
-                                        backgroundColor: tab === t.key ? colors.primary.DEFAULT : colors.iron[200],
+                                        backgroundColor: tab === t.key ? colors.primary.DEFAULT : colors.surface,
                                         borderColor: tab === t.key ? colors.primary.DEFAULT : colors.border,
                                     }}
                                 >
                                     <Text style={{
                                         fontWeight: '800',
                                         fontSize: 12,
-                                        color: tab === t.key ? colors.white : colors.iron[600],
+                                        color: tab === t.key ? colors.onPrimary : colors.textMuted,
                                         textTransform: 'uppercase',
                                         letterSpacing: 0.5
                                     }}>{t.label}</Text>
@@ -250,7 +249,7 @@ export default function AnalysisScreen() {
 
                 <View className="flex-1 relative">
                     <LinearGradient
-                        colors={[colors.iron[900], 'transparent']}
+                        colors={[colors.background, 'transparent']}
                         style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 16, zIndex: 10 }}
                         pointerEvents="none"
                     />

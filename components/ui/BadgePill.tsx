@@ -1,4 +1,5 @@
 import { useColors } from '@/src/hooks/useColors';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as LucideIcons from 'lucide-react-native';
 import React, { useMemo } from 'react';
@@ -59,10 +60,10 @@ export function BadgePill({ name, color, icon, size = 'sm', variant = 'default' 
         const baseOpacity = variant === 'minimal' ? '14' : '20';
         const gradientColors = variant === 'vibrant'
             ? [color, color]
-            : [color + baseOpacity, color + baseOpacity];
+            : [withAlpha(color, baseOpacity), withAlpha(color, baseOpacity)];
 
         const textColor = variant === 'vibrant' ? colors.white : color;
-        const borderColor = variant === 'minimal' ? 'transparent' : color + '40';
+        const borderColor = variant === 'minimal' ? 'transparent' : withAlpha(color, '40');
 
         const styles = StyleSheet.create({
             container: {
@@ -71,13 +72,7 @@ export function BadgePill({ name, color, icon, size = 'sm', variant = 'default' 
                 borderColor,
                 overflow: 'hidden',
                 alignSelf: 'flex-start',
-                ...(variant === 'vibrant' ? {
-                    shadowColor: colors.black,
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.15,
-                    shadowRadius: 6,
-                    elevation: 3,
-                } : {})
+                ...(variant === 'vibrant' ? ThemeFx.shadowSm : {})
             },
             content: {
                 flexDirection: 'row',

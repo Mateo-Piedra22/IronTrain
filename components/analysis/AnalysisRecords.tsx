@@ -3,7 +3,7 @@ import { PRCenter } from '@/components/PRCenter';
 import { BadgePill } from '@/components/ui/BadgePill';
 import { useColors } from '@/src/hooks/useColors';
 import { OneRMProgressRow, OneRepMax } from '@/src/services/AnalysisService';
-import { withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { useRouter } from 'expo-router';
 import { ChevronRight, TrendingUp, Trophy } from 'lucide-react-native';
 import React, { useMemo } from 'react';
@@ -48,14 +48,14 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
         sectionTitle: {
             fontSize: 18,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             letterSpacing: -0.3,
         },
         rangeBadge: {
             backgroundColor: withAlpha(colors.primary.DEFAULT, '15'),
             paddingHorizontal: 12,
             paddingVertical: 6,
-            borderRadius: 10,
+            borderRadius: 12,
             borderWidth: 1.5,
             borderColor: withAlpha(colors.primary.DEFAULT, '20'),
         },
@@ -69,12 +69,8 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
             padding: 16,
             borderRadius: 20,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.05,
-            shadowRadius: 15,
-            elevation: 4,
+            borderColor: colors.border,
+            ...ThemeFx.shadowSm,
             marginBottom: 12,
         },
         cardContent: {
@@ -101,7 +97,7 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
         ormName: {
             fontSize: 16,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
         },
         badgesContainer: {
             flexDirection: 'row',
@@ -112,7 +108,7 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
         ormBasis: {
             fontSize: 12,
             fontWeight: '800',
-            color: colors.iron[500],
+            color: colors.textMuted,
             marginTop: 6,
         },
         ormValueContainer: {
@@ -133,7 +129,7 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
         ormUnit: {
             fontSize: 11,
             fontWeight: '900',
-            color: colors.iron[400],
+            color: colors.textMuted,
             textTransform: 'uppercase',
         },
         chevron: {
@@ -169,7 +165,7 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
                 <View style={styles.sectionHeader}>
                     <View style={styles.sectionTitleContainer}>
                         <View style={styles.sectionAccent} />
-                        <Trophy size={18} color={colors.iron[950]} />
+                        <Trophy size={18} color={colors.text} />
                         <Text style={styles.sectionTitle}>Ranking de Fuerza (1RM Est.)</Text>
                     </View>
                     <View style={styles.rangeBadge}>
@@ -213,7 +209,7 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
                                         <Text style={styles.ormUnit}>kg</Text>
                                     </View>
                                 </View>
-                                <ChevronRight size={16} color={colors.iron[400]} style={styles.chevron} />
+                                <ChevronRight size={16} color={colors.textMuted} style={styles.chevron} />
                             </View>
                         </Pressable>
                     ))
@@ -225,7 +221,7 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
                 <View style={styles.sectionHeader}>
                     <View style={styles.sectionTitleContainer}>
                         <View style={[styles.sectionAccent, { backgroundColor: colors.green }]} />
-                        <TrendingUp size={18} color={colors.iron[950]} />
+                        <TrendingUp size={18} color={colors.text} />
                         <Text style={styles.sectionTitle}>Mayores Progresos</Text>
                     </View>
                 </View>
@@ -266,7 +262,7 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
                                         {prog.deltaPct ? `${prog.deltaPct}%` : 'kg'}
                                     </Text>
                                 </View>
-                                <ChevronRight size={16} color={colors.iron[400]} style={styles.chevron} />
+                                <ChevronRight size={16} color={colors.textMuted} style={styles.chevron} />
                             </View>
                         </Pressable>
                     ))

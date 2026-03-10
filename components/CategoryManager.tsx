@@ -33,22 +33,22 @@ export function CategoryManager() {
         categoryItem: {
             flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
             padding: 16, marginBottom: 12, backgroundColor: colors.surface,
-            borderRadius: 16, borderWidth: 1, borderColor: colors.iron[300],
+            borderRadius: 16, borderWidth: 1.5, borderColor: colors.border,
             borderLeftWidth: 4,
             elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6,
         },
         categoryInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
         colorIndicator: {
-            width: 36, height: 36, borderRadius: 10,
+            width: 36, height: 36, borderRadius: 12,
             justifyContent: 'center', alignItems: 'center',
         },
         colorDot: { width: 12, height: 12, borderRadius: 6 },
-        categoryName: { color: colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
-        systemBadge: { backgroundColor: colors.iron[200], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-        systemBadgeText: { fontSize: 9, color: colors.iron[600], fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+        categoryName: { color: colors.text, fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
+        systemBadge: { backgroundColor: colors.surfaceLighter, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+        systemBadgeText: { fontSize: 9, color: colors.textMuted, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
         actions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-        editBtn: { padding: 8, backgroundColor: colors.iron[100], borderRadius: 10, borderWidth: 1, borderColor: colors.iron[200] },
-        deleteBtn: { padding: 8, backgroundColor: withAlpha(colors.red, '12'), borderRadius: 10, borderWidth: 1, borderColor: withAlpha(colors.red, '25') },
+        editBtn: { padding: 8, backgroundColor: colors.surfaceLighter, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border },
+        deleteBtn: { padding: 8, backgroundColor: withAlpha(colors.red, '12'), borderRadius: 12, borderWidth: 1.5, borderColor: withAlpha(colors.red, '25') },
         fab: {
             position: 'absolute', right: 24, bottom: bottomOffset,
             width: 56, height: 56, borderRadius: 16,
@@ -58,20 +58,20 @@ export function CategoryManager() {
         modalOverlay: { flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center', padding: 16 },
         modalContent: {
             backgroundColor: colors.surface, width: '100%', maxWidth: 360,
-            borderRadius: 20, padding: 24, borderWidth: 1, borderColor: colors.iron[300],
+            borderRadius: 20, padding: 24, borderWidth: 1.5, borderColor: colors.border,
             elevation: 8, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24,
         },
-        modalTitle: { fontSize: 20, fontWeight: '900', color: colors.iron[950], marginBottom: 20, letterSpacing: -0.3 },
-        label: { color: colors.iron[500], fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 },
+        modalTitle: { fontSize: 20, fontWeight: '900', color: colors.text, marginBottom: 20, letterSpacing: -0.3 },
+        label: { color: colors.textMuted, fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 },
         colorSelector: {
-            flexDirection: 'row', alignItems: 'center', backgroundColor: colors.iron[100],
-            padding: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.iron[200],
+            flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceLighter,
+            padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border,
             marginBottom: 20, justifyContent: 'space-between',
         },
-        colorSelectorText: { color: colors.iron[950], fontWeight: '700', fontSize: 14 },
+        colorSelectorText: { color: colors.text, fontWeight: '700', fontSize: 14 },
         colorSelectorValue: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-        colorHex: { color: colors.iron[400], fontWeight: '600', fontSize: 11, textTransform: 'uppercase' },
-        colorPreview: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, borderColor: colors.iron[300] },
+        colorHex: { color: colors.textMuted, fontWeight: '600', fontSize: 11, textTransform: 'uppercase' },
+        colorPreview: { width: 32, height: 32, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border },
         modalFooter: { flexDirection: 'row', gap: 12 }
     }), [colors, bottomOffset]);
 
@@ -191,7 +191,7 @@ export function CategoryManager() {
                                         accessibilityRole="button"
                                         accessibilityLabel={`Editar categoría ${item.name}`}
                                     >
-                                        <Pencil size={14} color={colors.iron[500]} />
+                                        <Pencil size={14} color={colors.textMuted} />
                                     </TouchableOpacity>
                                 )}
                                 {!item.is_system && (
@@ -216,7 +216,7 @@ export function CategoryManager() {
                 accessibilityRole="button"
                 accessibilityLabel="Crear categoría"
             >
-                <Plus color={colors.white} size={24} />
+                <Plus color={colors.onPrimary} size={24} />
             </TouchableOpacity>
 
             {modalVisible && (

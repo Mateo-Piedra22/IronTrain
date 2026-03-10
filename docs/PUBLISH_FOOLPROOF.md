@@ -27,6 +27,20 @@ Al finalizar este proceso, se habrán cumplido los siguientes hitos:
   - `GITHUB_RELEASES_OWNER` / `REPO` / `TOKEN`: Para la sincronización de releases.
   - `FIREBASE_PRIVATE_KEY` y asociados: Para el envío de notificaciones Push (FCM).
 
+### Configuración de Firebase (Mobile)
+Debido a la política de Zero-Trust, `google-services.json` (Android) y `GoogleService-Info.plist` (iOS) están en el `.gitignore`. Para que los builds funcionen en GitHub Actions y EAS:
+
+1. **Codificar archivos a Base64** (ejecutar localmente):
+   - Android: `[System.Convert]::ToBase64String([System.IO.File]::ReadAllBytes("./google-services.json")) | clip` (Windows PowerShell)
+   - iOS: `[System.Convert]::ToBase64String([System.IO.File]::ReadAllBytes("./GoogleService-Info.plist")) | clip` (Windows PowerShell)
+2. **Cargar en GitHub Secrets**:
+   - `ANDROID_GOOGLE_SERVICES_JSON_BASE64`
+   - `IOS_GOOGLE_SERVICES_INFO_PLIST_BASE64`
+3. **Cargar en EAS Secrets** (para builds de EAS independientes):
+   - `ANDROID_GOOGLE_SERVICES_JSON_BASE64`
+   - `IOS_GOOGLE_SERVICES_INFO_PLIST_BASE64`
+   - El script `eas-build-pre-install` los restaurará automáticamente en el servidor de build.
+
 ---
 
 ## Paso 1 - Definición de Versión Semántica

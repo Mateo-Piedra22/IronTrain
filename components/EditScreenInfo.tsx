@@ -1,77 +1,80 @@
-import React from 'react';
-import { StyleSheet } from 'react-native';
-
+import React, { useMemo } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { useColors } from '../src/hooks/useColors';
 import { ExternalLink } from './ExternalLink';
 import { MonoText } from './StyledText';
-import { Text, View } from './Themed';
-
-import Colors from '@/constants/Colors';
 
 export default function EditScreenInfo({ path }: { path: string }) {
+  const colors = useColors();
+
+  const ss = useMemo(() => StyleSheet.create({
+    container: {
+      paddingHorizontal: 20,
+    },
+    getStartedContainer: {
+      alignItems: 'center',
+      marginHorizontal: 30,
+    },
+    getStartedText: {
+      fontSize: 15,
+      lineHeight: 22,
+      textAlign: 'center',
+      color: colors.textMuted,
+      fontWeight: '500',
+    },
+    codeHighlightContainer: {
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      marginVertical: 12,
+      backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    codeText: {
+      color: colors.text,
+      fontSize: 13,
+    },
+    helpContainer: {
+      marginTop: 20,
+      alignItems: 'center',
+    },
+    helpLink: {
+      paddingVertical: 10,
+    },
+    helpLinkText: {
+      textAlign: 'center',
+      color: colors.primary.DEFAULT,
+      fontWeight: '700',
+      fontSize: 13,
+    },
+  }), [colors]);
+
   return (
-    <View>
-      <View style={styles.getStartedContainer}>
-        <Text
-          style={styles.getStartedText}
-          lightColor="rgba(0,0,0,0.8)"
-          darkColor="rgba(255,255,255,0.8)">
+    <View style={ss.container}>
+      <View style={ss.getStartedContainer}>
+        <Text style={ss.getStartedText}>
           Abre el código de esta pantalla:
         </Text>
 
-        <View
-          style={[styles.codeHighlightContainer, styles.homeScreenFilename]}
-          darkColor="rgba(255,255,255,0.05)"
-          lightColor="rgba(0,0,0,0.05)">
-          <MonoText>{path}</MonoText>
+        <View style={ss.codeHighlightContainer}>
+          <MonoText style={ss.codeText}>{path}</MonoText>
         </View>
 
-        <Text
-          style={styles.getStartedText}
-          lightColor="rgba(0,0,0,0.8)"
-          darkColor="rgba(255,255,255,0.8)">
+        <Text style={ss.getStartedText}>
           Cambia cualquier texto, guarda el archivo y la app se actualizará automáticamente.
         </Text>
       </View>
 
-      <View style={styles.helpContainer}>
+      <View style={ss.helpContainer}>
         <ExternalLink
-          style={styles.helpLink}
+          style={ss.helpLink}
           href="https://docs.expo.io/get-started/create-a-new-app/#opening-the-app-on-your-phonetablet">
-          <Text style={styles.helpLinkText} lightColor={Colors.light.tint}>
-            Toca aquí si tu app no se actualiza automáticamente después de los cambios
+          <Text style={ss.helpLinkText}>
+            Toca aquí si tu app no se actualiza automáticamente
           </Text>
         </ExternalLink>
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  getStartedContainer: {
-    alignItems: 'center',
-    marginHorizontal: 50,
-  },
-  homeScreenFilename: {
-    marginVertical: 7,
-  },
-  codeHighlightContainer: {
-    borderRadius: 3,
-    paddingHorizontal: 4,
-  },
-  getStartedText: {
-    fontSize: 17,
-    lineHeight: 24,
-    textAlign: 'center',
-  },
-  helpContainer: {
-    marginTop: 15,
-    marginHorizontal: 20,
-    alignItems: 'center',
-  },
-  helpLink: {
-    paddingVertical: 15,
-  },
-  helpLinkText: {
-    textAlign: 'center',
-  },
-});

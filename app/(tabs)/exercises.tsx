@@ -16,6 +16,7 @@ import React, { useCallback, useContext, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '../../src/hooks/useColors';
+import { ThemeFx, withAlpha } from '../../src/theme';
 
 type SegmentMode = 'exercises' | 'categories' | 'routines';
 
@@ -43,17 +44,15 @@ export default function LibraryScreen() {
             justifyContent: 'space-between',
             alignItems: 'center',
             paddingHorizontal: 16,
-            height: 60,
-            backgroundColor: colors.iron[900],
+            height: 64,
+            backgroundColor: colors.background,
             zIndex: 10,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.3,
-            shadowRadius: 3,
-            elevation: 4,
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.border,
+            ...ThemeFx.shadowSm,
         },
         headerTitle: {
-            color: colors.iron[950],
+            color: colors.text,
             fontWeight: '900',
             fontSize: 20,
             letterSpacing: -0.5,
@@ -64,11 +63,11 @@ export default function LibraryScreen() {
         },
         segmentTrack: {
             flexDirection: 'row',
-            backgroundColor: colors.iron[200],
+            backgroundColor: colors.surface,
             padding: 4,
             borderRadius: 14,
             borderWidth: 1.5,
-            borderColor: colors.iron[300],
+            borderColor: colors.border,
         },
         segmentTab: {
             flex: 1,
@@ -77,7 +76,7 @@ export default function LibraryScreen() {
             alignItems: 'center',
         },
         segmentTabActive: {
-            backgroundColor: colors.surface,
+            backgroundColor: colors.primary.DEFAULT,
             shadowColor: colors.black,
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.1,
@@ -87,11 +86,11 @@ export default function LibraryScreen() {
         segmentText: {
             fontWeight: '700',
             fontSize: 13,
-            color: colors.iron[500],
+            color: colors.textMuted,
         },
         segmentTextActive: {
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.onPrimary,
         },
         // Cards — EXACTLY matching ExerciseList
         exerciseCard: {
@@ -103,7 +102,7 @@ export default function LibraryScreen() {
             backgroundColor: colors.surface,
             borderRadius: 16,
             borderWidth: 1.5,
-            borderColor: colors.iron[300],
+            borderColor: colors.border,
             elevation: 2,
             shadowColor: colors.black,
             shadowOffset: { width: 0, height: 2 },
@@ -114,20 +113,20 @@ export default function LibraryScreen() {
             width: 40,
             height: 40,
             borderRadius: 12,
-            backgroundColor: colors.primary.DEFAULT + '20',
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '20'),
             borderWidth: 1.5,
-            borderColor: colors.primary.DEFAULT + '40',
+            borderColor: withAlpha(colors.primary.DEFAULT, '40'),
             justifyContent: 'center',
             alignItems: 'center',
         },
         cardName: {
-            color: colors.iron[950],
+            color: colors.text,
             fontWeight: '900',
             fontSize: 16,
             letterSpacing: -0.3,
         },
         cardMeta: {
-            color: colors.iron[500],
+            color: colors.textMuted,
             fontSize: 11,
             fontWeight: '700',
             textTransform: 'uppercase',
@@ -136,17 +135,17 @@ export default function LibraryScreen() {
         },
         editBtn: {
             padding: 8,
-            backgroundColor: colors.iron[200],
+            backgroundColor: colors.surfaceLighter,
             borderRadius: 10,
             borderWidth: 1.5,
-            borderColor: colors.iron[300],
+            borderColor: colors.border,
         },
         deleteBtn: {
             padding: 8,
-            backgroundColor: colors.red + '12',
+            backgroundColor: withAlpha(colors.red, '12'),
             borderRadius: 10,
             borderWidth: 1.5,
-            borderColor: colors.red + '25',
+            borderColor: withAlpha(colors.red, '25'),
         },
         fab: {
             position: 'absolute',
@@ -173,20 +172,22 @@ export default function LibraryScreen() {
             width: 80,
             height: 80,
             borderRadius: 40,
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surface,
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: 20,
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         emptyTitle: {
             fontSize: 20,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             marginBottom: 8,
         },
         emptySub: {
             fontSize: 15,
-            color: colors.iron[600],
+            color: colors.textMuted,
             textAlign: 'center',
             lineHeight: 22,
         },
@@ -273,7 +274,7 @@ export default function LibraryScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`Editar rutina ${item.name}`}
                 >
-                    <Pencil size={14} color={colors.iron[500]} />
+                    <Pencil size={14} color={colors.textMuted} />
                 </TouchableOpacity>
                 <TouchableOpacity
                     onPress={() => handleDeleteRoutine(item)}
@@ -322,7 +323,7 @@ export default function LibraryScreen() {
             {mode === 'exercises' ? (
                 <View style={{ flex: 1, position: 'relative' }}>
                     <LinearGradient
-                        colors={[colors.iron[900], 'transparent']}
+                        colors={[colors.background, 'transparent']}
                         style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 16, zIndex: 10 }}
                         pointerEvents="none"
                     />
@@ -331,7 +332,7 @@ export default function LibraryScreen() {
             ) : mode === 'categories' ? (
                 <View style={{ flex: 1, position: 'relative' }}>
                     <LinearGradient
-                        colors={[colors.iron[900], 'transparent']}
+                        colors={[colors.background, 'transparent']}
                         style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 16, zIndex: 10 }}
                         pointerEvents="none"
                     />
@@ -341,7 +342,7 @@ export default function LibraryScreen() {
                 /* Routines */
                 <View style={{ flex: 1, backgroundColor: colors.background }}>
                     <LinearGradient
-                        colors={[colors.iron[900], 'transparent']}
+                        colors={[colors.background, 'transparent']}
                         style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 16, zIndex: 10 }}
                         pointerEvents="none"
                     />
@@ -358,7 +359,7 @@ export default function LibraryScreen() {
                             ListEmptyComponent={() => (
                                 <View style={ss.emptyState}>
                                     <View style={ss.emptyIconCircle}>
-                                        <BookOpen size={28} color={colors.iron[400]} />
+                                        <BookOpen size={28} color={colors.textMuted} />
                                     </View>
                                     <Text style={ss.emptyTitle}>Ninguna rutina</Text>
                                     <Text style={ss.emptySub}>Creá rutinas divididas en días con ejercicios personalizados.</Text>

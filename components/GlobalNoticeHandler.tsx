@@ -29,145 +29,145 @@ export const GlobalNoticeHandler: React.FC = () => {
             justifyContent: 'center',
             alignItems: 'center',
             padding: 24,
+            backgroundColor: withAlpha(colors.black, '80'), // Solid backdrop
         },
         modalBackdropPressable: {
             ...StyleSheet.absoluteFillObject,
-            backgroundColor: ThemeFx.backdrop,
         },
         modalContainer: {
             width: '100%',
             maxWidth: 420,
-            minHeight: 260,
-            maxHeight: '86%',
             backgroundColor: colors.surface,
-            borderRadius: 24,
-            borderWidth: 1,
-            borderColor: colors.iron[300],
+            borderRadius: 28,
+            borderWidth: 1.5,
+            borderColor: colors.border,
             padding: 24,
-            elevation: 8,
-            shadowColor: ThemeFx.shadowColor,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: ThemeFx.shadowOpacityStrong,
-            shadowRadius: 24,
+            ...ThemeFx.shadowLg,
             overflow: 'hidden',
         },
         modalHeader: {
             alignItems: 'center',
-            marginBottom: 20,
+            marginBottom: 24,
             gap: 12,
         },
         iconCircle: {
-            width: 52,
-            height: 52,
-            borderRadius: 26,
-            backgroundColor: withAlpha(colors.primary.DEFAULT, '14'),
+            width: 56,
+            height: 56,
+            borderRadius: 18,
+            backgroundColor: colors.surfaceLighter,
             justifyContent: 'center',
             alignItems: 'center',
             marginBottom: 8,
+            borderWidth: 1,
+            borderColor: withAlpha(colors.border, '50'),
         },
         modalTitle: {
-            fontSize: 19,
+            fontSize: 22,
             fontWeight: '900',
-            color: colors.iron[950],
-            letterSpacing: -0.3,
+            color: colors.text,
+            letterSpacing: -0.5,
             textAlign: 'center',
-            flexShrink: 1,
         },
         modalBody: {
             flexShrink: 1,
-            minHeight: 120,
-            maxHeight: 360,
-            marginBottom: 16,
-            backgroundColor: withAlpha(colors.iron[100], 'CC'),
-            borderRadius: 16,
+            marginBottom: 20,
+            backgroundColor: colors.surfaceLighter,
+            borderRadius: 20,
             padding: 4,
+            borderWidth: 1,
+            borderColor: colors.border,
         },
         modalMessageScroll: {
             maxHeight: 310,
         },
         modalMessageContent: {
-            paddingVertical: 12,
-            paddingHorizontal: 16,
+            paddingVertical: 16,
+            paddingHorizontal: 20,
         },
         modalActionText: {
             color: colors.primary.DEFAULT,
             fontWeight: '900',
-            fontSize: 12,
-            letterSpacing: 0.8,
+            fontSize: 13,
+            letterSpacing: 1,
             textTransform: 'uppercase',
         },
         modalMessage: {
-            fontSize: 14,
-            color: colors.iron[950],
-            lineHeight: 22,
+            fontSize: 15,
+            color: colors.text,
+            lineHeight: 24,
             fontWeight: '500',
-            textAlign: 'left',
         },
         richBold: {
             fontWeight: '900',
-            color: colors.black,
+            color: colors.primary.DEFAULT,
         },
         modalActionBtn: {
-            alignSelf: 'flex-start',
-            marginLeft: 16,
-            marginBottom: 12,
+            marginTop: 12,
+            alignSelf: 'center',
+            paddingVertical: 8,
+            paddingHorizontal: 16,
         },
         modalButton: {
             backgroundColor: colors.primary.DEFAULT,
-            borderRadius: 14,
-            paddingVertical: 14,
+            borderRadius: 16,
+            paddingVertical: 16,
             alignItems: 'center',
+            ...ThemeFx.shadowSm,
         },
         modalButtonText: {
-            color: colors.white,
-            fontWeight: '700',
-            fontSize: 16,
+            color: colors.onPrimary,
+            fontWeight: '900',
+            fontSize: 15,
+            textTransform: 'uppercase',
+            letterSpacing: 1,
         },
         toastContainer: {
             position: 'absolute',
             top: 60,
-            left: 20,
-            right: 20,
+            left: 16,
+            right: 16,
             backgroundColor: colors.surface,
-            borderRadius: 18,
+            borderRadius: 20,
             flexDirection: 'row',
             alignItems: 'center',
-            padding: 12,
-            borderWidth: 1,
-            borderColor: colors.iron[300],
+            padding: 14,
+            borderWidth: 1.5,
+            borderColor: colors.border,
             zIndex: 9999,
-            elevation: 10,
-            shadowColor: ThemeFx.shadowColor,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: ThemeFx.shadowOpacityStrong,
-            shadowRadius: 8,
+            ...ThemeFx.shadowLg,
         },
         toastIcon: {
-            width: 36,
-            height: 36,
-            borderRadius: 10,
-            backgroundColor: colors.primary.DEFAULT,
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '15'),
             justifyContent: 'center',
             alignItems: 'center',
-            marginRight: 12,
+            marginRight: 14,
+            borderWidth: 1,
+            borderColor: withAlpha(colors.primary.DEFAULT, '25'),
         },
         toastContent: {
             flex: 1,
         },
         toastTitle: {
-            color: colors.iron[950],
+            color: colors.text,
             fontSize: 14,
             fontWeight: '900',
             textTransform: 'uppercase',
+            letterSpacing: 0.3,
         },
         toastMessage: {
-            color: colors.iron[500],
-            fontSize: 12,
+            color: colors.textMuted,
+            fontSize: 13,
             marginTop: 2,
-            fontWeight: '500',
+            fontWeight: '600',
         },
         toastClose: {
             padding: 8,
+            backgroundColor: colors.surfaceLighter,
+            borderRadius: 10,
+            marginLeft: 8,
         }
     }), [colors]);
 
@@ -350,7 +350,7 @@ export const GlobalNoticeHandler: React.FC = () => {
                                     accessibilityRole="button"
                                     accessibilityLabel="Cerrar notificación"
                                 >
-                                    <X size={20} color={colors.iron[500]} />
+                                    <X size={20} color={colors.textMuted} />
                                 </TouchableOpacity>
                                 <View style={ss.iconCircle}>
                                     <Bell size={20} color={colors.primary.DEFAULT} />
@@ -389,7 +389,7 @@ export const GlobalNoticeHandler: React.FC = () => {
                     style={ss.toastContainer}
                 >
                     <View style={ss.toastIcon}>
-                        <Bell size={16} color={colors.white} />
+                        <Bell size={16} color={colors.primary.DEFAULT} />
                     </View>
                     <TouchableOpacity
                         style={ss.toastContent}
@@ -406,7 +406,7 @@ export const GlobalNoticeHandler: React.FC = () => {
                         accessibilityRole="button"
                         accessibilityLabel="Cerrar notificación rápida"
                     >
-                        <X size={16} color={colors.iron[400]} />
+                        <X size={16} color={colors.textMuted} />
                     </TouchableOpacity>
                 </Animated.View>
             )}

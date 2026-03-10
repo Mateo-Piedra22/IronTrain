@@ -25,9 +25,9 @@ export function EmptyChartPlaceholder({
         wrapper: {
             width: '100%',
             borderRadius: 16,
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
             borderStyle: 'dashed',
             justifyContent: 'center',
             alignItems: 'center',
@@ -42,7 +42,7 @@ export function EmptyChartPlaceholder({
             left: 0,
             right: 0,
             height: 1,
-            backgroundColor: colors.iron[300],
+            backgroundColor: colors.border,
             opacity: 0.3,
         },
         contentBox: {
@@ -56,7 +56,7 @@ export function EmptyChartPlaceholder({
             borderRadius: 22,
             backgroundColor: colors.surface,
             borderWidth: 1,
-            borderColor: colors.iron[300],
+            borderColor: colors.border,
             justifyContent: 'center',
             alignItems: 'center',
             marginBottom: 12,
@@ -67,7 +67,7 @@ export function EmptyChartPlaceholder({
             shadowRadius: 4,
         },
         title: {
-            color: colors.iron[700],
+            color: colors.text,
             fontWeight: '900',
             fontSize: 14,
             marginBottom: 4,
@@ -75,7 +75,7 @@ export function EmptyChartPlaceholder({
             letterSpacing: -0.2,
         },
         message: {
-            color: colors.iron[500],
+            color: colors.textMuted,
             fontSize: 12,
             textAlign: 'center',
             lineHeight: 18,
@@ -101,7 +101,7 @@ export function EmptyChartPlaceholder({
             {/* Content */}
             <View style={ss.contentBox}>
                 <View style={ss.iconCircle}>
-                    <BarChart2 size={20} color={colors.iron[400]} />
+                    <BarChart2 size={20} color={colors.textMuted} />
                 </View>
                 <Text style={ss.title}>{title}</Text>
                 <Text style={ss.message}>{message}</Text>

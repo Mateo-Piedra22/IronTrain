@@ -1,5 +1,5 @@
 import { useDataReload } from '@/src/hooks/useDataReload';
-import { withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -41,7 +41,7 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
     const bottomOffset = (tabBarHeight ? tabBarHeight : insets.bottom) + 12;
 
     const st = useMemo(() => StyleSheet.create({
-        container: { flex: 1, backgroundColor: inModal ? colors.iron[100] : colors.background },
+        container: { flex: 1, backgroundColor: inModal ? colors.surfaceLighter : colors.background },
         header: { padding: 18, paddingBottom: 12 },
         searchBar: {
             flexDirection: 'row',
@@ -49,17 +49,13 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
             backgroundColor: colors.surface,
             paddingHorizontal: 16,
             height: 52,
-            borderRadius: 14,
+            borderRadius: 16,
             borderWidth: 1.5,
             borderColor: colors.border,
-            elevation: 2,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.05,
-            shadowRadius: 10,
+            ...ThemeFx.shadowSm,
             gap: 12
         },
-        searchInput: { flex: 1, fontSize: 16, color: colors.iron[950], padding: 0, fontWeight: '700' },
+        searchInput: { flex: 1, fontSize: 16, color: colors.text, padding: 0, fontWeight: '700' },
         categoryList: { marginTop: 14 },
         categoryChip: {
             paddingHorizontal: 16,
@@ -73,14 +69,10 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
         categoryChipActive: {
             backgroundColor: colors.primary.DEFAULT,
             borderColor: colors.primary.DEFAULT,
-            elevation: 4,
-            shadowColor: colors.primary.DEFAULT,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
+            ...ThemeFx.shadowMd,
         },
-        categoryText: { fontSize: 13, fontWeight: '800', color: colors.iron[500] },
-        categoryTextActive: { color: colors.white },
+        categoryText: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
+        categoryTextActive: { color: colors.onPrimary },
 
         listContent: { padding: 16, paddingBottom: inModal ? 40 : 100 },
         card: {
@@ -90,14 +82,10 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
             padding: 16,
             marginBottom: 12,
             backgroundColor: colors.surface,
-            borderRadius: 16,
+            borderRadius: 20,
             borderWidth: 1.5,
             borderColor: colors.border,
-            elevation: 2,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.04,
-            shadowRadius: 10,
+            ...ThemeFx.shadowSm,
         },
         cardInfo: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 14, overflow: 'hidden' },
         cardIcon: {
@@ -107,22 +95,22 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
         },
         cardDot: { width: 12, height: 12, borderRadius: 6 },
         cardText: { flex: 1, overflow: 'hidden' },
-        cardTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.4 },
+        cardTitle: { color: colors.text, fontWeight: '900', fontSize: 16, letterSpacing: -0.4 },
         cardMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8, flex: 1, overflow: 'hidden' },
-        cardCategory: { color: colors.iron[500], fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, flexShrink: 0 },
+        cardCategory: { color: colors.textMuted, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, flexShrink: 0 },
         cardBadges: { flexDirection: 'row', gap: 4, flexShrink: 1, alignItems: 'center' },
-        badgeMore: { backgroundColor: colors.iron[100], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, justifyContent: 'center', flexShrink: 0 },
-        badgeMoreText: { fontSize: 9, fontWeight: '900', color: colors.iron[500] },
+        badgeMore: { backgroundColor: colors.surfaceLighter, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, justifyContent: 'center', flexShrink: 0 },
+        badgeMoreText: { fontSize: 9, fontWeight: '900', color: colors.textMuted },
 
         actions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 12 },
-        actionBtn: { width: 34, height: 34, backgroundColor: colors.iron[100], borderRadius: 10, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
+        actionBtn: { width: 34, height: 34, backgroundColor: colors.surfaceLighter, borderRadius: 10, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
         deleteBtn: { width: 34, height: 34, backgroundColor: withAlpha(colors.red, '10'), borderRadius: 10, borderWidth: 1.5, borderColor: withAlpha(colors.red, '25'), justifyContent: 'center', alignItems: 'center' },
 
         fab: {
             position: 'absolute', right: 24, bottom: bottomOffset, zIndex: 10,
             width: 56, height: 56, borderRadius: 18,
             backgroundColor: colors.primary.DEFAULT, alignItems: 'center', justifyContent: 'center',
-            shadowColor: colors.primary.DEFAULT, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
+            ...ThemeFx.shadowLg,
         },
         gradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: bottomOffset + 60, zIndex: 1 },
         centered: { flex: 1, alignItems: 'center', justifyContent: 'center' }
@@ -205,11 +193,11 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
             {/* Search Header */}
             <View style={st.header}>
                 <View style={st.searchBar}>
-                    <Search size={20} color={colors.iron[400]} />
+                    <Search size={20} color={colors.textMuted} />
                     <TextInput
                         style={st.searchInput}
                         placeholder="Buscar ejercicio…"
-                        placeholderTextColor={colors.iron[400]}
+                        placeholderTextColor={colors.textMuted}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                     />
@@ -219,7 +207,7 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
                 <View style={st.categoryList}>
                     <FlatList<CategoryItem>
                         horizontal
-                        data={[{ id: 'all', name: 'Todos', color: colors.iron[950] }, ...categories]}
+                        data={[{ id: 'all', name: 'Todos', color: colors.text }, ...categories]}
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={{ paddingRight: 20 }}
                         keyExtractor={(item) => item.id}
@@ -257,10 +245,10 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
                         >
                             <View style={st.cardInfo}>
                                 <View style={[st.cardIcon, {
-                                    backgroundColor: (item.category_color || colors.iron[400]) + '15',
-                                    borderColor: (item.category_color || colors.iron[400]) + '30',
+                                    backgroundColor: withAlpha(item.category_color || colors.textMuted, '15'),
+                                    borderColor: withAlpha(item.category_color || colors.textMuted, '30'),
                                 }]}>
-                                    <View style={[st.cardDot, { backgroundColor: item.category_color || colors.iron[400] }]} />
+                                    <View style={[st.cardDot, { backgroundColor: item.category_color || colors.textMuted }]} />
                                 </View>
                                 <View style={st.cardText}>
                                     <Text style={st.cardTitle} numberOfLines={1}>{item.name}</Text>
@@ -298,7 +286,7 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
                                         accessibilityRole="button"
                                         accessibilityLabel={`Editar ejercicio ${item.name}`}
                                     >
-                                        <Pencil size={15} color={colors.iron[600]} />
+                                        <Pencil size={15} color={colors.textMuted} />
                                     </TouchableOpacity>
                                     {!item.is_system && (
                                         <TouchableOpacity
@@ -325,7 +313,7 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
                     accessibilityRole="button"
                     accessibilityLabel="Crear ejercicio"
                 >
-                    <Plus color={colors.white} size={28} />
+                    <Plus color={colors.onPrimary} size={28} />
                 </TouchableOpacity>
             )}
 

@@ -1,5 +1,5 @@
 import { backupService } from '@/src/services/BackupService';
-import { withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { useRouter } from 'expo-router';
 import { Calculator, ChevronRight, CircleDot, Database, Ruler, Settings, Wrench } from 'lucide-react-native';
 import React, { useMemo } from 'react';
@@ -40,20 +40,16 @@ export function AnalysisTools({ setCalcVisible }: AnalysisToolsProps) {
         headerTitle: {
             fontSize: 18,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             letterSpacing: -0.3,
         },
         toolsGrid: {
             backgroundColor: colors.surface,
             borderRadius: 20,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
             overflow: 'hidden',
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.06,
-            shadowRadius: 16,
-            elevation: 4,
+            ...ThemeFx.shadowSm,
         },
         toolCard: {
             flexDirection: 'row',
@@ -63,7 +59,7 @@ export function AnalysisTools({ setCalcVisible }: AnalysisToolsProps) {
         },
         toolCardBorder: {
             borderBottomWidth: 1.5,
-            borderBottomColor: colors.iron[100],
+            borderBottomColor: colors.surfaceLighter,
         },
         toolIconCircle: {
             width: 44,
@@ -76,12 +72,12 @@ export function AnalysisTools({ setCalcVisible }: AnalysisToolsProps) {
         toolLabel: {
             fontSize: 16,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
         },
         toolSubtitle: {
             fontSize: 12,
             fontWeight: '600',
-            color: colors.iron[500],
+            color: colors.textMuted,
             marginTop: 2,
         },
     }), [colors]);
@@ -149,7 +145,7 @@ export function AnalysisTools({ setCalcVisible }: AnalysisToolsProps) {
             <View style={styles.toolsGrid}>
                 <View style={[styles.header, { paddingHorizontal: 16, paddingTop: 14 }]}>
                     <View style={styles.headerAccent} />
-                    <Wrench size={16} color={colors.iron[950]} />
+                    <Wrench size={16} color={colors.text} />
                     <Text style={styles.headerTitle}>Herramientas</Text>
                 </View>
 
@@ -160,7 +156,7 @@ export function AnalysisTools({ setCalcVisible }: AnalysisToolsProps) {
                             key={tool.id}
                             style={[styles.toolCard, idx < tools.length - 1 && styles.toolCardBorder]}
                             onPress={() => handlePress(tool.id)}
-                            android_ripple={{ color: colors.iron[300] }}
+                            android_ripple={{ color: colors.surfaceLighter }}
                         >
                             <View style={styles.toolIconCircle}>
                                 <IconComponent size={18} color={colors.primary.DEFAULT} />
@@ -169,7 +165,7 @@ export function AnalysisTools({ setCalcVisible }: AnalysisToolsProps) {
                                 <Text style={styles.toolLabel}>{tool.label}</Text>
                                 <Text style={styles.toolSubtitle}>{tool.subtitle}</Text>
                             </View>
-                            <ChevronRight size={16} color={colors.iron[400]} />
+                            <ChevronRight size={16} color={colors.textMuted} />
                         </Pressable>
                     );
                 })}

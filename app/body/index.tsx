@@ -214,8 +214,8 @@ export default function BodyTrackerScreen() {
     }, [metrics, unit]);
 
     const ss = useMemo(() => StyleSheet.create({
-        backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.border, elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
-        pageTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 24, letterSpacing: -1 },
+        backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.border, ...ThemeFx.shadowSm },
+        pageTitle: { color: colors.text, fontWeight: '900', fontSize: 24, letterSpacing: -1 },
         pageSub: { color: colors.primary.DEFAULT, fontSize: 12, fontWeight: '800', marginTop: 2, letterSpacing: 0.5 },
         quickLogCard: {
             backgroundColor: colors.surface,
@@ -226,7 +226,7 @@ export default function BodyTrackerScreen() {
             marginBottom: 20,
             elevation: 1,
         },
-        quickLogTitle: { fontSize: 15, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.3 },
+        quickLogTitle: { fontSize: 15, fontWeight: '900', color: colors.text, letterSpacing: -0.3 },
         inputRow: { flexDirection: 'row', gap: 12 },
         chartCard: {
             padding: 16,
@@ -261,9 +261,9 @@ export default function BodyTrackerScreen() {
             paddingHorizontal: 14,
             paddingVertical: 12,
         },
-        measureLabel: { fontSize: 13, fontWeight: '800', color: colors.iron[950] },
-        measureValue: { fontSize: 17, fontWeight: '900', color: colors.iron[950], marginTop: 2 },
-        measureEmpty: { fontSize: 12, fontWeight: '600', color: colors.iron[500], fontStyle: 'italic', marginTop: 2 },
+        measureLabel: { fontSize: 13, fontWeight: '800', color: colors.text },
+        measureValue: { fontSize: 17, fontWeight: '900', color: colors.text, marginTop: 2 },
+        measureEmpty: { fontSize: 12, fontWeight: '600', color: colors.textMuted, fontStyle: 'italic', marginTop: 2 },
         measureIconCircle: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
         trendBadge: {
             flexDirection: 'row',
@@ -297,8 +297,8 @@ export default function BodyTrackerScreen() {
             borderBottomWidth: 1.5,
             borderBottomColor: colors.border,
         },
-        historyDate: { fontSize: 10, fontWeight: '700', color: colors.iron[400], textTransform: 'uppercase', letterSpacing: 0.5 },
-        historyValue: { fontSize: 14, fontWeight: '900', color: colors.iron[950], marginTop: 2 },
+        historyDate: { fontSize: 10, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+        historyValue: { fontSize: 14, fontWeight: '900', color: colors.text, marginTop: 2 },
 
         // Modal
         modalOverlay: { flex: 1, backgroundColor: withAlpha(colors.black, '8C'), justifyContent: 'center', alignItems: 'center', padding: 32 },
@@ -308,30 +308,28 @@ export default function BodyTrackerScreen() {
             padding: 24,
             width: '100%',
             maxWidth: 340,
-            shadowColor: ThemeFx.shadowColor,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.18,
-            shadowRadius: 24,
-            elevation: 10,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            ...ThemeFx.shadowLg,
         },
-        modalTitle: { fontSize: 18, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.3 },
-        modalSub: { fontSize: 12, fontWeight: '600', color: colors.iron[400], marginTop: 4 },
+        modalTitle: { fontSize: 18, fontWeight: '900', color: colors.text, letterSpacing: -0.3 },
+        modalSub: { fontSize: 12, fontWeight: '600', color: colors.textMuted, marginTop: 4 },
         modalInput: {
-            backgroundColor: colors.iron[200],
+            backgroundColor: colors.background,
             borderRadius: 12,
             padding: 14,
             fontSize: 18,
             fontWeight: '800',
-            color: colors.iron[950],
+            color: colors.text,
             textAlign: 'center',
             borderWidth: 1.5,
             borderColor: colors.border,
         },
         modalBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-        modalBtnCancel: { backgroundColor: colors.iron[200] },
-        modalBtnCancelText: { fontWeight: '800', fontSize: 14, color: colors.iron[950] },
+        modalBtnCancel: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border },
+        modalBtnCancelText: { fontWeight: '800', fontSize: 14, color: colors.text },
         modalBtnSave: { backgroundColor: colors.primary.DEFAULT },
-        modalBtnSaveText: { fontWeight: '800', fontSize: 14, color: colors.white },
+        modalBtnSaveText: { fontWeight: '800', fontSize: 14, color: colors.onPrimary },
 
         // Selector
         selectorItem: {
@@ -345,18 +343,18 @@ export default function BodyTrackerScreen() {
         selectorText: {
             fontSize: 14,
             fontWeight: '700',
-            color: colors.iron[950],
+            color: colors.text,
             flex: 1,
         }
     }), [colors]);
 
     return (
-        <SafeAreaWrapper style={{ backgroundColor: colors.iron[900] }} edges={['top', 'left', 'right']}>
+        <SafeAreaWrapper style={{ backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
             <Stack.Screen options={{ headerShown: false }} />
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 60, paddingTop: 16 }}>
                 <View style={{ marginBottom: 24, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
                     <TouchableOpacity onPress={() => router.back()} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
-                        <ChevronLeft size={20} color={colors.iron[950]} />
+                        <ChevronLeft size={20} color={colors.text} />
                     </TouchableOpacity>
                     <View>
                         <Text style={ss.pageTitle}>Evolución Física</Text>
@@ -375,11 +373,11 @@ export default function BodyTrackerScreen() {
                             <Text style={ss.quickLogTitle}>
                                 {MEASUREMENT_CONFIG.find(c => c.type === quickAddType)?.label || 'Registro'}
                             </Text>
-                            <ChevronDown size={14} color={colors.iron[400]} />
+                            <ChevronDown size={14} color={colors.textMuted} />
                         </TouchableOpacity>
 
                         {quickAddType === 'weight' && (
-                            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.iron[400], textTransform: 'uppercase' }}>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase' }}>
                                 + Grasa corporal
                             </Text>
                         )}
@@ -423,7 +421,7 @@ export default function BodyTrackerScreen() {
                             dataPointsColor={colors.primary.DEFAULT}
                             dataPointsRadius={4}
                             hideRules={false}
-                            rulesColor={colors.iron[200]}
+                            rulesColor={colors.border}
                             rulesType="solid"
                             height={180}
                             width={screenWidth - 80}
@@ -435,14 +433,14 @@ export default function BodyTrackerScreen() {
                             startOpacity={0.15}
                             endOpacity={0}
                             areaChart
-                            yAxisTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
-                            xAxisLabelTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '600' }}
+                            yAxisTextStyle={{ color: colors.textMuted, fontSize: 10, fontWeight: '600' }}
+                            xAxisLabelTextStyle={{ color: colors.textMuted, fontSize: 10, fontWeight: '600' }}
                             initialSpacing={0}
                             endSpacing={0}
                             yAxisLabelSuffix={` ${unit}`}
                             yAxisLabelWidth={45}
                             xAxisThickness={1}
-                            xAxisColor={colors.iron[200]}
+                            xAxisColor={colors.border}
                             yAxisThickness={0}
                         />
                     </View>
@@ -507,14 +505,14 @@ export default function BodyTrackerScreen() {
                                                     {/* Trend indicator */}
                                                     {trend.delta !== null && (
                                                         <View style={[ss.trendBadge, {
-                                                            backgroundColor: trend.delta > 0 ? withAlpha(colors.green, '20') : trend.delta < 0 ? withAlpha(colors.red, '20') : colors.iron[200],
+                                                            backgroundColor: trend.delta > 0 ? withAlpha(colors.green, '20') : trend.delta < 0 ? withAlpha(colors.red, '20') : colors.border,
                                                         }]}>
                                                             {trend.delta > 0 ? <TrendingUp size={10} color={colors.green} /> :
                                                                 trend.delta < 0 ? <TrendingDown size={10} color={colors.red} /> :
-                                                                    <Minus size={10} color={colors.iron[500]} />}
+                                                                    <Minus size={10} color={colors.textMuted} />}
                                                             <Text style={{
                                                                 fontSize: 10, fontWeight: '800',
-                                                                color: trend.delta > 0 ? colors.green : trend.delta < 0 ? colors.red : colors.iron[500],
+                                                                color: trend.delta > 0 ? colors.green : trend.delta < 0 ? colors.red : colors.textMuted,
                                                             }}>
                                                                 {trend.delta > 0 ? '+' : ''}{trend.delta}
                                                             </Text>
@@ -528,7 +526,7 @@ export default function BodyTrackerScreen() {
                                                     >
                                                         <Plus size={14} color={colors.primary.DEFAULT} />
                                                     </Pressable>
-                                                    {isExpanded ? <ChevronUp size={16} color={colors.iron[400]} /> : <ChevronDown size={16} color={colors.iron[400]} />}
+                                                    {isExpanded ? <ChevronUp size={16} color={colors.textMuted} /> : <ChevronDown size={16} color={colors.textMuted} />}
                                                 </View>
                                             </Pressable>
 
@@ -544,7 +542,7 @@ export default function BodyTrackerScreen() {
                                                                 dataPointsColor={colors.primary.DEFAULT}
                                                                 dataPointsRadius={3}
                                                                 hideRules={false}
-                                                                rulesColor={colors.iron[200]}
+                                                                rulesColor={colors.border}
                                                                 rulesType="solid"
                                                                 height={120}
                                                                 width={screenWidth - 100}
@@ -556,8 +554,8 @@ export default function BodyTrackerScreen() {
                                                                 startOpacity={0.1}
                                                                 endOpacity={0}
                                                                 areaChart
-                                                                yAxisTextStyle={{ color: colors.iron[400], fontSize: 9, fontWeight: '600' }}
-                                                                xAxisLabelTextStyle={{ color: colors.iron[400], fontSize: 9, fontWeight: '600' }}
+                                                                yAxisTextStyle={{ color: colors.textMuted, fontSize: 9, fontWeight: '600' }}
+                                                                xAxisLabelTextStyle={{ color: colors.textMuted, fontSize: 9, fontWeight: '600' }}
                                                                 initialSpacing={0}
                                                                 endSpacing={0}
                                                                 xAxisThickness={0}
@@ -565,7 +563,7 @@ export default function BodyTrackerScreen() {
                                                             />
                                                         </View>
                                                     ) : (
-                                                        <Text style={{ color: colors.iron[400], fontSize: 11, fontWeight: '600', marginBottom: 12, fontStyle: 'italic' }}>
+                                                        <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '600', marginBottom: 12, fontStyle: 'italic' }}>
                                                             Registra al menos 2 mediciones para ver la tendencia.
                                                         </Text>
                                                     )}
@@ -584,12 +582,12 @@ export default function BodyTrackerScreen() {
                                                                 style={{ padding: 6 }}
                                                                 accessibilityLabel={`Eliminar medición`}
                                                             >
-                                                                <Trash2 size={14} color={colors.iron[400]} />
+                                                                <Trash2 size={14} color={colors.textMuted} />
                                                             </Pressable>
                                                         </View>
                                                     ))}
                                                     {historyList.length === 0 && (
-                                                        <Text style={{ color: colors.iron[400], fontSize: 11, fontStyle: 'italic' }}>
+                                                        <Text style={{ color: colors.textMuted, fontSize: 11, fontStyle: 'italic' }}>
                                                             Aún no hay registros de {cfg.label.toLowerCase()}.
                                                         </Text>
                                                     )}
@@ -621,7 +619,7 @@ export default function BodyTrackerScreen() {
                                         <TextInput
                                             style={ss.modalInput}
                                             placeholder={`Valor (${displayUnit})`}
-                                            placeholderTextColor={colors.iron[400]}
+                                            placeholderTextColor={colors.textMuted}
                                             keyboardType="numeric"
                                             value={addValue}
                                             onChangeText={setAddValue}
@@ -646,7 +644,7 @@ export default function BodyTrackerScreen() {
             <Modal visible={showTypeSelector} transparent animationType="slide" onRequestClose={() => setShowTypeSelector(false)}>
                 <Pressable style={ss.modalOverlay} onPress={() => setShowTypeSelector(false)}>
                     <View style={[ss.modalContainer, { maxHeight: '80%', padding: 0, overflow: 'hidden' }]}>
-                        <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: colors.iron[200] }}>
+                        <View style={{ padding: 20, borderBottomWidth: 1.5, borderBottomColor: colors.border }}>
                             <Text style={ss.modalTitle}>Seleccionar Métrica</Text>
                         </View>
                         <ScrollView>
@@ -677,10 +675,10 @@ export default function BodyTrackerScreen() {
                             ))}
                         </ScrollView>
                         <TouchableOpacity
-                            style={{ padding: 16, alignItems: 'center', backgroundColor: colors.iron[100] }}
+                            style={{ padding: 16, alignItems: 'center', backgroundColor: colors.surface }}
                             onPress={() => setShowTypeSelector(false)}
                         >
-                            <Text style={{ fontWeight: '800', color: colors.iron[950] }}>Cerrar</Text>
+                            <Text style={{ fontWeight: '800', color: colors.text }}>Cerrar</Text>
                         </TouchableOpacity>
                     </View>
                 </Pressable>

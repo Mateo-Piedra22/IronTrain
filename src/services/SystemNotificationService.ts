@@ -5,6 +5,7 @@ import notifee, {
     TimestampTrigger,
     TriggerType
 } from '@notifee/react-native';
+import { Colors } from '../theme';
 import { logger } from '../utils/logger';
 import { configService, NotificationPreferences } from './ConfigService';
 import { notificationPermissionsService } from './NotificationPermissionsService';
@@ -318,7 +319,7 @@ class SystemNotificationServiceImpl {
                     foregroundServiceTypes: [1], // DATA_SYNC
                     category: AndroidCategory.PROGRESS, // Use PROGRESS category for better system handling
                     autoCancel: false,
-                    color: '#5c2e2e',
+                    color: Colors.primary.DEFAULT,
                     pressAction: { id: 'default' },
                     onlyAlertOnce: true,
                     // Remove chronometer if it's causing issues with rendering updating body

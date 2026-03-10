@@ -2,7 +2,7 @@ import { SetRowInput } from '@/components/SetRowInput';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { configService } from '@/src/services/ConfigService';
 import { useWorkoutStore } from '@/src/store/workoutStore';
-import { ThemeFx } from '@/src/theme';
+import { withAlpha } from '@/src/theme';
 import { WorkoutSet } from '@/src/types/db';
 import { FlashList } from '@shopify/flash-list';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -24,143 +24,143 @@ export default function ActiveWorkoutScreen() {
     const [unit, setUnit] = useState(configService.get('weightUnit'));
 
     const ss = useMemo(() => StyleSheet.create({
-        header: { 
-            paddingHorizontal: 16, 
-            paddingBottom: 14, 
-            paddingTop: 8, 
-            backgroundColor: colors.background, 
-            borderBottomWidth: 1.5, 
-            borderBottomColor: colors.border, 
-            flexDirection: 'row', 
-            justifyContent: 'space-between', 
-            alignItems: 'center' 
+        header: {
+            paddingHorizontal: 16,
+            paddingBottom: 14,
+            paddingTop: 8,
+            backgroundColor: colors.background,
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.border,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center'
         },
-        headerTitle: { 
-            color: colors.iron[950], 
-            fontWeight: '900', 
-            fontSize: 17, 
-            letterSpacing: -0.3 
+        headerTitle: {
+            color: colors.text,
+            fontWeight: '900',
+            fontSize: 17,
+            letterSpacing: -0.3
         },
-        headerSub: { 
-            color: colors.iron[400], 
-            fontSize: 11, 
-            fontWeight: '700', 
-            marginTop: 2 
+        headerSub: {
+            color: colors.textMuted,
+            fontSize: 11,
+            fontWeight: '700',
+            marginTop: 2
         },
-        headerActions: { 
-            flexDirection: 'row', 
-            alignItems: 'center', 
-            gap: 10 
+        headerActions: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10
         },
-        timerChip: { 
-            flexDirection: 'row', 
-            alignItems: 'center', 
-            backgroundColor: colors.surface, 
-            paddingHorizontal: 10, 
-            paddingVertical: 6, 
-            borderRadius: 12, 
-            borderWidth: 1.5, 
-            borderColor: colors.border 
+        timerChip: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: colors.surface,
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            borderRadius: 12,
+            borderWidth: 1.5,
+            borderColor: colors.border
         },
-        timerText: { 
-            color: colors.primary.DEFAULT, 
-            marginLeft: 6, 
-            fontSize: 13, 
-            fontWeight: '800', 
-            fontVariant: ['tabular-nums'] 
+        timerText: {
+            color: colors.primary.DEFAULT,
+            marginLeft: 6,
+            fontSize: 13,
+            fontWeight: '800',
+            fontVariant: ['tabular-nums']
         },
-        statusChip: { 
-            paddingHorizontal: 10, 
-            paddingVertical: 6, 
-            borderRadius: 20, 
-            flexDirection: 'row', 
-            alignItems: 'center', 
-            borderWidth: 1.5 
+        statusChip: {
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            borderRadius: 20,
+            flexDirection: 'row',
+            alignItems: 'center',
+            borderWidth: 1.5
         },
-        statusFinished: { 
-            backgroundColor: ThemeFx.successBg, 
-            borderColor: ThemeFx.successBorder 
+        statusFinished: {
+            backgroundColor: withAlpha(colors.green, '1A'),
+            borderColor: withAlpha(colors.green, '66')
         },
-        statusActive: { 
-            backgroundColor: colors.surface, 
-            borderColor: colors.border 
+        statusActive: {
+            backgroundColor: colors.surface,
+            borderColor: colors.border
         },
-        statusText: { 
-            fontSize: 10, 
-            fontWeight: '800', 
-            textTransform: 'uppercase', 
-            letterSpacing: 0.5, 
-            marginRight: 6 
+        statusText: {
+            fontSize: 10,
+            fontWeight: '800',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            marginRight: 6
         },
-        exerciseHeader: { 
-            flexDirection: 'row', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            marginBottom: 8 
+        exerciseHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 8
         },
-        exerciseName: { 
-            color: colors.iron[950], 
-            fontWeight: '800', 
-            fontSize: 16 
+        exerciseName: {
+            color: colors.text,
+            fontWeight: '800',
+            fontSize: 16
         },
-        setsHeaderRow: { 
-            flexDirection: 'row', 
-            marginBottom: 8, 
-            paddingHorizontal: 8 
+        setsHeaderRow: {
+            flexDirection: 'row',
+            marginBottom: 8,
+            paddingHorizontal: 8
         },
-        colLabel: { 
-            textAlign: 'center', 
-            color: colors.iron[400], 
-            fontSize: 10, 
-            fontWeight: '800', 
-            letterSpacing: 0.8 
+        colLabel: {
+            textAlign: 'center',
+            color: colors.textMuted,
+            fontSize: 10,
+            fontWeight: '800',
+            letterSpacing: 0.8
         },
-        addSetBtn: { 
-            backgroundColor: colors.surface, 
-            paddingVertical: 12, 
-            borderRadius: 14, 
-            alignItems: 'center', 
-            marginTop: 8, 
-            borderWidth: 1.5, 
-            borderColor: colors.border, 
-            borderStyle: 'dashed' 
+        addSetBtn: {
+            backgroundColor: colors.surface,
+            paddingVertical: 12,
+            borderRadius: 14,
+            alignItems: 'center',
+            marginTop: 8,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            borderStyle: 'dashed'
         },
-        addSetText: { 
-            color: colors.iron[950], 
-            fontSize: 11, 
-            fontWeight: '800', 
-            textTransform: 'uppercase' 
+        addSetText: {
+            color: colors.text,
+            fontSize: 11,
+            fontWeight: '800',
+            textTransform: 'uppercase'
         },
-        addExerciseBtn: { 
-            backgroundColor: colors.surface, 
-            paddingVertical: 14, 
-            borderRadius: 14, 
-            alignItems: 'center', 
-            borderWidth: 1.5, 
-            borderColor: colors.primary.DEFAULT, 
-            borderStyle: 'dashed', 
-            marginBottom: 32 
+        addExerciseBtn: {
+            backgroundColor: colors.surface,
+            paddingVertical: 14,
+            borderRadius: 14,
+            alignItems: 'center',
+            borderWidth: 1.5,
+            borderColor: colors.primary.DEFAULT,
+            borderStyle: 'dashed',
+            marginBottom: 32
         },
-        addExerciseText: { 
-            color: colors.primary.DEFAULT, 
-            fontWeight: '800', 
-            textTransform: 'uppercase', 
-            fontSize: 13 
+        addExerciseText: {
+            color: colors.primary.DEFAULT,
+            fontWeight: '800',
+            textTransform: 'uppercase',
+            fontSize: 13
         },
-        backBtn: { 
-            backgroundColor: colors.surface, 
-            paddingVertical: 14, 
-            borderRadius: 14, 
-            alignItems: 'center', 
-            borderWidth: 1.5, 
-            borderColor: colors.border, 
-            marginBottom: 32 
+        backBtn: {
+            backgroundColor: colors.surface,
+            paddingVertical: 14,
+            borderRadius: 14,
+            alignItems: 'center',
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            marginBottom: 32
         },
-        backBtnText: { 
-            color: colors.iron[950], 
-            fontWeight: '800', 
-            textTransform: 'uppercase', 
-            fontSize: 13 
+        backBtnText: {
+            color: colors.text,
+            fontWeight: '800',
+            textTransform: 'uppercase',
+            fontSize: 13
         },
     }), [colors]);
 
@@ -258,7 +258,7 @@ export default function ActiveWorkoutScreen() {
 
                         {!isTemplate && activeWorkout && (
                             <View style={[ss.statusChip, isFinished ? ss.statusFinished : ss.statusActive]}>
-                                <Text style={[ss.statusText, isFinished ? { color: colors.green } : { color: colors.iron[950] }]}>
+                                <Text style={[ss.statusText, isFinished ? { color: colors.green } : { color: colors.text }]}>
                                     {isFinished ? 'Finalizado' : 'Activo'}
                                 </Text>
                                 <Switch value={!isFinished} onValueChange={(v) => requestToggleStatus(v)} />
@@ -269,7 +269,7 @@ export default function ActiveWorkoutScreen() {
 
                 {emptyState && (
                     <View style={{ paddingHorizontal: 16, paddingVertical: 24 }}>
-                        <Text style={{ color: colors.iron[400], fontWeight: '700', textAlign: 'center' }}>{emptyState}</Text>
+                        <Text style={{ color: colors.textMuted, fontWeight: '700', textAlign: 'center' }}>{emptyState}</Text>
                     </View>
                 )}
 
@@ -282,7 +282,7 @@ export default function ActiveWorkoutScreen() {
                         <View style={{ marginBottom: 24 }}>
                             <View style={ss.exerciseHeader}>
                                 <Text style={ss.exerciseName}>{exerciseNames[exId] || 'Loading Exercise...'}</Text>
-                                <Pressable onPress={() => { }}><LucideMoreVertical size={20} color={colors.iron[400]} /></Pressable>
+                                <Pressable onPress={() => { }}><LucideMoreVertical size={20} color={colors.textMuted} /></Pressable>
                             </View>
 
                             {/* Sets Header */}

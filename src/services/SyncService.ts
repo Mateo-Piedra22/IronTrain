@@ -131,12 +131,8 @@ export class SyncService {
         const out: Record<string, unknown> = {};
 
         for (const [key, value] of Object.entries(obj)) {
-            // Exclude cloud-only columns that don't exist in local SQLite schema
-            if (key === 'userId' || key === 'user_id') {
-                continue;
-            }
-
             if (key === 'updatedAt' || key === 'updated_at') {
+
                 if (typeof value === 'number') {
                     out.updated_at = value;
                 } else if (typeof value === 'string') {
@@ -700,11 +696,16 @@ export class SyncService {
                         await dbService.run(`DELETE FROM ${table}`);
                     }
 
+                    // Fetch table schemas to be schema-aware during restoration
+                    const tableSchemas = await this.fetchAllTableSchemas();
+
                     for (const table of presentInOrder) {
                         const recordsRaw = (snapshot as any)?.[table];
                         const records: unknown[] = Array.isArray(recordsRaw) ? recordsRaw : [];
+                        const validColumns = tableSchemas.get(table);
+
                         for (const record of records) {
-                            const normalized = this.normalizeIncomingRecord(table, record);
+                            const normalized = this.normalizeIncomingRecord(table, record, validColumns);
                             if (!normalized) continue;
                             const keys = Object.keys(normalized);
                             if (keys.length === 0) continue;

@@ -1,4 +1,5 @@
 import { ToastMessage, useNotificationStore } from '@/src/store/notificationStore';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { AlertTriangle, CheckCircle, Info, X, XCircle } from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -25,22 +26,26 @@ const ToastItem = ({ toast, onDismiss, styles, colors }: { toast: ToastMessage, 
             layout={LinearTransition.springify().damping(14).stiffness(150)}
             entering={FadeInDown.springify().damping(14).stiffness(150).mass(0.8)}
             exiting={SlideOutUp.duration(200)}
-            className="w-[95%] self-center bg-iron-900 rounded-2xl flex-row items-center p-4 mb-3 border-[1.5px] border-iron-950 shadow-xl"
-            style={[styles.toastShadow]}
+            className="w-[95%] self-center rounded-2xl flex-row items-center p-4 mb-3 border-[1.5px] shadow-xl"
+            style={[styles.toastShadow, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
-            <View className="mr-4 items-center justify-center p-2 rounded-full bg-iron-800 border-[1.5px] border-iron-950">
+            <View
+                className="mr-4 items-center justify-center p-2 rounded-full border-[1.5px]"
+                style={{ backgroundColor: colors.isDark ? withAlpha(colors.primary.DEFAULT, '20') : colors.surfaceLighter, borderColor: colors.border }}
+            >
                 {theme.icon}
             </View>
             <View className="flex-1 justify-center pr-2">
-                <Text className="text-iron-950 font-bold text-base leading-tight mb-1">{toast.title}</Text>
-                {!!toast.message && <Text className="text-iron-950 opacity-80 text-sm font-medium leading-tight">{toast.message}</Text>}
+                <Text className="font-bold text-base leading-tight mb-1" style={{ color: colors.text }}>{toast.title}</Text>
+                {!!toast.message && <Text className="opacity-80 text-sm font-medium leading-tight" style={{ color: colors.textMuted }}>{toast.message}</Text>}
             </View>
             <TouchableOpacity
                 onPress={() => onDismiss(toast.id)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                className="ml-1 active:opacity-50 items-center justify-center bg-iron-950 rounded-full w-8 h-8"
+                className="ml-1 active:opacity-50 items-center justify-center rounded-full w-8 h-8"
+                style={{ backgroundColor: colors.isDark ? withAlpha(colors.text, '10') : colors.surfaceLighter }}
             >
-                <X color={colors.iron[900]} size={18} strokeWidth={3} />
+                <X color={colors.text} size={18} strokeWidth={3} />
             </TouchableOpacity>
         </Animated.View>
     );
@@ -61,11 +66,7 @@ export const ToastContainer = () => {
             paddingHorizontal: 16,
         },
         toastShadow: {
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.15,
-            shadowRadius: 12,
-            elevation: 8,
+            ...ThemeFx.shadowLg,
         }
     }), [colors]);
 

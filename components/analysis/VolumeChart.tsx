@@ -6,6 +6,7 @@ import React, { useMemo, useState } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import { useColors } from '../../src/hooks/useColors';
+import { ThemeFx } from '../../src/theme';
 
 interface VolumeChartProps {
     data: { value: number; sets?: number; label: string; frontColor?: string; dateMs?: number }[];
@@ -20,12 +21,8 @@ export function VolumeChart({ data, bucket }: VolumeChartProps) {
             padding: 20,
             borderRadius: 20,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.05,
-            shadowRadius: 15,
-            elevation: 4,
+            borderColor: colors.border,
+            ...ThemeFx.shadowSm,
         },
         header: {
             flexDirection: 'row',
@@ -39,59 +36,55 @@ export function VolumeChart({ data, bucket }: VolumeChartProps) {
         title: {
             fontSize: 18,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             letterSpacing: -0.3,
         },
         subtitle: {
             fontSize: 13,
-            color: colors.iron[500],
+            color: colors.textMuted,
             fontWeight: '600',
             marginTop: 4,
         },
         tabContainer: {
             flexDirection: 'row',
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             alignSelf: 'flex-start',
             borderRadius: 12,
             padding: 4,
             marginTop: 12,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
         },
         tabBtn: {
             fontSize: 13,
-            color: colors.iron[600],
+            color: colors.textMuted,
             fontWeight: '900',
             paddingHorizontal: 16,
             paddingVertical: 6,
-            borderRadius: 10,
+            borderRadius: 12,
             overflow: 'hidden'
         },
         tabBtnActive: {
             backgroundColor: colors.surface,
             color: colors.primary.DEFAULT,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            elevation: 2,
+            ...ThemeFx.shadowSm,
         },
         tooltip: {
             alignItems: 'flex-end',
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             paddingHorizontal: 12,
             paddingVertical: 8,
             borderRadius: 12,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
         },
         tooltipValue: {
-            color: colors.iron[950],
+            color: colors.text,
             fontWeight: '900',
             fontSize: 15,
         },
         tooltipDate: {
-            color: colors.iron[500],
+            color: colors.textMuted,
             fontSize: 11,
             fontWeight: '800',
             textTransform: 'uppercase',
@@ -101,11 +94,11 @@ export function VolumeChart({ data, bucket }: VolumeChartProps) {
             marginTop: 16,
             paddingTop: 12,
             borderTopWidth: 1.5,
-            borderTopColor: colors.iron[100],
+            borderTopColor: colors.border,
             alignItems: 'center'
         },
         footer: {
-            color: colors.iron[400],
+            color: colors.textMuted,
             fontSize: 11,
             fontWeight: '900',
             textTransform: 'uppercase',
@@ -203,13 +196,13 @@ export function VolumeChart({ data, bucket }: VolumeChartProps) {
                 roundedTop
                 roundedBottom
                 hideRules={false}
-                rulesColor={colors.iron[100]}
+                rulesColor={colors.border}
                 rulesType="solid"
                 xAxisThickness={1.5}
-                xAxisColor={colors.iron[200]}
+                xAxisColor={colors.border}
                 yAxisThickness={0}
-                yAxisTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '900' }}
-                xAxisLabelTextStyle={{ color: colors.iron[400], fontSize: 10, fontWeight: '900' }}
+                yAxisTextStyle={{ color: colors.textMuted, fontSize: 10, fontWeight: '900' }}
+                xAxisLabelTextStyle={{ color: colors.textMuted, fontSize: 10, fontWeight: '900' }}
                 noOfSections={noOfSections}
                 maxValue={maxValue * 1.1}
                 width={screenWidth - 80}

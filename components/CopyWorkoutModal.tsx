@@ -33,22 +33,18 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
         sheet: {
             backgroundColor: colors.background,
             borderWidth: 1.5,
-            borderColor: colors.iron[300],
-            borderRadius: 20,
+            borderColor: colors.border,
+            borderRadius: 24,
             flex: 1,
             maxHeight: '95%',
             width: '100%',
             overflow: 'hidden',
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.15,
-            shadowRadius: 24,
-            elevation: 10,
+            ...ThemeFx.shadowLg,
         },
-        header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1.5, borderBottomColor: colors.iron[200], backgroundColor: colors.surface },
-        headerTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
-        headerSub: { color: colors.iron[400], fontSize: 11, marginTop: 2 },
-        closeBtn: { width: 34, height: 34, borderRadius: 14, backgroundColor: colors.primary.DEFAULT, justifyContent: 'center', alignItems: 'center' },
+        header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1.5, borderBottomColor: colors.border, backgroundColor: colors.surface },
+        headerTitle: { color: colors.text, fontWeight: '900', fontSize: 16, letterSpacing: -0.3 },
+        headerSub: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+        closeBtn: { width: 34, height: 34, borderRadius: 12, backgroundColor: colors.primary.DEFAULT, justifyContent: 'center', alignItems: 'center' },
 
         calendarDay: {
             width: 45,
@@ -68,10 +64,10 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
             fontSize: 16,
             fontWeight: '600',
         },
-        textWhiteBold: { color: colors.white, fontWeight: 'bold' },
+        textWhiteBold: { color: colors.onPrimary, fontWeight: 'bold' },
         textPrimaryBold: { color: colors.primary.DEFAULT, fontWeight: 'bold' },
-        textIron400: { color: colors.iron[400] },
-        textIron950: { color: colors.iron[950] },
+        textIron400: { color: colors.textMuted },
+        textIron950: { color: colors.text },
 
         calendarDotsContainer: {
             flexDirection: 'row',
@@ -101,48 +97,44 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
 
         // Consolidated History Detail Styles
         historyContentContainer: { padding: 16, backgroundColor: colors.background, minHeight: 400 },
-        historyLabel: { color: colors.iron[400], fontSize: 10, marginBottom: 12, textTransform: 'uppercase', fontWeight: '800', letterSpacing: 1 },
-        loadingText: { color: colors.iron[400], fontStyle: 'italic', marginTop: 10 },
+        historyLabel: { color: colors.textMuted, fontSize: 10, marginBottom: 12, textTransform: 'uppercase', fontWeight: '800', letterSpacing: 1 },
+        loadingText: { color: colors.textMuted, fontStyle: 'italic', marginTop: 10 },
 
         workoutCard: {
             backgroundColor: colors.surface,
             padding: 20,
-            borderRadius: 16,
+            borderRadius: 20,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.1,
-            shadowRadius: 10,
-            elevation: 4,
+            borderColor: colors.border,
+            ...ThemeFx.shadowSm,
         },
         workoutHeader: { marginBottom: 16 },
-        workoutName: { color: colors.iron[950], fontWeight: '900', fontSize: 20, marginBottom: 4 },
+        workoutName: { color: colors.text, fontWeight: '900', fontSize: 20, marginBottom: 4 },
         workoutDate: { color: colors.primary.DEFAULT, fontWeight: '700', fontSize: 13 },
 
         exercisesSummaryBox: {
             marginBottom: 20,
-            backgroundColor: colors.iron[100],
-            borderRadius: 14,
+            backgroundColor: colors.surfaceLighter,
+            borderRadius: 16,
             padding: 14,
             borderWidth: 1.5,
-            borderColor: colors.iron[200]
+            borderColor: colors.border
         },
-        exercisesSummaryTitle: { color: colors.iron[950], fontWeight: '800', marginBottom: 10, fontSize: 13 },
+        exercisesSummaryTitle: { color: colors.text, fontWeight: '800', marginBottom: 10, fontSize: 13 },
         exercisesList: { gap: 8 },
         exerciseRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
         categoryIndicator: { width: 8, height: 8, borderRadius: 4 },
-        exerciseNameText: { color: colors.iron[700], fontWeight: '600', flex: 1, fontSize: 13 },
+        exerciseNameText: { color: colors.text, fontWeight: '600', flex: 1, fontSize: 13 },
         setsBadge: {
-            backgroundColor: colors.surface,
+            backgroundColor: colors.background,
             paddingHorizontal: 8,
             paddingVertical: 3,
             borderRadius: 20,
             borderWidth: 1.5,
-            borderColor: colors.iron[200]
+            borderColor: colors.border
         },
-        setsBadgeText: { color: colors.iron[400], fontSize: 11, fontWeight: '800' },
-        noExercisesText: { color: colors.iron[400], fontStyle: 'italic', marginBottom: 16 },
+        setsBadgeText: { color: colors.textMuted, fontSize: 11, fontWeight: '800' },
+        noExercisesText: { color: colors.textMuted, fontStyle: 'italic', marginBottom: 16 },
 
         copyButton: {
             backgroundColor: colors.primary.DEFAULT,
@@ -152,26 +144,22 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
             justifyContent: 'center',
             alignItems: 'center',
             marginTop: 8,
-            shadowColor: colors.primary.DEFAULT,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.3,
-            shadowRadius: 12,
-            elevation: 8,
+            ...ThemeFx.shadowSm,
         },
-        copyButtonText: { color: colors.white, fontWeight: '900', marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 14 },
+        copyButtonText: { color: colors.onPrimary, fontWeight: '900', marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 14 },
 
         emptyStateContainer: {
             backgroundColor: colors.surface,
             padding: 24,
             borderRadius: 16,
             borderWidth: 1.5,
-            borderColor: colors.iron[300],
+            borderColor: colors.border,
             borderStyle: 'dashed',
             alignItems: 'center',
             marginTop: 8
         },
-        emptyStateText: { color: colors.iron[500], fontWeight: '600', textAlign: 'center' },
-        promptText: { color: colors.iron[400], fontStyle: 'italic' }
+        emptyStateText: { color: colors.textMuted, fontWeight: '600', textAlign: 'center' },
+        promptText: { color: colors.textMuted, fontStyle: 'italic' }
     }), [colors]);
 
     const handleDayPress = async (day: { dateString: string; year: number; month: number; day: number }) => {
@@ -389,7 +377,7 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
                             <Text style={ss.headerSub}>Buscar desde historial</Text>
                         </View>
                         <TouchableOpacity onPress={onClose} style={ss.closeBtn} accessibilityRole="button" accessibilityLabel="Cerrar ventana">
-                            <X size={18} color={colors.white} />
+                            <X size={18} color={colors.onPrimary} />
                         </TouchableOpacity>
                     </View>
 
@@ -400,9 +388,9 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
                             theme={{
                                 backgroundColor: colors.surface,
                                 calendarBackground: colors.surface,
-                                textSectionTitleColor: colors.iron[500],
+                                textSectionTitleColor: colors.textMuted,
                                 arrowColor: colors.primary.DEFAULT,
-                                monthTextColor: colors.iron[950],
+                                monthTextColor: colors.text,
                                 textMonthFontWeight: 'bold',
                             }}
                         />
@@ -445,13 +433,13 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
                                         style={ss.copyButton}
                                         disabled={sourceSets.length === 0}
                                     >
-                                        <Copy color={colors.white} size={18} />
+                                        <Copy color={colors.onPrimary} size={18} />
                                         <Text style={ss.copyButtonText}>Copiar rutina</Text>
                                     </TouchableOpacity>
                                 </View>
                             ) : selectedDateStr ? (
                                 <View style={ss.emptyStateContainer}>
-                                    <Tag size={32} color={colors.iron[300]} style={{ marginBottom: 12 }} />
+                                    <Tag size={32} color={colors.textMuted} style={{ marginBottom: 12 }} />
                                     <Text style={ss.emptyStateText}>No hay entrenamiento registrado en esta fecha.</Text>
                                 </View>
                             ) : (

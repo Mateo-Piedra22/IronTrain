@@ -68,10 +68,10 @@ function MainAppContent({ dbInitialized, fontsLoaded, fontError, installedVersio
           <Text style={{ color: activeTheme.colors.text, fontSize: 22, fontWeight: '900', marginTop: 16, textAlign: 'center' }}>
             Actualización Requerida
           </Text>
-          <Text style={{ color: activeTheme.colors.iron[500], textAlign: 'center', marginTop: 8, paddingHorizontal: 16, lineHeight: 20 }}>
+          <Text style={{ color: activeTheme.colors.textMuted, textAlign: 'center', marginTop: 8, paddingHorizontal: 16, lineHeight: 20 }}>
             Tu versión de IronTrain es demasiado antigua y ya no es compatible. Por favor, actualiza para continuar.
           </Text>
-          <Text style={{ color: activeTheme.colors.iron[400], fontSize: 11, marginTop: 16, fontVariant: ['tabular-nums'], fontWeight: '600' }}>
+          <Text style={{ color: activeTheme.colors.textMuted, fontSize: 11, marginTop: 16, fontVariant: ['tabular-nums'], fontWeight: '600' }}>
             v{installedVersion} {'->'}  v{latestVersion}
           </Text>
         </View>
@@ -82,8 +82,8 @@ function MainAppContent({ dbInitialized, fontsLoaded, fontError, installedVersio
           }}
           style={{ backgroundColor: activeTheme.colors.primary.DEFAULT, width: '100%', paddingVertical: 16, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
         >
-          <Download size={20} color={activeTheme.colors.white} />
-          <Text style={{ color: activeTheme.colors.white, fontWeight: '900', fontSize: 16 }}>Descargar Actualización</Text>
+          <Download size={20} color={activeTheme.colors.onPrimary} />
+          <Text style={{ color: activeTheme.colors.onPrimary, fontWeight: '900', fontSize: 16 }}>Descargar Actualización</Text>
         </TouchableOpacity>
       </View>
     );

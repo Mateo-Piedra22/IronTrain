@@ -1,5 +1,5 @@
 import { useNotificationStore } from '@/src/store/notificationStore';
-import { withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { AlertTriangle, CheckCircle, Info, X, XCircle } from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -19,61 +19,63 @@ export const GlobalBanner = () => {
             left: 16,
             right: 16,
             zIndex: 100,
-            backgroundColor: colors.iron[100],
-            borderRadius: 20,
+            backgroundColor: colors.surface, // Better depth
+            borderRadius: 24,
             flexDirection: 'row',
             alignItems: 'center',
-            padding: 16,
+            padding: 14,
             borderWidth: 1.5,
             borderColor: colors.border,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.2,
-            shadowRadius: 10,
-            elevation: 8,
-            minHeight: 64,
+            ...ThemeFx.shadowLg,
+            minHeight: 68,
         },
         iconContainer: {
             marginRight: 16,
             alignItems: 'center',
             justifyContent: 'center',
-            padding: 10,
-            borderRadius: 14,
-            backgroundColor: withAlpha(colors.iron[200], '40'),
+            width: 48,
+            height: 48,
+            borderRadius: 16,
+            backgroundColor: colors.surfaceLighter,
             borderWidth: 1,
-            borderColor: colors.border
+            borderColor: withAlpha(colors.border, '50'),
         },
         content: {
             flex: 1,
             justifyContent: 'center',
-            paddingVertical: 4
         },
         message: {
             fontSize: 15,
-            fontWeight: '700',
-            color: colors.iron[950],
-            lineHeight: 20
+            fontWeight: '900',
+            color: colors.text,
+            lineHeight: 20,
+            letterSpacing: -0.3,
         },
         actionButton: {
             marginLeft: 12,
-            paddingHorizontal: 14,
-            paddingVertical: 8,
+            paddingHorizontal: 16,
+            paddingVertical: 10,
             backgroundColor: colors.primary.DEFAULT,
             borderRadius: 12,
+            ...ThemeFx.shadowSm,
         },
         actionText: {
-            color: colors.white,
-            fontWeight: '800',
-            fontSize: 13
+            color: colors.onPrimary,
+            fontWeight: '900',
+            fontSize: 13,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
         },
         closeButton: {
             marginLeft: 8,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: colors.iron[200],
-            borderRadius: 10,
-            width: 32,
-            height: 32
+            backgroundColor: colors.surfaceLighter,
+            borderRadius: 12,
+            width: 36,
+            height: 36,
+            borderWidth: 1,
+            borderColor: withAlpha(colors.border, '30'),
         }
     }), [colors]);
 
@@ -81,11 +83,11 @@ export const GlobalBanner = () => {
 
     const theme = (() => {
         switch (banner.type) {
-            case 'error': return { icon: <XCircle color={colors.red} size={28} /> };
-            case 'warning': return { icon: <AlertTriangle color={colors.yellow} size={28} /> };
-            case 'success': return { icon: <CheckCircle color={colors.green} size={28} /> };
+            case 'error': return { icon: <XCircle color={colors.red} size={24} /> };
+            case 'warning': return { icon: <AlertTriangle color={colors.yellow} size={24} /> };
+            case 'success': return { icon: <CheckCircle color={colors.green} size={24} /> };
             case 'info':
-            default: return { icon: <Info color={colors.primary.DEFAULT} size={28} /> };
+            default: return { icon: <Info color={colors.primary.DEFAULT} size={24} /> };
         }
     })();
 
@@ -98,7 +100,7 @@ export const GlobalBanner = () => {
             exiting={FadeOutUp.duration(200)}
             style={[ss.container, { top: topOffset }]}
         >
-            <View style={ss.iconContainer}>
+            <View style={[ss.iconContainer, { backgroundColor: withAlpha(banner.type === 'error' ? colors.red : banner.type === 'warning' ? colors.yellow : banner.type === 'success' ? colors.green : colors.primary.DEFAULT, '12') }]}>
                 {theme.icon}
             </View>
 
@@ -131,9 +133,10 @@ export const GlobalBanner = () => {
                     style={ss.closeButton}
                     activeOpacity={0.5}
                 >
-                    <X color={colors.iron[900]} size={18} strokeWidth={3} />
+                    <X color={colors.textMuted} size={18} strokeWidth={3} />
                 </TouchableOpacity>
             )}
         </Animated.View>
     );
 };
+

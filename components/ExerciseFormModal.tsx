@@ -36,14 +36,14 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
             shadowOpacity: 0.1,
             shadowRadius: 24,
         },
-        title: { fontSize: 22, fontWeight: '900', color: colors.iron[950], marginBottom: 20, letterSpacing: -0.8 },
-        label: { color: colors.iron[500], fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1.2, marginLeft: 4 },
+        title: { fontSize: 22, fontWeight: '900', color: colors.text, marginBottom: 20, letterSpacing: -0.8 },
+        label: { color: colors.textMuted, fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1.2, marginLeft: 4 },
         input: {
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderRadius: 16,
             padding: 16,
             fontSize: 16,
-            color: colors.iron[950],
+            color: colors.text,
             borderWidth: 1.5,
             borderColor: colors.border,
             marginBottom: 24,
@@ -54,21 +54,21 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
         catChip: {
             paddingHorizontal: 12, paddingVertical: 10,
             borderRadius: 14,
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderWidth: 1.5,
             borderColor: colors.border,
             flexDirection: 'row',
             alignItems: 'center'
         },
         catDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-        catText: { fontSize: 13, fontWeight: '800', color: colors.iron[600] },
+        catText: { fontSize: 13, fontWeight: '800', color: colors.text },
 
         badgePicker: {
             flexDirection: 'row',
             flexWrap: 'wrap',
             gap: 6,
             minHeight: 52,
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderRadius: 16,
             padding: 10,
             borderWidth: 1.5,
@@ -76,8 +76,8 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
             alignItems: 'center'
         },
         badgePlaceholder: { flexDirection: 'row', alignItems: 'center', opacity: 0.6, gap: 6 },
-        badgePlaceholderText: { fontSize: 13, color: colors.iron[500], fontWeight: '800' },
-        addBadgeIcon: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.iron[200], justifyContent: 'center', alignItems: 'center' },
+        badgePlaceholderText: { fontSize: 13, color: colors.textMuted, fontWeight: '800' },
+        addBadgeIcon: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center' },
 
         typeContainer: { gap: 10 },
         typeCard: {
@@ -85,7 +85,7 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
             alignItems: 'center',
             padding: 16,
             borderRadius: 16,
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderWidth: 1.5,
             borderColor: colors.border
         },
@@ -93,19 +93,19 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
             backgroundColor: withAlpha(colors.primary.DEFAULT, '08'),
             borderColor: colors.primary.DEFAULT
         },
-        typeLabel: { fontSize: 14, fontWeight: '900', color: colors.iron[950] },
+        typeLabel: { fontSize: 14, fontWeight: '900', color: colors.text },
         typeLabelActive: { color: colors.primary.DEFAULT },
-        typeDesc: { fontSize: 11, color: colors.iron[500], marginTop: 2, fontWeight: '600' },
+        typeDesc: { fontSize: 11, color: colors.textMuted, marginTop: 2, fontWeight: '600' },
         typeIndicator: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary.DEFAULT },
 
         footer: { flexDirection: 'row', gap: 12, marginTop: 12 },
-        cancelBtn: { flex: 1, padding: 16, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', backgroundColor: colors.iron[100] },
-        cancelText: { color: colors.iron[600], fontWeight: '800', fontSize: 15 },
+        cancelBtn: { flex: 1, padding: 16, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', backgroundColor: colors.surfaceLighter },
+        cancelText: { color: colors.textMuted, fontWeight: '800', fontSize: 15 },
         saveBtn: {
             flex: 1, backgroundColor: colors.primary.DEFAULT, padding: 16, borderRadius: 16, alignItems: 'center',
             shadowColor: colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4
         },
-        saveText: { color: colors.white, fontWeight: '900', fontSize: 15 }
+        saveText: { color: colors.onPrimary, fontWeight: '900', fontSize: 15 }
     }), [colors]);
     const [name, setName] = useState('');
     const [categoryId, setCategoryId] = useState('');
@@ -202,7 +202,7 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
                         value={name}
                         onChangeText={setName}
                         placeholder="Ej: Press de banca"
-                        placeholderTextColor={colors.iron[400]}
+                        placeholderTextColor={colors.textMuted}
                         style={ss.input}
                         accessibilityLabel="Nombre del ejercicio"
                     />
@@ -239,7 +239,7 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
                         >
                             {selectedBadgeIds.length === 0 ? (
                                 <View style={ss.badgePlaceholder}>
-                                    <Plus size={16} color={colors.iron[400]} />
+                                    <Plus size={16} color={colors.textMuted} />
                                     <Text style={ss.badgePlaceholderText}>Añadir badges...</Text>
                                 </View>
                             ) : (
@@ -258,7 +258,7 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
                                         );
                                     })}
                                     <View style={ss.addBadgeIcon}>
-                                        <Plus size={14} color={colors.iron[600]} />
+                                        <Plus size={14} color={colors.textMuted} />
                                     </View>
                                 </>
                             )}

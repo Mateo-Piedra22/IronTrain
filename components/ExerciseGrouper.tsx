@@ -1,5 +1,5 @@
 import { UnitService } from '@/src/services/UnitService';
-import { ThemeFx } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { ExerciseType, WorkoutSet } from '@/src/types/db';
 import { formatTimeSeconds, parseFlexibleTimeToSeconds } from '@/src/utils/time';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,28 +48,28 @@ export function ExerciseGrouper({
             padding: 10,
             borderRadius: 12,
             borderWidth: 1.5,
-            borderColor: colors.iron[700]
+            borderColor: colors.border
         },
-        exerciseName: { color: colors.iron[950], fontSize: 16, fontWeight: '800', flex: 1 },
-        tableCard: { backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1.5, borderColor: colors.iron[700], overflow: 'hidden' },
-        tableHeader: { flexDirection: 'row', backgroundColor: colors.iron[100], padding: 8, borderBottomWidth: 1, borderBottomColor: colors.iron[200] },
-        headerCell: { color: colors.iron[400], fontSize: 10, textAlign: 'center', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
-        setRow: { flexDirection: 'row', alignItems: 'center', padding: 8, borderBottomWidth: 1, borderBottomColor: colors.iron[200] },
-        setRowCompleted: { backgroundColor: colors.primary.DEFAULT + '08' },
-        indexCell: { color: colors.iron[400], width: 32, textAlign: 'center', fontWeight: '700', fontSize: 12 },
+        exerciseName: { color: colors.text, fontSize: 16, fontWeight: '800', flex: 1 },
+        tableCard: { backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, overflow: 'hidden' },
+        tableHeader: { flexDirection: 'row', backgroundColor: colors.surfaceLighter, padding: 8, borderBottomWidth: 1.5, borderBottomColor: colors.border },
+        headerCell: { color: colors.textMuted, fontSize: 10, textAlign: 'center', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+        setRow: { flexDirection: 'row', alignItems: 'center', padding: 8, borderBottomWidth: 1.5, borderBottomColor: colors.border },
+        setRowCompleted: { backgroundColor: withAlpha(colors.primary.DEFAULT, '08') },
+        indexCell: { color: colors.textMuted, width: 32, textAlign: 'center', fontWeight: '700', fontSize: 12 },
         inputCell: { flex: 1, paddingHorizontal: 4 },
         actionsCell: { width: 64, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
-        noteText: { color: colors.iron[400], fontSize: 11, paddingHorizontal: 10, paddingBottom: 6, fontStyle: 'italic', borderBottomWidth: 1, borderBottomColor: colors.iron[200] },
+        noteText: { color: colors.textMuted, fontSize: 11, paddingHorizontal: 10, paddingBottom: 6, fontStyle: 'italic', borderBottomWidth: 1.5, borderBottomColor: colors.border },
         modalOverlay: { flex: 1, backgroundColor: ThemeFx.backdropStrong, justifyContent: 'center', paddingHorizontal: 24 },
-        modalSheet: { backgroundColor: colors.surface, padding: 20, borderRadius: 16, borderWidth: 1.5, borderColor: colors.iron[700] },
-        modalTitle: { color: colors.iron[950], fontWeight: '900', marginBottom: 12, fontSize: 15 },
-        modalInput: { backgroundColor: colors.iron[100], color: colors.iron[950], padding: 12, borderRadius: 12, borderWidth: 1.5, borderColor: colors.iron[200], marginBottom: 16, height: 96 },
+        modalSheet: { backgroundColor: colors.surface, padding: 20, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border },
+        modalTitle: { color: colors.text, fontWeight: '900', marginBottom: 12, fontSize: 15 },
+        modalInput: { backgroundColor: colors.surfaceLighter, color: colors.text, padding: 12, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, marginBottom: 16, height: 96 },
         modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
     }), [colors]);
 
     const SET_TYPE_CONFIG = useMemo(() => [
-        { key: 'normal', label: 'Serie Normal', shortLabel: 'SERIE', Icon: Dumbbell, bg: colors.iron[200], text: colors.iron[500] },
-        { key: 'warmup', label: 'Calentamiento', shortLabel: 'CALENT', Icon: Flame, bg: colors.yellow, text: colors.iron[600] },
+        { key: 'normal', label: 'Serie Normal', shortLabel: 'SERIE', Icon: Dumbbell, bg: colors.surfaceLighter, text: colors.textMuted },
+        { key: 'warmup', label: 'Calentamiento', shortLabel: 'CALENT', Icon: Flame, bg: colors.yellow, text: colors.textMuted },
         { key: 'failure', label: 'Al Fallo', shortLabel: 'FALLO', Icon: Skull, bg: colors.red, text: colors.red },
         { key: 'drop', label: 'Drop Set', shortLabel: 'DROP', Icon: ArrowDownCircle, bg: colors.primary.light, text: colors.primary.dark },
         { key: 'myo_reps', label: 'Myo-Reps', shortLabel: 'MYO', Icon: RefreshCw, bg: colors.blue, text: colors.blue },
@@ -169,7 +169,7 @@ export function ExerciseGrouper({
                                 <View style={[
                                     ss.setRow,
                                     set.completed ? ss.setRowCompleted : null,
-                                    (!isNormal && cfg) ? { backgroundColor: cfg.bg + '40' } : null
+                                    (!isNormal && cfg) ? { backgroundColor: withAlpha(cfg.bg, '40') } : null
                                 ]}>
                                     <Text style={[ss.indexCell, !isNormal && { color: cfg.text, fontWeight: '900', fontSize: 8 }]}>
                                         {isNormal ? index + 1 : cfg.shortLabel}
@@ -259,13 +259,13 @@ export function ExerciseGrouper({
 
                                     <View style={ss.actionsCell}>
                                         <Pressable onPress={() => openComment(set)} hitSlop={6}>
-                                            <Ionicons name="chatbubble-outline" size={15} color={set.notes ? colors.primary.dark : colors.iron[400]} />
+                                            <Ionicons name="chatbubble-outline" size={15} color={set.notes ? colors.primary.dark : colors.textMuted} />
                                         </Pressable>
                                         <Pressable onPress={() => handleToggleComplete(set)} hitSlop={6}>
                                             <Ionicons
                                                 name={set.completed ? "checkmark-circle" : "ellipse-outline"}
                                                 size={20}
-                                                color={set.completed ? colors.green : colors.iron[400]}
+                                                color={set.completed ? colors.green : colors.textMuted}
                                             />
                                         </Pressable>
                                         <Pressable onPress={() => confirm.destructive('Eliminar', '¿Eliminar serie?', () => onDeleteSet(set.id), 'Eliminar')} hitSlop={6}>
@@ -296,7 +296,7 @@ export function ExerciseGrouper({
                             value={currentComment}
                             onChangeText={setCurrentComment}
                             placeholder="Ej: RPE 8, se sintió pesado..."
-                            placeholderTextColor={colors.iron[400]}
+                            placeholderTextColor={colors.textMuted}
                         />
                         <View style={ss.modalActions}>
                             <IronButton label="Cancelar" variant="outline" size="sm" onPress={() => setCommentModalVisible(false)} />

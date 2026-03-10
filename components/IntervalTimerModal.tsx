@@ -1,4 +1,4 @@
-import { withAlpha } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { ChevronDown, Minus, Pause, Play, Plus, RotateCcw, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -52,7 +52,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
     const insets = useSafeAreaInsets();
 
     const ss = useMemo(() => StyleSheet.create({
-        container: { flex: 1, backgroundColor: colors.iron[100] },
+        container: { flex: 1, backgroundColor: colors.surface },
         idleHeader: {
             marginBottom: 12,
             paddingHorizontal: 20,
@@ -67,59 +67,58 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
         },
         backBtn: {
             width: 38, height: 38, borderRadius: 12,
-            backgroundColor: colors.iron[100], alignItems: 'center', justifyContent: 'center',
+            backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
             borderWidth: 1.5, borderColor: colors.border,
-            elevation: 2, shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4
+            ...ThemeFx.shadowSm,
         },
-        pageTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 24, letterSpacing: -1 },
+        pageTitle: { color: colors.text, fontWeight: '900', fontSize: 24, letterSpacing: -1 },
         pageSub: { color: colors.primary.DEFAULT, fontSize: 11, fontWeight: '800', marginTop: 2, letterSpacing: 0.8, textTransform: 'uppercase' },
         closeBtn: { padding: 8 },
-        sectionLabel: { color: colors.iron[400], fontSize: 10, fontWeight: '800', textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1.2, marginLeft: 4 },
+        sectionLabel: { color: colors.textMuted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1.2, marginLeft: 4 },
         presetsSection: { paddingVertical: 20 },
         presetCard: {
             width: 140, backgroundColor: colors.surface, borderRadius: 16,
             borderWidth: 1.5, borderColor: colors.border, padding: 14, justifyContent: 'center',
-            shadowColor: colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2
+            ...ThemeFx.shadowSm,
         },
-        presetCardActive: { backgroundColor: colors.primary.DEFAULT, borderColor: colors.primary.DEFAULT, elevation: 4, shadowOpacity: 0.15 },
-        presetCardName: { fontWeight: '900', fontSize: 14, color: colors.iron[950], marginBottom: 4 },
-        presetCardDesc: { fontSize: 11, color: colors.iron[400], fontWeight: '600', lineHeight: 15 },
+        presetCardActive: { backgroundColor: colors.primary.DEFAULT, borderColor: colors.primary.DEFAULT, ...ThemeFx.shadowMd },
+        presetCardName: { fontWeight: '900', fontSize: 14, color: colors.text, marginBottom: 4 },
+        presetCardDesc: { fontSize: 11, color: colors.textMuted, fontWeight: '600', lineHeight: 15 },
         steppersTopRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
         stepperCard: {
             flex: 1, backgroundColor: colors.surface, borderRadius: 18,
             borderWidth: 1.5, borderColor: colors.border, padding: 16, marginBottom: 12,
-            shadowColor: colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2
+            ...ThemeFx.shadowSm,
         },
         stepperAccent: { width: 4, height: 14, borderRadius: 2, backgroundColor: colors.primary.DEFAULT },
-        stepperLabel: { color: colors.iron[500], fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+        stepperLabel: { color: colors.textMuted, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
         stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
         stepperBtn: {
             width: 40, height: 40, borderRadius: 12,
-            backgroundColor: colors.iron[100], borderWidth: 1.5, borderColor: colors.border,
+            backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border,
             alignItems: 'center', justifyContent: 'center'
         },
-        stepperValue: { color: colors.iron[950], fontSize: 26, fontWeight: '900', fontVariant: ['tabular-nums'] },
+        stepperValue: { color: colors.text, fontSize: 26, fontWeight: '900', fontVariant: ['tabular-nums'] },
         summaryCard: {
             backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1.5, borderColor: colors.border,
-            padding: 16, shadowColor: colors.black, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2
+            padding: 16, ...ThemeFx.shadowSm,
         },
         detailBox: {
             backgroundColor: colors.surface, borderRadius: 16, padding: 16, borderWidth: 1.5, borderColor: colors.border
         },
         detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-        detailLabel: { color: colors.iron[500], fontSize: 12, fontWeight: '700' },
-        detailValue: { color: colors.iron[950], fontSize: 13, fontWeight: '900', textTransform: 'uppercase' },
+        detailLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
+        detailValue: { color: colors.text, fontSize: 13, fontWeight: '900', textTransform: 'uppercase' },
         summaryRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
         dot: { width: 12, height: 12, borderRadius: 6, marginRight: 8 },
-        summaryLabel: { color: colors.iron[950], fontWeight: '700', flex: 1 },
-        summaryValue: { color: colors.iron[950], fontWeight: '800' },
+        summaryLabel: { color: colors.text, fontWeight: '700', flex: 1 },
+        summaryValue: { color: colors.text, fontWeight: '800' },
         summaryTotal: { borderTopWidth: 1.5, borderTopColor: colors.border, marginTop: 4, paddingTop: 8, flexDirection: 'row', alignItems: 'center' },
         startBtn: {
             backgroundColor: colors.primary.DEFAULT, borderRadius: 16, paddingVertical: 18, alignItems: 'center',
-            elevation: 4, shadowColor: colors.primary.DEFAULT, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12
+            ...ThemeFx.shadowMd,
         },
-        startBtnText: { color: colors.white, fontWeight: '900', fontSize: 16, textTransform: 'uppercase', letterSpacing: 1 },
+        startBtnText: { color: colors.onPrimary, fontWeight: '900', fontSize: 16, textTransform: 'uppercase', letterSpacing: 1 },
         activeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
         activeTopBar: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, zIndex: 10 },
         activePhaseChip: {
@@ -153,8 +152,8 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
         controlLabel: { color: withAlpha(colors.white, '59'), fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 },
         pauseBtn: {
             width: 84, height: 84, backgroundColor: colors.white, borderRadius: 42,
-            alignItems: 'center', justifyContent: 'center', elevation: 8,
-            shadowColor: colors.black, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16
+            alignItems: 'center', justifyContent: 'center',
+            ...ThemeFx.shadowLg,
         },
         finishedControls: { position: 'absolute', width: '100%', paddingHorizontal: 20 },
         finishedCard: {
@@ -175,7 +174,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
         repeatBtnText: { color: colors.white, fontWeight: '800', fontSize: 15 },
         doneBtn: {
             flex: 1, backgroundColor: colors.white, borderRadius: 16, paddingVertical: 18, alignItems: 'center',
-            elevation: 4, shadowColor: colors.black, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.15, shadowRadius: 8
+            ...ThemeFx.shadowSm,
         },
         doneBtnText: { color: colors.black, fontWeight: '900', fontSize: 15 },
         flex1: { flex: 1 },
@@ -345,25 +344,56 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
             </View>
             <View style={ss.stepperRow}>
                 <TouchableOpacity onPress={() => { onChange(Math.max(min, value - step)); feedbackService.buttonPress(); }} style={ss.stepperBtn} activeOpacity={0.8}>
-                    <Minus size={16} color={colors.iron[950]} />
+                    <Minus size={16} color={colors.text} />
                 </TouchableOpacity>
                 <View style={ss.flex1}>
                     <Text style={[ss.stepperValue, { textAlign: 'center' }]}>{formatFn ? formatFn(value) : value}</Text>
                 </View>
                 <TouchableOpacity onPress={() => { onChange(Math.min(max, value + step)); feedbackService.buttonPress(); }} style={ss.stepperBtn} activeOpacity={0.8}>
-                    <Plus size={16} color={colors.iron[950]} />
+                    <Plus size={16} color={colors.text} />
                 </TouchableOpacity>
             </View>
         </View>
     );
 
     const getPhaseConfig = () => {
+        const isDark = colors.isDark;
         switch (phase) {
-            case 'prepare': return { bg: '#92400e', label: 'PREPÁRATE', ringColor: '#fbbf24', accentBg: withAlpha(colors.yellow, '26') };
-            case 'work': return { bg: '#3e1c1c', label: '¡TRABAJO!', ringColor: '#d4a574', accentBg: withAlpha(colors.primary.light, '1F') };
-            case 'rest': return { bg: '#14532d', label: 'DESCANSO', ringColor: '#86efac', accentBg: withAlpha(colors.green, '1F') };
-            case 'finished': return { bg: '#3e1c1c', label: '¡COMPLETADO!', ringColor: '#d4a574', accentBg: withAlpha(colors.primary.light, '1F') };
-            default: return { bg: colors.iron[900], label: '', ringColor: colors.primary.DEFAULT, accentBg: 'transparent' };
+            case 'prepare':
+                return {
+                    bg: isDark ? withAlpha(colors.yellow, '20') : colors.yellow,
+                    label: 'PREPÁRATE',
+                    ringColor: colors.yellow,
+                    accentBg: withAlpha(colors.yellow, '26')
+                };
+            case 'work':
+                return {
+                    bg: isDark ? withAlpha(colors.primary.dark, '40') : colors.primary.DEFAULT,
+                    label: '¡TRABAJO!',
+                    ringColor: colors.primary.DEFAULT,
+                    accentBg: withAlpha(colors.primary.DEFAULT, '26')
+                };
+            case 'rest':
+                return {
+                    bg: isDark ? withAlpha(colors.green, '20') : colors.green,
+                    label: 'DESCANSO',
+                    ringColor: colors.green,
+                    accentBg: withAlpha(colors.green, '26')
+                };
+            case 'finished':
+                return {
+                    bg: colors.isDark ? colors.surface : colors.primary.dark,
+                    label: '¡COMPLETADO!',
+                    ringColor: colors.primary.DEFAULT,
+                    accentBg: withAlpha(colors.primary.DEFAULT, '26')
+                };
+            default:
+                return {
+                    bg: isDark ? colors.surface : colors.background,
+                    label: '',
+                    ringColor: colors.primary.DEFAULT,
+                    accentBg: 'transparent'
+                };
         }
     };
 
@@ -379,7 +409,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                     {/* Modern Header */}
                     <View style={ss.idleHeader}>
                         <TouchableOpacity onPress={handleClose} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Cerrar">
-                            <ChevronDown size={20} color={colors.iron[950]} />
+                            <ChevronDown size={20} color={colors.text} />
                         </TouchableOpacity>
                         <View style={ss.flex1}>
                             <Text style={ss.pageTitle}>Interval Timer</Text>
@@ -397,8 +427,8 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                                         const isActive = preset.work === workSec && preset.rest === restSec && preset.rounds === rounds;
                                         return (
                                             <Pressable key={preset.id} onPress={() => applyPreset(preset)} style={[ss.presetCard, isActive && ss.presetCardActive]}>
-                                                <Text style={[ss.presetCardName, isActive && { color: colors.white }]}>{preset.name}</Text>
-                                                <Text style={[ss.presetCardDesc, isActive && { color: withAlpha(colors.white, 'B3') }]}>{preset.description}</Text>
+                                                <Text style={[ss.presetCardName, isActive && { color: colors.onPrimary }]}>{preset.name}</Text>
+                                                <Text style={[ss.presetCardDesc, isActive && { color: withAlpha(colors.onPrimary, 'B3') }]}>{preset.description}</Text>
                                             </Pressable>
                                         );
                                     })}
@@ -408,8 +438,8 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                                         const isActive = preset.work === workSec && preset.rest === restSec && preset.rounds === rounds;
                                         return (
                                             <Pressable key={preset.id} onPress={() => applyPreset(preset)} style={[ss.presetCard, isActive && ss.presetCardActive]}>
-                                                <Text style={[ss.presetCardName, isActive && { color: colors.white }]}>{preset.name}</Text>
-                                                <Text style={[ss.presetCardDesc, isActive && { color: withAlpha(colors.white, 'B3') }]}>{preset.description}</Text>
+                                                <Text style={[ss.presetCardName, isActive && { color: colors.onPrimary }]}>{preset.name}</Text>
+                                                <Text style={[ss.presetCardDesc, isActive && { color: withAlpha(colors.onPrimary, 'B3') }]}>{preset.description}</Text>
                                             </Pressable>
                                         );
                                     })}
@@ -436,14 +466,14 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                                     </View>
 
                                     <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                                        <Text style={{ fontSize: 26, fontWeight: '900', color: colors.iron[950] }}>
+                                        <Text style={{ fontSize: 26, fontWeight: '900', color: colors.text }}>
                                             {formatDuration(totalWorkoutTime).split(' ')[0]}
                                         </Text>
-                                        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.iron[500] }}>
+                                        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.textMuted }}>
                                             {formatDuration(totalWorkoutTime).split(' ')[1] || 'min'}
                                         </Text>
                                     </View>
-                                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.iron[400], marginTop: 2 }}>
+                                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textMuted, marginTop: 2 }}>
                                         Duración total
                                     </Text>
                                 </View>

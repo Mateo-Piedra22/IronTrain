@@ -13,8 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors } from '../../src/hooks/useColors';
 
 const getPlateColor = (weight: number, unit: string, type?: PlateType, colors?: any) => {
-    if (!colors) return '#666';
-    if (!type || type === 'standard') return colors.iron[600];
+    if (!colors) return '#888'; // Keeping as fallback if colors is somehow undefined, but it should be passed
+    if (!type || type === 'standard') return colors.textMuted;
 
     const w = unit === 'kg' ? weight : weight / 2.20462;
     if (w >= 25) return colors.red;
@@ -23,7 +23,7 @@ const getPlateColor = (weight: number, unit: string, type?: PlateType, colors?: 
     if (w >= 10) return colors.green;
     if (w >= 5) return colors.white;
     if (w >= 2.5) return colors.black;
-    return colors.iron[300];
+    return colors.border;
 };
 
 const getPlateGeometry = (weight: number, unit: string, type?: PlateType) => {
@@ -181,7 +181,7 @@ export default function PlateCalculator() {
                             <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: p.color || getPlateColor(p.plate, unit, p.type, colors), borderWidth: 1, borderColor: withAlpha(colors.black, '20') }} />
                             <Text style={ss.plateWeight}>{p.plate} {unit}</Text>
                             {p.type && p.type !== 'standard' && (
-                                <View style={{ backgroundColor: getPlateColor(p.plate, unit, p.type, colors) + '20', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                                <View style={{ backgroundColor: withAlpha(getPlateColor(p.plate, unit, p.type, colors), '20'), paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
                                     <Text style={{ fontSize: 8, fontWeight: '800', color: getPlateColor(p.plate, unit, p.type, colors), textTransform: 'uppercase' }}>{p.type === 'bumper' ? 'BMP' : 'CAL'}</Text>
                                 </View>
                             )}
@@ -198,60 +198,60 @@ export default function PlateCalculator() {
 
     const ss = useMemo(() => StyleSheet.create({
         backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.border, elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
-        pageTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 24, letterSpacing: -1 },
+        pageTitle: { color: colors.text, fontWeight: '900', fontSize: 24, letterSpacing: -1 },
         pageSub: { color: colors.primary.DEFAULT, fontSize: 12, fontWeight: '800', marginTop: 2, letterSpacing: 0.5 },
-        headerBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.iron[200], borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
+        headerBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
         inputSection: { marginBottom: 20 },
-        inputLabel: { fontSize: 10, fontWeight: '800', color: colors.iron[400], textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
-        bigInput: { backgroundColor: colors.surface, color: colors.iron[950], fontSize: 32, fontWeight: '900', padding: 16, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border, textAlign: 'center', elevation: 1, fontVariant: ['tabular-nums'] },
-        smallInput: { backgroundColor: colors.surface, color: colors.iron[950], fontSize: 14, padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, fontWeight: '600' },
+        inputLabel: { fontSize: 10, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+        bigInput: { backgroundColor: colors.surface, color: colors.text, fontSize: 32, fontWeight: '900', padding: 16, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border, textAlign: 'center', elevation: 1, fontVariant: ['tabular-nums'] },
+        smallInput: { backgroundColor: colors.surface, color: colors.text, fontSize: 14, padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, fontWeight: '600' },
         barChipRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
         barChip: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center' },
         barChipActive: { backgroundColor: colors.primary.DEFAULT, borderColor: colors.primary.DEFAULT },
-        barChipText: { fontWeight: '800', fontSize: 14, color: colors.iron[500] },
-        barChipTextActive: { color: colors.white },
+        barChipText: { fontWeight: '800', fontSize: 14, color: colors.textMuted },
+        barChipTextActive: { color: colors.onPrimary },
         calcBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary.DEFAULT, paddingVertical: 16, borderRadius: 16, marginBottom: 24, shadowColor: colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-        calcBtnText: { color: colors.white, fontWeight: '900', fontSize: 16, letterSpacing: 1 },
+        calcBtnText: { color: colors.onPrimary, fontWeight: '900', fontSize: 16, letterSpacing: 1 },
         card: { backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border, padding: 20, marginBottom: 12, elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 },
         loadoutHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-        loadoutLabel: { fontSize: 10, fontWeight: '800', color: colors.iron[400], textTransform: 'uppercase', letterSpacing: 1 },
-        loadoutTotal: { fontSize: 20, fontWeight: '900', color: colors.iron[950], fontVariant: ['tabular-nums'] },
+        loadoutLabel: { fontSize: 10, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 },
+        loadoutTotal: { fontSize: 20, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
         barVis: { height: 90, justifyContent: 'center', alignItems: 'center', position: 'relative' },
-        barLine: { height: 6, width: '100%', position: 'absolute', backgroundColor: colors.iron[300], borderRadius: 3 },
+        barLine: { height: 6, width: '100%', position: 'absolute', backgroundColor: colors.border, borderRadius: 3 },
         platesRow: { flexDirection: 'row', alignItems: 'center', gap: 2, zIndex: 10 },
-        collar: { width: 6, height: 48, backgroundColor: colors.iron[400], borderRadius: 2 },
+        collar: { width: 6, height: 48, backgroundColor: colors.textMuted, borderRadius: 2 },
         plateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
         plateRowBorder: { borderBottomWidth: 1.5, borderBottomColor: colors.border },
-        plateWeight: { fontSize: 15, fontWeight: '800', color: colors.iron[950] },
-        plateBadge: { backgroundColor: colors.iron[200], paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-        plateBadgeText: { fontSize: 11, fontWeight: '700', color: colors.iron[500] },
-        plateCount: { fontSize: 11, fontWeight: '600', color: colors.iron[400] },
+        plateWeight: { fontSize: 15, fontWeight: '800', color: colors.text },
+        plateBadge: { backgroundColor: colors.background, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: colors.border },
+        plateBadgeText: { fontSize: 11, fontWeight: '700', color: colors.textMuted },
+        plateCount: { fontSize: 11, fontWeight: '600', color: colors.textMuted },
         altRow: { paddingVertical: 12 },
         // Inventory Modal
-        modalContainer: { flex: 1, backgroundColor: colors.iron[900] },
+        modalContainer: { flex: 1, backgroundColor: colors.background },
         modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottomWidth: 1.5, borderBottomColor: colors.border, paddingBottom: 16 },
-        modalTitle: { color: colors.iron[950], fontSize: 20, fontWeight: '900', letterSpacing: -0.3 },
-        modalSub: { color: colors.iron[400], fontSize: 11, fontWeight: '600', marginTop: 2 },
-        modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.iron[200], justifyContent: 'center', alignItems: 'center' },
-        invSectionTitle: { color: colors.iron[950], fontWeight: '800', fontSize: 13, marginBottom: 8 },
-        toggleRow: { padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.iron[200] },
+        modalTitle: { color: colors.text, fontSize: 20, fontWeight: '900', letterSpacing: -0.3 },
+        modalSub: { color: colors.textMuted, fontSize: 11, fontWeight: '600', marginTop: 2 },
+        modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: colors.border },
+        invSectionTitle: { color: colors.text, fontWeight: '800', fontSize: 13, marginBottom: 8 },
+        toggleRow: { padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
         invRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, backgroundColor: colors.surface, padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, elevation: 1 },
         invControls: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-        stepBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.iron[200], borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
-        invCount: { color: colors.iron[950], fontWeight: '900', fontSize: 18, minWidth: 30, textAlign: 'center', fontVariant: ['tabular-nums'] },
+        stepBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
+        invCount: { color: colors.text, fontWeight: '900', fontSize: 18, minWidth: 30, textAlign: 'center', fontVariant: ['tabular-nums'] },
         addSection: { marginTop: 16, borderTopWidth: 1.5, borderTopColor: colors.border, paddingTop: 16 },
         colorBtn: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: colors.border }
     }), [colors]);
 
     return (
-        <SafeAreaWrapper style={{ backgroundColor: colors.iron[900] }} edges={['top', 'left', 'right']}>
+        <SafeAreaWrapper style={{ backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
             <Stack.Screen options={{ headerShown: false }} />
 
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40, paddingTop: 16 }}>
                 <View style={{ marginBottom: 24, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
                         <TouchableOpacity onPress={() => router.back()} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
-                            <ChevronLeft size={20} color={colors.iron[950]} />
+                            <ChevronLeft size={20} color={colors.text} />
                         </TouchableOpacity>
                         <View>
                             <Text style={ss.pageTitle}>Discos</Text>
@@ -264,7 +264,7 @@ export default function PlateCalculator() {
                         accessibilityRole="button"
                         accessibilityLabel="Abrir inventario de discos"
                     >
-                        <Settings color={colors.iron[950]} size={20} />
+                        <Settings color={colors.text} size={20} />
                     </TouchableOpacity>
                 </View>
 
@@ -274,7 +274,7 @@ export default function PlateCalculator() {
                     <TextInput
                         style={ss.bigInput}
                         placeholder={unit === 'kg' ? '100' : '225'}
-                        placeholderTextColor={colors.iron[400]}
+                        placeholderTextColor={colors.textMuted}
                         keyboardType="numeric"
                         value={targetWeight}
                         onChangeText={setTargetWeight}
@@ -301,7 +301,7 @@ export default function PlateCalculator() {
                     <TextInput
                         style={ss.smallInput}
                         placeholder="Barra personalizada"
-                        placeholderTextColor={colors.iron[400]}
+                        placeholderTextColor={colors.textMuted}
                         keyboardType="numeric"
                         value={barWeight}
                         onChangeText={setBarWeight}
@@ -312,15 +312,15 @@ export default function PlateCalculator() {
 
                 {/* Calculate CTA */}
                 <Pressable onPress={calculate} style={ss.calcBtn} accessibilityRole="button" accessibilityLabel="Calcular discos">
-                    <Disc size={18} color={colors.white} />
+                    <Disc size={18} color={colors.onPrimary} />
                     <Text style={ss.calcBtnText}>CALCULAR</Text>
                 </Pressable>
 
                 {/* Empty inventory warning */}
                 {!hasInventoryForUnit && (
                     <View style={[ss.card, { marginBottom: 16 }]}>
-                        <Text style={{ color: colors.iron[950], fontWeight: '800', fontSize: 14, marginBottom: 4 }}>Inventario vacío ({unit})</Text>
-                        <Text style={{ color: colors.iron[400], fontSize: 12, lineHeight: 18 }}>Abre el inventario y agrega tus discos para este sistema de unidades.</Text>
+                        <Text style={{ color: colors.text, fontWeight: '800', fontSize: 14, marginBottom: 4 }}>Inventario vacío ({unit})</Text>
+                        <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 18 }}>Abre el inventario y agrega tus discos para este sistema de unidades.</Text>
                     </View>
                 )}
 
@@ -329,23 +329,23 @@ export default function PlateCalculator() {
 
                 {!activeLoadout && (closestBelow || closestAbove) && (
                     <View style={[ss.card, { marginBottom: 16 }]}>
-                        <Text style={{ color: colors.iron[950], fontWeight: '800', fontSize: 14, marginBottom: 14 }}>No se puede llegar exacto</Text>
+                        <Text style={{ color: colors.text, fontWeight: '800', fontSize: 14, marginBottom: 14 }}>No se puede llegar exacto</Text>
                         {closestBelow && (
                             <View style={{ marginBottom: closestAbove ? 14 : 0 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                                     <ChevronDown size={14} color={colors.red} />
-                                    <Text style={{ color: colors.iron[950], fontWeight: '700', fontSize: 13 }}>Más cercano por debajo: {closestBelow.totalWeight} {unit}</Text>
+                                    <Text style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>Más cercano por debajo: {closestBelow.totalWeight} {unit}</Text>
                                 </View>
                                 {closestBelow.perSide.map((p) => (
                                     <View key={`b-${p.plate}-${p.type}`} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                             <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: p.color || getPlateColor(p.plate, unit, p.type, colors) }} />
-                                            <Text style={{ color: colors.iron[950], fontWeight: '700' }}>{p.plate} {unit}</Text>
+                                            <Text style={{ color: colors.text, fontWeight: '700' }}>{p.plate} {unit}</Text>
                                             {p.type && p.type !== 'standard' && (
-                                                <Text style={{ fontSize: 9, fontWeight: '800', color: colors.iron[400], textTransform: 'uppercase' }}>{p.type === 'bumper' ? 'BMP' : 'CAL'}</Text>
+                                                <Text style={{ fontSize: 9, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase' }}>{p.type === 'bumper' ? 'BMP' : 'CAL'}</Text>
                                             )}
                                         </View>
-                                        <Text style={{ color: colors.iron[400], fontWeight: '700' }}>×{p.pairs}/lado</Text>
+                                        <Text style={{ color: colors.textMuted, fontWeight: '700' }}>×{p.pairs}/lado</Text>
                                     </View>
                                 ))}
                             </View>
@@ -354,18 +354,18 @@ export default function PlateCalculator() {
                             <View>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                                     <ChevronUp size={14} color={colors.green} />
-                                    <Text style={{ color: colors.iron[950], fontWeight: '700', fontSize: 13 }}>Más cercano por arriba: {closestAbove.totalWeight} {unit}</Text>
+                                    <Text style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>Más cercano por arriba: {closestAbove.totalWeight} {unit}</Text>
                                 </View>
                                 {closestAbove.perSide.map((p) => (
                                     <View key={`a-${p.plate}-${p.type}`} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                             <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: p.color || getPlateColor(p.plate, unit, p.type, colors) }} />
-                                            <Text style={{ color: colors.iron[950], fontWeight: '700' }}>{p.plate} {unit}</Text>
+                                            <Text style={{ color: colors.text, fontWeight: '700' }}>{p.plate} {unit}</Text>
                                             {p.type && p.type !== 'standard' && (
-                                                <Text style={{ fontSize: 9, fontWeight: '800', color: colors.iron[400], textTransform: 'uppercase' }}>{p.type === 'bumper' ? 'BMP' : 'CAL'}</Text>
+                                                <Text style={{ fontSize: 9, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase' }}>{p.type === 'bumper' ? 'BMP' : 'CAL'}</Text>
                                             )}
                                         </View>
-                                        <Text style={{ color: colors.iron[400], fontWeight: '700' }}>×{p.pairs}/lado</Text>
+                                        <Text style={{ color: colors.textMuted, fontWeight: '700' }}>×{p.pairs}/lado</Text>
                                     </View>
                                 ))}
                             </View>
@@ -375,11 +375,11 @@ export default function PlateCalculator() {
 
                 {exactAlternatives.length > 0 && (
                     <View style={[ss.card, { marginBottom: 24 }]}>
-                        <Text style={{ color: colors.iron[950], fontWeight: '800', fontSize: 14, marginBottom: 12 }}>Alternativas exactas</Text>
+                        <Text style={{ color: colors.text, fontWeight: '800', fontSize: 14, marginBottom: 12 }}>Alternativas exactas</Text>
                         {exactAlternatives.map((l, idx) => (
                             <Pressable key={idx} onPress={() => setActiveLoadout(l)} style={[ss.altRow, idx < exactAlternatives.length - 1 && ss.plateRowBorder]} accessibilityRole="button">
-                                <Text style={{ color: colors.iron[950], fontWeight: '800', fontSize: 14 }}>{l.totalWeight} {unit}</Text>
-                                <Text style={{ color: colors.iron[400], fontSize: 11, fontWeight: '600', marginTop: 2 }}>
+                                <Text style={{ color: colors.text, fontWeight: '800', fontSize: 14 }}>{l.totalWeight} {unit}</Text>
+                                <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '600', marginTop: 2 }}>
                                     {l.perSide.map((p) => `${p.plate}${unit} ×${p.pairs}`).join(' · ')}
                                 </Text>
                             </Pressable>
@@ -398,7 +398,7 @@ export default function PlateCalculator() {
                                     <Text style={ss.modalSub}>{editingPlate ? 'Ajusta peso, color y cantidad' : 'Gestiona tus discos disponibles'}</Text>
                                 </View>
                                 <TouchableOpacity onPress={() => { editingPlate ? setEditingPlate(null) : setIsSettingsVisible(false) }} style={ss.modalCloseBtn} accessibilityRole="button">
-                                    <X color={colors.iron[950]} size={18} />
+                                    <X color={colors.text} size={18} />
                                 </TouchableOpacity>
                             </View>
 
@@ -409,7 +409,7 @@ export default function PlateCalculator() {
                                         <TextInput
                                             style={[ss.smallInput, { marginBottom: 16 }]}
                                             placeholder="Ej: 20"
-                                            placeholderTextColor={colors.iron[400]}
+                                            placeholderTextColor={colors.textMuted}
                                             keyboardType="numeric"
                                             value={editingPlate.weight}
                                             onChangeText={(t) => setEditingPlate({ ...editingPlate, weight: t })}
@@ -419,7 +419,7 @@ export default function PlateCalculator() {
                                         <TextInput
                                             style={[ss.smallInput, { marginBottom: 16 }]}
                                             placeholder="Ej: 2"
-                                            placeholderTextColor={colors.iron[400]}
+                                            placeholderTextColor={colors.textMuted}
                                             keyboardType="numeric"
                                             value={editingPlate.count}
                                             onChangeText={(t) => setEditingPlate({ ...editingPlate, count: t })}
@@ -434,7 +434,7 @@ export default function PlateCalculator() {
                                                 <PaintBucket size={18} color={editingPlate.color ? colors.white : colors.black} />
                                             </TouchableOpacity>
                                             <TouchableOpacity onPress={() => setEditingPlate({ ...editingPlate, color: undefined })}>
-                                                <Text style={{ color: colors.iron[400], fontWeight: '700', fontSize: 12 }}>RESTABLECER AUTO</Text>
+                                                <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 12 }}>RESTABLECER AUTO</Text>
                                             </TouchableOpacity>
                                         </View>
 
@@ -477,9 +477,9 @@ export default function PlateCalculator() {
                                         <Text style={ss.invSectionTitle}>Preferencia</Text>
                                         <TouchableOpacity
                                             onPress={() => setPreferFewerPlates(!preferFewerPlates)}
-                                            style={[ss.toggleRow, preferFewerPlates && { backgroundColor: colors.primary.DEFAULT + '15', borderColor: colors.primary.DEFAULT }]}
+                                            style={[ss.toggleRow, preferFewerPlates && { backgroundColor: withAlpha(colors.primary.DEFAULT, '26'), borderColor: colors.primary.DEFAULT }]}
                                         >
-                                            <Text style={[{ fontWeight: '700', fontSize: 13 }, preferFewerPlates ? { color: colors.primary.DEFAULT } : { color: colors.iron[950] }]}>
+                                            <Text style={[{ fontWeight: '700', fontSize: 13 }, preferFewerPlates ? { color: colors.primary.DEFAULT } : { color: colors.text }]}>
                                                 {preferFewerPlates ? 'Preferir menos discos (más rápido)' : 'Permitir más discos (más opciones)'}
                                             </Text>
                                         </TouchableOpacity>
@@ -488,11 +488,11 @@ export default function PlateCalculator() {
                                     {/* Symmetry */}
                                     <View style={[ss.card, { marginBottom: 12 }]}>
                                         <Text style={ss.invSectionTitle}>Simetría</Text>
-                                        <Text style={{ color: colors.iron[400], fontSize: 11, marginBottom: 8, lineHeight: 16 }}>La app calcula por pares (1 disco por lado). Un disco suelto no se usa.</Text>
+                                        <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: 8, lineHeight: 16 }}>La app calcula por pares (1 disco por lado). Un disco suelto no se usa.</Text>
                                         {hasOddCounts && (
                                             <TouchableOpacity onPress={normalizeToPairs} style={ss.toggleRow}>
-                                                <Text style={{ color: colors.iron[950], fontWeight: '700', fontSize: 13 }}>Normalizar a pares</Text>
-                                                <Text style={{ color: colors.iron[400], fontSize: 11, marginTop: 2 }}>Resta 1 a los conteos impares (solo {unit}).</Text>
+                                                <Text style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>Normalizar a pares</Text>
+                                                <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>Resta 1 a los conteos impares (solo {unit}).</Text>
                                             </TouchableOpacity>
                                         )}
                                     </View>
@@ -506,30 +506,30 @@ export default function PlateCalculator() {
                                         >
                                             <View style={{ flex: 1 }}>
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                    <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: p.color || getPlateColor(p.weight, unit, p.type), borderWidth: 1, borderColor: withAlpha(colors.black, '20') }} />
-                                                    <Text style={{ color: colors.iron[950], fontWeight: '900', fontSize: 16 }}>{p.weight} {p.unit}</Text>
+                                                    <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: p.color || getPlateColor(p.weight, unit, p.type, colors), borderWidth: 1, borderColor: withAlpha(colors.black, '20') }} />
+                                                    <Text style={{ color: colors.text, fontWeight: '900', fontSize: 16 }}>{p.weight} {p.unit}</Text>
                                                     {p.type && p.type !== 'standard' && (
-                                                        <View style={{ backgroundColor: colors.iron[200], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                                                            <Text style={{ color: colors.iron[600], fontSize: 10, fontWeight: '800', textTransform: 'uppercase' }}>{p.type}</Text>
+                                                        <View style={{ backgroundColor: colors.border, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                                            <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase' }}>{p.type}</Text>
                                                         </View>
                                                     )}
                                                 </View>
-                                                <Text style={{ color: colors.iron[400], fontSize: 10, fontWeight: '600', marginTop: 2, marginLeft: 22 }}>
+                                                <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '600', marginTop: 2, marginLeft: 22 }}>
                                                     Pares: {Math.floor((p.count ?? 0) / 2)} {((p.count ?? 0) % 2 !== 0) ? '· sobra 1' : ''}
                                                 </Text>
                                             </View>
                                             <View style={ss.invControls}>
-                                                <Text style={{ color: colors.iron[400], fontSize: 11, fontWeight: '700' }}>TOCAR PARA EDITAR</Text>
+                                                <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700' }}>TOCAR PARA EDITAR</Text>
                                             </View>
                                         </TouchableOpacity>
                                     ))}
 
                                     <TouchableOpacity
                                         onPress={() => setEditingPlate({ weight: '', count: '2' })}
-                                        style={[ss.calcBtn, { marginTop: 16, backgroundColor: colors.iron[200], shadowOpacity: 0, borderWidth: 1, borderColor: colors.iron[300] }]}
+                                        style={[ss.calcBtn, { marginTop: 16, backgroundColor: colors.border, shadowOpacity: 0, borderWidth: 1, borderColor: colors.border }]}
                                     >
-                                        <Plus size={18} color={colors.iron[950]} />
-                                        <Text style={[ss.calcBtnText, { color: colors.iron[950] }]}>NUEVO DISCO</Text>
+                                        <Plus size={18} color={colors.text} />
+                                        <Text style={[ss.calcBtnText, { color: colors.text }]}>NUEVO DISCO</Text>
                                     </TouchableOpacity>
                                 </ScrollView>
                             )}

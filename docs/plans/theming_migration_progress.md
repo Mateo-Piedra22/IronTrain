@@ -4,9 +4,9 @@ Estado actual de la migración de componentes para soporte de temas en tiempo re
 
 ## 📊 Resumen Estadístico
 - **Total de archivos identificados:** 73
-- **Archivos migrados (Premium & Reactive):** 70
-- **Pendientes:** 3
-- **Progreso Global:** 95.9%
+- **Archivos migrados (Premium & Reactive):** 73
+- **Pendientes:** 0
+- **Progreso Global:** 100%
 
 ---
 
@@ -99,16 +99,16 @@ Refactorización de la UI de comunidad, posts y componentes sociales.
 - [x] `components/CategoryManager.tsx`
 - [x] `components/ui/ColorPicker.tsx`
 
-### ⏳ Lote 17: Misc & Utils
-- [ ] `app/feedback.tsx`
-- [ ] `app/changelog.tsx`
-- [ ] `app/callback.tsx`
-- [ ] `app/modal.tsx`
-- [ ] `components/GlobalNoticeHandler.tsx`
-- [ ] `components/EditScreenInfo.tsx`
-- [ ] `app/+html.tsx`
-- [ ] `app/+not-found.tsx`
-- [ ] `components/ExternalLink.tsx`
+### ✅ Lote 17: Misc & Utils (COMPLETADO)
+- [x] `app/feedback.tsx`
+- [x] `app/changelog.tsx`
+- [x] `app/callback.tsx` **(Fijado: Race condition de navegación)**
+- [x] `app/modal.tsx`
+- [x] `components/GlobalNoticeHandler.tsx` **(Refactorizado: Estándar 20px / 1.5px)**
+- [x] `components/EditScreenInfo.tsx`
+- [x] `app/+html.tsx`
+- [x] `app/+not-found.tsx`
+- [x] `components/ExternalLink.tsx`
 
 ---
 

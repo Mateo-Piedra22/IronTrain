@@ -43,16 +43,12 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
         },
         card: {
             backgroundColor: colors.surface,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: colors.iron[200],
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            elevation: 2,
-            shadowColor: ThemeFx.shadowColor,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.04,
-            shadowRadius: 6,
+            borderRadius: 24,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            ...ThemeFx.shadowSm,
         },
         cardActive: {
             borderColor: withAlpha(colors.primary.DEFAULT, '30'),
@@ -72,8 +68,8 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
             borderWidth: 1,
         },
         pillIdle: {
-            backgroundColor: colors.iron[100],
-            borderColor: colors.iron[200],
+            backgroundColor: colors.surfaceLighter,
+            borderColor: colors.border,
         },
         pillActive: {
             backgroundColor: withAlpha(colors.primary.DEFAULT, '08'),
@@ -90,7 +86,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
         pillTextIdle: {
             fontSize: 11,
             fontWeight: '800',
-            color: colors.iron[400],
+            color: colors.textMuted,
         },
         pillTextActive: {
             fontSize: 11,
@@ -105,14 +101,14 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
         pillTextComplete: {
             fontSize: 11,
             fontWeight: '800',
-            color: colors.white,
+            color: colors.onPrimary,
         },
         liveDot: {
             width: 6,
             height: 6,
             borderRadius: 3,
         },
-        liveDotIdle: { backgroundColor: colors.iron[400] },
+        liveDotIdle: { backgroundColor: colors.textMuted },
         liveDotActive: { backgroundColor: colors.primary.DEFAULT },
         liveDotPaused: { backgroundColor: colors.yellow },
 
@@ -122,7 +118,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
         timerLabel: {
             fontSize: 9,
             fontWeight: '700',
-            color: colors.iron[400],
+            color: colors.textMuted,
             textTransform: 'uppercase',
             letterSpacing: 0.5,
             marginBottom: 1,
@@ -135,14 +131,14 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
         timerValue: {
             fontSize: 20,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             fontVariant: ['tabular-nums'],
             letterSpacing: -0.5,
         },
         timerEdit: {
             fontSize: 20,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             fontVariant: ['tabular-nums'],
             borderBottomWidth: 2,
             borderBottomColor: colors.primary.DEFAULT,
@@ -163,13 +159,9 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
             backgroundColor: colors.surface,
             alignItems: 'center',
             justifyContent: 'center',
-            borderWidth: 1,
-            borderColor: colors.iron[200],
-            elevation: 1,
-            shadowColor: ThemeFx.shadowColor,
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.04,
-            shadowRadius: 2,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            ...ThemeFx.shadowSm,
         },
         ctrlBtnFinish: {
             width: 34,
@@ -178,7 +170,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
             backgroundColor: withAlpha(colors.primary.DEFAULT, '0A'),
             alignItems: 'center',
             justifyContent: 'center',
-            borderWidth: 1,
+            borderWidth: 1.5,
             borderColor: withAlpha(colors.primary.DEFAULT, '25'),
         },
         primaryBtn: {
@@ -189,16 +181,12 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
             paddingVertical: 8,
             borderRadius: 12,
             backgroundColor: colors.primary.DEFAULT,
-            elevation: 2,
-            shadowColor: ThemeFx.shadowColor,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.2,
-            shadowRadius: 4,
+            ...ThemeFx.shadowSm,
         },
         primaryBtnText: {
             fontSize: 12,
             fontWeight: '800',
-            color: colors.white,
+            color: colors.onPrimary,
         },
         secondaryBtn: {
             flexDirection: 'row',
@@ -208,13 +196,13 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
             paddingVertical: 8,
             borderRadius: 12,
             backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.iron[200],
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         secondaryBtnText: {
             fontSize: 12,
             fontWeight: '700',
-            color: colors.iron[500],
+            color: colors.textMuted,
         },
         statsRow: {
             flexDirection: 'row',
@@ -223,19 +211,19 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
             gap: 8,
             marginTop: 8,
             paddingTop: 8,
-            borderTopWidth: 1,
-            borderTopColor: colors.iron[100],
+            borderTopWidth: 1.5,
+            borderTopColor: colors.border,
         },
         statText: {
             fontSize: 11,
             fontWeight: '700',
-            color: colors.iron[400],
+            color: colors.textMuted,
         },
         statDot: {
             width: 3,
             height: 3,
             borderRadius: 2,
-            backgroundColor: colors.iron[200],
+            backgroundColor: colors.border,
         },
         pickerOverlay: {
             flex: 1,
@@ -250,24 +238,20 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
             maxWidth: 320,
             borderRadius: 24,
             padding: 16,
-            borderWidth: 1,
-            borderColor: colors.iron[200],
-            elevation: 8,
-            shadowColor: ThemeFx.shadowColor,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.2,
-            shadowRadius: 24,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            ...ThemeFx.shadowLg,
         },
         pickerHeader: {
             paddingBottom: 16,
             marginBottom: 8,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.iron[100],
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.border,
         },
         pickerTitle: {
             fontSize: 16,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             textAlign: 'center',
         },
         pickerOption: {
@@ -285,7 +269,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
         pickerOptionText: {
             fontSize: 15,
             fontWeight: '700',
-            color: colors.iron[500],
+            color: colors.textMuted,
         },
         pickerOptionTextActive: {
             color: colors.primary.DEFAULT,
@@ -295,7 +279,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
             height: 12,
             borderRadius: 6,
         },
-        pickerDotIdle: { backgroundColor: colors.iron[300] },
+        pickerDotIdle: { backgroundColor: colors.textMuted },
         pickerDotActive: { backgroundColor: colors.primary.DEFAULT },
         pickerDotPaused: { backgroundColor: colors.yellow },
     }), [colors]);
@@ -580,7 +564,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
                         <View style={st.row}>
                             {/* Status pill */}
                             <Pressable style={[st.pill, st.pillComplete]} onPress={() => setShowStatePicker(true)}>
-                                <Check size={10} color={colors.white} strokeWidth={3} />
+                                <Check size={10} color={colors.onPrimary} strokeWidth={3} />
                                 <Text style={st.pillTextComplete}>Finalizado</Text>
                             </Pressable>
 
@@ -641,7 +625,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
                                 ) : (
                                     <Pressable onPress={handleEditTimer} style={st.timerTouchable} hitSlop={4}>
                                         <Text style={st.timerValue}>{formatTimer(timerSeconds)}</Text>
-                                        <Pencil size={10} color={colors.iron[400]} />
+                                        <Pencil size={10} color={colors.textMuted} />
                                     </Pressable>
                                 )}
                             </View>
@@ -679,11 +663,11 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
                         {/* Actions */}
                         <View style={st.controlsRow}>
                             <Pressable onPress={handleStart} style={st.primaryBtn} hitSlop={6}>
-                                <Play size={11} color={colors.white} fill={colors.white} />
+                                <Play size={11} color={colors.onPrimary} fill={colors.onPrimary} />
                                 <Text style={st.primaryBtnText}>Iniciar</Text>
                             </Pressable>
                             <Pressable onPress={handleFinish} style={st.secondaryBtn} hitSlop={6}>
-                                <Check size={11} color={colors.iron[500]} strokeWidth={3} />
+                                <Check size={11} color={colors.textMuted} strokeWidth={3} />
                                 <Text style={st.secondaryBtnText}>Finalizar</Text>
                             </Pressable>
                         </View>
@@ -720,7 +704,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
                         </Pressable>
 
                         <Pressable onPress={() => handleSelectState('completed')} style={[st.pickerOption, phase === 'completed' && st.pickerOptionActive]}>
-                            <Check size={12} color={phase === 'completed' ? colors.primary.DEFAULT : colors.iron[400]} strokeWidth={3} />
+                            <Check size={12} color={phase === 'completed' ? colors.primary.DEFAULT : colors.textMuted} strokeWidth={3} />
                             <Text style={[st.pickerOptionText, phase === 'completed' && st.pickerOptionTextActive]}>Finalizado</Text>
                         </Pressable>
                     </View>

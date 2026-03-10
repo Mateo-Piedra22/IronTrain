@@ -1,6 +1,7 @@
 import React from 'react';
 import renderer from 'react-test-renderer';
 import LibraryScreen from '../(tabs)/exercises';
+import { TestingProvider } from '../../src/utils/TestingProvider';
 
 // Mock react-native-safe-area-context
 jest.mock('react-native-safe-area-context', () => ({
@@ -32,7 +33,11 @@ describe('LibraryScreen Navigation Structure', () => {
   it('renders exercises mode by default', () => {
     let root: renderer.ReactTestRenderer;
     renderer.act(() => {
-      root = renderer.create(<LibraryScreen />);
+      root = renderer.create(
+        <TestingProvider>
+          <LibraryScreen />
+        </TestingProvider>
+      );
     });
     expect(root!.toJSON()).toBeTruthy();
     renderer.act(() => {

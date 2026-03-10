@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '../src/hooks/useColors';
+import { ThemeFx } from '../src/theme';
 
 interface ConsistencyHeatmapProps {
     timestamps: number[];
@@ -23,14 +24,10 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
         container: {
             backgroundColor: colors.surface,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
             padding: 20,
             borderRadius: 20,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.05,
-            shadowRadius: 15,
-            elevation: 4,
+            ...ThemeFx.shadowSm,
         },
         header: {
             flexDirection: 'row',
@@ -57,11 +54,7 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
             paddingHorizontal: 10,
             paddingVertical: 3,
             borderRadius: 10,
-            shadowColor: colors.primary.DEFAULT,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.2,
-            shadowRadius: 4,
-            elevation: 2,
+            ...ThemeFx.shadowSm,
         },
         yearText: {
             color: colors.surface,
@@ -70,22 +63,22 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
             letterSpacing: 0.5,
         },
         subtitle: {
-            color: colors.iron[500],
+            color: colors.textMuted,
             fontSize: 12,
             marginTop: 4,
             fontWeight: '700',
         },
         tooltip: {
             alignItems: 'flex-end',
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             paddingHorizontal: 12,
             paddingVertical: 8,
             borderRadius: 12,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
         },
         tooltipDate: {
-            color: colors.iron[950],
+            color: colors.text,
             fontSize: 11,
             fontWeight: '900',
             textTransform: 'uppercase',
@@ -113,7 +106,7 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
         },
         dayLabel: {
             fontSize: 9,
-            color: colors.iron[400],
+            color: colors.textMuted,
             fontWeight: '900',
             textAlign: 'center',
             width: 12,
@@ -130,12 +123,12 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
         yearDividerLine: {
             width: 1.5,
             flex: 1,
-            backgroundColor: colors.iron[200],
+            backgroundColor: colors.border,
             minHeight: 12,
         },
         yearDividerText: {
             fontSize: 10,
-            color: colors.iron[500],
+            color: colors.textMuted,
             fontWeight: '900',
             transform: [{ rotate: '-90deg' }],
             width: 40,
@@ -160,15 +153,15 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
         },
         monthLabel: {
             fontSize: 11,
-            color: colors.iron[950],
+            color: colors.text,
             fontWeight: '900',
             letterSpacing: 0.3,
         },
         monthGridContainer: {
-            backgroundColor: colors.iron[50],
+            backgroundColor: colors.surfaceLighter,
             borderRadius: 16,
             borderWidth: 1.5,
-            borderColor: colors.iron[100],
+            borderColor: colors.border,
             padding: MONTH_CARD_PADDING + 2,
         },
         weeksRow: {
@@ -185,7 +178,7 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
         },
         cellToday: {
             borderWidth: 2,
-            borderColor: colors.iron[950],
+            borderColor: colors.text,
         },
         cellEmpty: {
             width: CELL_SIZE,
@@ -201,10 +194,10 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
             gap: 6,
             paddingTop: 12,
             borderTopWidth: 1.5,
-            borderTopColor: colors.iron[100],
+            borderTopColor: colors.border,
         },
         legendLabel: {
-            color: colors.iron[400],
+            color: colors.textMuted,
             fontSize: 11,
             fontWeight: '900',
             textTransform: 'uppercase',
@@ -275,8 +268,8 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
     }, [timestamps]);
 
     const getCellColor = (count: number, isSelected: boolean): string => {
-        if (isSelected) return colors.iron[950];
-        if (count === 0) return colors.iron[200];
+        if (isSelected) return colors.text;
+        if (count === 0) return colors.isDark ? colors.surface : colors.border;
         if (count === 1) return colors.primary.light;
         if (count === 2) return colors.primary.DEFAULT;
         return colors.primary.dark;
@@ -414,7 +407,7 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
             {/* Legend */}
             <View style={ss.legend}>
                 <Text style={ss.legendLabel}>Menos</Text>
-                <View style={[ss.legendCell, { backgroundColor: colors.iron[200] }]} />
+                <View style={[ss.legendCell, { backgroundColor: colors.border }]} />
                 <View style={[ss.legendCell, { backgroundColor: colors.primary.light }]} />
                 <View style={[ss.legendCell, { backgroundColor: colors.primary.DEFAULT }]} />
                 <View style={[ss.legendCell, { backgroundColor: colors.primary.dark }]} />

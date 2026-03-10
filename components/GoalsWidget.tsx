@@ -1,5 +1,5 @@
 import { GoalsService } from '@/src/services/GoalsService';
-import { ThemeFx } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { Goal } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import * as Haptics from 'expo-haptics';
@@ -27,14 +27,10 @@ export function GoalsWidget() {
         container: {
             backgroundColor: colors.surface,
             borderRadius: 16,
-            borderWidth: 1,
-            borderColor: colors.iron[700],
+            borderWidth: 1.5,
+            borderColor: colors.border,
             padding: 20,
-            elevation: 2,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 8,
+            ...ThemeFx.shadowSm,
         },
         header: {
             flexDirection: 'row',
@@ -51,20 +47,20 @@ export function GoalsWidget() {
             width: 34,
             height: 34,
             borderRadius: 17,
-            backgroundColor: colors.primary.DEFAULT + '15',
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '15'),
             justifyContent: 'center',
             alignItems: 'center',
         },
         title: {
             fontSize: 15,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             letterSpacing: -0.3,
         },
         subtitle: {
             fontSize: 10,
             fontWeight: '600',
-            color: colors.iron[400],
+            color: colors.textMuted,
             textTransform: 'uppercase',
         },
         addButton: {
@@ -80,12 +76,12 @@ export function GoalsWidget() {
             alignItems: 'center',
         },
         loadingText: {
-            color: colors.iron[500],
+            color: colors.textMuted,
             marginTop: 8,
             fontSize: 12,
         },
         errorText: {
-            color: colors.iron[500],
+            color: colors.textMuted,
             paddingVertical: 16,
         },
         emptyState: {
@@ -94,21 +90,21 @@ export function GoalsWidget() {
             gap: 6,
         },
         emptyTitle: {
-            color: colors.iron[500],
+            color: colors.textMuted,
             fontWeight: '800',
             fontSize: 13,
         },
         emptyMessage: {
-            color: colors.iron[400],
+            color: colors.textMuted,
             fontSize: 11,
             textAlign: 'center',
         },
         goalCard: {
-            backgroundColor: colors.iron[200],
+            backgroundColor: colors.surfaceLighter,
             borderRadius: 12,
             padding: 14,
-            borderWidth: 1,
-            borderColor: colors.iron[300],
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         goalHeader: {
             flexDirection: 'row',
@@ -119,7 +115,7 @@ export function GoalsWidget() {
         goalTitle: {
             fontSize: 14,
             fontWeight: '700',
-            color: colors.iron[950],
+            color: colors.text,
             flex: 1,
             paddingRight: 8,
         },
@@ -130,7 +126,7 @@ export function GoalsWidget() {
         },
         progressTrack: {
             height: 6,
-            backgroundColor: colors.iron[300],
+            backgroundColor: colors.border,
             borderRadius: 3,
             overflow: 'hidden',
             marginBottom: 10,
@@ -147,7 +143,7 @@ export function GoalsWidget() {
         goalValues: {
             fontSize: 11,
             fontWeight: '600',
-            color: colors.iron[500],
+            color: colors.textMuted,
         },
         goalActions: {
             flexDirection: 'row',
@@ -157,18 +153,20 @@ export function GoalsWidget() {
             width: 28,
             height: 28,
             borderRadius: 14,
-            backgroundColor: colors.iron[300],
+            backgroundColor: colors.surface,
+            borderWidth: 1.5,
+            borderColor: colors.border,
             justifyContent: 'center',
             alignItems: 'center',
         },
         completeButton: {
-            backgroundColor: colors.green + '20',
+            backgroundColor: withAlpha(colors.green, '20'),
         },
         historySection: {
             marginTop: 16,
             paddingTop: 16,
-            borderTopWidth: 1,
-            borderTopColor: colors.iron[300],
+            borderTopWidth: 1.5,
+            borderTopColor: colors.border,
         },
         historyToggle: {
             flexDirection: 'row',
@@ -184,45 +182,118 @@ export function GoalsWidget() {
         historyToggleText: {
             fontSize: 13,
             fontWeight: '700',
-            color: colors.iron[950],
+            color: colors.text,
         },
         completedCard: {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: colors.iron[200],
+            backgroundColor: colors.surfaceLighter,
             borderRadius: 10,
             padding: 12,
-            borderWidth: 1,
-            borderColor: colors.iron[300],
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         completedCheckCircle: {
             width: 24,
             height: 24,
             borderRadius: 12,
-            backgroundColor: colors.green + '20',
+            backgroundColor: withAlpha(colors.green, '20'),
             justifyContent: 'center',
             alignItems: 'center',
         },
         completedTitle: {
             fontSize: 13,
             fontWeight: '600',
-            color: colors.iron[500],
+            color: colors.textMuted,
             textDecorationLine: 'line-through',
         },
         completedValues: {
             fontSize: 10,
             fontWeight: '500',
-            color: colors.iron[400],
+            color: colors.textMuted,
         },
         reopenButton: {
             width: 26,
             height: 26,
             borderRadius: 13,
-            backgroundColor: colors.iron[300],
+            backgroundColor: colors.surface,
+            borderWidth: 1.5,
+            borderColor: colors.border,
             justifyContent: 'center',
             alignItems: 'center',
         },
+        modalOverlay: {
+            flex: 1,
+            backgroundColor: ThemeFx.backdrop,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 16
+        },
+        modalContainer: {
+            backgroundColor: colors.surface,
+            width: '100%',
+            maxWidth: 360,
+            borderRadius: 24,
+            padding: 24,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            ...ThemeFx.shadowLg,
+        },
+        modalTitle: {
+            fontSize: 20,
+            fontWeight: '900',
+            color: colors.text,
+            marginBottom: 20,
+            letterSpacing: -0.3
+        },
+        label: {
+            color: colors.textMuted,
+            fontSize: 10,
+            fontWeight: '800',
+            marginBottom: 8,
+            textTransform: 'uppercase',
+            letterSpacing: 1
+        },
+        input: {
+            backgroundColor: colors.surfaceLighter,
+            borderRadius: 14,
+            padding: 14,
+            fontSize: 16,
+            color: colors.text,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            marginBottom: 20
+        },
+        inputRow: {
+            flexDirection: 'row',
+            gap: 12,
+            marginBottom: 24
+        },
+        cancelBtn: {
+            padding: 14,
+            borderRadius: 14,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            alignItems: 'center'
+        },
+        cancelBtnText: {
+            color: colors.textMuted,
+            fontWeight: '700',
+            fontSize: 14
+        },
+        saveBtn: {
+            backgroundColor: colors.primary.DEFAULT,
+            padding: 14,
+            borderRadius: 14,
+            alignItems: 'center',
+            ...ThemeFx.shadowSm
+        },
+        saveBtnText: {
+            color: colors.surface,
+            fontWeight: '800',
+            fontSize: 14
+        }
     }), [colors]);
 
     useEffect(() => {
@@ -343,7 +414,7 @@ export function GoalsWidget() {
                 <Text style={ss.errorText}>{error}</Text>
             ) : goals.length === 0 ? (
                 <View style={ss.emptyState}>
-                    <Target size={24} color={colors.iron[300]} />
+                    <Target size={24} color={colors.textMuted} />
                     <Text style={ss.emptyTitle}>Sin metas activas</Text>
                     <Text style={ss.emptyMessage}>
                         Crea tu primera meta para seguir tu progreso.
@@ -386,7 +457,7 @@ export function GoalsWidget() {
                                             accessibilityRole="button"
                                             accessibilityLabel={`Eliminar meta ${g.title}`}
                                         >
-                                            <Trash2 size={14} color={colors.iron[400]} />
+                                            <Trash2 size={14} color={colors.textMuted} />
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             onPress={() => handleComplete(g.id)}
@@ -420,8 +491,8 @@ export function GoalsWidget() {
                             </Text>
                         </View>
                         {showHistory
-                            ? <ChevronUp size={16} color={colors.iron[400]} />
-                            : <ChevronDown size={16} color={colors.iron[400]} />
+                            ? <ChevronUp size={16} color={colors.textMuted} />
+                            : <ChevronDown size={16} color={colors.textMuted} />
                         }
                     </TouchableOpacity>
 
@@ -449,7 +520,7 @@ export function GoalsWidget() {
                                             accessibilityRole="button"
                                             accessibilityLabel={`Reabrir meta ${g.title}`}
                                         >
-                                            <RotateCcw size={12} color={colors.iron[400]} />
+                                            <RotateCcw size={12} color={colors.textMuted} />
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             onPress={() => handleDelete(g.id, g.title)}
@@ -457,7 +528,7 @@ export function GoalsWidget() {
                                             accessibilityRole="button"
                                             accessibilityLabel={`Eliminar meta ${g.title}`}
                                         >
-                                            <Trash2 size={12} color={colors.iron[400]} />
+                                            <Trash2 size={12} color={colors.textMuted} />
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -469,66 +540,55 @@ export function GoalsWidget() {
 
             {/* Add Goal Modal */}
             <Modal visible={modalVisible} transparent animationType="fade">
-                <View style={{ flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-                    <View style={{
-                        backgroundColor: colors.surface, width: '100%', maxWidth: 360,
-                        borderRadius: 20, padding: 24, borderWidth: 1, borderColor: colors.iron[700],
-                        elevation: 8, shadowColor: colors.black, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24,
-                    }}>
-                        <Text style={{ fontSize: 20, fontWeight: '900', color: colors.iron[950], marginBottom: 20, letterSpacing: -0.3 }}>
+                <View style={ss.modalOverlay}>
+                    <View style={ss.modalContainer}>
+                        <Text style={ss.modalTitle}>
                             Nueva meta
                         </Text>
 
-                        <Text style={{ color: colors.iron[500], fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Título</Text>
+                        <Text style={ss.label}>Título</Text>
                         <TextInput
                             value={newTitle}
                             onChangeText={setNewTitle}
                             placeholder="Ej. Press banca 100kg"
-                            style={{
-                                backgroundColor: colors.iron[200], borderRadius: 12, padding: 14,
-                                fontSize: 16, color: colors.iron[950], borderWidth: 1, borderColor: colors.iron[300],
-                                marginBottom: 20
-                            }}
+                            placeholderTextColor={colors.textMuted}
+                            style={ss.input}
                         />
 
-                        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
+                        <View style={ss.inputRow}>
                             <View style={{ flex: 1 }}>
-                                <Text style={{ color: colors.iron[500], fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Objetivo (kg)</Text>
+                                <Text style={ss.label}>Objetivo (kg)</Text>
                                 <TextInput
                                     value={newTarget}
                                     onChangeText={setNewTarget}
                                     keyboardType="numeric"
                                     placeholder="100"
-                                    style={{
-                                        backgroundColor: colors.iron[200], borderRadius: 12, padding: 14,
-                                        fontSize: 16, color: colors.iron[950], borderWidth: 1, borderColor: colors.iron[300],
-                                    }}
+                                    placeholderTextColor={colors.textMuted}
+                                    style={ss.input}
                                 />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text style={{ color: colors.iron[500], fontSize: 10, fontWeight: '800', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Actual (kg)</Text>
+                                <Text style={ss.label}>Actual (kg)</Text>
                                 <TextInput
                                     value={newCurrent}
                                     onChangeText={setNewCurrent}
                                     keyboardType="numeric"
                                     placeholder="80"
-                                    style={{
-                                        backgroundColor: colors.iron[200], borderRadius: 12, padding: 14,
-                                        fontSize: 16, color: colors.iron[950], borderWidth: 1, borderColor: colors.iron[300],
-                                    }}
+                                    placeholderTextColor={colors.textMuted}
+                                    style={ss.input}
                                 />
                             </View>
                         </View>
 
                         <View style={{ flexDirection: 'row', gap: 12 }}>
                             <View style={{ flex: 1 }}>
-                                <TouchableOpacity onPress={() => setModalVisible(false)} style={{ padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.iron[300], alignItems: 'center' }}>
-                                    <Text style={{ color: colors.iron[600], fontWeight: '700', fontSize: 14 }}>Cancelar</Text>
+                                <TouchableOpacity onPress={() => setModalVisible(false)} style={ss.cancelBtn}>
+                                    <Text style={ss.cancelBtnText}>Cancelar</Text>
                                 </TouchableOpacity>
                             </View>
                             <View style={{ flex: 1 }}>
-                                <TouchableOpacity onPress={handleAddGoal} style={{ backgroundColor: colors.primary.DEFAULT, padding: 14, borderRadius: 12, alignItems: 'center' }}>
-                                    <Text style={{ color: colors.surface, fontWeight: '800', fontSize: 14 }}>Guardar</Text>
+                                <TouchableOpacity onPress={handleAddGoal} style={ss.saveBtn}>
+                                    <Text style={ss.saveBtnText}>Guardar</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>

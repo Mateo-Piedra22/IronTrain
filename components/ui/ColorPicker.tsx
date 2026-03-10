@@ -57,21 +57,21 @@ export function ColorPicker({ visible, initialColor, onClose, onSelect }: ColorP
     const [hex, setHex] = useState(initialColor || colors.blue);
 
     const ss = useMemo(() => StyleSheet.create({
-        overlay: { flex: 1, backgroundColor: withAlpha(colors.black, '99'), justifyContent: 'center', alignItems: 'center', padding: 24 },
-        sheet: { backgroundColor: colors.surface, width: '100%', maxWidth: 380, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: colors.iron[300], elevation: 12, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 20 },
-        title: { fontSize: 18, fontWeight: '900', color: colors.iron[950], marginBottom: 20, letterSpacing: -0.3 },
-        preview: { height: 80, borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: colors.iron[300], alignItems: 'center', justifyContent: 'center' },
+        overlay: { flex: 1, backgroundColor: ThemeFx.backdropStrong, justifyContent: 'center', alignItems: 'center', padding: 24 },
+        sheet: { backgroundColor: colors.surface, width: '100%', maxWidth: 380, borderRadius: 24, padding: 24, borderWidth: 1.5, borderColor: colors.border, ...ThemeFx.shadowLg },
+        title: { fontSize: 18, fontWeight: '900', color: colors.text, marginBottom: 20, letterSpacing: -0.3 },
+        preview: { height: 80, borderRadius: 16, marginBottom: 24, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
         previewBadge: { backgroundColor: withAlpha(colors.black, '4D'), paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8 },
         previewText: { color: colors.white, fontWeight: '900', fontSize: 15, letterSpacing: 1 },
-        sliderLabel: { color: colors.iron[400], fontSize: 10, fontWeight: '800', textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.8 },
+        sliderLabel: { color: colors.textMuted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.8 },
         trackOuter: { height: 40, borderRadius: 20, overflow: 'hidden', position: 'relative', justifyContent: 'center', marginBottom: 20 },
         gradient: { flex: 1, borderRadius: 20 },
-        thumb: { position: 'absolute', width: 22, height: '100%', backgroundColor: colors.white, borderWidth: 2.5, borderColor: colors.black, borderRadius: 11, transform: [{ translateX: -11 }], shadowColor: colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4 },
+        thumb: { position: 'absolute', width: 22, height: '100%', backgroundColor: colors.white, borderWidth: 2.5, borderColor: colors.black, borderRadius: 11, transform: [{ translateX: -11 }], ...ThemeFx.shadowSm },
         actions: { flexDirection: 'row', gap: 12, marginTop: 4 },
-        cancelBtn: { flex: 1, paddingVertical: 14, backgroundColor: colors.iron[100], borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.iron[300] },
-        cancelText: { color: colors.iron[500], fontWeight: '800', fontSize: 14 },
-        selectBtn: { flex: 1, paddingVertical: 14, backgroundColor: colors.primary.DEFAULT, borderRadius: 14, alignItems: 'center' },
-        selectText: { color: colors.white, fontWeight: '800', fontSize: 14 },
+        cancelBtn: { flex: 1, paddingVertical: 14, backgroundColor: colors.surfaceLighter, borderRadius: 14, alignItems: 'center', borderWidth: 1.5, borderColor: colors.border },
+        cancelText: { color: colors.textMuted, fontWeight: '800', fontSize: 14 },
+        selectBtn: { flex: 1, paddingVertical: 14, backgroundColor: colors.primary.DEFAULT, borderRadius: 14, alignItems: 'center', ...ThemeFx.shadowSm },
+        selectText: { color: colors.onPrimary, fontWeight: '900', fontSize: 14, textTransform: 'uppercase', letterSpacing: 0.5 },
     }), [colors]);
 
     /** Draggable slider track that responds to both taps and pan gestures */

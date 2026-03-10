@@ -35,7 +35,7 @@ export function IronButton({
             },
             outline: {
                 backgroundColor: 'transparent',
-                borderWidth: 1,
+                borderWidth: 1.5,
                 borderColor: colors.primary.DEFAULT,
                 elevation: 0,
             },
@@ -53,17 +53,18 @@ export function IronButton({
         };
 
         const textVariants: Record<string, { color: string; fontWeight: "800" | "700" }> = {
-            solid: { color: colors.white, fontWeight: '800' },
+            solid: { color: colors.onPrimary, fontWeight: '800' },
             outline: { color: colors.primary.DEFAULT, fontWeight: '800' },
-            ghost: { color: colors.iron[950], fontWeight: '700' }
+            ghost: { color: colors.text, fontWeight: '700' }
         };
 
         return StyleSheet.create({
             container: {
-                borderRadius: 16,
+                borderRadius: 14,
                 overflow: 'hidden',
                 justifyContent: 'center',
                 alignItems: 'center',
+                borderWidth: variant === 'outline' ? 1.5 : 0,
                 ...variants[variant],
                 ...sizes[size],
             },
@@ -96,7 +97,7 @@ export function IronButton({
     };
 
     const rippleColor = useMemo(() => {
-        if (variant === 'solid') return withAlpha(colors.white, '20');
+        if (variant === 'solid') return withAlpha(colors.onPrimary, '20');
         return withAlpha(colors.primary.DEFAULT, '15');
     }, [colors, variant]);
 
@@ -114,7 +115,7 @@ export function IronButton({
             // but we rely on ripple for Android and standard opacity for iOS in simple setups.
             >
                 {loading ? (
-                    <ActivityIndicator color={variant === 'solid' ? colors.white : colors.primary.dark} />
+                    <ActivityIndicator color={variant === 'solid' ? colors.onPrimary : colors.primary.DEFAULT} />
                 ) : (
                     <Text style={ss.text}>
                         {label}

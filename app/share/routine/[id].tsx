@@ -8,6 +8,7 @@ import { AlertCircle, Calendar, ChevronLeft, Dumbbell, Info } from 'lucide-react
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useColors } from '../../../src/hooks/useColors';
+import { ThemeFx, withAlpha } from '../../../src/theme';
 
 export default function ShareRoutineScreen() {
     const colors = useColors();
@@ -66,7 +67,7 @@ export default function ShareRoutineScreen() {
     const styles = useMemo(() => StyleSheet.create({
         screen: {
             flex: 1,
-            backgroundColor: colors.iron[900],
+            backgroundColor: colors.background,
         },
         centered: {
             flex: 1,
@@ -80,7 +81,7 @@ export default function ShareRoutineScreen() {
         },
         loadingText: {
             marginTop: 16,
-            color: colors.iron[500],
+            color: colors.textMuted,
             fontSize: 14,
             fontWeight: '700',
             letterSpacing: 0.2,
@@ -93,22 +94,18 @@ export default function ShareRoutineScreen() {
             marginBottom: 24,
         },
         backBtn: {
-            width: 38,
-            height: 38,
-            borderRadius: 19,
+            width: 40,
+            height: 40,
+            borderRadius: 20,
             backgroundColor: colors.surface,
             alignItems: 'center',
             justifyContent: 'center',
             borderWidth: 1.5,
             borderColor: colors.border,
-            elevation: 2,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 4,
+            ...ThemeFx.shadowSm,
         },
         pageTitle: {
-            color: colors.iron[950],
+            color: colors.text,
             fontWeight: '900',
             fontSize: 24,
             letterSpacing: -1,
@@ -125,20 +122,20 @@ export default function ShareRoutineScreen() {
             width: 80,
             height: 80,
             borderRadius: 40,
-            backgroundColor: colors.red + '10',
+            backgroundColor: withAlpha(colors.red, '10'),
             justifyContent: 'center',
             alignItems: 'center',
             marginBottom: 20,
         },
         errorTitle: {
-            color: colors.iron[950],
+            color: colors.text,
             fontSize: 22,
             fontWeight: '900',
             letterSpacing: -0.5,
         },
         errorText: {
             marginTop: 12,
-            color: colors.iron[500],
+            color: colors.textMuted,
             textAlign: 'center',
             fontSize: 15,
             lineHeight: 22,
@@ -151,9 +148,10 @@ export default function ShareRoutineScreen() {
             borderRadius: 14,
             borderWidth: 1.5,
             borderColor: colors.border,
+            ...ThemeFx.shadowSm,
         },
         errorBtnText: {
-            color: colors.iron[950],
+            color: colors.text,
             fontWeight: '900',
             textTransform: 'uppercase',
             fontSize: 13,
@@ -168,11 +166,7 @@ export default function ShareRoutineScreen() {
             borderWidth: 1.5,
             borderColor: colors.border,
             marginBottom: 24,
-            elevation: 2,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.05,
-            shadowRadius: 10,
+            ...ThemeFx.shadowLg,
         },
         titleRow: {
             flexDirection: 'row',
@@ -184,37 +178,37 @@ export default function ShareRoutineScreen() {
             width: 52,
             height: 52,
             borderRadius: 16,
-            backgroundColor: colors.primary.DEFAULT + '10',
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '10'),
             justifyContent: 'center',
             alignItems: 'center',
             borderWidth: 1.5,
-            borderColor: colors.primary.DEFAULT + '20',
+            borderColor: withAlpha(colors.primary.DEFAULT, '20'),
         },
         routineIconBox: {
             width: 52,
             height: 52,
             borderRadius: 16,
-            backgroundColor: colors.primary.DEFAULT + '10',
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '10'),
             justifyContent: 'center',
             alignItems: 'center',
             borderWidth: 1.5,
-            borderColor: colors.primary.DEFAULT + '20',
+            borderColor: withAlpha(colors.primary.DEFAULT, '20'),
         },
         title: {
             fontSize: 22,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             letterSpacing: -0.5,
         },
         subtitle: {
             fontSize: 12,
             fontWeight: '700',
-            color: colors.iron[400],
+            color: colors.textMuted,
             textTransform: 'uppercase',
             letterSpacing: 0.5,
         },
         infoCard: {
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             padding: 14,
             borderRadius: 12,
             borderLeftWidth: 3,
@@ -225,7 +219,7 @@ export default function ShareRoutineScreen() {
         },
         infoCardText: {
             fontSize: 14,
-            color: colors.iron[600],
+            color: colors.textMuted,
             lineHeight: 20,
             flex: 1,
         },
@@ -235,7 +229,7 @@ export default function ShareRoutineScreen() {
         },
         statItem: {
             flex: 1,
-            backgroundColor: colors.iron[50],
+            backgroundColor: colors.surfaceLighter,
             padding: 12,
             borderRadius: 14,
             borderWidth: 1.5,
@@ -246,18 +240,18 @@ export default function ShareRoutineScreen() {
         statValue: {
             fontSize: 18,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
         },
         statLabel: {
             fontSize: 10,
             fontWeight: '800',
-            color: colors.iron[400],
+            color: colors.textMuted,
             textTransform: 'uppercase',
         },
 
         // Days list
         sectionLabel: {
-            color: colors.iron[400],
+            color: colors.textMuted,
             fontSize: 11,
             fontWeight: '900',
             textTransform: 'uppercase',
@@ -275,12 +269,13 @@ export default function ShareRoutineScreen() {
             borderWidth: 1.5,
             borderColor: colors.border,
             overflow: 'hidden',
+            ...ThemeFx.shadowSm,
         },
         dayHeader: {
             flexDirection: 'row',
             alignItems: 'center',
             padding: 14,
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderBottomWidth: 1.5,
             borderBottomColor: colors.border,
             gap: 12,
@@ -289,19 +284,19 @@ export default function ShareRoutineScreen() {
             width: 36,
             height: 36,
             borderRadius: 12,
-            backgroundColor: colors.primary.DEFAULT + '10',
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '10'),
             justifyContent: 'center',
             alignItems: 'center',
         },
         dayTitle: {
             fontSize: 16,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
         },
         daySubLabel: {
             fontSize: 9,
             fontWeight: '800',
-            color: colors.iron[400],
+            color: colors.textMuted,
             letterSpacing: 0.5,
             marginTop: -1,
         },
@@ -325,7 +320,7 @@ export default function ShareRoutineScreen() {
             fontSize: 10,
             fontWeight: '900',
             color: colors.primary.DEFAULT,
-            backgroundColor: colors.primary.DEFAULT + '15',
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '15'),
             width: 20,
             height: 20,
             borderRadius: 6,
@@ -336,7 +331,7 @@ export default function ShareRoutineScreen() {
         exName: {
             fontSize: 14,
             fontWeight: '900',
-            color: colors.iron[950],
+            color: colors.text,
             marginBottom: 4,
         },
         badgeRow: {
@@ -352,12 +347,12 @@ export default function ShareRoutineScreen() {
         },
         exNotesText: {
             fontSize: 12,
-            color: colors.iron[400],
+            color: colors.textMuted,
             fontStyle: 'italic',
         },
         emptyText: {
             fontSize: 13,
-            color: colors.iron[400],
+            color: colors.textMuted,
             fontStyle: 'italic',
             textAlign: 'center',
             paddingVertical: 10,
@@ -371,15 +366,17 @@ export default function ShareRoutineScreen() {
             flexDirection: 'row',
             alignItems: 'center',
             gap: 10,
-            backgroundColor: colors.iron[200],
+            backgroundColor: colors.surfaceLighter,
             padding: 14,
             borderRadius: 14,
             marginBottom: 8,
+            borderWidth: 1.5,
+            borderColor: colors.border,
         },
         helperText: {
             flex: 1,
             fontSize: 12,
-            color: colors.iron[600],
+            color: colors.text,
             fontWeight: '700',
             lineHeight: 18,
         },
@@ -389,7 +386,7 @@ export default function ShareRoutineScreen() {
             marginTop: 8,
         },
         cancelBtnText: {
-            color: colors.iron[500],
+            color: colors.textMuted,
             fontWeight: '800',
             fontSize: 13,
             textTransform: 'uppercase',
@@ -433,7 +430,7 @@ export default function ShareRoutineScreen() {
                 {/* Custom Floating Header Style (Matching Changelog) */}
                 <View style={styles.headerRow}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                        <ChevronLeft size={20} color={colors.iron[950]} />
+                        <ChevronLeft size={20} color={colors.text} />
                     </TouchableOpacity>
                     <View>
                         <Text style={styles.pageTitle}>Vista Previa</Text>

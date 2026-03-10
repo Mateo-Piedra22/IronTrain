@@ -14,8 +14,8 @@ export function SafeAreaWrapper({ children, style, edges = ['top', 'left', 'righ
   const colors = useColors();
   return (
     <SafeAreaView
-      className={`flex-1 ${className || 'bg-iron-900'}`}
-      style={style}
+      className={`flex-1 ${className || ''}`}
+      style={[{ backgroundColor: colors.background }, style]}
       edges={edges}
       {...props}
     >

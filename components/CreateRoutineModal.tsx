@@ -1,7 +1,7 @@
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
 import { routineService } from '@/src/services/RoutineService';
-import { ThemeFx } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import { BookOpen } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
@@ -25,28 +25,24 @@ export function CreateRoutineModal({ visible, onClose, onCreated, editRoutine }:
         container: {
             backgroundColor: colors.surface,
             width: '100%',
-            borderRadius: 20,
+            borderRadius: 24,
             padding: 24,
             borderWidth: 1.5,
             borderColor: colors.border,
-            elevation: 12,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.15,
-            shadowRadius: 24,
+            ...ThemeFx.shadowLg,
         },
         titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 },
         iconCircle: {
             width: 44, height: 44, borderRadius: 14,
-            backgroundColor: colors.primary.DEFAULT + '15',
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '15'),
             alignItems: 'center', justifyContent: 'center',
-            borderWidth: 1.5, borderColor: colors.primary.DEFAULT + '30',
+            borderWidth: 1.5, borderColor: withAlpha(colors.primary.DEFAULT, '30'),
         },
-        title: { fontSize: 20, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.6 },
+        title: { fontSize: 20, fontWeight: '900', color: colors.text, letterSpacing: -0.6 },
         switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, paddingHorizontal: 4 },
         switchInfo: { flex: 1, paddingRight: 16 },
-        switchLabel: { color: colors.iron[950], fontWeight: '800', fontSize: 15 },
-        switchDesc: { color: colors.iron[500], fontSize: 11, marginTop: 2, fontWeight: '600' },
+        switchLabel: { color: colors.text, fontWeight: '800', fontSize: 15 },
+        switchDesc: { color: colors.textMuted, fontSize: 11, marginTop: 2, fontWeight: '600' },
         actions: { flexDirection: 'row', gap: 12 },
         actionWrapper: { flex: 1 }
     }), [colors]);

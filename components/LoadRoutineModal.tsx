@@ -1,4 +1,4 @@
-import { ThemeFx } from '@/src/theme';
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import { BookOpen, ChevronDown, ChevronRight, Dumbbell, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -17,19 +17,15 @@ export function LoadRoutineModal({ visible, onClose, onLoadDay }: LoadRoutineMod
     const st = useMemo(() => StyleSheet.create({
         overlay: { flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 48 },
         sheet: {
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderWidth: 1.5,
             borderColor: colors.border,
-            borderRadius: 20,
+            borderRadius: 24,
             flex: 1,
             maxHeight: '90%',
             width: '100%',
             overflow: 'hidden',
-            elevation: 12,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.15,
-            shadowRadius: 24,
+            ...ThemeFx.shadowLg,
         },
         header: {
             flexDirection: 'row',
@@ -40,17 +36,17 @@ export function LoadRoutineModal({ visible, onClose, onLoadDay }: LoadRoutineMod
             borderBottomColor: colors.border,
             backgroundColor: colors.surface,
         },
-        headerTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 18, letterSpacing: -0.6 },
-        headerSub: { color: colors.iron[500], fontSize: 11, marginTop: 2, fontWeight: '700' },
+        headerTitle: { color: colors.text, fontWeight: '900', fontSize: 18, letterSpacing: -0.6 },
+        headerSub: { color: colors.textMuted, fontSize: 11, marginTop: 2, fontWeight: '700' },
         closeBtn: {
             width: 36, height: 36, borderRadius: 12,
-            backgroundColor: colors.iron[200], justifyContent: 'center', alignItems: 'center',
+            backgroundColor: colors.surfaceLighter, justifyContent: 'center', alignItems: 'center',
             borderWidth: 1.5, borderColor: colors.border
         },
 
-        contentArea: { padding: 16, backgroundColor: colors.iron[100] },
+        contentArea: { padding: 16, backgroundColor: colors.surfaceLighter },
         sectionLabel: {
-            color: colors.iron[500],
+            color: colors.textMuted,
             fontSize: 10,
             marginBottom: 12,
             textTransform: 'uppercase',
@@ -60,35 +56,31 @@ export function LoadRoutineModal({ visible, onClose, onLoadDay }: LoadRoutineMod
 
         routineCard: {
             backgroundColor: colors.surface,
-            borderRadius: 16,
+            borderRadius: 24,
             marginBottom: 12,
             borderWidth: 1.5,
             borderColor: colors.border,
             overflow: 'hidden',
-            elevation: 2,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.04,
-            shadowRadius: 10,
+            ...ThemeFx.shadowSm,
         },
         routineHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
         iconBox: {
             width: 44, height: 44, borderRadius: 12,
-            backgroundColor: colors.primary.DEFAULT + '15',
-            borderWidth: 1.5, borderColor: colors.primary.DEFAULT + '30',
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '15'),
+            borderWidth: 1.5, borderColor: withAlpha(colors.primary.DEFAULT, '30'),
             justifyContent: 'center', alignItems: 'center',
         },
-        cardName: { color: colors.iron[950], fontWeight: '900', fontSize: 16, letterSpacing: -0.4 },
-        cardMeta: { color: colors.iron[500], fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 4 },
+        cardName: { color: colors.text, fontWeight: '900', fontSize: 16, letterSpacing: -0.4 },
+        cardMeta: { color: colors.textMuted, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 4 },
 
         daysContainer: {
             borderTopWidth: 1.5,
             borderTopColor: colors.border,
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             padding: 12,
             gap: 10,
         },
-        noDays: { fontSize: 13, color: colors.iron[400], textAlign: 'center', paddingVertical: 12, fontWeight: '700' },
+        noDays: { fontSize: 13, color: colors.textMuted, textAlign: 'center', paddingVertical: 12, fontWeight: '700' },
         dayItem: {
             flexDirection: 'row',
             alignItems: 'center',
@@ -103,36 +95,33 @@ export function LoadRoutineModal({ visible, onClose, onLoadDay }: LoadRoutineMod
         },
         dayIconBox: {
             width: 34, height: 34, borderRadius: 10,
-            backgroundColor: colors.primary.DEFAULT + '12',
-            borderWidth: 1.5, borderColor: colors.primary.DEFAULT + '25',
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '12'),
+            borderWidth: 1.5, borderColor: withAlpha(colors.primary.DEFAULT, '25'),
             justifyContent: 'center', alignItems: 'center',
         },
-        dayName: { fontSize: 15, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.2 },
-        dayMeta: { color: colors.iron[500], fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 3 },
+        dayName: { fontSize: 15, fontWeight: '900', color: colors.text, letterSpacing: -0.2 },
+        dayMeta: { color: colors.textMuted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 3 },
         dayPressed: { transform: [{ scale: 0.98 }], borderColor: colors.primary.DEFAULT },
         loadPill: {
             backgroundColor: colors.primary.DEFAULT,
             paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+            ...ThemeFx.shadowSm,
             shadowColor: colors.primary.DEFAULT,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
-            elevation: 4,
         },
-        loadPillText: { color: colors.white, fontSize: 13, fontWeight: '900' },
+        loadPillText: { color: colors.onPrimary, fontSize: 13, fontWeight: '900' },
 
         emptyBlock: {
             alignItems: 'center',
             paddingVertical: 40,
             backgroundColor: colors.surface,
-            borderRadius: 20,
+            borderRadius: 24,
             borderWidth: 1.5,
             borderColor: colors.border,
             borderStyle: 'dashed',
             gap: 10,
         },
-        emptyTitle: { fontSize: 16, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.3 },
-        emptyText: { fontSize: 13, color: colors.iron[500], textAlign: 'center', fontWeight: '600' },
+        emptyTitle: { fontSize: 16, fontWeight: '900', color: colors.text, letterSpacing: -0.3 },
+        emptyText: { fontSize: 13, color: colors.textMuted, textAlign: 'center', fontWeight: '600' },
     }), [colors]);
     const [routines, setRoutines] = useState<RoutineWithDays[]>([]);
     const [loading, setLoading] = useState(false);
@@ -177,7 +166,7 @@ export function LoadRoutineModal({ visible, onClose, onLoadDay }: LoadRoutineMod
                             <Text style={st.headerSub}>Seleccioná un día para cargarlo</Text>
                         </View>
                         <TouchableOpacity onPress={onClose} style={st.closeBtn}>
-                            <X size={18} color={colors.iron[600]} />
+                            <X size={18} color={colors.textMuted} />
                         </TouchableOpacity>
                     </View>
 
@@ -192,7 +181,7 @@ export function LoadRoutineModal({ visible, onClose, onLoadDay }: LoadRoutineMod
                                 </View>
                             ) : routines.length === 0 ? (
                                 <View style={st.emptyBlock}>
-                                    <BookOpen size={28} color={colors.iron[400]} />
+                                    <BookOpen size={28} color={colors.textMuted} />
                                     <Text style={st.emptyTitle}>No tienes rutinas</Text>
                                     <Text style={st.emptyText}>Ve a Biblioteca → Rutinas para crear una.</Text>
                                 </View>
@@ -219,8 +208,8 @@ export function LoadRoutineModal({ visible, onClose, onLoadDay }: LoadRoutineMod
                                                     </View>
                                                 </View>
                                                 {isExpanded
-                                                    ? <ChevronDown size={20} color={colors.iron[400]} />
-                                                    : <ChevronRight size={20} color={colors.iron[400]} />
+                                                    ? <ChevronDown size={20} color={colors.textMuted} />
+                                                    : <ChevronRight size={20} color={colors.textMuted} />
                                                 }
                                             </TouchableOpacity>
 

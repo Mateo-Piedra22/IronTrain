@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useColors } from '../src/hooks/useColors';
 import { configService } from '../src/services/ConfigService';
 import { UnitService } from '../src/services/UnitService';
+import { withAlpha } from '../src/theme';
 
 interface SetRowInputProps {
     index: number;
@@ -18,16 +19,16 @@ export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disab
     const colors = useColors();
     const ss = useMemo(() => StyleSheet.create({
         row: { flexDirection: 'row', alignItems: 'center', padding: 8, gap: 8, borderRadius: 12, borderWidth: 1 },
-        rowDefault: { backgroundColor: colors.surface, borderColor: colors.iron[200] },
-        rowCompleted: { backgroundColor: colors.iron[50], borderColor: colors.primary.DEFAULT },
+        rowDefault: { backgroundColor: colors.surface, borderColor: colors.border },
+        rowCompleted: { backgroundColor: colors.surfaceLighter, borderColor: colors.primary.DEFAULT },
         indexCol: { width: 24, alignItems: 'center' },
-        indexText: { fontSize: 13, fontWeight: '700', color: colors.iron[400] },
-        inputCol: { flex: 1, backgroundColor: colors.iron[200], borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center' },
-        input: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.iron[950], textAlign: 'center', padding: 4 },
-        unitLabel: { fontSize: 9, fontWeight: '800', color: colors.iron[400], marginLeft: 4 },
+        indexText: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
+        inputCol: { flex: 1, backgroundColor: colors.surfaceLighter, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center' },
+        input: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.text, textAlign: 'center', padding: 4 },
+        unitLabel: { fontSize: 9, fontWeight: '800', color: colors.textMuted, marginLeft: 4 },
         checkBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
         checkActive: { backgroundColor: colors.primary.DEFAULT },
-        checkInactive: { backgroundColor: colors.iron[300] + '33', borderWidth: 1, borderColor: colors.iron[300] },
+        checkInactive: { backgroundColor: withAlpha(colors.border, '33'), borderWidth: 1, borderColor: colors.border },
         checkDisabled: { opacity: 0.5 },
     }), [colors]);
 
@@ -86,7 +87,7 @@ export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disab
                     style={ss.input}
                     value={set.rpe?.toString() ?? ''}
                     placeholder="-"
-                    placeholderTextColor={colors.iron[400]}
+                    placeholderTextColor={colors.textMuted}
                     editable={!disabled}
                     onChangeText={(t) => {
                         if (disabled) return;
@@ -106,7 +107,7 @@ export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disab
                 }}
                 style={[ss.checkBtn, disabled ? ss.checkDisabled : (isCompleted ? ss.checkActive : ss.checkInactive)]}
             >
-                <LucideCheck size={22} color={isCompleted ? "white" : colors.iron[400]} strokeWidth={3} />
+                <LucideCheck size={22} color={isCompleted ? "white" : colors.textMuted} strokeWidth={3} />
             </Pressable>
         </View>
     );

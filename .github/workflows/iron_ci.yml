@@ -1,53 +1,59 @@
 name: IronTrain CI/CD
 
 on:
-    push:
-        branches: ["main"]
-    pull_request:
-        branches: ["main"]
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
 
 jobs:
-    build-and-test-mobile:
-        name: Expo Mobile Build Check
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v3
+  build-and-test-mobile:
+    name: Expo Mobile Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
-            - name: Use Node.js 18.x
-              uses: actions/setup-node@v3
-              with:
-                  node-version: 18.x
-                  cache: "npm"
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: "npm"
 
-            - name: Install Mobile Dependencies
-              run: npm ci --legacy-peer-deps
+      - name: Install Mobile Dependencies
+        run: npm ci --legacy-peer-deps
 
-            - name: Run TypeScript Compiler (Mobile)
-              run: npx tsc --noEmit
+      - name: Run Tests
+        run: npm test
 
-    build-and-test-web:
-        name: Next.js Web Build Check
-        runs-on: ubuntu-latest
-        defaults:
-            run:
-                working-directory: ./website
-        steps:
-            - uses: actions/checkout@v3
+      - name: Run Changelog Generator
+        run: npm run generate-changelog
 
-            - name: Use Node.js 18.x
-              uses: actions/setup-node@v3
-              with:
-                  node-version: 18.x
-                  cache: "npm"
-                  cache-dependency-path: website/package-lock.json
+      - name: Run TypeScript Compiler (Mobile)
+        run: npx tsc --noEmit
 
-            - name: Install Web Dependencies
-              run: npm ci
+  build-and-test-web:
+    name: Next.js Web Build Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./website
+    steps:
+      - uses: actions/checkout@v3
 
-            - name: Run TypeScript Compiler (Web)
-              run: npx tsc --noEmit
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: "npm"
+          cache-dependency-path: website/package-lock.json
 
-            - name: Build Next.js
-              run: npm run build
-              env:
-                  NEXT_TELEMETRY_DISABLED: 1
+      - name: Install Web Dependencies
+        run: npm ci
+
+      - name: Run TypeScript Compiler (Web)
+        run: npx tsc --noEmit
+
+      - name: Build Next.js
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1

@@ -31,15 +31,15 @@ export function DateHeader({ date, onChange }: DateHeaderProps) {
             backgroundColor: colors.background
         },
         arrowBtn: { padding: 8 },
-        dateText: { color: colors.iron[950], fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },
-        yearText: { color: colors.iron[400], fontSize: 11, fontWeight: '600', marginTop: 2 },
+        dateText: { color: colors.text, fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },
+        yearText: { color: colors.textMuted, fontSize: 11, fontWeight: '600', marginTop: 2 },
         modalOverlay: { flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', paddingHorizontal: 16 },
         modalSheet: {
             backgroundColor: colors.surface,
             borderRadius: 20,
             overflow: 'hidden',
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
             ...ThemeFx.shadowSm
         },
         closeBtn: {
@@ -47,7 +47,7 @@ export function DateHeader({ date, onChange }: DateHeaderProps) {
             padding: 16,
             alignItems: 'center',
             borderTopWidth: 1.5,
-            borderTopColor: colors.iron[100]
+            borderTopColor: colors.border
         },
         closeBtnText: { color: colors.primary.DEFAULT, fontWeight: '800', fontSize: 14 },
     }), [colors]);
@@ -61,7 +61,7 @@ export function DateHeader({ date, onChange }: DateHeaderProps) {
 
                 <Pressable onPress={() => setShowCalendar(true)} style={{ alignItems: 'center' }}>
                     <Text style={ss.dateText}>
-                        {isToday ? 'Hoy' : format(date, 'EEE, MMM do')} <Ionicons name="calendar-outline" size={14} color={colors.iron[400]} />
+                        {isToday ? 'Hoy' : format(date, 'EEE, MMM do')} <Ionicons name="calendar-outline" size={14} color={colors.textMuted} />
                     </Text>
                     <Text style={ss.yearText}>{format(date, 'yyyy')}</Text>
                 </Pressable>
@@ -87,14 +87,14 @@ export function DateHeader({ date, onChange }: DateHeaderProps) {
                             theme={{
                                 backgroundColor: colors.surface,
                                 calendarBackground: colors.surface,
-                                textSectionTitleColor: colors.iron[500],
+                                textSectionTitleColor: colors.textMuted,
                                 selectedDayBackgroundColor: colors.primary.DEFAULT,
-                                selectedDayTextColor: colors.white,
+                                selectedDayTextColor: colors.onPrimary,
                                 todayTextColor: colors.primary.DEFAULT,
-                                dayTextColor: colors.iron[950],
-                                textDisabledColor: colors.iron[400],
+                                dayTextColor: colors.text,
+                                textDisabledColor: colors.textMuted,
                                 arrowColor: colors.primary.DEFAULT,
-                                monthTextColor: colors.iron[950],
+                                monthTextColor: colors.text,
                                 indicatorColor: colors.primary.DEFAULT,
                                 textMonthFontWeight: '900',
                             }}

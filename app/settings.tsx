@@ -27,54 +27,54 @@ export default function SettingsScreen() {
     const colors = useColors();
 
     const s = useMemo(() => StyleSheet.create({
-        backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.iron[300], elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
-        pageTitle: { color: colors.iron[950], fontWeight: '900', fontSize: 24, letterSpacing: -1 },
+        backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.border, elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
+        pageTitle: { color: colors.text, fontWeight: '900', fontSize: 24, letterSpacing: -1 },
         pageSub: { color: colors.primary.DEFAULT, fontSize: 12, fontWeight: '800', marginTop: 2, letterSpacing: 0.5 },
         sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 28, marginBottom: 10 },
         sectionAccent: { width: 3, height: 16, borderRadius: 2, backgroundColor: colors.primary.DEFAULT },
-        sectionTitle: { fontSize: 11, fontWeight: '800', color: colors.iron[500], textTransform: 'uppercase', letterSpacing: 1 },
-        card: { backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1.5, borderColor: colors.iron[300], overflow: 'hidden', elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 },
+        sectionTitle: { fontSize: 11, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 },
+        card: { backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border, overflow: 'hidden', elevation: 2, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8 },
         cardInnerPadded: { padding: 16 },
         settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
-        settingRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.iron[200] },
+        settingRowBorder: { borderBottomWidth: 1.5, borderBottomColor: colors.border },
         settingLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 12 },
         settingIconCircle: { width: 36, height: 36, borderRadius: 12, backgroundColor: withAlpha(colors.primary.DEFAULT, '12'), justifyContent: 'center', alignItems: 'center' },
-        settingLabel: { fontSize: 15, fontWeight: '800', color: colors.iron[950], letterSpacing: -0.2 },
-        settingSubtitle: { fontSize: 12, color: colors.iron[500], marginTop: 2, lineHeight: 16 },
-        roundLabel: { fontSize: 13, fontWeight: '800', color: colors.iron[500] },
+        settingLabel: { fontSize: 15, fontWeight: '800', color: colors.text, letterSpacing: -0.2 },
+        settingSubtitle: { fontSize: 12, color: colors.textMuted, marginTop: 2, lineHeight: 16 },
+        roundLabel: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
         stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-        stepperBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.iron[300], justifyContent: 'center', alignItems: 'center', elevation: 1 },
-        stepperBtnText: { fontSize: 18, fontWeight: '700', color: colors.iron[950], lineHeight: 20 },
-        stepperValue: { fontSize: 14, fontWeight: '800', color: colors.iron[950], minWidth: 40, textAlign: 'center' },
+        stepperBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.surfaceLighter, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center', elevation: 1 },
+        stepperBtnText: { fontSize: 18, fontWeight: '700', color: colors.text, lineHeight: 20 },
+        stepperValue: { fontSize: 14, fontWeight: '800', color: colors.text, minWidth: 40, textAlign: 'center' },
         chipGroup: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-        chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100, borderWidth: 1.5, borderColor: colors.iron[300], backgroundColor: colors.surface, elevation: 1, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 },
+        chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surfaceLighter, elevation: 1, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 },
         chipActive: { backgroundColor: colors.primary.DEFAULT, borderColor: colors.primary.DEFAULT, elevation: 2 },
-        chipText: { fontSize: 13, fontWeight: '800', color: colors.iron[600] },
-        chipTextActive: { color: colors.white },
-        dayChip: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.iron[300], alignItems: 'center', justifyContent: 'center', elevation: 1, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 },
+        chipText: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
+        chipTextActive: { color: colors.onPrimary },
+        dayChip: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceLighter, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', elevation: 1, shadowColor: ThemeFx.shadowColor, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 },
         dayChipActive: { backgroundColor: colors.primary.DEFAULT, borderColor: colors.primary.DEFAULT, elevation: 2, shadowColor: colors.primary.DEFAULT, shadowOpacity: 0.25, shadowRadius: 4 },
-        dayChipText: { fontSize: 14, fontWeight: '800', color: colors.iron[500] },
-        dayChipTextActive: { color: colors.white },
-        updateBtn: { flex: 1, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.iron[300], borderRadius: 14, paddingVertical: 14, alignItems: 'center', elevation: 1 },
-        updateBtnText: { fontSize: 14, fontWeight: '800', color: colors.iron[950] },
+        dayChipText: { fontSize: 14, fontWeight: '800', color: colors.textMuted },
+        dayChipTextActive: { color: colors.onPrimary },
+        updateBtn: { flex: 1, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, borderRadius: 14, paddingVertical: 14, alignItems: 'center', elevation: 1 },
+        updateBtnText: { fontSize: 14, fontWeight: '800', color: colors.text },
         updateBtnPrimary: { flex: 1, backgroundColor: colors.primary.DEFAULT, borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, elevation: 3 },
-        updateBtnPrimaryText: { fontSize: 14, fontWeight: '800', color: colors.white },
-        footer: { textAlign: 'center', color: colors.iron[400], fontSize: 12, marginTop: 32, marginBottom: 20 },
+        updateBtnPrimaryText: { fontSize: 14, fontWeight: '800', color: colors.onPrimary },
+        footer: { textAlign: 'center', color: colors.textMuted, fontSize: 12, marginTop: 32, marginBottom: 20 },
     }), [colors]);
 
     const ns = useMemo(() => StyleSheet.create({
         groupRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 },
         groupLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 },
         groupIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: withAlpha(colors.primary.DEFAULT, '12'), justifyContent: 'center', alignItems: 'center' },
-        groupTitle: { fontSize: 14, fontWeight: '800', color: colors.iron[950], letterSpacing: -0.2 },
-        groupSub: { fontSize: 11, color: colors.iron[500], marginTop: 1 },
+        groupTitle: { fontSize: 14, fontWeight: '800', color: colors.text, letterSpacing: -0.2 },
+        groupSub: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
         badge: { backgroundColor: withAlpha(colors.primary.DEFAULT, '18'), borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
         badgeText: { fontSize: 10, fontWeight: '800', color: colors.primary.DEFAULT },
-        subGroup: { backgroundColor: colors.iron[900], borderTopWidth: 1, borderTopColor: colors.iron[300], paddingLeft: 20 },
+        subGroup: { backgroundColor: colors.surfaceLighter, borderTopWidth: 1.5, borderTopColor: colors.border, paddingLeft: 20 },
         subRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 16, gap: 10 },
-        subRowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.iron[300] },
+        subRowBorder: { borderBottomWidth: 1.5, borderBottomColor: colors.border },
         subDot: { width: 7, height: 7, borderRadius: 4 },
-        subLabel: { flex: 1, fontSize: 13, fontWeight: '700', color: colors.iron[950] },
+        subLabel: { flex: 1, fontSize: 13, fontWeight: '700', color: colors.text },
     }), [colors]);
     const installedVersion = ChangelogService.getAppVersion();
     const [footerDate, setFooterDate] = useState<string | null>(null);
@@ -433,7 +433,7 @@ export default function SettingsScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text style={[ns.groupTitle, !enabled && { color: colors.iron[400] }]}>{title}</Text>
+                        <Text style={[ns.groupTitle, !enabled && { color: colors.textMuted }]}>{title}</Text>
                         {enabled && (
                             <View style={ns.badge}>
                                 <Text style={ns.badgeText}>{activeCount}/{totalCount}</Text>
@@ -442,7 +442,7 @@ export default function SettingsScreen() {
                     </View>
                     <Text style={ns.groupSub}>{subtitle}</Text>
                 </View>
-                {enabled && (expanded ? <ChevronUp size={14} color={colors.iron[400]} /> : <ChevronDown size={14} color={colors.iron[400]} />)}
+                {enabled && (expanded ? <ChevronUp size={14} color={colors.textMuted} /> : <ChevronDown size={14} color={colors.textMuted} />)}
             </TouchableOpacity>
             <Switch value={enabled} onValueChange={onToggle} trackColor={{ true: colors.primary.DEFAULT }} style={{ marginLeft: 8 }} />
         </View>
@@ -452,8 +452,8 @@ export default function SettingsScreen() {
         label: string; enabled: boolean; onToggle: (v: boolean) => void; last?: boolean;
     }) => (
         <View style={[ns.subRow, !last && ns.subRowBorder]}>
-            <View style={[ns.subDot, { backgroundColor: enabled ? colors.primary.DEFAULT : colors.iron[300] }]} />
-            <Text style={[ns.subLabel, !enabled && { color: colors.iron[400] }]}>{label}</Text>
+            <View style={[ns.subDot, { backgroundColor: enabled ? colors.primary.DEFAULT : colors.border }]} />
+            <Text style={[ns.subLabel, !enabled && { color: colors.textMuted }]}>{label}</Text>
             <Switch value={enabled} onValueChange={onToggle} trackColor={{ true: colors.primary.DEFAULT }} style={{ transform: [{ scale: 0.8 }] }} />
         </View>
     );
@@ -516,7 +516,7 @@ export default function SettingsScreen() {
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40, paddingTop: 16 }}>
                 <View style={{ marginBottom: 24, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
                     <TouchableOpacity onPress={() => router.back()} style={s.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
-                        <ChevronLeft size={20} color={colors.iron[950]} />
+                        <ChevronLeft size={20} color={colors.text} />
                     </TouchableOpacity>
                     <View>
                         <Text style={s.pageTitle}>Ajustes</Text>
@@ -530,8 +530,8 @@ export default function SettingsScreen() {
                     {auth.user ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                             <View style={{ flex: 1 }}>
-                                <Text style={{ color: colors.iron[950], fontWeight: '800', fontSize: 16 }}>Conectado</Text>
-                                <Text style={{ color: colors.iron[500], fontSize: 13, marginTop: 4 }}>{auth.user.email || 'Miembro de IronTrain'}</Text>
+                                <Text style={{ color: colors.text, fontWeight: '800', fontSize: 16 }}>Conectado</Text>
+                                <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 4 }}>{auth.user.email || 'Miembro de IronTrain'}</Text>
                             </View>
                             <TouchableOpacity
                                 onPress={() => {
@@ -548,7 +548,7 @@ export default function SettingsScreen() {
                         </View>
                     ) : (
                         <View style={{ flexDirection: 'column', gap: 12 }}>
-                            <Text style={{ color: colors.iron[600], fontSize: 14, lineHeight: 20 }}>
+                            <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 20 }}>
                                 Inicia sesión para habilitar la sincronización en la nube y proteger tus rutinas. Tus datos locales actuales se mantendrán intactos.
                             </Text>
                             <TouchableOpacity
@@ -562,8 +562,8 @@ export default function SettingsScreen() {
                                     opacity: auth.isLoading ? 0.7 : 1
                                 }}
                             >
-                                <User size={18} color={colors.white} />
-                                <Text style={{ color: colors.white, fontWeight: '800', fontSize: 15 }}>
+                                <User size={18} color={colors.onPrimary} />
+                                <Text style={{ color: colors.onPrimary, fontWeight: '800', fontSize: 15 }}>
                                     {auth.isLoading ? 'Conectando...' : 'Iniciar Sesión (vía Web)'}
                                 </Text>
                             </TouchableOpacity>
@@ -768,7 +768,7 @@ export default function SettingsScreen() {
                             <View style={s.settingIconCircle}><Disc size={16} color={colors.primary.DEFAULT} /></View>
                             <Text style={s.settingLabel}>Inventario de discos</Text>
                         </View>
-                        <ChevronRight size={16} color={colors.iron[400]} />
+                        <ChevronRight size={16} color={colors.textMuted} />
                     </TouchableOpacity>
 
                     <TouchableOpacity onPress={() => router.push('/body' as any)} style={[s.settingRow, s.settingRowBorder]}>
@@ -776,7 +776,7 @@ export default function SettingsScreen() {
                             <View style={s.settingIconCircle}><Ruler size={16} color={colors.primary.DEFAULT} /></View>
                             <Text style={s.settingLabel}>Evolución Física</Text>
                         </View>
-                        <ChevronRight size={16} color={colors.iron[400]} />
+                        <ChevronRight size={16} color={colors.textMuted} />
                     </TouchableOpacity>
 
                     <View style={[s.cardInnerPadded, s.settingRowBorder]}>
@@ -797,10 +797,10 @@ export default function SettingsScreen() {
 
                     <TouchableOpacity onPress={handleBackup} style={[s.settingRow, s.settingRowBorder]}>
                         <View style={s.settingLeft}>
-                            <View style={s.settingIconCircle}><Database size={16} color={colors.primary.DEFAULT} /></View>
+                            <View style={s.settingIconCircle}><Disc size={16} color={colors.primary.DEFAULT} /></View>
                             <Text style={s.settingLabel}>Exportar backup (JSON)</Text>
                         </View>
-                        <ChevronRight size={16} color={colors.iron[400]} />
+                        <ChevronRight size={16} color={colors.textMuted} />
                     </TouchableOpacity>
 
                     <TouchableOpacity onPress={handleDownloadBackup} style={[s.settingRow, s.settingRowBorder]}>
@@ -808,7 +808,7 @@ export default function SettingsScreen() {
                             <View style={s.settingIconCircle}><Download size={16} color={colors.primary.DEFAULT} /></View>
                             <Text style={s.settingLabel}>Descargar backup (JSON)</Text>
                         </View>
-                        <ChevronRight size={16} color={colors.iron[400]} />
+                        <ChevronRight size={16} color={colors.textMuted} />
                     </TouchableOpacity>
 
                     <TouchableOpacity onPress={handleCloudSnapshot} style={[s.settingRow, s.settingRowBorder]}>
@@ -824,7 +824,7 @@ export default function SettingsScreen() {
                             <View style={[s.settingIconCircle, { backgroundColor: withAlpha(colors.red, '15') }]}><RefreshCw size={16} color={colors.red} /></View>
                             <Text style={[s.settingLabel, { color: colors.red }]}>Restaurar backup</Text>
                         </View>
-                        <ChevronRight size={16} color={colors.iron[400]} />
+                        <ChevronRight size={16} color={colors.textMuted} />
                     </TouchableOpacity>
                 </View>
 
@@ -859,12 +859,12 @@ export default function SettingsScreen() {
                 <View style={[s.card, { marginBottom: 24 }]}>
                     <TouchableOpacity onPress={() => router.push('/feedback' as any)} style={s.settingRow}>
                         <View style={s.settingLeft}>
-                            <View style={[s.settingIconCircle, { backgroundColor: `${colors.primary.DEFAULT}15` }]}>
+                            <View style={[s.settingIconCircle, { backgroundColor: withAlpha(colors.primary.DEFAULT, '15') }]}>
                                 <MessageSquare size={16} color={colors.primary.DEFAULT} />
                             </View>
                             <Text style={s.settingLabel}>Enviar Feedback y Reportes</Text>
                         </View>
-                        <ChevronRight size={16} color={colors.iron[400]} />
+                        <ChevronRight size={16} color={colors.textMuted} />
                     </TouchableOpacity>
                 </View>
 
@@ -909,7 +909,7 @@ export default function SettingsScreen() {
                             accessibilityRole="button"
                             accessibilityLabel="Abrir descarga"
                         >
-                            <Download size={16} color={colors.white} />
+                            <Download size={16} color={colors.onPrimary} />
                             <Text style={s.updateBtnPrimaryText}>{updateStatus === 'update_pending' ? 'Ver notas' : 'Descargar'}</Text>
                         </TouchableOpacity>
                     </View>

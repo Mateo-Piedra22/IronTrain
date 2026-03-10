@@ -1,3 +1,4 @@
+import { ThemeFx, withAlpha } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -23,17 +24,17 @@ export function ReorderModal({ visible, onClose, items, onSave }: ReorderModalPr
         container: { flex: 1, backgroundColor: colors.background },
         content: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
         header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-        headerTitle: { fontSize: 20, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.5 },
+        headerTitle: { fontSize: 20, fontWeight: '900', color: colors.text, letterSpacing: -0.5 },
         closeBtn: {
             paddingHorizontal: 14,
             paddingVertical: 8,
             borderRadius: 12,
-            backgroundColor: colors.iron[100],
+            backgroundColor: colors.surfaceLighter,
             borderWidth: 1.5,
-            borderColor: colors.iron[200]
+            borderColor: colors.border
         },
-        closeBtnText: { fontSize: 13, fontWeight: '800', color: colors.iron[500] },
-        hint: { color: colors.iron[400], fontSize: 13, marginBottom: 20, fontWeight: '500' },
+        closeBtnText: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
+        hint: { color: colors.textMuted, fontSize: 13, marginBottom: 20, fontWeight: '500' },
         item: {
             flexDirection: 'row',
             alignItems: 'center',
@@ -41,19 +42,15 @@ export function ReorderModal({ visible, onClose, items, onSave }: ReorderModalPr
             marginBottom: 10,
             borderRadius: 16,
             borderWidth: 1.5,
-            borderColor: colors.iron[200],
+            borderColor: colors.border,
             backgroundColor: colors.surface,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.05,
-            shadowRadius: 10,
-            elevation: 2,
+            ...ThemeFx.shadowSm,
         },
         itemActive: {
-            backgroundColor: colors.primary.DEFAULT + '15',
-            borderColor: colors.primary.DEFAULT + '40'
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '15'),
+            borderColor: withAlpha(colors.primary.DEFAULT, '40')
         },
-        itemText: { color: colors.iron[950], fontSize: 15, fontWeight: '700' },
+        itemText: { color: colors.text, fontSize: 15, fontWeight: '700' },
         dragHandle: { marginRight: 12 },
         footer: { paddingVertical: 24 },
     }), [colors]);
@@ -82,7 +79,7 @@ export function ReorderModal({ visible, onClose, items, onSave }: ReorderModalPr
                     disabled={isActive}
                     style={[ss.item, isActive && ss.itemActive]}
                 >
-                    <Ionicons name="menu" size={22} color={colors.iron[400]} style={ss.dragHandle} />
+                    <Ionicons name="menu" size={22} color={colors.textMuted} style={ss.dragHandle} />
                     <Text style={ss.itemText}>{item.exerciseName}</Text>
                 </TouchableOpacity>
             </ScaleDecorator>

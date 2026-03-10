@@ -293,15 +293,16 @@ export default function DailyLogScreen() {
                   <Pressable
                     style={({ pressed }) => ({
                       opacity: pressed ? 0.7 : 1,
-                      width: 36, height: 36, borderRadius: 18,
-                      backgroundColor: colors.iron[800],
+                      width: 42, height: 42, borderRadius: 21,
+                      backgroundColor: colors.surface,
                       alignItems: 'center', justifyContent: 'center',
-                      borderWidth: 1, borderColor: colors.iron[700],
+                      borderWidth: 1.5, borderColor: colors.border,
+                      ...ThemeFx.shadowSm,
                     })}
                   >
-                    <Info size={20} color={markedDates['changelog'] ? colors.primary.DEFAULT : colors.iron[400]} />
+                    <Info size={20} color={hasNewChangelog ? colors.primary.DEFAULT : colors.textMuted} />
                     {hasNewChangelog && (
-                      <View style={{ position: 'absolute', top: -1, right: -1, width: 10, height: 10, borderRadius: 5, backgroundColor: colors.red, borderWidth: 2, borderColor: colors.iron[900] }} />
+                      <View style={{ position: 'absolute', top: -1, right: -1, width: 10, height: 10, borderRadius: 5, backgroundColor: colors.red, borderWidth: 1.5, borderColor: colors.background }} />
                     )}
                   </Pressable>
                 </Link>
@@ -351,9 +352,23 @@ export default function DailyLogScreen() {
         !loading && (
           <TouchableOpacity
             onPress={handleAddButton}
-            style={{ position: 'absolute', bottom: bottomOffset, right: 24, zIndex: 20, width: 56, height: 56, backgroundColor: colors.primary.DEFAULT, borderRadius: 28, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
+            style={{
+              position: 'absolute',
+              bottom: bottomOffset,
+              right: 24,
+              zIndex: 20,
+              width: 56,
+              height: 56,
+              backgroundColor: colors.primary.DEFAULT,
+              borderRadius: 28,
+              alignItems: 'center',
+              justifyContent: 'center',
+              ...ThemeFx.shadowLg,
+              shadowColor: colors.primary.DEFAULT,
+              shadowOpacity: 0.35,
+            }}
           >
-            <Plus color={colors.white} size={28} />
+            <Plus color={colors.onPrimary} size={28} />
           </TouchableOpacity>
         )
       }
@@ -362,14 +377,15 @@ export default function DailyLogScreen() {
       <Modal visible={isPickerVisible} transparent animationType="fade" onRequestClose={() => setIsPickerVisible(false)}>
         <View style={{ flex: 1, backgroundColor: ThemeFx.backdropStrong, justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 48 }}>
           <View style={{
-            backgroundColor: colors.iron[900], borderWidth: 1, borderColor: colors.iron[700],
-            borderRadius: 20, flex: 1, maxHeight: '95%', width: '100%', overflow: 'hidden',
+            backgroundColor: colors.background, borderWidth: 1.5, borderColor: colors.border,
+            borderRadius: 32, flex: 1, maxHeight: '95%', width: '100%', overflow: 'hidden',
+            ...ThemeFx.shadowLg,
           }}>
             {/* Modal Header — CopyWorkoutModal pattern */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.iron[200] }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: colors.surface, borderBottomWidth: 1.5, borderBottomColor: colors.border }}>
               <View>
-                <Text style={{ fontSize: 16, fontWeight: '900', color: colors.iron[950], letterSpacing: -0.3 }}>Seleccionar ejercicio</Text>
-                <Text style={{ fontSize: 11, color: colors.iron[400], marginTop: 2 }}>Tocá uno para agregarlo al entrenamiento</Text>
+                <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text, letterSpacing: -0.3 }}>Seleccionar ejercicio</Text>
+                <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>Tocá uno para agregarlo al entrenamiento</Text>
               </View>
               <TouchableOpacity
                 onPress={() => setIsPickerVisible(false)}
@@ -377,7 +393,7 @@ export default function DailyLogScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Cerrar selector de ejercicios"
               >
-                <X color={colors.white} size={18} />
+                <X color={colors.text} size={18} />
               </TouchableOpacity>
             </View>
 
@@ -422,9 +438,23 @@ export default function DailyLogScreen() {
         !loading && (
           <TouchableOpacity
             onPress={() => setTimerVisible(true)}
-            style={{ position: 'absolute', bottom: bottomOffset, left: 24, zIndex: 20, width: 48, height: 48, backgroundColor: colors.iron[800], borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.iron[700], elevation: 6, shadowColor: colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6 }}
+            style={{
+              position: 'absolute',
+              bottom: bottomOffset,
+              left: 24,
+              zIndex: 20,
+              width: 52,
+              height: 52,
+              backgroundColor: colors.surface,
+              borderRadius: 26,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1.5,
+              borderColor: colors.border,
+              ...ThemeFx.shadowSm,
+            }}
           >
-            <Timer color="#94a3b8" size={22} />
+            <Timer color={colors.text} size={24} />
           </TouchableOpacity>
         )
       }
