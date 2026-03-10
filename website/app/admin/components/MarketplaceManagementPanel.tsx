@@ -186,7 +186,7 @@ export default function MarketplaceManagementPanel({
                             </>
                         )}
 
-                        <button type="submit" name="action" value="save" className="w-full bg-[#1a1a2e] text-[#f5f1e8] py-4 font-black uppercase text-xs tracking-[0.2em] hover:bg-red-600 transition-all shadow-[6px_6px_0px_0px_rgba(26,26,46,0.2)] active:translate-y-1 active:shadow-none flex items-center justify-center gap-2 mt-4">
+                        <button type="submit" name="intent" value="save" className="w-full bg-[#1a1a2e] text-[#f5f1e8] py-4 font-black uppercase text-xs tracking-[0.2em] hover:bg-red-600 transition-all shadow-[6px_6px_0px_0px_rgba(26,26,46,0.2)] active:translate-y-1 active:shadow-none flex items-center justify-center gap-2 mt-4">
                             {editingItem ? 'COMMIT_CHANGES' : 'PUBLISH_OFFICIAL'}
                             <Check className="w-4 h-4" />
                         </button>
@@ -228,7 +228,7 @@ export default function MarketplaceManagementPanel({
                                                 <input type="hidden" name="id" value={item.id} />
                                                 <input type="hidden" name="origin_tab" value="marketplace" />
                                                 <input type="hidden" name="origin_section" value={activeSection} />
-                                                <button type="submit" name="action" value="delete" className="text-red-500/40 hover:text-red-600 transition-colors">
+                                                <button type="submit" name="intent" value="delete" className="text-red-500/40 hover:text-red-600 transition-colors">
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
                                             </form>

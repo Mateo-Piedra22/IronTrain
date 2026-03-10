@@ -190,7 +190,7 @@ export default function ContentManagementPanel({
                                 <input type="checkbox" name="isActive" value="true" id="active_notif" defaultChecked={editingNotification?.isActive !== 0} className="w-4 h-4 accent-[#1a1a2e]" />
                                 <label htmlFor="active_notif" className="text-[10px] font-black uppercase">ENABLE_LIVE_FEED</label>
                             </div>
-                            <button type="submit" name="action" value="save" className="w-full bg-[#1a1a2e] text-[#f5f1e8] py-3 font-black uppercase text-[10px] tracking-widest hover:bg-orange-500 transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
+                            <button type="submit" name="intent" value="save" className="w-full bg-[#1a1a2e] text-[#f5f1e8] py-3 font-black uppercase text-[10px] tracking-widest hover:bg-orange-500 transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
                                 {editingNotification ? 'COMMIT_CHANGES' : 'PUBLISH_ANNOUNCEMENT'}
                             </button>
                             {editingNotification && (
@@ -266,7 +266,7 @@ export default function ContentManagementPanel({
                                                     <input type="hidden" name="id" value={n.id} />
                                                     <input type="hidden" name="origin_tab" value={searchParams.get('tab') || 'content'} />
                                                     <input type="hidden" name="origin_section" value="broadcast" />
-                                                    <button type="submit" name="action" value="delete" className="text-red-500">
+                                                    <button type="submit" name="intent" value="delete" className="text-red-500">
                                                         <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
                                                 </form>
@@ -300,7 +300,7 @@ export default function ContentManagementPanel({
                                 <input type="checkbox" name="isUnreleased" value="true" id="unreleased_check" defaultChecked={editingChangelog?.isUnreleased === 1} className="w-4 h-4 accent-[#1a1a2e]" />
                                 <label htmlFor="unreleased_check" className="text-[10px] font-black uppercase">UNRELEASED_DRAFT_ONLY</label>
                             </div>
-                            <button type="submit" name="action" value="save" className="w-full bg-[#1a1a2e] text-green-400 py-3 font-black uppercase text-[10px] tracking-widest hover:bg-green-600 hover:text-[#1a1a2e] transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
+                            <button type="submit" name="intent" value="save" className="w-full bg-[#1a1a2e] text-green-400 py-3 font-black uppercase text-[10px] tracking-widest hover:bg-green-600 hover:text-[#1a1a2e] transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
                                 {editingChangelog ? 'UPDATE_RELEASE' : 'DEPLOY_VERSION_DATA'}
                             </button>
                             {editingChangelog && (
@@ -350,7 +350,7 @@ export default function ContentManagementPanel({
                                                 <input type="hidden" name="id" value={c.id} />
                                                 <input type="hidden" name="origin_tab" value={searchParams.get('tab') || 'content'} />
                                                 <input type="hidden" name="origin_section" value="changelog" />
-                                                <button type="submit" name="action" value="delete" className="text-red-500">
+                                                <button type="submit" name="intent" value="delete" className="text-red-500">
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
                                             </form>
@@ -460,7 +460,7 @@ export default function ContentManagementPanel({
                                                 <input type="hidden" name="id" value={e.id} />
                                                 <input type="hidden" name="origin_tab" value={searchParams.get('tab') || 'content'} />
                                                 <input type="hidden" name="origin_section" value="events" />
-                                                <button type="submit" name="action" value="delete" className="text-red-500">
+                                                <button type="submit" name="intent" value="delete" className="text-red-500">
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
                                             </form>

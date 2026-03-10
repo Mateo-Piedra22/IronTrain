@@ -89,7 +89,7 @@ export default function CommunityModerationPanel({ routines, feedback }: Communi
                                                 <div className="flex gap-2">
                                                     <button
                                                         type="submit"
-                                                        name="action"
+                                                        name="intent"
                                                         value="toggle-moderation"
                                                         className={`h-8 px-3 border border-[#1a1a2e] font-black uppercase text-[9px] transition-all flex items-center gap-2 ${r.isModerated ? 'bg-amber-400 hover:bg-[#1a1a2e] hover:text-[#f5f1e8]' : 'bg-[#f5f1e8] hover:bg-[#1a1a2e] hover:text-[#f5f1e8]'}`}
                                                         title={r.isModerated ? "Mostrar en feed" : "Ocultar en feed"}
@@ -99,8 +99,8 @@ export default function CommunityModerationPanel({ routines, feedback }: Communi
                                                     </button>
                                                     <button
                                                         type="submit"
-                                                        name="action"
-                                                        value="delete"
+                                                        name="intent"
+                                                        value="purge"
                                                         className="h-8 w-8 border border-[#1a1a2e] bg-[#f5f1e8] hover:bg-red-500 hover:text-white transition-all flex items-center justify-center"
                                                         title="Eliminar rutina permanentemente"
                                                     >

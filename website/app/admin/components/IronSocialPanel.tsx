@@ -131,7 +131,7 @@ export default function IronSocialPanel({
                                     </div>
                                     <form action={handleGlobalEventAction}>
                                         <input type="hidden" name="id" value={event.id} />
-                                        <button type="submit" name="action" value="delete" className="text-red-400 hover:text-red-600">
+                                        <button type="submit" name="intent" value="delete" className="text-red-400 hover:text-red-600">
                                             <Trash2 className="w-4 h-4" />
                                         </button>
                                     </form>

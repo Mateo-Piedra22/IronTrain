@@ -165,13 +165,13 @@ export async function handleRoutineAction(formData: FormData) {
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
 
         const id = String(formData.get('id') || '').trim();
-        const action = String(formData.get('action') || '').trim();
+        const intent = String(formData.get('intent') || '').trim();
         const currentModerated = formData.get('currentModerated') === '1';
         const message = String(formData.get('message') || '').trim();
 
         if (!id) throw new Error('MISSING_ROUTINE_ID');
 
-        if (action === 'toggle-moderation') {
+        if (intent === 'toggle-moderation') {
             const newStatus = currentModerated ? 0 : 1;
             await db.update(schema.routines)
                 .set({
@@ -181,7 +181,7 @@ export async function handleRoutineAction(formData: FormData) {
                     updatedAt: new Date()
                 })
                 .where(eq(schema.routines.id, id));
-        } else if (action === 'purge') {
+        } else if (intent === 'purge') {
             await db.update(schema.routines)
                 .set({
                     deletedAt: new Date(),
@@ -192,7 +192,7 @@ export async function handleRoutineAction(formData: FormData) {
                 })
                 .where(eq(schema.routines.id, id));
         } else {
-            console.error('Invalid routine action:', action);
+            console.error('Invalid routine intent:', intent);
             redirectPath = getRedirectPath(formData, 'social');
         }
 
@@ -216,20 +216,20 @@ export async function handleChangelogAction(formData: FormData) {
         const adminId = await getAuthenticatedAdmin();
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
 
-        const action = String(formData.get('action') || '');
+        const intent = String(formData.get('intent') || '');
         const id = String(formData.get('id') || '').trim() || randomUUID();
         const version = String(formData.get('version') || '').trim();
         const itemsRaw = String(formData.get('items') || '').trim();
         const isUnreleased = formData.get('isUnreleased') === 'true' ? 1 : 0;
 
-        if (action === 'delete') {
+        if (intent === 'delete') {
             if (id) {
                 // Delete reactions to prevent FK violation
                 await db.delete(schema.changelogReactions).where(eq(schema.changelogReactions.changelogId, id));
                 await db.delete(schema.changelogs).where(eq(schema.changelogs.id, id));
             }
             redirectPath = getRedirectPath(formData, 'changelog');
-        } else if (action === 'save') {
+        } else if (intent === 'save') {
             if (!version || !itemsRaw) {
                 console.error('Validation failed: version or items missing');
                 redirectPath = getRedirectPath(formData, 'changelog');
@@ -315,7 +315,7 @@ export async function handleNotificationAction(formData: FormData) {
         const adminId = await getAuthenticatedAdmin();
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
 
-        const action = String(formData.get('action') || '');
+        const intent = String(formData.get('intent') || '');
         const id = String(formData.get('id') || '').trim() || randomUUID();
         const title = String(formData.get('title') || '').trim();
         const message = String(formData.get('message') || '').trim();
@@ -330,7 +330,7 @@ export async function handleNotificationAction(formData: FormData) {
 
         const metadata = actionUrl ? JSON.stringify({ actionUrl }) : null;
 
-        if (action === 'delete') {
+        if (intent === 'delete') {
             if (id) {
                 // Pre-delete logs and reactions to avoid FK violations
                 await db.delete(schema.notificationLogs).where(eq(schema.notificationLogs.notificationId, id));
@@ -338,7 +338,7 @@ export async function handleNotificationAction(formData: FormData) {
                 await db.delete(schema.adminNotifications).where(eq(schema.adminNotifications.id, id));
             }
             redirectPath = getRedirectPath(formData, 'broadcast');
-        } else if (action === 'save') {
+        } else if (intent === 'save') {
             if (!title || !message) {
                 console.error('Validation failed: title or message missing');
                 redirectPath = getRedirectPath(formData, 'broadcast');
@@ -477,17 +477,17 @@ export async function handleGlobalEventAction(formData: FormData) {
         const adminId = await getAuthenticatedAdmin();
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
 
-        const action = String(formData.get('action') || '');
+        const intent = String(formData.get('intent') || '');
         const id = String(formData.get('id') || '').trim() || randomUUID();
 
-        if (action === 'delete') {
+        if (intent === 'delete') {
             if (id) {
                 await db.delete(schema.globalEvents).where(eq(schema.globalEvents.id, id));
             }
             revalidatePath('/admin');
             revalidatePath('/feed');
             redirectPath = getRedirectPath(formData, 'events');
-        } else {
+        } else if (intent === 'save') {
             const name = String(formData.get('name') || '').trim();
             const multiplier = Number(formData.get('multiplier') || 1);
             const startRaw = String(formData.get('startDate') || '');
@@ -563,10 +563,10 @@ export async function handleMarketplaceEntityAction(formData: FormData) {
         if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
 
         const table = formData.get('table') as 'exercises' | 'categories' | 'badges';
-        const action = String(formData.get('action') || '');
+        const intent = String(formData.get('intent') || '');
         const id = String(formData.get('id') || '').trim() || randomUUID();
 
-        if (action === 'delete') {
+        if (intent === 'delete') {
             if (id) {
                 if (table === 'exercises') {
                     await db.delete(schema.exerciseBadges).where(eq(schema.exerciseBadges.exerciseId, id));
@@ -588,7 +588,7 @@ export async function handleMarketplaceEntityAction(formData: FormData) {
                 }
             }
             redirectPath = getRedirectPath(formData, 'marketplace');
-        } else if (action === 'save') {
+        } else if (intent === 'save') {
             if (table === 'categories') {
                 const name = String(formData.get('name') || '').trim();
                 const color = String(formData.get('color') || '').trim();
