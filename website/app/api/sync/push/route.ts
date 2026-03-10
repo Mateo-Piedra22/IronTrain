@@ -1,9 +1,9 @@
-import { eq, getTableColumns, sql } from 'drizzle-orm';
+import { and, eq, getTableColumns, like, or, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
-import { applyWorkoutScoring } from '../../../../src/lib/social-scoring';
+import { applyWorkoutScoring, revertWorkoutScoring } from '../../../../src/lib/social-scoring';
 
 export const runtime = 'nodejs';
 
@@ -216,9 +216,18 @@ export async function POST(req: NextRequest) {
                             }
                         }
 
+                        // Hydrate insertion payload to satisfy PostgreSQL NOT NULL constraints 
+                        // when performing partial updates on existing records (deltas).
+                        const insertPayload = existingRecord
+                            ? { ...existingRecord, ...filteredData }
+                            : filteredData;
+
                         // Perform UPSERT
+                        // Note: .values() uses the hydrated payload for the INSERT phase.
+                        // .onConflictDoUpdate.set uses ONLY filteredData for the UPDATE phase to avoid 
+                        // overwriting with stale data and for write efficiency.
                         await tx.insert(tableSchema)
-                            .values(filteredData)
+                            .values(insertPayload)
                             .onConflictDoUpdate({
                                 target: pkCol,
                                 set: filteredData
@@ -227,23 +236,23 @@ export async function POST(req: NextRequest) {
                         // Special side effects for counts (handle active <-> deleted transitions)
                         if (operation !== 'DELETE') {
                             const wasActive = !!existingRecord && !existingRecord.deletedAt;
-                            const willBeActive = !filteredData.deletedAt;
+                            const willBeActive = !insertPayload.deletedAt;
                             const becameActive = (!existingRecord && willBeActive) || (!!existingRecord && !wasActive && willBeActive);
                             const becameDeleted = !!existingRecord && wasActive && !willBeActive;
 
                             if (becameActive) {
-                                if (tableName === 'kudos' && filteredData.feedId) {
+                                if (tableName === 'kudos' && insertPayload.feedId) {
                                     await tx.update(schema.activityFeed)
                                         .set({ kudoCount: sql`${schema.activityFeed.kudoCount} + 1`, updatedAt: new Date() })
-                                        .where(eq(schema.activityFeed.id, filteredData.feedId));
-                                } else if (tableName === 'changelog_reactions' && filteredData.changelogId) {
+                                        .where(eq(schema.activityFeed.id, insertPayload.feedId));
+                                } else if (tableName === 'changelog_reactions' && insertPayload.changelogId) {
                                     await tx.update(schema.changelogs)
                                         .set({ reactionCount: sql`${schema.changelogs.reactionCount} + 1`, updatedAt: new Date() })
-                                        .where(eq(schema.changelogs.id, filteredData.changelogId));
-                                } else if (tableName === 'notification_reactions' && filteredData.notificationId) {
+                                        .where(eq(schema.changelogs.id, insertPayload.changelogId));
+                                } else if (tableName === 'notification_reactions' && insertPayload.notificationId) {
                                     await tx.update(schema.adminNotifications)
                                         .set({ reactionCount: sql`${schema.adminNotifications.reactionCount} + 1`, updatedAt: new Date() })
-                                        .where(eq(schema.adminNotifications.id, filteredData.notificationId));
+                                        .where(eq(schema.adminNotifications.id, insertPayload.notificationId));
                                 }
                             }
 
@@ -264,9 +273,42 @@ export async function POST(req: NextRequest) {
                             }
                         }
 
-                        // Score Processing
-                        if (tableName === 'workouts' && filteredData.status === 'completed' && (!existingRecord || existingRecord.status !== 'completed')) {
-                            await applyWorkoutScoring(tx, userId, pkValue);
+                        // Score Processing & Invalidation Side Effects
+                        if (tableName === 'workouts') {
+                            const wasCompleted = existingRecord?.status === 'completed' && !existingRecord.deletedAt;
+                            const isCompleted = insertPayload.status === 'completed' && !insertPayload.deletedAt;
+
+                            if (isCompleted && !wasCompleted) {
+                                // Activation (Finished or Restored)
+                                await applyWorkoutScoring(tx, userId, pkValue);
+                                // Un-delete feed entries if they exist
+                                await tx.update(schema.activityFeed)
+                                    .set({ deletedAt: null, updatedAt: new Date() })
+                                    .where(
+                                        and(
+                                            eq(schema.activityFeed.userId, userId),
+                                            or(
+                                                eq(schema.activityFeed.id, `activity-workout-${pkValue}`),
+                                                like(schema.activityFeed.id, `activity-pr-${pkValue}-%`)
+                                            )
+                                        )
+                                    );
+                            } else if (!isCompleted && wasCompleted) {
+                                // Deactivation (Resumed or Soft-deleted)
+                                await revertWorkoutScoring(tx, userId, pkValue);
+                                // Soft-delete feed entries
+                                await tx.update(schema.activityFeed)
+                                    .set({ deletedAt: new Date(), updatedAt: new Date() })
+                                    .where(
+                                        and(
+                                            eq(schema.activityFeed.userId, userId),
+                                            or(
+                                                eq(schema.activityFeed.id, `activity-workout-${pkValue}`),
+                                                like(schema.activityFeed.id, `activity-pr-${pkValue}-%`)
+                                            )
+                                        )
+                                    );
+                            }
                         }
                     });
 
@@ -304,6 +346,21 @@ export async function POST(req: NextRequest) {
                                         await tx.update(schema.adminNotifications)
                                             .set({ reactionCount: sql`GREATEST(0, ${schema.adminNotifications.reactionCount} - 1)`, updatedAt: new Date() })
                                             .where(eq(schema.adminNotifications.id, record.notificationId));
+                                    }
+
+                                    if (tableName === 'workouts') {
+                                        await revertWorkoutScoring(tx, userId, finalId);
+                                        await tx.update(schema.activityFeed)
+                                            .set({ deletedAt: new Date(), updatedAt: new Date() })
+                                            .where(
+                                                and(
+                                                    eq(schema.activityFeed.userId, userId),
+                                                    or(
+                                                        eq(schema.activityFeed.id, `activity-workout-${finalId}`),
+                                                        like(schema.activityFeed.id, `activity-pr-${finalId}-%`)
+                                                    )
+                                                )
+                                            );
                                     }
                                 }
                             }

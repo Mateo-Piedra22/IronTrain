@@ -86,15 +86,20 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
 
     const toggleExpand = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        setIsExpanded(prev => {
-            const nextState = !prev;
-            if (nextState) {
-                setVisibleMonth(selectedDate);
-            }
-            onExpandedChange?.(nextState);
-            return nextState;
-        });
-    }, [selectedDate, onExpandedChange]);
+
+        // 1. Calculamos el nuevo estado directamente
+        const nextState = !isExpanded;
+
+        // 2. Ejecutamos la lógica que dependía de esto
+        if (nextState) {
+            setVisibleMonth(selectedDate);
+        }
+
+        // 3. Actualizamos los estados de manera segura (fuera de un callback prev => ...)
+        setIsExpanded(nextState);
+        onExpandedChange?.(nextState);
+
+    }, [isExpanded, selectedDate, onExpandedChange]); // <-- Agrega isExpanded a las dependencias
 
     const handleViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken<Date>[] }) => {
         if (viewableItems.length > 0) {

@@ -437,6 +437,95 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
     return { totalAwarded };
 }
 
+export async function revertWorkoutScoring(trx: any, userId: string, workoutId: string): Promise<{ totalReverted: number }> {
+    logger.info('[Scoring] Reverting score', { userId, workoutId });
+
+    // 1. Find all score events for this workout
+    const events = await trx
+        .select({
+            id: schema.scoreEvents.id,
+            pointsAwarded: schema.scoreEvents.pointsAwarded,
+            eventType: schema.scoreEvents.eventType,
+            eventKey: schema.scoreEvents.eventKey
+        })
+        .from(schema.scoreEvents)
+        .where(and(
+            eq(schema.scoreEvents.userId, userId),
+            eq(schema.scoreEvents.workoutId, workoutId)
+        ));
+
+    if (events.length === 0) return { totalReverted: 0 };
+
+    const totalPoints = events.reduce((sum: number, e: any) => sum + (e.pointsAwarded || 0), 0);
+
+    // 2. Subtract from user profile (ensure we don't go below 0)
+    await trx
+        .update(schema.userProfiles)
+        .set({
+            scoreLifetime: sql`GREATEST(0, ${schema.userProfiles.scoreLifetime} - ${totalPoints})`,
+            updatedAt: new Date(),
+        })
+        .where(eq(schema.userProfiles.id, userId));
+
+    // 3. Revert PR records if necessary
+    const prEvents = events.filter((e: any) => e.eventType === 'pr_break');
+    for (const event of prEvents) {
+        // eventKey format: pr:${workoutId}:${exerciseId}
+        const parts = (event as any).eventKey?.split(':');
+        const exerciseId = parts?.[2];
+        if (!exerciseId) continue;
+
+        const prId = `${userId}:${exerciseId}`;
+
+        // Find the next best 1RM (excluding this workout)
+        const [nextBest] = await trx
+            .select({
+                oneRm: sql<number>`${schema.workoutSets.weight} * (1.0 + (${schema.workoutSets.reps} / 30.0))`.mapWith(Number),
+                exerciseName: schema.exercises.name
+            })
+            .from(schema.workoutSets)
+            .innerJoin(schema.workouts, eq(schema.workouts.id, schema.workoutSets.workoutId))
+            .innerJoin(schema.exercises, eq(schema.exercises.id, schema.workoutSets.exerciseId))
+            .where(and(
+                eq(schema.workoutSets.userId, userId),
+                eq(schema.workoutSets.exerciseId, exerciseId),
+                eq(schema.workoutSets.completed, 1),
+                eq(schema.workouts.status, 'completed'),
+                isNull(schema.workouts.deletedAt),
+                isNull(schema.workoutSets.deletedAt),
+                sql`${schema.workouts.id} != ${workoutId}`,
+                sql`${schema.workoutSets.weight} > 0`,
+                sql`${schema.workoutSets.reps} > 0`,
+                or(isNull(schema.workoutSets.type), sql`${schema.workoutSets.type} != 'warmup'`)
+            ))
+            .orderBy(desc(sql`${schema.workoutSets.weight} * (1.0 + (${schema.workoutSets.reps} / 30.0))`))
+            .limit(1);
+
+        if (nextBest) {
+            await trx.update(schema.userExercisePrs)
+                .set({
+                    best1RmKg: nextBest.oneRm,
+                    exerciseName: nextBest.exerciseName,
+                    updatedAt: new Date(),
+                })
+                .where(eq(schema.userExercisePrs.id, prId));
+        } else {
+            // No other PRs for this exercise, delete the PR record
+            await trx.delete(schema.userExercisePrs).where(eq(schema.userExercisePrs.id, prId));
+        }
+    }
+
+    // 4. Delete the score events to allow re-awarding later
+    await trx
+        .delete(schema.scoreEvents)
+        .where(and(
+            eq(schema.scoreEvents.userId, userId),
+            eq(schema.scoreEvents.workoutId, workoutId)
+        ));
+
+    return { totalReverted: totalPoints };
+}
+
 export async function buildLeaderboard(userId: string) {
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 86400000);

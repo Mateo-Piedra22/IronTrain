@@ -569,6 +569,9 @@ class WorkoutService {
         );
         await dbService.queueSyncMutation('workouts', id, 'UPDATE', { status: 'in_progress', updated_at: now });
 
+        // Clean up social feed events because the workout is no longer completed
+        await this.cleanupActivityFeedForWorkout(id);
+
         dataEventService.emit('DATA_UPDATED');
 
         this.invalidateCaches();
@@ -745,6 +748,27 @@ class WorkoutService {
         });
     }
 
+    private async cleanupActivityFeedForWorkout(workoutId: string): Promise<void> {
+        const now = Date.now();
+        // Since we use deterministic IDs for workouts and PRs, we can target them directly or via prefix
+        // Workout ID: activity-workout-[workoutId]
+        // PR ID: activity-pr-[workoutId]-[exerciseId]
+
+        const related = await dbService.getAll<{ id: string }>(
+            "SELECT id FROM activity_feed WHERE id = ? OR id LIKE ?",
+            [`activity-workout-${workoutId}`, `activity-pr-${workoutId}-%`]
+        );
+
+        for (const act of related) {
+            await dbService.run(
+                'UPDATE activity_feed SET deleted_at = ?, updated_at = ? WHERE id = ?',
+                [now, now, act.id]
+            );
+            // Queue sync deletion
+            await dbService.queueSyncMutation('activity_feed', act.id, 'DELETE');
+        }
+    }
+
     private generateId(): string {
         return uuidV4();
     }
@@ -854,6 +878,9 @@ class WorkoutService {
     public async delete(id: string): Promise<void> {
         try {
             await dbService.withTransaction(async () => {
+                // Clean up associated social feed events
+                await this.cleanupActivityFeedForWorkout(id);
+
                 // Queue deletes before actual deletion so we have the references
                 const sets = await dbService.getAll<{ id: string }>('SELECT id FROM workout_sets WHERE workout_id = ?', [id]);
                 for (const s of sets) await dbService.queueSyncMutation('workout_sets', s.id, 'DELETE');
