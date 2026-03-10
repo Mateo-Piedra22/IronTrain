@@ -51,12 +51,13 @@ Ejemplo de flujo: `2.0.0` -> `2.0.1` (Parche) o `2.0.0` -> `2.1.0` (Nueva Funcio
 ---
 
 ## Paso 2 - Preparación de la Versión (Automatizado)
-
-Ejecutar en la raíz del proyecto:
-`npm run release:prepare -- [VERSION]`
-Ejemplo: `npm run release:prepare -- 2.0.1`
-
-Este comando sincroniza automáticamente:
+ 
+ Ejecutar en la raíz del proyecto:
+ `npm run audit` (Verificar integridad del proyecto)
+ `npm run release:prepare -- [VERSION]`
+ Ejemplo: `npm run release:prepare -- 2.0.1`
+ 
+ Este comando sincroniza automáticamente:
 - `app.json` (Version y Build Number).
 - `package.json` (Metadata del paquete).
 - `docs/CHANGELOG.md` (Fuente única de verdad del changelog).
@@ -76,15 +77,15 @@ En la sección `## [VERSION] (Unreleased)`, describa los cambios realizados sigu
 ---
 
 ## Paso 4 - Cierre del Release (Automatizado)
-
-Una vez verificado el contenido del changelog:
-`npm run release:finalize`
-
-Este paso realiza:
-1. Conversión de `Unreleased` a la fecha actual (`YYYY-MM-DD`).
-2. Creación preventivo del siguiente bloque `Unreleased`.
-3. Regeneración de `src/changelog.generated.json`.
-4. Sincronización final de `website/content/` para asegurar que el despliegue en Vercel incluya la información actualizada.
+ 
+ Una vez verificado el contenido del changelog:
+ `npm run release:finalize`
+ 
+ Este paso realiza:
+1. Auditoría automática del proyecto.
+2. Conversión de `Unreleased` a la fecha actual (`YYYY-MM-DD`).
+3. Creación preventivo del siguiente bloque `Unreleased`.
+4. Regeneración automática de changelogs (JSON y Web).
 5. La tabla `changelogs` en Neon se alinea automáticamente cuando se consulta `GET /api/changelogs` (upsert idempotente desde `docs/CHANGELOG.md`).
 
 ## Modelo Unificado de Changelog
@@ -96,28 +97,43 @@ Este paso realiza:
 
 ---
 
-## Paso 5 - Commit y Despliegue de Código
-
-Realice el commit de los archivos modificados (app.json, package.json, changelogs, etc.) y haga push a la rama principal. 
-Vercel detectará el cambio y actualizará el sitio web automáticamente.
-
----
-
-## Paso 6 - Tagging y Build de Producción
-
-Para disparar la construcción del APK y la publicación del release:
-`git tag v[VERSION]`
-`git push --tags`
-
-Esto activa el flujo de GitHub Actions que:
-- Ejecuta `eas build` para Android/iOS.
-- Lee el changelog desde `src/changelog.generated.json` y lo usa como notas del release.
-- Crea el Release en GitHub con el tag correspondiente y el contenido detallado del changelog.
-- Sube el binario (`.apk`) y el archivo de sumas de verificación (`sha256`).
-
----
-
-## Paso 7 - Verificación Final (Checklist)
+## Paso 5 - Commit y Despliegue de Código (Manual)
+ 
+ Realice el commit de los archivos modificados (app.json, package.json, changelogs, etc.) y haga push a la rama principal. 
+ Vercel detectará el cambio y actualizará el sitio web automáticamente.
+ 
+ ---
+ 
+ ## Paso 6 - Tagging y Build de Producción (Manual)
+ 
+ Para disparar la construcción del APK y la publicación del release:
+ `git tag v[VERSION]`
+ `git push --tags`
+ 
+ Esto activa el flujo de GitHub Actions que:
+ - Ejecuta `eas build` para Android/iOS.
+ - Lee el changelog desde `src/changelog.generated.json` y lo usa como notas del release.
+ - Crea el Release en GitHub con el tag correspondiente y el contenido detallado del changelog.
+ - Sube el binario (`.apk`) y el archivo de sumas de verificación (`sha256`).
+ 
+ ---
+ 
+ ## OPCIÓN RECOMENDADA: Publicación Total (One-Click)
+ 
+ Para automatizar todo el ciclo anterior (audit, commit, tagging y push) en un solo comando:
+ `npm run deploy:mobile`
+ 
+ Este comando ejecutará internamente:
+ 1. `npm run audit` (Verificación de integridad).
+ 2. `git commit` automático de los cambios de versión.
+ 3. `git tag` con la versión actual de `app.json`.
+ 4. `git push` de la rama y los tags hacia GitHub.
+ 
+ Al finalizar el push, **GitHub Actions** detectará el nuevo tag y disparará automáticamente la build en EAS a través del flujo `release-android.yml`.
+ 
+ ---
+ 
+ ## Paso 7 - Verificación Final (Checklist)
 
 ### GitHub Releases
 - Confirmar que el Release `v[VERSION]` existe y contiene el archivo APK.

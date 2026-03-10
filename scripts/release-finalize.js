@@ -1,8 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 
+const { execSync } = require('child_process');
 const { generate } = require('./generate-changelog');
 const { syncWebsiteContent } = require('./sync-website-content');
+
+function runAudit() {
+  console.log('Running pre-release audit...');
+  execSync('node scripts/audit.js', { stdio: 'inherit' });
+}
 
 function isSemver(v) {
   return /^\d+\.\d+\.\d+$/.test(String(v).trim());
@@ -18,6 +24,7 @@ function todayIsoDate() {
 }
 
 function main() {
+  runAudit();
   const repoRoot = path.resolve(__dirname, '..');
   const changelogPath = path.join(repoRoot, 'docs', 'CHANGELOG.md');
   const appJsonPath = path.join(repoRoot, 'app.json');

@@ -37,6 +37,10 @@ function generate() {
   const inputPath = path.join(repoRoot, 'docs', 'CHANGELOG.md');
   const outputPath = path.join(repoRoot, 'src', 'changelog.generated.json');
 
+  if (!fs.existsSync(inputPath)) {
+    console.warn('Skipping changelog generation: docs/CHANGELOG.md not found. This is expected if running in a restricted environment like EAS Build.');
+    return null;
+  }
   const md = fs.readFileSync(inputPath, 'utf8');
   const lines = md.split(/\r?\n/);
 
