@@ -33,12 +33,20 @@ export async function GET(req: NextRequest) {
         const feedUsers = [userId, ...friendIds];
 
         // 3. Fetch Activity Feed for these users
-        let activityRecords: typeof schema.activityFeed.$inferSelect[] = [];
+        let activityRecords: { activity: typeof schema.activityFeed.$inferSelect, seenAt: Date | null }[] = [];
         let kudosCounts: any[] = [];
         let userKudos: any[] = [];
 
         if (feedUsers.length > 0) {
-            activityRecords = await db.select().from(schema.activityFeed)
+            activityRecords = await db.select({
+                activity: schema.activityFeed,
+                seenAt: schema.activitySeen.seenAt
+            })
+                .from(schema.activityFeed)
+                .leftJoin(schema.activitySeen, and(
+                    eq(schema.activitySeen.activityId, schema.activityFeed.id),
+                    eq(schema.activitySeen.userId, userId)
+                ))
                 .where(
                     and(
                         inArray(schema.activityFeed.userId, feedUsers),
@@ -48,7 +56,7 @@ export async function GET(req: NextRequest) {
                 .orderBy(desc(schema.activityFeed.createdAt))
                 .limit(50); // Get latest 50 activities overall
 
-            const activityIds = activityRecords.map(a => a.id);
+            const activityIds = activityRecords.map(a => a.activity.id);
             if (activityIds.length > 0) {
                 // Get total kudos per activity
                 kudosCounts = await db.select({
@@ -76,7 +84,7 @@ export async function GET(req: NextRequest) {
         // Fetch display names for everyone
         const allUserIds = [...new Set([
             ...shareRecords.map(r => r.senderId),
-            ...activityRecords.map(a => a.userId)
+            ...activityRecords.map(a => a.activity.userId)
         ])];
 
         const profilesMap = new Map<string, { name: string, username: string | null }>();
@@ -109,18 +117,20 @@ export async function GET(req: NextRequest) {
                 payload: r.payload,
                 status: r.status,
                 createdAt: r.updatedAt,
+                seenAt: r.seenAt,
             })),
             ...activityRecords.map(a => ({
-                id: a.id,
+                id: a.activity.id,
                 feedType: 'activity_log',
-                senderId: a.userId,
-                senderName: profilesMap.get(a.userId)?.name || 'Unknown',
-                senderUsername: profilesMap.get(a.userId)?.username,
-                actionType: a.actionType,
-                metadata: a.metadata,
-                kudosCount: kudoCountMap.get(a.id) || 0,
-                hasKudoed: userKudosSet.has(a.id),
-                createdAt: a.createdAt,
+                senderId: a.activity.userId,
+                senderName: profilesMap.get(a.activity.userId)?.name || 'Unknown',
+                senderUsername: profilesMap.get(a.activity.userId)?.username,
+                actionType: a.activity.actionType,
+                metadata: a.activity.metadata,
+                kudosCount: kudoCountMap.get(a.activity.id) || 0,
+                hasKudoed: userKudosSet.has(a.activity.id),
+                createdAt: a.activity.createdAt,
+                seenAt: a.seenAt || (a.activity.userId === userId ? a.activity.seenAt : null),
             }))
         ];
 
@@ -132,6 +142,50 @@ export async function GET(req: NextRequest) {
         });
 
         return NextResponse.json({ success: true, items: list });
+    } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : 'Internal server error';
+        return NextResponse.json({ error: message }, { status: 500 });
+    }
+}
+
+export async function POST(req: NextRequest) {
+    try {
+        const userId = await verifyAuth(req);
+        if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+        const body = await req.json();
+        const { id, feedType } = body;
+
+        if (!id || !feedType) {
+            return NextResponse.json({ error: 'Missing id or feedType' }, { status: 400 });
+        }
+
+        if (feedType === 'direct_share') {
+            await db.update(schema.sharesInbox)
+                .set({ seenAt: new Date(), updatedAt: new Date() })
+                .where(and(eq(schema.sharesInbox.id, id), eq(schema.sharesInbox.receiverId, userId)));
+        } else if (feedType === 'activity_log') {
+            // Per-user seen status for shared activities
+            const seenId = `${userId}_${id}`;
+            await db.insert(schema.activitySeen)
+                .values({
+                    id: seenId,
+                    userId,
+                    activityId: id,
+                    seenAt: new Date()
+                })
+                .onConflictDoUpdate({
+                    target: schema.activitySeen.id,
+                    set: { seenAt: new Date() }
+                });
+
+            // Also update the main activity_feed.seenAt if it's our own activity (legacy/simplicity)
+            await db.update(schema.activityFeed)
+                .set({ seenAt: new Date(), updatedAt: new Date() })
+                .where(and(eq(schema.activityFeed.id, id), eq(schema.activityFeed.userId, userId)));
+        }
+
+        return NextResponse.json({ success: true });
     } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Internal server error';
         return NextResponse.json({ error: message }, { status: 500 });

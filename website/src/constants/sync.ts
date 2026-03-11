@@ -19,6 +19,8 @@ export const SYNC_TABLES: ReadonlyArray<string> = [
     'notification_reactions',
     'kudos',
     'activity_feed',
+    'activity_seen',
+    'shares_inbox',
     'score_events',
     'user_exercise_prs',
     'friendships',

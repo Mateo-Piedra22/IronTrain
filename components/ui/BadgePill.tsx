@@ -35,26 +35,33 @@ export function BadgePill({ name, color, icon, size = 'sm', variant = 'default' 
             borderRadius = 6;
             paddingH = 6;
             paddingV = 2;
-            fontSize = 7.5;
-            iconSize = 8;
+            fontSize = 8.5;  // 7.5 -> 8.5
+            iconSize = 9;   // 8 -> 9
             letterSpacing = 0;
             gap = 2;
         } else if (isSm) {
-            borderRadius = 8;
-            paddingH = 7;
-            paddingV = 3;
-            fontSize = 9;
-            iconSize = 10;
+            borderRadius = 10; // 8 -> 10
+            paddingH = 9;      // 7 -> 9
+            paddingV = 4;      // 3 -> 4
+            fontSize = 11;     // 9 -> 11
+            iconSize = 12;     // 10 -> 12
             letterSpacing = 0.1;
-            gap = 3;
+            gap = 4;
         } else if (isLg) {
-            borderRadius = 14;
-            paddingH = 10;
-            paddingV = 6;
-            fontSize = 13;
-            iconSize = 14;
+            borderRadius = 16; // 14 -> 16
+            paddingH = 14;     // 10 -> 14
+            paddingV = 8;      // 6 -> 8
+            fontSize = 15;     // 13 -> 15
+            iconSize = 16;     // 14 -> 16
             letterSpacing = 0.3;
-            gap = 6;
+            gap = 8;
+        } else {
+            // Default MD
+            borderRadius = 12; // 10 -> 12
+            paddingH = 11;      // 8 -> 11
+            paddingV = 5;      // 4 -> 5
+            fontSize = 13;     // 11 -> 13
+            iconSize = 14;     // 12 -> 14
         }
 
         const baseOpacity = variant === 'minimal' ? '14' : '20';
@@ -62,7 +69,16 @@ export function BadgePill({ name, color, icon, size = 'sm', variant = 'default' 
             ? [color, color]
             : [withAlpha(color, baseOpacity), withAlpha(color, baseOpacity)];
 
-        const textColor = variant === 'vibrant' ? colors.white : color;
+        // Intelligent contrast for vibrant
+        const getContrastText = (hex: string) => {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+            return (yiq >= 128) ? colors.black : colors.white;
+        };
+
+        const textColor = variant === 'vibrant' ? getContrastText(color) : color;
         const borderColor = variant === 'minimal' ? 'transparent' : withAlpha(color, '40');
 
         const styles = StyleSheet.create({

@@ -5,7 +5,7 @@ import { notify } from '@/src/utils/notify';
 import * as Haptics from 'expo-haptics';
 import { Check, ChevronDown, ChevronUp, Plus, RotateCcw, Target, Trash2, Trophy } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useColors } from '../src/hooks/useColors';
 import { confirm } from '../src/store/confirmStore';
 
@@ -225,10 +225,13 @@ export function GoalsWidget() {
         },
         modalOverlay: {
             flex: 1,
-            backgroundColor: ThemeFx.backdrop,
+            backgroundColor: withAlpha(colors.background, '80'),
+        },
+        modalScroll: {
+            flexGrow: 1,
             justifyContent: 'center',
             alignItems: 'center',
-            padding: 16
+            padding: 16,
         },
         modalContainer: {
             backgroundColor: colors.surface,
@@ -540,60 +543,65 @@ export function GoalsWidget() {
 
             {/* Add Goal Modal */}
             <Modal visible={modalVisible} transparent animationType="fade">
-                <View style={ss.modalOverlay}>
-                    <View style={ss.modalContainer}>
-                        <Text style={ss.modalTitle}>
-                            Nueva meta
-                        </Text>
+                <KeyboardAvoidingView
+                    style={ss.modalOverlay}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
+                    <ScrollView contentContainerStyle={ss.modalScroll} keyboardShouldPersistTaps="handled" bounces={false} showsVerticalScrollIndicator={false}>
+                        <View style={ss.modalContainer}>
+                            <Text style={ss.modalTitle}>
+                                Nueva meta
+                            </Text>
 
-                        <Text style={ss.label}>Título</Text>
-                        <TextInput
-                            value={newTitle}
-                            onChangeText={setNewTitle}
-                            placeholder="Ej. Press banca 100kg"
-                            placeholderTextColor={colors.textMuted}
-                            style={ss.input}
-                        />
+                            <Text style={ss.label}>Título</Text>
+                            <TextInput
+                                value={newTitle}
+                                onChangeText={setNewTitle}
+                                placeholder="Ej. Press banca 100kg"
+                                placeholderTextColor={colors.textMuted}
+                                style={ss.input}
+                            />
 
-                        <View style={ss.inputRow}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={ss.label}>Objetivo (kg)</Text>
-                                <TextInput
-                                    value={newTarget}
-                                    onChangeText={setNewTarget}
-                                    keyboardType="numeric"
-                                    placeholder="100"
-                                    placeholderTextColor={colors.textMuted}
-                                    style={ss.input}
-                                />
+                            <View style={ss.inputRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={ss.label}>Objetivo (kg)</Text>
+                                    <TextInput
+                                        value={newTarget}
+                                        onChangeText={setNewTarget}
+                                        keyboardType="numeric"
+                                        placeholder="100"
+                                        placeholderTextColor={colors.textMuted}
+                                        style={ss.input}
+                                    />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={ss.label}>Actual (kg)</Text>
+                                    <TextInput
+                                        value={newCurrent}
+                                        onChangeText={setNewCurrent}
+                                        keyboardType="numeric"
+                                        placeholder="80"
+                                        placeholderTextColor={colors.textMuted}
+                                        style={ss.input}
+                                    />
+                                </View>
                             </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={ss.label}>Actual (kg)</Text>
-                                <TextInput
-                                    value={newCurrent}
-                                    onChangeText={setNewCurrent}
-                                    keyboardType="numeric"
-                                    placeholder="80"
-                                    placeholderTextColor={colors.textMuted}
-                                    style={ss.input}
-                                />
+
+                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                                <View style={{ flex: 1 }}>
+                                    <TouchableOpacity onPress={() => setModalVisible(false)} style={ss.cancelBtn}>
+                                        <Text style={ss.cancelBtnText}>Cancelar</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <TouchableOpacity onPress={handleAddGoal} style={ss.saveBtn}>
+                                        <Text style={ss.saveBtnText}>Guardar</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </View>
-
-                        <View style={{ flexDirection: 'row', gap: 12 }}>
-                            <View style={{ flex: 1 }}>
-                                <TouchableOpacity onPress={() => setModalVisible(false)} style={ss.cancelBtn}>
-                                    <Text style={ss.cancelBtnText}>Cancelar</Text>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <TouchableOpacity onPress={handleAddGoal} style={ss.saveBtn}>
-                                    <Text style={ss.saveBtnText}>Guardar</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                </View>
+                    </ScrollView>
+                </KeyboardAvoidingView>
             </Modal>
         </View>
     );

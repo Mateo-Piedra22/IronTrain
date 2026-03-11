@@ -10,7 +10,7 @@ import { format } from 'date-fns';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { Dumbbell, Play, Plus, Trash2 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useColors } from '../../src/hooks/useColors';
 import { confirm } from '../../src/store/confirmStore';
 
@@ -254,16 +254,18 @@ export default function TemplatesScreen() {
 
             {/* Create Modal */}
             <Modal transparent visible={isCreating} animationType="fade" onRequestClose={() => setIsCreating(false)}>
-                <View style={ss.modalOverlay}>
-                    <View style={ss.modalSheet}>
-                        <Text style={ss.modalTitle}>Nueva plantilla</Text>
-                        <IronInput placeholder="Nombre de plantilla (ej: Piernas)" value={newTemplateName} onChangeText={setNewTemplateName} autoFocus />
-                        <View style={ss.modalActions}>
-                            <View style={{ flex: 1 }}><IronButton label="Cancelar" variant="ghost" onPress={() => setIsCreating(false)} /></View>
-                            <View style={{ flex: 1 }}><IronButton label="Crear" onPress={handleCreate} /></View>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+                    <View style={ss.modalOverlay}>
+                        <View style={ss.modalSheet}>
+                            <Text style={ss.modalTitle}>Nueva plantilla</Text>
+                            <IronInput placeholder="Nombre de plantilla (ej: Piernas)" value={newTemplateName} onChangeText={setNewTemplateName} autoFocus />
+                            <View style={ss.modalActions}>
+                                <View style={{ flex: 1 }}><IronButton label="Cancelar" variant="ghost" onPress={() => setIsCreating(false)} /></View>
+                                <View style={{ flex: 1 }}><IronButton label="Crear" onPress={handleCreate} /></View>
+                            </View>
                         </View>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
         </SafeAreaWrapper>
     );

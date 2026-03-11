@@ -4,7 +4,7 @@ import { ThemeFx, withAlpha } from '@/src/theme';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { Pencil, Plus, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '../src/hooks/useColors';
 import { CategoryService } from '../src/services/CategoryService';
@@ -55,7 +55,7 @@ export function CategoryManager() {
             backgroundColor: colors.primary.DEFAULT, alignItems: 'center', justifyContent: 'center',
             shadowColor: colors.primary.DEFAULT, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
         },
-        modalOverlay: { flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center', padding: 16 },
+        modalOverlay: { flex: 1, backgroundColor: ThemeFx.backdrop },
         modalContent: {
             backgroundColor: colors.surface, width: '100%', maxWidth: 360,
             borderRadius: 20, padding: 24, borderWidth: 1.5, borderColor: colors.border,
@@ -220,33 +220,45 @@ export function CategoryManager() {
             </TouchableOpacity>
 
             {modalVisible && (
-                <Modal transparent visible animationType="fade" onRequestClose={() => setModalVisible(false)}>
-                    <SafeAreaView style={ss.modalOverlay} edges={['top', 'bottom', 'left', 'right']}>
-                        <View style={ss.modalContent}>
-                            <Text style={ss.modalTitle}>
-                                {editingCategory ? 'Editar categoría' : 'Nueva categoría'}
-                            </Text>
-
-                            <IronInput label="Nombre" value={categoryName} onChangeText={setCategoryName} autoFocus />
-
-                            <Text style={ss.label}>Color</Text>
-                            <TouchableOpacity
-                                onPress={() => setShowColorPicker(true)}
-                                style={ss.colorSelector}
+                <Modal transparent visible animationType="fade" onRequestClose={() => setModalVisible(false)} statusBarTranslucent>
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                        style={ss.modalOverlay}
+                    >
+                        <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
+                            <ScrollView
+                                contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}
+                                keyboardShouldPersistTaps="handled"
+                                bounces={false}
+                                showsVerticalScrollIndicator={false}
                             >
-                                <Text style={ss.colorSelectorText}>Color seleccionado</Text>
-                                <View style={ss.colorSelectorValue}>
-                                    <Text style={ss.colorHex}>{selectedColor}</Text>
-                                    <View style={[ss.colorPreview, { backgroundColor: selectedColor }]} />
-                                </View>
-                            </TouchableOpacity>
+                                <View style={ss.modalContent}>
+                                    <Text style={ss.modalTitle}>
+                                        {editingCategory ? 'Editar categoría' : 'Nueva categoría'}
+                                    </Text>
 
-                            <View style={ss.modalFooter}>
-                                <View style={{ flex: 1 }}><IronButton label="Cancelar" variant="ghost" onPress={() => setModalVisible(false)} /></View>
-                                <View style={{ flex: 1 }}><IronButton label="Guardar" onPress={handleSave} /></View>
-                            </View>
-                        </View>
-                    </SafeAreaView>
+                                    <IronInput label="Nombre" value={categoryName} onChangeText={setCategoryName} autoFocus />
+
+                                    <Text style={ss.label}>Color</Text>
+                                    <TouchableOpacity
+                                        onPress={() => setShowColorPicker(true)}
+                                        style={ss.colorSelector}
+                                    >
+                                        <Text style={ss.colorSelectorText}>Color seleccionado</Text>
+                                        <View style={ss.colorSelectorValue}>
+                                            <Text style={ss.colorHex}>{selectedColor}</Text>
+                                            <View style={[ss.colorPreview, { backgroundColor: selectedColor }]} />
+                                        </View>
+                                    </TouchableOpacity>
+
+                                    <View style={ss.modalFooter}>
+                                        <View style={{ flex: 1 }}><IronButton label="Cancelar" variant="ghost" onPress={() => setModalVisible(false)} /></View>
+                                        <View style={{ flex: 1 }}><IronButton label="Guardar" onPress={handleSave} /></View>
+                                    </View>
+                                </View>
+                            </ScrollView>
+                        </SafeAreaView>
+                    </KeyboardAvoidingView>
                 </Modal>
             )}
 

@@ -13,7 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { ChevronDown, ChevronLeft, ChevronUp, Circle, Minus, Plus, Ruler, Scale, Trash2, TrendingDown, TrendingUp } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import { Dimensions, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Dimensions, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
 import { useColors } from '../../src/hooks/useColors';
 import { confirm } from '../../src/store/confirmStore';
@@ -603,43 +603,44 @@ export default function BodyTrackerScreen() {
             </ScrollView >
 
             {/* Add Measurement Modal */}
-            < Modal visible={addModalType !== null
-            } transparent animationType="fade" onRequestClose={() => setAddModalType(null)}>
-                <Pressable style={ss.modalOverlay} onPress={() => setAddModalType(null)}>
-                    <View style={ss.modalContainer}>
-                        {(() => {
-                            const cfg = MEASUREMENT_CONFIG.find(c => c.type === addModalType);
-                            if (!cfg) return null;
-                            const displayUnit = getUnitForType(cfg);
-                            return (
-                                <>
-                                    <Text style={ss.modalTitle}>{cfg.label}</Text>
-                                    <Text style={ss.modalSub}>Registrar nueva medición</Text>
-                                    <View style={{ marginVertical: 16 }}>
-                                        <TextInput
-                                            style={ss.modalInput}
-                                            placeholder={`Valor (${displayUnit})`}
-                                            placeholderTextColor={colors.textMuted}
-                                            keyboardType="numeric"
-                                            value={addValue}
-                                            onChangeText={setAddValue}
-                                            autoFocus
-                                        />
-                                    </View>
-                                    <View style={{ flexDirection: 'row', gap: 12 }}>
-                                        <Pressable onPress={() => setAddModalType(null)} style={[ss.modalBtn, ss.modalBtnCancel]}>
-                                            <Text style={ss.modalBtnCancelText}>Cancelar</Text>
-                                        </Pressable>
-                                        <Pressable onPress={handleAddMeasurement} style={[ss.modalBtn, ss.modalBtnSave]}>
-                                            <Text style={ss.modalBtnSaveText}>Guardar</Text>
-                                        </Pressable>
-                                    </View>
-                                </>
-                            );
-                        })()}
-                    </View>
-                </Pressable>
-            </Modal >
+            <Modal visible={addModalType !== null} transparent animationType="fade" onRequestClose={() => setAddModalType(null)}>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+                    <Pressable style={ss.modalOverlay} onPress={() => setAddModalType(null)}>
+                        <View style={ss.modalContainer}>
+                            {(() => {
+                                const cfg = MEASUREMENT_CONFIG.find(c => c.type === addModalType);
+                                if (!cfg) return null;
+                                const displayUnit = getUnitForType(cfg);
+                                return (
+                                    <>
+                                        <Text style={ss.modalTitle}>{cfg.label}</Text>
+                                        <Text style={ss.modalSub}>Registrar nueva medición</Text>
+                                        <View style={{ marginVertical: 16 }}>
+                                            <TextInput
+                                                style={ss.modalInput}
+                                                placeholder={`Valor (${displayUnit})`}
+                                                placeholderTextColor={colors.textMuted}
+                                                keyboardType="numeric"
+                                                value={addValue}
+                                                onChangeText={setAddValue}
+                                                autoFocus
+                                            />
+                                        </View>
+                                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                                            <Pressable onPress={() => setAddModalType(null)} style={[ss.modalBtn, ss.modalBtnCancel]}>
+                                                <Text style={ss.modalBtnCancelText}>Cancelar</Text>
+                                            </Pressable>
+                                            <Pressable onPress={handleAddMeasurement} style={[ss.modalBtn, ss.modalBtnSave]}>
+                                                <Text style={ss.modalBtnSaveText}>Guardar</Text>
+                                            </Pressable>
+                                        </View>
+                                    </>
+                                );
+                            })()}
+                        </View>
+                    </Pressable>
+                </KeyboardAvoidingView>
+            </Modal>
             {/* Metric Selector Modal (Quick Add) */}
             <Modal visible={showTypeSelector} transparent animationType="slide" onRequestClose={() => setShowTypeSelector(false)}>
                 <Pressable style={ss.modalOverlay} onPress={() => setShowTypeSelector(false)}>

@@ -9,13 +9,15 @@ import { ThemeFx, withAlpha } from '@/src/theme';
 import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
-import { Award, CalendarDays, CheckCircle, ChevronDown, ChevronUp, CloudRain, Copy, Dumbbell, Flame, Globe, Info, Lock as LockIcon, MapPin, MapPinOff, RefreshCcw, Scale, Settings, Shield as ShieldIcon, TrendingUp, Trophy, UserCheck, UserMinus as UserMinusIcon, XCircle, X as XIcon, Zap } from 'lucide-react-native';
+import { Award, CalendarDays, CheckCircle, ChevronDown, ChevronUp, CloudRain, Copy, Dumbbell, Eye, EyeOff, Flame, Globe, Info, Lock as LockIcon, MapPin, MapPinOff, RefreshCcw, Scale, Settings, Shield as ShieldIcon, TrendingUp, Trophy, UserCheck, UserMinus as UserMinusIcon, XCircle, X as XIcon, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Image,
+    KeyboardAvoidingView,
     Linking,
     Modal,
+    Platform,
     Pressable,
     RefreshControl,
     ScrollView,
@@ -24,7 +26,7 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { useColors } from '../../src/hooks/useColors';
 
@@ -1326,6 +1328,48 @@ export default function SocialTab() {
             color: colors.primary.DEFAULT,
             fontWeight: '900',
         },
+        inboxSecondaryHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 8,
+            paddingHorizontal: 4,
+        },
+        inboxStatusTitle: {
+            fontSize: 14,
+            fontWeight: '800',
+            color: colors.text,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+        },
+        archiveToggle: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            backgroundColor: colors.surfaceLighter,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: colors.border,
+        },
+        archiveToggleActive: {
+            backgroundColor: colors.primary.DEFAULT,
+            borderColor: colors.primary.DEFAULT,
+        },
+        archiveToggleText: {
+            fontSize: 12,
+            fontWeight: '800',
+            color: colors.textMuted,
+        },
+        archiveToggleTextActive: {
+            color: colors.onPrimary,
+        },
+        markSeenBtn: {
+            padding: 8,
+            backgroundColor: withAlpha(colors.textMuted, '10'),
+            borderRadius: 10,
+        },
     }), [colors]);
     const [profile, setProfile] = useState<SocialProfile | null>(null);
     const [friends, setFriends] = useState<SocialFriend[]>([]);
@@ -1335,6 +1379,7 @@ export default function SocialTab() {
     const [searchResults, setSearchResults] = useState<SocialSearchUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [showSeen, setShowSeen] = useState(false);
     const [activeTab, setActiveTab] = useState<SocialTabKey>('leaderboard');
     const router = useRouter();
     const [rankingSegment, setRankingSegment] = useState<'weekly' | 'monthly' | 'lifetime'>('lifetime');
@@ -1595,12 +1640,22 @@ export default function SocialTab() {
                 await routineService.importSharedRoutine(parsedPayload);
                 confirm.success('Rutina importada', 'La rutina ha sido añadida a tu biblioteca local.');
             }
+            setInbox(prev => prev.map(item => item.id === inboxId ? { ...item, seenAt: new Date().toISOString() } : item));
             await SocialService.respondInbox(inboxId, action);
             loadData();
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : 'Error desconocido';
             confirm.error('Error', msg);
         }
+    };
+
+    const handleMarkAsSeen = async (id: string, feedType: 'direct_share' | 'activity_log') => {
+        try {
+            const success = await SocialService.markAsSeen(id, feedType);
+            if (success) {
+                setInbox(prev => prev.map(item => item.id === id ? { ...item, seenAt: new Date().toISOString() } : item));
+            }
+        } catch { }
     };
 
     const handleToggleKudo = async (feedId: string) => {
@@ -2066,100 +2121,139 @@ export default function SocialTab() {
 
                     {activeTab === 'inbox' && (
                         <View style={{ gap: 16 }}>
-                            {inbox.length === 0 ? (
-                                <Text style={styles.emptyText}>Tu Feed de la comunidad está vacío.</Text>
+                            <View style={styles.inboxSecondaryHeader}>
+                                <Text style={styles.inboxStatusTitle}>
+                                    {showSeen ? 'Historial de Notificaciones' : 'Notificaciones Recientes'}
+                                </Text>
+                                <TouchableOpacity
+                                    style={[styles.archiveToggle, showSeen && styles.archiveToggleActive]}
+                                    onPress={() => setShowSeen(!showSeen)}
+                                >
+                                    {showSeen ? <Eye size={16} color={colors.onPrimary} /> : <EyeOff size={16} color={colors.textMuted} />}
+                                    <Text style={[styles.archiveToggleText, showSeen && styles.archiveToggleTextActive]}>
+                                        {showSeen ? 'Ver pendientes' : 'Ver archivadas'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {(inbox.filter(item => showSeen ? !!item.seenAt : !item.seenAt)).length === 0 ? (
+                                <Text style={styles.emptyText}>
+                                    {showSeen ? 'No tenés notificaciones archivadas.' : 'Todo al día por acá.'}
+                                </Text>
                             ) : (
-                                inbox.map((item) => {
-                                    if (item.feedType === 'direct_share' || !item.feedType) {
-                                        return (
-                                            <View key={item.id} style={styles.premiumCard}>
-                                                <View style={styles.premiumHeader}>
-                                                    <View style={styles.premiumIconBox}>
-                                                        <Dumbbell size={24} color={colors.onPrimary} />
+                                inbox
+                                    .filter(item => showSeen ? !!item.seenAt : !item.seenAt)
+                                    .map((item) => {
+                                        if (item.feedType === 'direct_share' || !item.feedType) {
+                                            return (
+                                                <View key={item.id} style={styles.premiumCard}>
+                                                    <View style={styles.premiumHeader}>
+                                                        <View style={styles.premiumIconBox}>
+                                                            <Dumbbell size={24} color={colors.onPrimary} />
+                                                        </View>
+                                                        <View style={{ flex: 1 }}>
+                                                            <Text style={styles.premiumTitle}>Invitación a Entrenar</Text>
+                                                            <Text style={styles.premiumSender}>de @{item.senderUsername || item.senderName}</Text>
+                                                        </View>
+                                                        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                                                            <Text style={styles.activityDate}>
+                                                                {new Date(item.createdAt).toLocaleDateString()}
+                                                            </Text>
+                                                            {!item.seenAt && (
+                                                                <TouchableOpacity
+                                                                    style={styles.markSeenBtn}
+                                                                    onPress={() => handleMarkAsSeen(item.id, 'direct_share')}
+                                                                >
+                                                                    <Eye size={16} color={colors.textMuted} />
+                                                                </TouchableOpacity>
+                                                            )}
+                                                        </View>
                                                     </View>
-                                                    <View style={{ flex: 1 }}>
-                                                        <Text style={styles.premiumTitle}>Invitación a Entrenar</Text>
-                                                        <Text style={styles.premiumSender}>de @{item.senderUsername || item.senderName}</Text>
-                                                    </View>
-                                                    <Text style={styles.activityDate}>
-                                                        {new Date(item.createdAt).toLocaleDateString()}
-                                                    </Text>
-                                                </View>
 
-                                                <View style={styles.premiumBody}>
-                                                    <Text style={styles.premiumDescription}>
-                                                        @{item.senderUsername || item.senderName} diseñó una rutina para vos. Sumala a tu biblioteca.
-                                                    </Text>
-                                                </View>
-
-                                                {item.status === 'pending' ? (
-                                                    <View style={styles.premiumActions}>
-                                                        <TouchableOpacity style={styles.premiumBtnPrimary} onPress={() => handleInboxResponse(item.id, 'accept', item.payload)}>
-                                                            <Text style={styles.premiumBtnTextPrimary}>Descargar & Importar</Text>
-                                                        </TouchableOpacity>
-                                                        <TouchableOpacity style={styles.premiumBtnSecondary} onPress={() => handleInboxResponse(item.id, 'reject')}>
-                                                            <Text style={styles.premiumBtnTextSecondary}>Ignorar</Text>
-                                                        </TouchableOpacity>
-                                                    </View>
-                                                ) : (
-                                                    <View style={styles.premiumResolved}>
-                                                        {item.status === 'accepted' ? (
-                                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                                <CheckCircle size={16} color={colors.green} style={{ marginRight: 6 }} />
-                                                                <Text style={[styles.premiumStatusText, { color: colors.green }]}>Rutina Importada</Text>
-                                                            </View>
-                                                        ) : (
-                                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                                <XCircle size={16} color={colors.red} style={{ marginRight: 6 }} />
-                                                                <Text style={[styles.premiumStatusText, { color: colors.red }]}>Rutina Rechazada</Text>
-                                                            </View>
-                                                        )}
-                                                    </View>
-                                                )}
-                                            </View>
-                                        );
-                                    }
-
-                                    if (item.feedType === 'activity_log') {
-                                        const isPr = item.actionType === 'pr_broken';
-                                        const isRoutineShared = item.actionType === 'routine_shared';
-                                        const isOwnActivity = profile?.id && item.senderId === profile.id;
-
-                                        return (
-                                            <View key={item.id} style={styles.activityRow}>
-                                                <View style={styles.activityHeader}>
-                                                    <View style={[styles.activityIconBox, isPr ? { backgroundColor: withAlpha(colors.yellow, '30') } : (isRoutineShared ? { backgroundColor: withAlpha(colors.primary.DEFAULT, '30') } : { backgroundColor: withAlpha(colors.primary.DEFAULT, '15') })]}>
-                                                        {isPr ? <Trophy size={18} color={colors.yellow} /> : isRoutineShared ? <Globe size={18} color={colors.primary.DEFAULT} /> : <Dumbbell size={18} color={colors.primary.DEFAULT} />}
-                                                    </View>
-                                                    <View style={{ flex: 1 }}>
-                                                        <Text style={styles.activityUser}>@{item.senderUsername || item.senderName}</Text>
-                                                        <Text style={styles.activityDesc}>
-                                                            {isPr ? 'Rompió un Récord Personal' : isRoutineShared ? 'Compartió una rutina' : 'Completó un Entrenamiento'}
+                                                    <View style={styles.premiumBody}>
+                                                        <Text style={styles.premiumDescription}>
+                                                            @{item.senderUsername || item.senderName} diseñó una rutina para vos. Sumala a tu biblioteca.
                                                         </Text>
                                                     </View>
-                                                    <Text style={styles.activityDate}>
-                                                        {new Date(item.createdAt).toLocaleDateString()}
-                                                    </Text>
-                                                </View>
 
-                                                <View style={styles.activityFooter}>
-                                                    <TouchableOpacity
-                                                        style={[styles.kudoBtn, item.hasKudoed && styles.kudoBtnActive, isOwnActivity && styles.kudoBtnDisabled]}
-                                                        onPress={() => !isOwnActivity && handleToggleKudo(item.id)}
-                                                        disabled={!!isOwnActivity}
-                                                    >
-                                                        <Flame size={18} color={item.hasKudoed ? colors.yellow : colors.textMuted} fill={item.hasKudoed ? colors.yellow : "transparent"} />
-                                                        <Text style={[styles.kudoText, item.hasKudoed && styles.kudoTextActive]}>
-                                                            {item.kudosCount || 0} Kudos
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                    {isOwnActivity ? <Text style={styles.ownActivityHint}>Tu actividad</Text> : null}
+                                                    {item.status === 'pending' ? (
+                                                        <View style={styles.premiumActions}>
+                                                            <TouchableOpacity style={styles.premiumBtnPrimary} onPress={() => handleInboxResponse(item.id, 'accept', item.payload)}>
+                                                                <Text style={styles.premiumBtnTextPrimary}>Descargar & Importar</Text>
+                                                            </TouchableOpacity>
+                                                            <TouchableOpacity style={styles.premiumBtnSecondary} onPress={() => handleInboxResponse(item.id, 'reject')}>
+                                                                <Text style={styles.premiumBtnTextSecondary}>Ignorar</Text>
+                                                            </TouchableOpacity>
+                                                        </View>
+                                                    ) : (
+                                                        <View style={styles.premiumResolved}>
+                                                            {item.status === 'accepted' ? (
+                                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                                    <CheckCircle size={16} color={colors.green} style={{ marginRight: 6 }} />
+                                                                    <Text style={[styles.premiumStatusText, { color: colors.green }]}>Rutina Importada</Text>
+                                                                </View>
+                                                            ) : (
+                                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                                    <XCircle size={16} color={colors.red} style={{ marginRight: 6 }} />
+                                                                    <Text style={[styles.premiumStatusText, { color: colors.red }]}>Rutina Rechazada</Text>
+                                                                </View>
+                                                            )}
+                                                        </View>
+                                                    )}
                                                 </View>
-                                            </View>
-                                        );
-                                    }
-                                    return null;
-                                })
+                                            );
+                                        }
+
+                                        if (item.feedType === 'activity_log') {
+                                            const isPr = item.actionType === 'pr_broken';
+                                            const isRoutineShared = item.actionType === 'routine_shared';
+                                            const isOwnActivity = profile?.id && item.senderId === profile.id;
+
+                                            return (
+                                                <View key={item.id} style={styles.activityRow}>
+                                                    <View style={styles.activityHeader}>
+                                                        <View style={[styles.activityIconBox, isPr ? { backgroundColor: withAlpha(colors.yellow, '30') } : (isRoutineShared ? { backgroundColor: withAlpha(colors.primary.DEFAULT, '30') } : { backgroundColor: withAlpha(colors.primary.DEFAULT, '15') })]}>
+                                                            {isPr ? <Trophy size={18} color={colors.yellow} /> : isRoutineShared ? <Globe size={18} color={colors.primary.DEFAULT} /> : <Dumbbell size={18} color={colors.primary.DEFAULT} />}
+                                                        </View>
+                                                        <View style={{ flex: 1 }}>
+                                                            <Text style={styles.activityUser}>@{item.senderUsername || item.senderName}</Text>
+                                                            <Text style={styles.activityDesc}>
+                                                                {isPr ? 'Rompió un Récord Personal' : isRoutineShared ? 'Compartió una rutina' : 'Completó un Entrenamiento'}
+                                                            </Text>
+                                                        </View>
+                                                        <Text style={styles.activityDate}>
+                                                            {new Date(item.createdAt).toLocaleDateString()}
+                                                        </Text>
+                                                    </View>
+
+                                                    <View style={styles.activityFooter}>
+                                                        <TouchableOpacity
+                                                            style={[styles.kudoBtn, item.hasKudoed && styles.kudoBtnActive, isOwnActivity && styles.kudoBtnDisabled]}
+                                                            onPress={() => !isOwnActivity && handleToggleKudo(item.id)}
+                                                            disabled={!!isOwnActivity}
+                                                        >
+                                                            <Flame size={18} color={item.hasKudoed ? colors.yellow : colors.textMuted} fill={item.hasKudoed ? colors.yellow : "transparent"} />
+                                                            <Text style={[styles.kudoText, item.hasKudoed && styles.kudoTextActive]}>
+                                                                {item.kudosCount || 0} Kudos
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                                            {isOwnActivity && <Text style={styles.ownActivityHint}>Tu actividad</Text>}
+                                                            {!item.seenAt && (
+                                                                <TouchableOpacity
+                                                                    style={styles.markSeenBtn}
+                                                                    onPress={() => handleMarkAsSeen(item.id, 'activity_log')}
+                                                                >
+                                                                    <Eye size={18} color={colors.textMuted} />
+                                                                </TouchableOpacity>
+                                                            )}
+                                                        </View>
+                                                    </View>
+                                                </View>
+                                            );
+                                        }
+                                        return null;
+                                    })
                             )}
                         </View>
                     )}
@@ -2203,80 +2297,82 @@ export default function SocialTab() {
 
             <Modal visible={isProfileModalVisible} transparent animationType="fade" onRequestClose={() => setIsProfileModalVisible(false)}>
                 <Pressable style={styles.modalOverlay} onPress={() => setIsProfileModalVisible(false)}>
-                    <Pressable style={styles.modalCard} onPress={() => { }}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Perfil Social</Text>
-                            <TouchableOpacity onPress={() => setIsProfileModalVisible(false)} style={styles.modalCloseBtn}>
-                                <XIcon size={18} color={colors.textMuted} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.modalBody}>
-                            <Text style={styles.modalLabel}>Nombre visible</Text>
-                            <TextInput
-                                style={styles.modalInput}
-                                value={profileFormDisplayName}
-                                onChangeText={setProfileFormDisplayName}
-                                maxLength={64}
-                                placeholder="Tu nombre visible"
-                                placeholderTextColor={colors.textMuted}
-                            />
-                            <Text style={styles.modalFieldHint}>
-                                Entre 2 y 64 caracteres. Evitá datos sensibles.
-                            </Text>
-
-                            <Text style={styles.modalLabel}>Username</Text>
-                            <TextInput
-                                style={[
-                                    styles.modalInput,
-                                    profile?.lastUsernameChangeAt &&
-                                    (Date.now() - new Date(profile.lastUsernameChangeAt).getTime() < 30 * 24 * 60 * 60 * 1000) &&
-                                    { backgroundColor: colors.surface, color: colors.textMuted }
-                                ]}
-                                value={profileFormUsername}
-                                onChangeText={(value) => setProfileFormUsername(value.replace(/\s+/g, '').toLowerCase())}
-                                maxLength={32}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                placeholder="sin espacios"
-                                placeholderTextColor={colors.textMuted}
-                                editable={!profile?.lastUsernameChangeAt || (Date.now() - new Date(profile.lastUsernameChangeAt).getTime() >= 30 * 24 * 60 * 60 * 1000)}
-                            />
-                            {profile?.lastUsernameChangeAt && (Date.now() - new Date(profile.lastUsernameChangeAt).getTime() < 30 * 24 * 60 * 60 * 1000) ? (
-                                <Text style={[styles.modalFieldHint, { color: colors.primary.DEFAULT, fontWeight: '900' }]}>
-                                    Bloqueado hasta: {new Date(new Date(profile.lastUsernameChangeAt).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}
-                                </Text>
-                            ) : (
-                                <Text style={styles.modalFieldHint}>
-                                    Dejá vacío para quitar username. Permitido: a-z, 0-9 y _ (1 vez cada 30 días)
-                                </Text>
-                            )}
-
-                            <View style={styles.privacyRow}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.modalLabel}>Visibilidad del perfil</Text>
-                                    <Text style={styles.privacyHint}>
-                                        {profileFormPublic ? 'Público: apareces en búsqueda social.' : 'Privado: no apareces en búsqueda social.'}
-                                    </Text>
-                                </View>
-                                <Switch
-                                    value={profileFormPublic}
-                                    onValueChange={setProfileFormPublic}
-                                    trackColor={{ false: colors.border, true: withAlpha(colors.primary.DEFAULT, '66') }}
-                                    thumbColor={profileFormPublic ? colors.primary.DEFAULT : colors.textMuted}
-                                />
+                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%', alignItems: 'center' }}>
+                        <Pressable style={styles.modalCard} onPress={() => { }}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Perfil Social</Text>
+                                <TouchableOpacity onPress={() => setIsProfileModalVisible(false)} style={styles.modalCloseBtn}>
+                                    <XIcon size={18} color={colors.textMuted} />
+                                </TouchableOpacity>
                             </View>
-                        </View>
 
-                        <View style={styles.modalActions}>
-                            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setIsProfileModalVisible(false)}>
-                                <Text style={styles.modalCancelText}>Cancelar</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.modalPrimaryBtn} onPress={handleSaveProfile} disabled={profileSaving}>
-                                {profileSaving ? <ActivityIndicator size="small" color={colors.onPrimary} /> : <Text style={styles.modalPrimaryText}>Guardar</Text>}
-                            </TouchableOpacity>
-                        </View>
-                    </Pressable>
+                            <View style={styles.modalBody}>
+                                <Text style={styles.modalLabel}>Nombre visible</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    value={profileFormDisplayName}
+                                    onChangeText={setProfileFormDisplayName}
+                                    maxLength={64}
+                                    placeholder="Tu nombre visible"
+                                    placeholderTextColor={colors.textMuted}
+                                />
+                                <Text style={styles.modalFieldHint}>
+                                    Entre 2 y 64 caracteres. Evitá datos sensibles.
+                                </Text>
+
+                                <Text style={styles.modalLabel}>Username</Text>
+                                <TextInput
+                                    style={[
+                                        styles.modalInput,
+                                        profile?.lastUsernameChangeAt &&
+                                        (Date.now() - new Date(profile.lastUsernameChangeAt).getTime() < 30 * 24 * 60 * 60 * 1000) &&
+                                        { backgroundColor: colors.surface, color: colors.textMuted }
+                                    ]}
+                                    value={profileFormUsername}
+                                    onChangeText={(value) => setProfileFormUsername(value.replace(/\s+/g, '').toLowerCase())}
+                                    maxLength={32}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    placeholder="sin espacios"
+                                    placeholderTextColor={colors.textMuted}
+                                    editable={!profile?.lastUsernameChangeAt || (Date.now() - new Date(profile.lastUsernameChangeAt).getTime() >= 30 * 24 * 60 * 60 * 1000)}
+                                />
+                                {profile?.lastUsernameChangeAt && (Date.now() - new Date(profile.lastUsernameChangeAt).getTime() < 30 * 24 * 60 * 60 * 1000) ? (
+                                    <Text style={[styles.modalFieldHint, { color: colors.primary.DEFAULT, fontWeight: '900' }]}>
+                                        Bloqueado hasta: {new Date(new Date(profile.lastUsernameChangeAt).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                                    </Text>
+                                ) : (
+                                    <Text style={styles.modalFieldHint}>
+                                        Dejá vacío para quitar username. Permitido: a-z, 0-9 y _ (1 vez cada 30 días)
+                                    </Text>
+                                )}
+
+                                <View style={styles.privacyRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.modalLabel}>Visibilidad del perfil</Text>
+                                        <Text style={styles.privacyHint}>
+                                            {profileFormPublic ? 'Público: apareces en búsqueda social.' : 'Privado: no apareces en búsqueda social.'}
+                                        </Text>
+                                    </View>
+                                    <Switch
+                                        value={profileFormPublic}
+                                        onValueChange={setProfileFormPublic}
+                                        trackColor={{ false: colors.border, true: withAlpha(colors.primary.DEFAULT, '66') }}
+                                        thumbColor={profileFormPublic ? colors.primary.DEFAULT : colors.textMuted}
+                                    />
+                                </View>
+                            </View>
+
+                            <View style={styles.modalActions}>
+                                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setIsProfileModalVisible(false)}>
+                                    <Text style={styles.modalCancelText}>Cancelar</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.modalPrimaryBtn} onPress={handleSaveProfile} disabled={profileSaving}>
+                                    {profileSaving ? <ActivityIndicator size="small" color={colors.onPrimary} /> : <Text style={styles.modalPrimaryText}>Guardar</Text>}
+                                </TouchableOpacity>
+                            </View>
+                        </Pressable>
+                    </KeyboardAvoidingView>
                 </Pressable>
             </Modal>
 

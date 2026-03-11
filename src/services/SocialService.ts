@@ -1,7 +1,9 @@
 import * as SecureStore from 'expo-secure-store';
 import { Config } from '../constants/Config';
+import { useAuthStore } from '../store/authStore';
 import { logger } from '../utils/logger';
 import { dataEventService } from './DataEventService';
+import { dbService } from './DatabaseService';
 
 const API_URL = Config.API_URL;
 
@@ -74,6 +76,7 @@ export interface SocialInboxItem {
     kudosCount?: number;
     hasKudoed?: boolean;
     createdAt: string | number | Date;
+    seenAt?: string | number | Date | null;
 }
 
 export interface SocialLeaderboardEntry {
@@ -250,6 +253,59 @@ export class SocialService {
             dataEventService.emit('SOCIAL_UPDATED');
         } catch { }
         return data.success;
+    }
+
+    static async markAsSeen(id: string, feedType: 'direct_share' | 'activity_log') {
+        const now = Date.now();
+        const userId = useAuthStore.getState().user?.id;
+
+        try {
+            // 1. Local Updates (Offline First)
+            if (feedType === 'activity_log') {
+                // Personal seenAt (Your own activity)
+                await dbService.run('UPDATE activity_feed SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
+                await dbService.queueSyncMutation('activity_feed', id, 'UPDATE', { seen_at: now, updated_at: now });
+
+                // Per-user global tracking record (If viewing a friend's activity)
+                if (userId) {
+                    const seenId = `${userId}-${id}`;
+                    await dbService.run(
+                        'INSERT OR REPLACE INTO activity_seen (id, user_id, activity_id, seen_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+                        [seenId, userId, id, now, now]
+                    );
+                    await dbService.queueSyncMutation('activity_seen', seenId, 'INSERT', {
+                        user_id: userId,
+                        activity_id: id,
+                        seen_at: now,
+                        updated_at: now
+                    });
+                }
+            } else {
+                await dbService.run('UPDATE shares_inbox SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
+                await dbService.queueSyncMutation('shares_inbox', id, 'UPDATE', {
+                    seen_at: now,
+                    updated_at: now
+                });
+            }
+        } catch (e) {
+            logger.warn('[SocialService] Local markAsSeen failed (record may not be in local DB)', { id, feedType });
+        }
+
+        // Emit local event for immediate UI refresh
+        dataEventService.emit('SOCIAL_UPDATED');
+
+        try {
+            const headers = await this.getHeaders();
+            const data = await this.request<{ success: boolean }>(`${API_URL}/api/social/inbox`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ id, feedType }),
+            });
+            return data.success;
+        } catch (e) {
+            // If offline, we return true because we've queued the sync
+            return true;
+        }
     }
 
     static async respondInbox(inboxId: string, action: 'accept' | 'reject') {

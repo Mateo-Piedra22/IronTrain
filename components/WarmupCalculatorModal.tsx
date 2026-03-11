@@ -3,7 +3,8 @@ import { configService } from '@/src/services/ConfigService';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { WorkoutSet } from '@/src/types/db';
 import React, { useMemo, useState } from 'react';
-import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors } from '../src/hooks/useColors';
 
 interface WarmupCalculatorModalProps {
@@ -25,8 +26,7 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
 
     const st = useMemo(() => StyleSheet.create({
         overlay: {
-            flex: 1,
-            backgroundColor: ThemeFx.backdrop,
+            flexGrow: 1,
             justifyContent: 'center',
             alignItems: 'center',
             padding: 16
@@ -164,66 +164,78 @@ export function WarmupCalculatorModal({ visible, onClose, onAddSets, defaultWeig
     const calculatedSets = calculateSets();
 
     return (
-        <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
-            <View style={st.overlay}>
-                <View style={st.container}>
-                    <Text style={st.title}>Warm-up</Text>
-                    <Text style={st.description}>
-                        Generaremos un esquema progresivo de calentamiento seguro basado en tu peso objetivo.
-                    </Text>
+        <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={{ flex: 1 }}
+            >
+                <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: ThemeFx.backdrop }}>
+                    <ScrollView
+                        contentContainerStyle={st.overlay}
+                        keyboardShouldPersistTaps="handled"
+                        bounces={false}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        <View style={st.container}>
+                            <Text style={st.title}>Warm-up</Text>
+                            <Text style={st.description}>
+                                Generaremos un esquema progresivo de calentamiento seguro basado en tu peso objetivo.
+                            </Text>
 
-                    <Text style={st.label}>Peso objetivo ({unit})</Text>
-                    <TextInput
-                        value={targetWeight}
-                        onChangeText={setTargetWeight}
-                        placeholder={unit === 'kg' ? '100' : '225'}
-                        placeholderTextColor={colors.textMuted}
-                        keyboardType="numeric"
-                        autoFocus
-                        style={st.input}
-                    />
+                            <Text style={st.label}>Peso objetivo ({unit})</Text>
+                            <TextInput
+                                value={targetWeight}
+                                onChangeText={setTargetWeight}
+                                placeholder={unit === 'kg' ? '100' : '225'}
+                                placeholderTextColor={colors.textMuted}
+                                keyboardType="numeric"
+                                autoFocus
+                                style={st.input}
+                            />
 
-                    {calculatedSets.length > 0 && (
-                        <View style={{ marginBottom: 4 }}>
-                            <Text style={st.label}>Progresión sugerida</Text>
-                            <View style={st.progressionCard}>
-                                {calculatedSets.map((set, idx) => (
-                                    <View key={idx} style={[st.row, idx < calculatedSets.length - 1 && st.rowBorder]}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                            <View style={st.badge}>
-                                                <Text style={st.badgeText}>{idx + 1}</Text>
+                            {calculatedSets.length > 0 && (
+                                <View style={{ marginBottom: 4 }}>
+                                    <Text style={st.label}>Progresión sugerida</Text>
+                                    <View style={st.progressionCard}>
+                                        {calculatedSets.map((set, idx) => (
+                                            <View key={idx} style={[st.row, idx < calculatedSets.length - 1 && st.rowBorder]}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                                    <View style={st.badge}>
+                                                        <Text style={st.badgeText}>{idx + 1}</Text>
+                                                    </View>
+                                                    <Text style={st.weightText}>{set.weight} {unit}</Text>
+                                                </View>
+                                                <Text style={st.repsText}>{set.reps} reps</Text>
                                             </View>
-                                            <Text style={st.weightText}>{set.weight} {unit}</Text>
-                                        </View>
-                                        <Text style={st.repsText}>{set.reps} reps</Text>
+                                        ))}
                                     </View>
-                                ))}
+                                </View>
+                            )}
+
+                            <View style={st.footer}>
+                                <TouchableOpacity onPress={onClose} style={st.cancelBtn}>
+                                    <Text style={st.cancelBtnText}>Cancelar</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        if (calculatedSets.length > 0) {
+                                            onAddSets(calculatedSets);
+                                            onClose();
+                                        }
+                                    }}
+                                    disabled={calculatedSets.length === 0}
+                                    style={[
+                                        st.addBtn,
+                                        { backgroundColor: calculatedSets.length > 0 ? colors.primary.DEFAULT : colors.border }
+                                    ]}
+                                >
+                                    <Text style={st.addBtnText}>Agregar series</Text>
+                                </TouchableOpacity>
                             </View>
                         </View>
-                    )}
-
-                    <View style={st.footer}>
-                        <TouchableOpacity onPress={onClose} style={st.cancelBtn}>
-                            <Text style={st.cancelBtnText}>Cancelar</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => {
-                                if (calculatedSets.length > 0) {
-                                    onAddSets(calculatedSets);
-                                    onClose();
-                                }
-                            }}
-                            disabled={calculatedSets.length === 0}
-                            style={[
-                                st.addBtn,
-                                { backgroundColor: calculatedSets.length > 0 ? colors.primary.DEFAULT : colors.border }
-                            ]}
-                        >
-                            <Text style={st.addBtnText}>Agregar series</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </View>
+                    </ScrollView>
+                </SafeAreaView>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }

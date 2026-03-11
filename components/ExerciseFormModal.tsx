@@ -1,7 +1,8 @@
-import { ThemeFx, withAlpha } from '@/src/theme';
+import { withAlpha } from '@/src/theme';
 import { Plus } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors } from '../src/hooks/useColors';
 import { badgeService } from '../src/services/BadgeService';
 import { CategoryService } from '../src/services/CategoryService';
@@ -21,7 +22,7 @@ interface ExerciseFormModalProps {
 export function ExerciseFormModal({ visible, onClose, onSave, initialData }: ExerciseFormModalProps) {
     const colors = useColors();
     const ss = useMemo(() => StyleSheet.create({
-        overlay: { flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center', padding: 16 },
+        overlay: { flex: 1, backgroundColor: withAlpha(colors.background, '80') },
         modalContent: {
             backgroundColor: colors.surface,
             width: '100%',
@@ -186,121 +187,134 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
     ];
 
     return (
-        <Modal visible={visible} animationType="fade" transparent statusBarTranslucent>
+        <Modal visible={visible} animationType="fade" transparent statusBarTranslucent onRequestClose={onClose}>
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={ss.overlay}
             >
-                <View style={ss.modalContent}>
-                    <Text style={ss.title}>
-                        {initialData ? 'Editar ejercicio' : 'Nuevo ejercicio'}
-                    </Text>
+                <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
+                    <ScrollView
+                        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}
+                        keyboardShouldPersistTaps="handled"
+                        bounces={false}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        <View style={ss.modalContent}>
+                            <Text style={ss.title}>
+                                {initialData ? 'Editar ejercicio' : 'Nuevo ejercicio'}
+                            </Text>
 
-                    {/* Name */}
-                    <Text style={ss.label}>Nombre</Text>
-                    <TextInput
-                        value={name}
-                        onChangeText={setName}
-                        placeholder="Ej: Press de banca"
-                        placeholderTextColor={colors.textMuted}
-                        style={ss.input}
-                        accessibilityLabel="Nombre del ejercicio"
-                    />
+                            {/* Name */}
+                            <Text style={ss.label}>Nombre</Text>
+                            <TextInput
+                                value={name}
+                                onChangeText={setName}
+                                placeholder="Ej: Press de banca"
+                                placeholderTextColor={colors.textMuted}
+                                style={ss.input}
+                                accessibilityLabel="Nombre del ejercicio"
+                            />
 
-                    {/* Category */}
-                    <Text style={ss.label}>Categoría</Text>
-                    <View style={[ss.chipRow, ss.section]}>
-                        {categories.map(cat => {
-                            const isActive = categoryId === cat.id;
-                            const catColor = (cat as any).color || colors.primary.DEFAULT;
-                            return (
+                            {/* Category */}
+                            <Text style={ss.label}>Categoría</Text>
+                            <View style={[ss.chipRow, ss.section]}>
+                                {categories.map(cat => {
+                                    const isActive = categoryId === cat.id;
+                                    const catColor = (cat as any).color || colors.primary.DEFAULT;
+                                    return (
+                                        <TouchableOpacity
+                                            key={cat.id}
+                                            onPress={() => setCategoryId(cat.id)}
+                                            style={[
+                                                ss.catChip,
+                                                isActive && { backgroundColor: withAlpha(catColor, '14'), borderColor: catColor }
+                                            ]}
+                                            accessibilityRole="button"
+                                        >
+                                            <View style={[ss.catDot, { backgroundColor: catColor }]} />
+                                            <Text style={[ss.catText, isActive && { color: catColor, fontWeight: '900' }]}>{cat.name}</Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+
+                            {/* Badges Selection */}
+                            <Text style={ss.label}>Badges / Etiquetas</Text>
+                            <View style={ss.section}>
                                 <TouchableOpacity
-                                    key={cat.id}
-                                    onPress={() => setCategoryId(cat.id)}
-                                    style={[
-                                        ss.catChip,
-                                        isActive && { backgroundColor: withAlpha(catColor, '14'), borderColor: catColor }
-                                    ]}
-                                    accessibilityRole="button"
+                                    onPress={() => setShowBadgeSelector(true)}
+                                    style={ss.badgePicker}
                                 >
-                                    <View style={[ss.catDot, { backgroundColor: catColor }]} />
-                                    <Text style={[ss.catText, isActive && { color: catColor, fontWeight: '900' }]}>{cat.name}</Text>
+                                    {selectedBadgeIds.length === 0 ? (
+                                        <View style={ss.badgePlaceholder}>
+                                            <Plus size={16} color={colors.textMuted} />
+                                            <Text style={ss.badgePlaceholderText}>Añadir badges...</Text>
+                                        </View>
+                                    ) : (
+                                        <>
+                                            {selectedBadgeIds.map(id => {
+                                                const badge = allBadges.find(b => b.id === id);
+                                                if (!badge) return null;
+                                                return (
+                                                    <BadgePill
+                                                        key={badge.id}
+                                                        name={badge.name}
+                                                        color={badge.color}
+                                                        icon={badge.icon || undefined}
+                                                        size="md"
+                                                    />
+                                                );
+                                            })}
+                                            <View style={ss.addBadgeIcon}>
+                                                <Plus size={14} color={colors.textMuted} />
+                                            </View>
+                                        </>
+                                    )}
                                 </TouchableOpacity>
-                            );
-                        })}
-                    </View>
+                            </View>
 
-                    {/* Badges Selection */}
-                    <Text style={ss.label}>Badges / Etiquetas</Text>
-                    <View style={ss.section}>
-                        <TouchableOpacity
-                            onPress={() => setShowBadgeSelector(true)}
-                            style={ss.badgePicker}
-                        >
-                            {selectedBadgeIds.length === 0 ? (
-                                <View style={ss.badgePlaceholder}>
-                                    <Plus size={16} color={colors.textMuted} />
-                                    <Text style={ss.badgePlaceholderText}>Añadir badges...</Text>
-                                </View>
-                            ) : (
-                                <>
-                                    {selectedBadgeIds.map(id => {
-                                        const badge = allBadges.find(b => b.id === id);
-                                        if (!badge) return null;
-                                        return (
-                                            <BadgePill
-                                                key={badge.id}
-                                                name={badge.name}
-                                                color={badge.color}
-                                                icon={badge.icon || undefined}
-                                                size="sm"
-                                            />
-                                        );
-                                    })}
-                                    <View style={ss.addBadgeIcon}>
-                                        <Plus size={14} color={colors.textMuted} />
-                                    </View>
-                                </>
-                            )}
-                        </TouchableOpacity>
-                    </View>
+                            {/* Type/Registro Selection */}
+                            <Text style={ss.label}>Registro</Text>
+                            <View style={[ss.typeContainer, ss.section]}>
+                                {EXERCISE_TYPES.map(t => {
+                                    const isActive = type === t.id;
+                                    return (
+                                        <TouchableOpacity
+                                            key={t.id}
+                                            onPress={() => setType(t.id)}
+                                            style={[ss.typeCard, isActive && ss.typeCardActive]}
+                                            accessibilityRole="button"
+                                        >
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={[ss.typeLabel, isActive && ss.typeLabelActive]}>{t.label}</Text>
+                                                <Text style={ss.typeDesc}>{t.desc}</Text>
+                                            </View>
+                                            {isActive && <View style={ss.typeIndicator} />}
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
 
-                    {/* Type/Registro Selection */}
-                    <Text style={ss.label}>Registro</Text>
-                    <View style={[ss.typeContainer, ss.section]}>
-                        {EXERCISE_TYPES.map(t => {
-                            const isActive = type === t.id;
-                            return (
-                                <TouchableOpacity
-                                    key={t.id}
-                                    onPress={() => setType(t.id)}
-                                    style={[ss.typeCard, isActive && ss.typeCardActive]}
-                                    accessibilityRole="button"
-                                >
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={[ss.typeLabel, isActive && ss.typeLabelActive]}>{t.label}</Text>
-                                        <Text style={ss.typeDesc}>{t.desc}</Text>
-                                    </View>
-                                    {isActive && <View style={ss.typeIndicator} />}
+                            <View style={ss.footer}>
+                                <TouchableOpacity onPress={onClose} style={ss.cancelBtn}>
+                                    <Text style={ss.cancelText}>Cancelar</Text>
                                 </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-
-                    <View style={ss.footer}>
-                        <TouchableOpacity onPress={onClose} style={ss.cancelBtn}>
-                            <Text style={ss.cancelText}>Cancelar</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={handleSave} style={ss.saveBtn}>
-                            <Text style={ss.saveText}>Guardar</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                                <TouchableOpacity onPress={handleSave} style={ss.saveBtn}>
+                                    <Text style={ss.saveText}>Guardar</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </ScrollView>
+                </SafeAreaView>
 
                 <BadgeSelectorModal
                     visible={showBadgeSelector}
                     onClose={() => setShowBadgeSelector(false)}
-                    onSave={(ids) => setSelectedBadgeIds(ids)}
+                    onSave={async (ids) => {
+                        setSelectedBadgeIds(ids);
+                        const updated = await badgeService.getAllBadges();
+                        setAllBadges(updated);
+                    }}
                     initialSelectedIds={selectedBadgeIds}
                 />
             </KeyboardAvoidingView>

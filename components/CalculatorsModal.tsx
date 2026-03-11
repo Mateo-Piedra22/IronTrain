@@ -5,7 +5,7 @@ import { statsService } from '@/src/services/StatsService';
 import { UnitService } from '@/src/services/UnitService';
 import { X } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors } from '../src/hooks/useColors';
 
@@ -102,188 +102,198 @@ export function CalculatorsModal({ visible, onClose, initialTab = 'oneRm' }: Cal
 
     return (
         <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-            <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={ss.container}>
-                <View style={ss.inner}>
-                    {/* Header */}
-                    <View style={ss.header}>
-                        <View>
-                            <Text style={ss.headerTitle}>Calculadoras</Text>
-                            <Text style={ss.headerSubtitle}>Herramientas de entrenamiento</Text>
-                        </View>
-                        <TouchableOpacity onPress={onClose} style={ss.closeBtn} accessibilityRole="button" accessibilityLabel="Cerrar calculadoras">
-                            <X color={colors.text} size={20} />
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Tabs */}
-                    <View style={ss.tabTrack}>
-                        {tabs.map((t) => (
-                            <TouchableOpacity
-                                key={t.id}
-                                style={[ss.tab, activeTab === t.id && ss.tabActive]}
-                                onPress={() => setActiveTab(t.id)}
-                                accessibilityRole="button"
-                                accessibilityLabel={`Abrir ${t.label}`}
-                            >
-                                <Text style={[ss.tabText, activeTab === t.id && ss.tabTextActive]}>{t.label}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-                        {activeTab === 'oneRm' ? (
+            <SafeAreaView edges={['top', 'left', 'right']} style={ss.container}>
+                <KeyboardAvoidingView
+                    style={{ flex: 1 }}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
+                    <View style={ss.inner}>
+                        {/* Header */}
+                        <View style={ss.header}>
                             <View>
-                                <Text style={ss.sectionTitle}>Estimación de 1RM</Text>
-                                <View style={ss.card}>
-                                    <Text style={ss.cardLabel}>Fórmula</Text>
-                                    <View style={ss.chipRow}>
-                                        {([{ id: 'epley', label: 'Epley' }, { id: 'brzycki', label: 'Brzycki' }, { id: 'lombardi', label: 'Lombardi' }] as const).map((f) => (
+                                <Text style={ss.headerTitle}>Calculadoras</Text>
+                                <Text style={ss.headerSubtitle}>Herramientas de entrenamiento</Text>
+                            </View>
+                            <TouchableOpacity onPress={onClose} style={ss.closeBtn} accessibilityRole="button" accessibilityLabel="Cerrar calculadoras">
+                                <X color={colors.text} size={20} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Tabs */}
+                        <View style={ss.tabTrack}>
+                            {tabs.map((t) => (
+                                <TouchableOpacity
+                                    key={t.id}
+                                    style={[ss.tab, activeTab === t.id && ss.tabActive]}
+                                    onPress={() => setActiveTab(t.id)}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`Abrir ${t.label}`}
+                                >
+                                    <Text style={[ss.tabText, activeTab === t.id && ss.tabTextActive]}>{t.label}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ paddingBottom: 40 }}
+                            keyboardShouldPersistTaps="handled"
+                            bounces={false}
+                        >
+                            {activeTab === 'oneRm' ? (
+                                <View>
+                                    <Text style={ss.sectionTitle}>Estimación de 1RM</Text>
+                                    <View style={ss.card}>
+                                        <Text style={ss.cardLabel}>Fórmula</Text>
+                                        <View style={ss.chipRow}>
+                                            {([{ id: 'epley', label: 'Epley' }, { id: 'brzycki', label: 'Brzycki' }, { id: 'lombardi', label: 'Lombardi' }] as const).map((f) => (
+                                                <TouchableOpacity
+                                                    key={f.id}
+                                                    onPress={() => { setFormula(f.id); configService.set('calculatorsDefault1RMFormula', f.id); }}
+                                                    style={[ss.chip, formula === f.id && ss.chipActive]}
+                                                    accessibilityRole="button"
+                                                >
+                                                    <Text style={[ss.chipText, formula === f.id && ss.chipTextActive]}>{f.label}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+
+                                        <Text style={[ss.cardLabel, { marginTop: 16 }]}>Desde una serie</Text>
+                                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                                            <View style={{ flex: 1 }}><IronInput value={setWeight} onChangeText={setSetWeight} keyboardType="numeric" placeholder={`Peso (${unit})`} /></View>
+                                            <View style={{ flex: 1 }}><IronInput value={setReps} onChangeText={setSetReps} keyboardType="numeric" placeholder="Reps" /></View>
+                                        </View>
+
+                                        <Text style={[ss.cardLabel, { marginTop: 16 }]}>1RM manual</Text>
+                                        <IronInput value={oneRmManual} onChangeText={setOneRmManual} keyboardType="numeric" placeholder={`1RM (${unit})`} />
+
+                                        {/* Result */}
+                                        <View style={ss.resultBox}>
+                                            <Text style={ss.resultLabel}>TU 1RM ACTUAL</Text>
+                                            <Text style={ss.resultValue}>{Math.round(oneRm)}</Text>
+                                            <Text style={ss.resultUnit}>{unit}</Text>
+                                        </View>
+                                    </View>
+
+                                    <Text style={ss.sectionTitle}>Perfil de Intensidades</Text>
+                                    <View style={ss.tableCard}>
+                                        <View style={ss.tableHeader}>
+                                            <Text style={[ss.tableHeaderText, { flex: 1.2 }]}>INTENSIDAD</Text>
+                                            <Text style={[ss.tableHeaderText, { flex: 1, textAlign: 'center' }]}>REPS</Text>
+                                            <Text style={[ss.tableHeaderText, { flex: 1.5, textAlign: 'right' }]}>PESO ({unit})</Text>
+                                        </View>
+                                        {[
+                                            { pct: 1.00, reps: '1', zone: 'MÁXIMA', color: colors.red },
+                                            { pct: 0.95, reps: '2', zone: 'MÁXIMA', color: colors.red },
+                                            { pct: 0.90, reps: '4', zone: 'FUERZA', color: colors.blue },
+                                            { pct: 0.85, reps: '6', zone: 'FUERZA', color: colors.blue },
+                                            { pct: 0.80, reps: '8', zone: 'HIPERTROFIA', color: colors.green },
+                                            { pct: 0.75, reps: '10', zone: 'HIPERTROFIA', color: colors.green },
+                                            { pct: 0.70, reps: '12', zone: 'RESISTENCIA', color: colors.primary.light },
+                                            { pct: 0.65, reps: '16', zone: 'RESISTENCIA', color: colors.primary.light },
+                                            { pct: 0.60, reps: '20', zone: 'TÉCNICA', color: colors.textMuted },
+                                            { pct: 0.50, reps: '30+', zone: 'TÉCNICA', color: colors.textMuted },
+                                        ].map((row, idx, arr) => {
+                                            const weight = CalculatorService.roundToIncrement(oneRm * row.pct, rounding);
+                                            return (
+                                                <View key={row.pct} style={[ss.tableRow, idx < arr.length - 1 && ss.tableRowBorder]}>
+                                                    <View style={{ flex: 1.2, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                                        <View style={{ width: 4, height: 24, backgroundColor: row.color, borderRadius: 2 }} />
+                                                        <View>
+                                                            <Text style={ss.tablePct}>{Math.round(row.pct * 100)}%</Text>
+                                                            <Text style={[ss.tableZone, { color: row.color }]}>{row.zone}</Text>
+                                                        </View>
+                                                    </View>
+                                                    <View style={{ flex: 1, alignItems: 'center' }}>
+                                                        <View style={ss.repsBadge}>
+                                                            <Text style={ss.repsText}>{row.reps}</Text>
+                                                        </View>
+                                                    </View>
+                                                    <Text style={[ss.tableWeight, { flex: 1.5, textAlign: 'right' }]}>{weight}</Text>
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                </View>
+                            ) : activeTab === 'warmup' ? (
+                                <View>
+                                    <Text style={ss.sectionTitle}>Warm-up</Text>
+                                    <View style={ss.card}>
+                                        <Text style={ss.cardLabel}>Peso de trabajo</Text>
+                                        <IronInput value={warmupWorking} onChangeText={setWarmupWorking} keyboardType="numeric" placeholder={unit === 'kg' ? '100' : '225'} />
+                                        <Text style={[ss.cardLabel, { marginTop: 16 }]}>Barra</Text>
+                                        <IronInput value={warmupBar} onChangeText={setWarmupBar} keyboardType="numeric" placeholder={unit === 'kg' ? '20' : '45'} />
+                                        <Text style={ss.hintText}>Redondeo: {rounding} {unit}</Text>
+                                    </View>
+
+                                    <View style={ss.tableCard}>
+                                        {warmup.length > 0 ? warmup.map((ws, idx) => (
+                                            <View key={`${ws.weight}-${idx}`} style={[ss.tableRow, idx < warmup.length - 1 && ss.tableRowBorder]}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.yellow }} />
+                                                    <Text style={ss.tableWeightText}>{ws.weight} {unit}</Text>
+                                                </View>
+                                                <Text style={ss.tablePct}>{ws.reps} reps</Text>
+                                            </View>
+                                        )) : (
+                                            <View style={{ padding: 20 }}>
+                                                <Text style={ss.emptyText}>Ingresa un peso de trabajo válido.</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                </View>
+                            ) : (
+                                <View>
+                                    <Text style={ss.sectionTitle}>Power Scores</Text>
+                                    <View style={{ marginBottom: 20 }}>
+                                        <Text style={ss.inputLabel}>Género</Text>
+                                        <View style={ss.chipRow}>
                                             <TouchableOpacity
-                                                key={f.id}
-                                                onPress={() => { setFormula(f.id); configService.set('calculatorsDefault1RMFormula', f.id); }}
-                                                style={[ss.chip, formula === f.id && ss.chipActive]}
+                                                onPress={() => setIsFemale(false)}
+                                                style={[ss.chip, !isFemale && ss.chipActive]}
                                                 accessibilityRole="button"
                                             >
-                                                <Text style={[ss.chipText, formula === f.id && ss.chipTextActive]}>{f.label}</Text>
+                                                <Text style={[ss.chipText, !isFemale && ss.chipTextActive]}>Masculino</Text>
                                             </TouchableOpacity>
-                                        ))}
-                                    </View>
-
-                                    <Text style={[ss.cardLabel, { marginTop: 16 }]}>Desde una serie</Text>
-                                    <View style={{ flexDirection: 'row', gap: 12 }}>
-                                        <View style={{ flex: 1 }}><IronInput value={setWeight} onChangeText={setSetWeight} keyboardType="numeric" placeholder={`Peso (${unit})`} /></View>
-                                        <View style={{ flex: 1 }}><IronInput value={setReps} onChangeText={setSetReps} keyboardType="numeric" placeholder="Reps" /></View>
-                                    </View>
-
-                                    <Text style={[ss.cardLabel, { marginTop: 16 }]}>1RM manual</Text>
-                                    <IronInput value={oneRmManual} onChangeText={setOneRmManual} keyboardType="numeric" placeholder={`1RM (${unit})`} />
-
-                                    {/* Result */}
-                                    <View style={ss.resultBox}>
-                                        <Text style={ss.resultLabel}>TU 1RM ACTUAL</Text>
-                                        <Text style={ss.resultValue}>{Math.round(oneRm)}</Text>
-                                        <Text style={ss.resultUnit}>{unit}</Text>
-                                    </View>
-                                </View>
-
-                                <Text style={ss.sectionTitle}>Perfil de Intensidades</Text>
-                                <View style={ss.tableCard}>
-                                    <View style={ss.tableHeader}>
-                                        <Text style={[ss.tableHeaderText, { flex: 1.2 }]}>INTENSIDAD</Text>
-                                        <Text style={[ss.tableHeaderText, { flex: 1, textAlign: 'center' }]}>REPS</Text>
-                                        <Text style={[ss.tableHeaderText, { flex: 1.5, textAlign: 'right' }]}>PESO ({unit})</Text>
-                                    </View>
-                                    {[
-                                        { pct: 1.00, reps: '1', zone: 'MÁXIMA', color: colors.red },
-                                        { pct: 0.95, reps: '2', zone: 'MÁXIMA', color: colors.red },
-                                        { pct: 0.90, reps: '4', zone: 'FUERZA', color: colors.blue },
-                                        { pct: 0.85, reps: '6', zone: 'FUERZA', color: colors.blue },
-                                        { pct: 0.80, reps: '8', zone: 'HIPERTROFIA', color: colors.green },
-                                        { pct: 0.75, reps: '10', zone: 'HIPERTROFIA', color: colors.green },
-                                        { pct: 0.70, reps: '12', zone: 'RESISTENCIA', color: colors.primary.light },
-                                        { pct: 0.65, reps: '16', zone: 'RESISTENCIA', color: colors.primary.light },
-                                        { pct: 0.60, reps: '20', zone: 'TÉCNICA', color: colors.textMuted },
-                                        { pct: 0.50, reps: '30+', zone: 'TÉCNICA', color: colors.textMuted },
-                                    ].map((row, idx, arr) => {
-                                        const weight = CalculatorService.roundToIncrement(oneRm * row.pct, rounding);
-                                        return (
-                                            <View key={row.pct} style={[ss.tableRow, idx < arr.length - 1 && ss.tableRowBorder]}>
-                                                <View style={{ flex: 1.2, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                                    <View style={{ width: 4, height: 24, backgroundColor: row.color, borderRadius: 2 }} />
-                                                    <View>
-                                                        <Text style={ss.tablePct}>{Math.round(row.pct * 100)}%</Text>
-                                                        <Text style={[ss.tableZone, { color: row.color }]}>{row.zone}</Text>
-                                                    </View>
-                                                </View>
-                                                <View style={{ flex: 1, alignItems: 'center' }}>
-                                                    <View style={ss.repsBadge}>
-                                                        <Text style={ss.repsText}>{row.reps}</Text>
-                                                    </View>
-                                                </View>
-                                                <Text style={[ss.tableWeight, { flex: 1.5, textAlign: 'right' }]}>{weight}</Text>
-                                            </View>
-                                        );
-                                    })}
-                                </View>
-                            </View>
-                        ) : activeTab === 'warmup' ? (
-                            <View>
-                                <Text style={ss.sectionTitle}>Warm-up</Text>
-                                <View style={ss.card}>
-                                    <Text style={ss.cardLabel}>Peso de trabajo</Text>
-                                    <IronInput value={warmupWorking} onChangeText={setWarmupWorking} keyboardType="numeric" placeholder={unit === 'kg' ? '100' : '225'} />
-                                    <Text style={[ss.cardLabel, { marginTop: 16 }]}>Barra</Text>
-                                    <IronInput value={warmupBar} onChangeText={setWarmupBar} keyboardType="numeric" placeholder={unit === 'kg' ? '20' : '45'} />
-                                    <Text style={ss.hintText}>Redondeo: {rounding} {unit}</Text>
-                                </View>
-
-                                <View style={ss.tableCard}>
-                                    {warmup.length > 0 ? warmup.map((ws, idx) => (
-                                        <View key={`${ws.weight}-${idx}`} style={[ss.tableRow, idx < warmup.length - 1 && ss.tableRowBorder]}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.yellow }} />
-                                                <Text style={ss.tableWeightText}>{ws.weight} {unit}</Text>
-                                            </View>
-                                            <Text style={ss.tablePct}>{ws.reps} reps</Text>
+                                            <TouchableOpacity
+                                                onPress={() => setIsFemale(true)}
+                                                style={[ss.chip, isFemale && ss.chipActive]}
+                                                accessibilityRole="button"
+                                            >
+                                                <Text style={[ss.chipText, isFemale && ss.chipTextActive]}>Femenino</Text>
+                                            </TouchableOpacity>
                                         </View>
-                                    )) : (
-                                        <View style={{ padding: 20 }}>
-                                            <Text style={ss.emptyText}>Ingresa un peso de trabajo válido.</Text>
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={ss.inputLabel}>Peso corporal ({unit})</Text>
+                                            <IronInput value={bw} onChangeText={setBw} keyboardType="numeric" placeholder={unit === 'kg' ? '80' : '180'} />
                                         </View>
-                                    )}
-                                </View>
-                            </View>
-                        ) : (
-                            <View>
-                                <Text style={ss.sectionTitle}>Power Scores</Text>
-                                <View style={{ marginBottom: 20 }}>
-                                    <Text style={ss.inputLabel}>Género</Text>
-                                    <View style={ss.chipRow}>
-                                        <TouchableOpacity
-                                            onPress={() => setIsFemale(false)}
-                                            style={[ss.chip, !isFemale && ss.chipActive]}
-                                            accessibilityRole="button"
-                                        >
-                                            <Text style={[ss.chipText, !isFemale && ss.chipTextActive]}>Masculino</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            onPress={() => setIsFemale(true)}
-                                            style={[ss.chip, isFemale && ss.chipActive]}
-                                            accessibilityRole="button"
-                                        >
-                                            <Text style={[ss.chipText, isFemale && ss.chipTextActive]}>Femenino</Text>
-                                        </TouchableOpacity>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={ss.inputLabel}>Total SBD</Text>
+                                            <IronInput value={total} onChangeText={setTotal} keyboardType="numeric" placeholder={unit === 'kg' ? '500' : '1100'} />
+                                        </View>
                                     </View>
-                                </View>
-
-                                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={ss.inputLabel}>Peso corporal ({unit})</Text>
-                                        <IronInput value={bw} onChangeText={setBw} keyboardType="numeric" placeholder={unit === 'kg' ? '80' : '180'} />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={ss.inputLabel}>Total SBD</Text>
-                                        <IronInput value={total} onChangeText={setTotal} keyboardType="numeric" placeholder={unit === 'kg' ? '500' : '1100'} />
-                                    </View>
-                                </View>
 
 
-                                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
-                                    <View style={ss.scoreCard}>
-                                        <Text style={ss.scoreLabel}>WILKS</Text>
-                                        <Text style={ss.scoreValue}>{Number.isFinite(wilks) ? wilks.toFixed(2) : '0.00'}</Text>
+                                    <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                                        <View style={ss.scoreCard}>
+                                            <Text style={ss.scoreLabel}>WILKS</Text>
+                                            <Text style={ss.scoreValue}>{Number.isFinite(wilks) ? wilks.toFixed(2) : '0.00'}</Text>
+                                        </View>
+                                        <View style={ss.scoreCard}>
+                                            <Text style={ss.scoreLabel}>DOTS</Text>
+                                            <Text style={ss.scoreValue}>{Number.isFinite(dots) ? dots.toFixed(2) : '0.00'}</Text>
+                                        </View>
                                     </View>
-                                    <View style={ss.scoreCard}>
-                                        <Text style={ss.scoreLabel}>DOTS</Text>
-                                        <Text style={ss.scoreValue}>{Number.isFinite(dots) ? dots.toFixed(2) : '0.00'}</Text>
-                                    </View>
-                                </View>
 
-                                <Text style={ss.hintText}>*Wilks/DOTS se calculan en kg internamente.</Text>
-                            </View>
-                        )}
-                    </ScrollView>
-                </View>
+                                    <Text style={ss.hintText}>*Wilks/DOTS se calculan en kg internamente.</Text>
+                                </View>
+                            )}
+                        </ScrollView>
+                    </View>
+                </KeyboardAvoidingView>
             </SafeAreaView>
         </Modal>
     );

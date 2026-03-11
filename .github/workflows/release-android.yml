@@ -11,6 +11,7 @@ permissions:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip eas]')"
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}

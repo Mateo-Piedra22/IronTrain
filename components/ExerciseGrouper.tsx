@@ -1,11 +1,11 @@
 import { UnitService } from '@/src/services/UnitService';
-import { ThemeFx, withAlpha } from '@/src/theme';
+import { withAlpha } from '@/src/theme';
 import { ExerciseType, WorkoutSet } from '@/src/types/db';
 import { formatTimeSeconds, parseFlexibleTimeToSeconds } from '@/src/utils/time';
 import { Ionicons } from '@expo/vector-icons';
 import { ArrowDownCircle, CirclePause, Dumbbell, Flame, RefreshCw, Skull, Trophy } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useColors } from '../src/hooks/useColors';
 import { confirm } from '../src/store/confirmStore';
 import { IronButton } from './IronButton';
@@ -60,7 +60,8 @@ export function ExerciseGrouper({
         inputCell: { flex: 1, paddingHorizontal: 4 },
         actionsCell: { width: 64, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
         noteText: { color: colors.textMuted, fontSize: 11, paddingHorizontal: 10, paddingBottom: 6, fontStyle: 'italic', borderBottomWidth: 1.5, borderBottomColor: colors.border },
-        modalOverlay: { flex: 1, backgroundColor: ThemeFx.backdropStrong, justifyContent: 'center', paddingHorizontal: 24 },
+        modalOverlay: { flex: 1, backgroundColor: withAlpha(colors.background, '80') },
+        modalScroll: { flexGrow: 1, justifyContent: 'center', padding: 16 },
         modalSheet: { backgroundColor: colors.surface, padding: 20, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border },
         modalTitle: { color: colors.text, fontWeight: '900', marginBottom: 12, fontSize: 15 },
         modalInput: { backgroundColor: colors.surfaceLighter, color: colors.text, padding: 12, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, marginBottom: 16, height: 96 },
@@ -286,24 +287,26 @@ export function ExerciseGrouper({
 
             {/* Comment Modal */}
             <Modal visible={commentModalVisible} transparent animationType="fade">
-                <View style={ss.modalOverlay}>
-                    <View style={ss.modalSheet}>
-                        <Text style={ss.modalTitle}>Nota de la serie</Text>
-                        <TextInput
-                            style={ss.modalInput}
-                            textAlignVertical="top"
-                            multiline
-                            value={currentComment}
-                            onChangeText={setCurrentComment}
-                            placeholder="Ej: RPE 8, se sintió pesado..."
-                            placeholderTextColor={colors.textMuted}
-                        />
-                        <View style={ss.modalActions}>
-                            <IronButton label="Cancelar" variant="outline" size="sm" onPress={() => setCommentModalVisible(false)} />
-                            <IronButton label="Guardar" size="sm" onPress={saveComment} />
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={ss.modalOverlay}>
+                    <ScrollView contentContainerStyle={ss.modalScroll} keyboardShouldPersistTaps="handled" bounces={false} showsVerticalScrollIndicator={false}>
+                        <View style={ss.modalSheet}>
+                            <Text style={ss.modalTitle}>Nota de la serie</Text>
+                            <TextInput
+                                style={ss.modalInput}
+                                textAlignVertical="top"
+                                multiline
+                                value={currentComment}
+                                onChangeText={setCurrentComment}
+                                placeholder="Ej: RPE 8, se sintió pesado..."
+                                placeholderTextColor={colors.textMuted}
+                            />
+                            <View style={ss.modalActions}>
+                                <IronButton label="Cancelar" variant="outline" size="sm" onPress={() => setCommentModalVisible(false)} />
+                                <IronButton label="Guardar" size="sm" onPress={saveComment} />
+                            </View>
                         </View>
-                    </View>
-                </View>
+                    </ScrollView>
+                </KeyboardAvoidingView>
             </Modal>
         </View>
     );

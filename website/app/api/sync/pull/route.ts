@@ -59,6 +59,8 @@ export async function GET(req: NextRequest) {
             badges: schema.badges,
             exercise_badges: schema.exerciseBadges,
             user_profiles: schema.userProfiles,
+            shares_inbox: schema.sharesInbox,
+            activity_seen: schema.activitySeen,
             changelogs: schema.changelogs,
             changelog_reactions: schema.changelogReactions,
             notification_reactions: schema.notificationReactions,
@@ -111,6 +113,8 @@ export async function GET(req: NextRequest) {
                     conditions.push(sql`(${tableSchema.userId} = ${userId} OR ${tableSchema.friendId} = ${userId})`);
                 } else if (tableName === 'shares_inbox') {
                     conditions.push(sql`(${tableSchema.senderId} = ${userId} OR ${tableSchema.receiverId} = ${userId})`);
+                } else if (tableName === 'activity_seen') {
+                    conditions.push(eq(tableSchema.userId, userId));
                 } else if ('userId' in tableSchema) {
                     conditions.push(eq(tableSchema.userId, userId));
                 }

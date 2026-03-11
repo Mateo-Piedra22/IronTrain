@@ -265,6 +265,12 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
       CREATE INDEX IF NOT EXISTS idx_routine_days_routine ON routine_days(routine_id);
       CREATE INDEX IF NOT EXISTS idx_routine_exercises_day ON routine_exercises(routine_day_id);
+      CREATE INDEX IF NOT EXISTS idx_friendships_user ON friendships(user_id);
+      CREATE INDEX IF NOT EXISTS idx_friendships_friend ON friendships(friend_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_feed_user ON activity_feed(user_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_seen_user ON activity_seen(user_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_seen_activity ON activity_seen(activity_id);
+      CREATE INDEX IF NOT EXISTS idx_shares_receiver ON shares_inbox(receiver_id);
 
       CREATE TABLE IF NOT EXISTS user_profiles (
         id TEXT PRIMARY KEY NOT NULL,
@@ -337,6 +343,44 @@ export class DatabaseService {
         reaction_count INTEGER DEFAULT 0 NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS friendships (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        friend_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS shares_inbox (
+        id TEXT PRIMARY KEY NOT NULL,
+        sender_id TEXT NOT NULL,
+        receiver_id TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        type TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        seen_at INTEGER,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS activity_seen (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        activity_id TEXT NOT NULL,
+        seen_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS notification_reactions (
+        id TEXT PRIMARY KEY NOT NULL,
+        notification_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER
+      );
+
       CREATE TABLE IF NOT EXISTS activity_feed (
         id TEXT PRIMARY KEY NOT NULL,
         user_id TEXT NOT NULL,
@@ -346,6 +390,7 @@ export class DatabaseService {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         deleted_at INTEGER,
+        seen_at INTEGER,
         kudo_count INTEGER DEFAULT 0 NOT NULL
       );
     `;
@@ -986,6 +1031,64 @@ export class DatabaseService {
             }
         } catch (e) {
             logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 21 failed' });
+        }
+
+        // Migration 22: Add seen_at to activity_feed
+        try {
+            const info = await this.getAll<{ name: string }>("PRAGMA table_info('activity_feed')");
+            const cols = info.map(c => c.name);
+            if (!cols.includes('seen_at')) {
+                logger.info('[Migration 22] Adding seen_at to activity_feed');
+                await this.executeRaw('ALTER TABLE activity_feed ADD COLUMN seen_at INTEGER');
+            }
+        } catch (e) {
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 22 failed' });
+        }
+
+        // Migration 23: Social Sync Infrastructure (shares_inbox, activity_seen, notification_reactions)
+        try {
+            logger.info('[Migration] Running Migration 23: Social Infrastructure');
+
+            await this.executeRaw(`
+                CREATE TABLE IF NOT EXISTS shares_inbox (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    sender_id TEXT NOT NULL,
+                    receiver_id TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    seen_at INTEGER,
+                    updated_at INTEGER NOT NULL,
+                    deleted_at INTEGER
+                );
+            `);
+
+            await this.executeRaw(`
+                CREATE TABLE IF NOT EXISTS activity_seen (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    user_id TEXT NOT NULL,
+                    activity_id TEXT NOT NULL,
+                    seen_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+            `);
+
+            await this.executeRaw(`
+                CREATE TABLE IF NOT EXISTS notification_reactions (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    notification_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    deleted_at INTEGER
+                );
+            `);
+
+            await this.executeRaw('CREATE INDEX IF NOT EXISTS idx_activity_seen_user ON activity_seen(user_id)');
+            await this.executeRaw('CREATE INDEX IF NOT EXISTS idx_activity_seen_activity ON activity_seen(activity_id)');
+            await this.executeRaw('CREATE INDEX IF NOT EXISTS idx_shares_receiver ON shares_inbox(receiver_id)');
+        } catch (e) {
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 23 failed' });
         }
     }
 

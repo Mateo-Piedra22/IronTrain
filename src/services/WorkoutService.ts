@@ -621,10 +621,24 @@ class WorkoutService {
         }
     }
 
-    private async createSocialFeedEventsForFinishedWorkout(workoutId: string, timestamp: number): Promise<void> {
+    private async createSocialFeedEventsForFinishedWorkout(workoutId: string, now?: number): Promise<void> {
+        const timestamp = now || Date.now();
         const userId = useAuthStore.getState().user?.id;
         if (!userId) return;
 
+        // 1. Clean up existing PR events for THIS workout first.
+        // This handles cases where an exercise was removed or the PR is no longer achieved.
+        // We use the deterministic ID pattern: activity-pr-${workoutId}-*
+        const stalePrs = await dbService.getAll<{ id: string }>(
+            "SELECT id FROM activity_feed WHERE action_type = 'pr_broken' AND id LIKE ?",
+            [`activity-pr-${workoutId}-%`]
+        );
+        for (const pr of stalePrs) {
+            await dbService.run('UPDATE activity_feed SET deleted_at = ?, updated_at = ? WHERE id = ?', [timestamp, timestamp, pr.id]);
+            await dbService.queueSyncMutation('activity_feed', pr.id, 'UPDATE', { deleted_at: timestamp, updated_at: timestamp });
+        }
+
+        // 2. Main workout event
         await this.upsertActivityFeedRecord({
             id: `activity-workout-${workoutId}`,
             userId,
@@ -721,14 +735,19 @@ class WorkoutService {
 
         if (existing?.id) {
             await dbService.run(
-                'UPDATE activity_feed SET metadata = ?, updated_at = ?, deleted_at = NULL WHERE id = ?',
+                'UPDATE activity_feed SET metadata = ?, updated_at = ?, seen_at = NULL, deleted_at = NULL WHERE id = ?',
                 [payload.metadata, payload.updatedAt, payload.id]
             );
             await dbService.queueSyncMutation('activity_feed', payload.id, 'UPDATE', {
                 metadata: payload.metadata,
                 updated_at: payload.updatedAt,
+                seen_at: null,
                 deleted_at: null,
             });
+
+            // IMPORTANT: Clear seen records locally to ensure UI shows it as new
+            await dbService.run('DELETE FROM activity_seen WHERE activity_id = ?', [payload.id]);
+            // (Sync concern: activity_seen deletions are usually managed by the server when the parent activity is updated)
             return;
         }
 
@@ -766,6 +785,9 @@ class WorkoutService {
             );
             // Queue sync deletion
             await dbService.queueSyncMutation('activity_feed', act.id, 'DELETE');
+
+            // Also clear seen records locally
+            await dbService.run('DELETE FROM activity_seen WHERE activity_id = ?', [act.id]);
         }
     }
 

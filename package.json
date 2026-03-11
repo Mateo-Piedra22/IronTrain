@@ -15,6 +15,7 @@
     "postinstall": "node scripts/patch-css-interop.js && node scripts/generate-changelog.js",
     "eas-build-pre-install": "node scripts/recreate-secrets.js",
     "deploy:mobile": "node scripts/deploy-mobile.js",
+    "deploy:hotfix": "node scripts/deploy-hotfix.js",
     "prebuild:eas": "npm run audit && npm run generate-changelog && npm run website:sync-content",
     "pretest": "node scripts/generate-changelog.js",
     "test": "jest"

@@ -5,7 +5,7 @@ import { ThemeFx, withAlpha } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
 import { BookOpen } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Switch, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors } from '../src/hooks/useColors';
 
@@ -20,8 +20,7 @@ interface CreateRoutineModalProps {
 export function CreateRoutineModal({ visible, onClose, onCreated, editRoutine }: CreateRoutineModalProps) {
     const colors = useColors();
     const st = useMemo(() => StyleSheet.create({
-        overlay: { flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center', padding: 16 },
-        keyboardView: { width: '100%', maxWidth: 380, alignItems: 'center' },
+        overlay: { flex: 1, backgroundColor: ThemeFx.backdrop },
         container: {
             backgroundColor: colors.surface,
             width: '100%',
@@ -91,66 +90,73 @@ export function CreateRoutineModal({ visible, onClose, onCreated, editRoutine }:
     };
 
     return (
-        <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-            <SafeAreaView style={st.overlay} edges={['top', 'bottom', 'left', 'right']}>
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                    style={st.keyboardView}
-                >
-                    <View style={st.container}>
-                        {/* Title */}
-                        <View style={st.titleRow}>
-                            <View style={st.iconCircle}>
-                                <BookOpen size={18} color={colors.primary.DEFAULT} />
+        <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={st.overlay}
+            >
+                <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
+                    <ScrollView
+                        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}
+                        keyboardShouldPersistTaps="handled"
+                        bounces={false}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        <View style={st.container}>
+                            {/* Title */}
+                            <View style={st.titleRow}>
+                                <View style={st.iconCircle}>
+                                    <BookOpen size={18} color={colors.primary.DEFAULT} />
+                                </View>
+                                <Text style={st.title}>
+                                    {isEditing ? 'Editar rutina' : 'Nueva rutina'}
+                                </Text>
                             </View>
-                            <Text style={st.title}>
-                                {isEditing ? 'Editar rutina' : 'Nueva rutina'}
-                            </Text>
+
+                            {/* Form */}
+                            <IronInput
+                                label="Nombre"
+                                value={name}
+                                onChangeText={setName}
+                                autoFocus
+                                placeholder="Ej: Push / Pull / Legs..."
+                            />
+
+                            <IronInput
+                                label="Descripción (Opcional)"
+                                value={description}
+                                onChangeText={setDescription}
+                                placeholder="Breve detalle del objetivo..."
+                                multiline
+                                numberOfLines={3}
+                            />
+
+                            <View style={st.switchRow}>
+                                <View style={st.switchInfo}>
+                                    <Text style={st.switchLabel}>Hacer Pública</Text>
+                                    <Text style={st.switchDesc}>Aparecerá en el Directorio Global para que otros la descarguen.</Text>
+                                </View>
+                                <Switch value={isPublic} onValueChange={setIsPublic} trackColor={{ true: colors.primary.DEFAULT }} />
+                            </View>
+
+                            {/* Buttons */}
+                            <View style={st.actions}>
+                                <View style={st.actionWrapper}>
+                                    <IronButton label="Cancelar" variant="ghost" onPress={onClose} />
+                                </View>
+                                <View style={st.actionWrapper}>
+                                    <IronButton
+                                        label={loading ? 'Guardando...' : isEditing ? 'Guardar' : 'Crear'}
+                                        onPress={handleSave}
+                                        disabled={!name.trim() || loading}
+                                        loading={loading}
+                                    />
+                                </View>
+                            </View>
                         </View>
-
-                        {/* Form */}
-                        <IronInput
-                            label="Nombre"
-                            value={name}
-                            onChangeText={setName}
-                            autoFocus
-                            placeholder="Ej: Push / Pull / Legs..."
-                        />
-
-                        <IronInput
-                            label="Descripción (Opcional)"
-                            value={description}
-                            onChangeText={setDescription}
-                            placeholder="Breve detalle del objetivo..."
-                            multiline
-                            numberOfLines={3}
-                        />
-
-                        <View style={st.switchRow}>
-                            <View style={st.switchInfo}>
-                                <Text style={st.switchLabel}>Hacer Pública</Text>
-                                <Text style={st.switchDesc}>Aparecerá en el Directorio Global para que otros la descarguen.</Text>
-                            </View>
-                            <Switch value={isPublic} onValueChange={setIsPublic} trackColor={{ true: colors.primary.DEFAULT }} />
-                        </View>
-
-                        {/* Buttons */}
-                        <View style={st.actions}>
-                            <View style={st.actionWrapper}>
-                                <IronButton label="Cancelar" variant="ghost" onPress={onClose} />
-                            </View>
-                            <View style={st.actionWrapper}>
-                                <IronButton
-                                    label={loading ? 'Guardando...' : isEditing ? 'Guardar' : 'Crear'}
-                                    onPress={handleSave}
-                                    disabled={!name.trim() || loading}
-                                    loading={loading}
-                                />
-                            </View>
-                        </View>
-                    </View>
-                </KeyboardAvoidingView>
-            </SafeAreaView>
+                    </ScrollView>
+                </SafeAreaView>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }

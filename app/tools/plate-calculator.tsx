@@ -8,7 +8,7 @@ import { PlateInventory, PlateType } from '@/src/types/db';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { ChevronDown, ChevronLeft, ChevronUp, Disc, PaintBucket, Plus, Settings, Trash2, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors } from '../../src/hooks/useColors';
 
@@ -389,152 +389,161 @@ export default function PlateCalculator() {
 
                 {/* Settings/Inventory Modal */}
                 <Modal visible={isSettingsVisible} animationType="slide" presentationStyle="formSheet">
-                    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={ss.modalContainer}>
-                        <View style={{ flex: 1, padding: 16 }}>
-                            {/* Modal Header */}
-                            <View style={ss.modalHeader}>
-                                <View>
-                                    <Text style={ss.modalTitle}>{editingPlate ? (editingPlate.originalWeight ? 'Editar Disco' : 'Nuevo Disco') : 'Inventario de discos'}</Text>
-                                    <Text style={ss.modalSub}>{editingPlate ? 'Ajusta peso, color y cantidad' : 'Gestiona tus discos disponibles'}</Text>
-                                </View>
-                                <TouchableOpacity onPress={() => { editingPlate ? setEditingPlate(null) : setIsSettingsVisible(false) }} style={ss.modalCloseBtn} accessibilityRole="button">
-                                    <X color={colors.text} size={18} />
-                                </TouchableOpacity>
-                            </View>
-
-                            {editingPlate ? (
-                                <View style={{ flex: 1 }}>
-                                    <View style={ss.card}>
-                                        <Text style={ss.invSectionTitle}>Peso del disco ({unit})</Text>
-                                        <TextInput
-                                            style={[ss.smallInput, { marginBottom: 16 }]}
-                                            placeholder="Ej: 20"
-                                            placeholderTextColor={colors.textMuted}
-                                            keyboardType="numeric"
-                                            value={editingPlate.weight}
-                                            onChangeText={(t) => setEditingPlate({ ...editingPlate, weight: t })}
-                                        />
-
-                                        <Text style={ss.invSectionTitle}>Cantidad (total)</Text>
-                                        <TextInput
-                                            style={[ss.smallInput, { marginBottom: 16 }]}
-                                            placeholder="Ej: 2"
-                                            placeholderTextColor={colors.textMuted}
-                                            keyboardType="numeric"
-                                            value={editingPlate.count}
-                                            onChangeText={(t) => setEditingPlate({ ...editingPlate, count: t })}
-                                        />
-
-                                        <Text style={ss.invSectionTitle}>Color (opcional)</Text>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                                            <TouchableOpacity
-                                                style={[ss.colorBtn, { backgroundColor: editingPlate.color || getPlateColor(parseFloat(editingPlate.weight) || 0, unit, editingPlate.type) }]}
-                                                onPress={() => setIsColorPickerVisible(true)}
-                                            >
-                                                <PaintBucket size={18} color={editingPlate.color ? colors.white : colors.black} />
-                                            </TouchableOpacity>
-                                            <TouchableOpacity onPress={() => setEditingPlate({ ...editingPlate, color: undefined })}>
-                                                <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 12 }}>RESTABLECER AUTO</Text>
-                                            </TouchableOpacity>
-                                        </View>
-
-                                        <Text style={ss.invSectionTitle}>Tipo de disco</Text>
-                                        <View style={ss.barChipRow}>
-                                            {[
-                                                { val: 'standard', label: 'Estándar' },
-                                                { val: 'bumper', label: 'Bumper' },
-                                                { val: 'calibrated', label: 'Calibrado' }
-                                            ].map(opt => {
-                                                const isActive = (editingPlate.type || 'standard') === opt.val;
-                                                return (
-                                                    <Pressable
-                                                        key={opt.val}
-                                                        onPress={() => setEditingPlate({ ...editingPlate, type: opt.val as PlateType })}
-                                                        style={[ss.barChip, { paddingVertical: 10 }, isActive && ss.barChipActive]}
-                                                    >
-                                                        <Text style={[ss.barChipText, { fontSize: 13 }, isActive && ss.barChipTextActive]}>{opt.label}</Text>
-                                                    </Pressable>
-                                                )
-                                            })}
-                                        </View>
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                        style={{ flex: 1 }}
+                    >
+                        <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={ss.modalContainer}>
+                            <View style={{ flex: 1, padding: 16 }}>
+                                {/* Modal Header */}
+                                <View style={ss.modalHeader}>
+                                    <View>
+                                        <Text style={ss.modalTitle}>{editingPlate ? (editingPlate.originalWeight ? 'Editar Disco' : 'Nuevo Disco') : 'Inventario de discos'}</Text>
+                                        <Text style={ss.modalSub}>{editingPlate ? 'Ajusta peso, color y cantidad' : 'Gestiona tus discos disponibles'}</Text>
                                     </View>
-
-                                    <View style={{ flexDirection: 'row', gap: 12, marginTop: 'auto', paddingTop: 16 }}>
-                                        {editingPlate.originalWeight !== undefined && (
-                                            <TouchableOpacity onPress={deletePlateEditor} style={[ss.calcBtn, { flex: 0, paddingHorizontal: 20, backgroundColor: colors.red }]}>
-                                                <Trash2 size={18} color={colors.white} />
-                                            </TouchableOpacity>
-                                        )}
-                                        <TouchableOpacity onPress={savePlateEditor} style={[ss.calcBtn, { flex: 1, marginBottom: 0 }]}>
-                                            <Text style={ss.calcBtnText}>GUARDAR DISCO</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            ) : (
-                                <ScrollView showsVerticalScrollIndicator={false}>
-                                    {/* Preference toggle */}
-                                    <View style={[ss.card, { marginBottom: 12 }]}>
-                                        <Text style={ss.invSectionTitle}>Preferencia</Text>
-                                        <TouchableOpacity
-                                            onPress={() => setPreferFewerPlates(!preferFewerPlates)}
-                                            style={[ss.toggleRow, preferFewerPlates && { backgroundColor: withAlpha(colors.primary.DEFAULT, '26'), borderColor: colors.primary.DEFAULT }]}
-                                        >
-                                            <Text style={[{ fontWeight: '700', fontSize: 13 }, preferFewerPlates ? { color: colors.primary.DEFAULT } : { color: colors.text }]}>
-                                                {preferFewerPlates ? 'Preferir menos discos (más rápido)' : 'Permitir más discos (más opciones)'}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    {/* Symmetry */}
-                                    <View style={[ss.card, { marginBottom: 12 }]}>
-                                        <Text style={ss.invSectionTitle}>Simetría</Text>
-                                        <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: 8, lineHeight: 16 }}>La app calcula por pares (1 disco por lado). Un disco suelto no se usa.</Text>
-                                        {hasOddCounts && (
-                                            <TouchableOpacity onPress={normalizeToPairs} style={ss.toggleRow}>
-                                                <Text style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>Normalizar a pares</Text>
-                                                <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>Resta 1 a los conteos impares (solo {unit}).</Text>
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-
-                                    {/* Inventory list */}
-                                    {inventoryForUnit.map((p) => (
-                                        <TouchableOpacity
-                                            key={`${p.weight}-${p.type || 'standard'}`}
-                                            style={ss.invRow}
-                                            onPress={() => setEditingPlate({ weight: String(p.weight), count: String(p.count), color: p.color, type: p.type, originalWeight: p.weight, originalType: p.type })}
-                                        >
-                                            <View style={{ flex: 1 }}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                    <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: p.color || getPlateColor(p.weight, unit, p.type, colors), borderWidth: 1, borderColor: withAlpha(colors.black, '20') }} />
-                                                    <Text style={{ color: colors.text, fontWeight: '900', fontSize: 16 }}>{p.weight} {p.unit}</Text>
-                                                    {p.type && p.type !== 'standard' && (
-                                                        <View style={{ backgroundColor: colors.border, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                                                            <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase' }}>{p.type}</Text>
-                                                        </View>
-                                                    )}
-                                                </View>
-                                                <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '600', marginTop: 2, marginLeft: 22 }}>
-                                                    Pares: {Math.floor((p.count ?? 0) / 2)} {((p.count ?? 0) % 2 !== 0) ? '· sobra 1' : ''}
-                                                </Text>
-                                            </View>
-                                            <View style={ss.invControls}>
-                                                <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700' }}>TOCAR PARA EDITAR</Text>
-                                            </View>
-                                        </TouchableOpacity>
-                                    ))}
-
-                                    <TouchableOpacity
-                                        onPress={() => setEditingPlate({ weight: '', count: '2' })}
-                                        style={[ss.calcBtn, { marginTop: 16, backgroundColor: colors.border, shadowOpacity: 0, borderWidth: 1, borderColor: colors.border }]}
-                                    >
-                                        <Plus size={18} color={colors.text} />
-                                        <Text style={[ss.calcBtnText, { color: colors.text }]}>NUEVO DISCO</Text>
+                                    <TouchableOpacity onPress={() => { editingPlate ? setEditingPlate(null) : setIsSettingsVisible(false) }} style={ss.modalCloseBtn} accessibilityRole="button">
+                                        <X color={colors.text} size={18} />
                                     </TouchableOpacity>
-                                </ScrollView>
-                            )}
-                        </View>
-                    </SafeAreaView>
+                                </View>
+
+                                {editingPlate ? (
+                                    <View style={{ flex: 1 }}>
+                                        <View style={ss.card}>
+                                            <Text style={ss.invSectionTitle}>Peso del disco ({unit})</Text>
+                                            <TextInput
+                                                style={[ss.smallInput, { marginBottom: 16 }]}
+                                                placeholder="Ej: 20"
+                                                placeholderTextColor={colors.textMuted}
+                                                keyboardType="numeric"
+                                                value={editingPlate.weight}
+                                                onChangeText={(t) => setEditingPlate({ ...editingPlate, weight: t })}
+                                            />
+
+                                            <Text style={ss.invSectionTitle}>Cantidad (total)</Text>
+                                            <TextInput
+                                                style={[ss.smallInput, { marginBottom: 16 }]}
+                                                placeholder="Ej: 2"
+                                                placeholderTextColor={colors.textMuted}
+                                                keyboardType="numeric"
+                                                value={editingPlate.count}
+                                                onChangeText={(t) => setEditingPlate({ ...editingPlate, count: t })}
+                                            />
+
+                                            <Text style={ss.invSectionTitle}>Color (opcional)</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                                                <TouchableOpacity
+                                                    style={[ss.colorBtn, { backgroundColor: editingPlate.color || getPlateColor(parseFloat(editingPlate.weight) || 0, unit, editingPlate.type) }]}
+                                                    onPress={() => setIsColorPickerVisible(true)}
+                                                >
+                                                    <PaintBucket size={18} color={editingPlate.color ? colors.white : colors.black} />
+                                                </TouchableOpacity>
+                                                <TouchableOpacity onPress={() => setEditingPlate({ ...editingPlate, color: undefined })}>
+                                                    <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 12 }}>RESTABLECER AUTO</Text>
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            <Text style={ss.invSectionTitle}>Tipo de disco</Text>
+                                            <View style={ss.barChipRow}>
+                                                {[
+                                                    { val: 'standard', label: 'Estándar' },
+                                                    { val: 'bumper', label: 'Bumper' },
+                                                    { val: 'calibrated', label: 'Calibrado' }
+                                                ].map(opt => {
+                                                    const isActive = (editingPlate.type || 'standard') === opt.val;
+                                                    return (
+                                                        <Pressable
+                                                            key={opt.val}
+                                                            onPress={() => setEditingPlate({ ...editingPlate, type: opt.val as PlateType })}
+                                                            style={[ss.barChip, { paddingVertical: 10 }, isActive && ss.barChipActive]}
+                                                        >
+                                                            <Text style={[ss.barChipText, { fontSize: 13 }, isActive && ss.barChipTextActive]}>{opt.label}</Text>
+                                                        </Pressable>
+                                                    )
+                                                })}
+                                            </View>
+                                        </View>
+
+                                        <View style={{ flexDirection: 'row', gap: 12, marginTop: 'auto', paddingTop: 16 }}>
+                                            {editingPlate.originalWeight !== undefined && (
+                                                <TouchableOpacity onPress={deletePlateEditor} style={[ss.calcBtn, { flex: 0, paddingHorizontal: 20, backgroundColor: colors.red }]}>
+                                                    <Trash2 size={18} color={colors.white} />
+                                                </TouchableOpacity>
+                                            )}
+                                            <TouchableOpacity onPress={savePlateEditor} style={[ss.calcBtn, { flex: 1, marginBottom: 0 }]}>
+                                                <Text style={ss.calcBtnText}>GUARDAR DISCO</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                ) : (
+                                    <ScrollView
+                                        showsVerticalScrollIndicator={false}
+                                        keyboardShouldPersistTaps="handled"
+                                        bounces={false}
+                                    >
+                                        {/* Preference toggle */}
+                                        <View style={[ss.card, { marginBottom: 12 }]}>
+                                            <Text style={ss.invSectionTitle}>Preferencia</Text>
+                                            <TouchableOpacity
+                                                onPress={() => setPreferFewerPlates(!preferFewerPlates)}
+                                                style={[ss.toggleRow, preferFewerPlates && { backgroundColor: withAlpha(colors.primary.DEFAULT, '26'), borderColor: colors.primary.DEFAULT }]}
+                                            >
+                                                <Text style={[{ fontWeight: '700', fontSize: 13 }, preferFewerPlates ? { color: colors.primary.DEFAULT } : { color: colors.text }]}>
+                                                    {preferFewerPlates ? 'Preferir menos discos (más rápido)' : 'Permitir más discos (más opciones)'}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        {/* Symmetry */}
+                                        <View style={[ss.card, { marginBottom: 12 }]}>
+                                            <Text style={ss.invSectionTitle}>Simetría</Text>
+                                            <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: 8, lineHeight: 16 }}>La app calcula por pares (1 disco por lado). Un disco suelto no se usa.</Text>
+                                            {hasOddCounts && (
+                                                <TouchableOpacity onPress={normalizeToPairs} style={ss.toggleRow}>
+                                                    <Text style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>Normalizar a pares</Text>
+                                                    <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>Resta 1 a los conteos impares (solo {unit}).</Text>
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+
+                                        {/* Inventory list */}
+                                        {inventoryForUnit.map((p) => (
+                                            <TouchableOpacity
+                                                key={`${p.weight}-${p.type || 'standard'}`}
+                                                style={ss.invRow}
+                                                onPress={() => setEditingPlate({ weight: String(p.weight), count: String(p.count), color: p.color, type: p.type, originalWeight: p.weight, originalType: p.type })}
+                                            >
+                                                <View style={{ flex: 1 }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                        <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: p.color || getPlateColor(p.weight, unit, p.type, colors), borderWidth: 1, borderColor: withAlpha(colors.black, '20') }} />
+                                                        <Text style={{ color: colors.text, fontWeight: '900', fontSize: 16 }}>{p.weight} {p.unit}</Text>
+                                                        {p.type && p.type !== 'standard' && (
+                                                            <View style={{ backgroundColor: colors.border, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                                                <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase' }}>{p.type}</Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                    <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '600', marginTop: 2, marginLeft: 22 }}>
+                                                        Pares: {Math.floor((p.count ?? 0) / 2)} {((p.count ?? 0) % 2 !== 0) ? '· sobra 1' : ''}
+                                                    </Text>
+                                                </View>
+                                                <View style={ss.invControls}>
+                                                    <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700' }}>TOCAR PARA EDITAR</Text>
+                                                </View>
+                                            </TouchableOpacity>
+                                        ))}
+
+                                        <TouchableOpacity
+                                            onPress={() => setEditingPlate({ weight: '', count: '2' })}
+                                            style={[ss.calcBtn, { marginTop: 16, backgroundColor: colors.border, shadowOpacity: 0, borderWidth: 1, borderColor: colors.border }]}
+                                        >
+                                            <Plus size={18} color={colors.text} />
+                                            <Text style={[ss.calcBtnText, { color: colors.text }]}>NUEVO DISCO</Text>
+                                        </TouchableOpacity>
+                                    </ScrollView>
+                                )}
+                            </View>
+                        </SafeAreaView>
+                    </KeyboardAvoidingView>
                 </Modal>
                 <ColorPicker
                     visible={isColorPickerVisible}

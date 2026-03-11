@@ -62,6 +62,8 @@ export async function POST(req: NextRequest) {
             'notification_reactions': schema.notificationReactions,
             'kudos': schema.kudos,
             'activity_feed': schema.activityFeed,
+            'activity_seen': schema.activitySeen,
+            'shares_inbox': schema.sharesInbox,
             'score_events': schema.scoreEvents,
             'user_exercise_prs': schema.userExercisePrs,
             'friendships': schema.friendships,
@@ -138,7 +140,10 @@ export async function POST(req: NextRequest) {
                     } else if (tableName === 'kudos') {
                         filteredData.giverId = userId;
                     } else if (tableName === 'shares_inbox') {
-                        filteredData.senderId = userId;
+                        // RECEIVER can only update seenAt and status. SENDER can update payload if needed.
+                        // We check this in the ownership logic below.
+                    } else if (tableName === 'activity_seen') {
+                        filteredData.userId = userId;
                     } else if (tableName === 'activity_feed') {
                         filteredData.userId = userId;
                     } else if (tableName === 'friendships') {
@@ -198,12 +203,39 @@ export async function POST(req: NextRequest) {
                                 (tableName === 'user_profiles' ? existingRecord.id : undefined);
                             const isSystemRecord = existingRecord.isSystem === 1 || existingRecord.is_system === 1;
 
-                            if (ownerId && ownerId !== userId && !['friendships', 'activity_feed', 'kudos', 'changelog_reactions', 'notification_reactions'].includes(tableName)) {
+                            if (ownerId && ownerId !== userId && !['friendships', 'activity_feed', 'kudos', 'changelog_reactions', 'notification_reactions', 'shares_inbox', 'activity_seen'].includes(tableName)) {
                                 if (isSystemRecord) {
                                     // Zero Trust: Ignore sync attempts to modify official system records
                                     return;
                                 }
                                 throw new Error('Ownership mismatch');
+                            }
+
+                            // ZERO TRUST: shares_inbox specific checks
+                            if (tableName === 'shares_inbox') {
+                                if (existingRecord.receiverId === userId) {
+                                    // Receiver can ONLY update seenAt and status
+                                    const allowedFields = new Set(['seenAt', 'status', 'updatedAt']);
+                                    for (const key of Object.keys(filteredData)) {
+                                        if (!allowedFields.has(key)) {
+                                            delete filteredData[key];
+                                        }
+                                    }
+                                } else if (existingRecord.senderId !== userId) {
+                                    throw new Error('Forbidden: Not sender or receiver of this share');
+                                }
+                            }
+
+                            // ZERO TRUST: activity_seen check
+                            if (tableName === 'activity_seen' && existingRecord.userId !== userId) {
+                                throw new Error('Forbidden: Cannot update seen status for another user');
+                            }
+
+                            // ZERO TRUST: Specifically for friendships, block status changes via sync
+                            if (tableName === 'friendships') {
+                                if (filteredData.status && filteredData.status !== existingRecord.status) {
+                                    throw new Error('Forbidden: Cannot change friendship status via sync');
+                                }
                             }
 
                             if (isSystemRecord && tableName !== 'user_profiles') {
@@ -226,6 +258,11 @@ export async function POST(req: NextRequest) {
                         const insertPayload = existingRecord
                             ? { ...existingRecord, ...filteredData }
                             : filteredData;
+
+                        // ZERO TRUST: Friendships cannot be created as 'accepted' via sync
+                        if (tableName === 'friendships' && !existingRecord && insertPayload.status !== 'pending') {
+                            throw new Error('Forbidden: New friendships must start as pending');
+                        }
 
                         // Perform UPSERT
                         // Note: .values() uses the hydrated payload for the INSERT phase.
@@ -286,9 +323,9 @@ export async function POST(req: NextRequest) {
                             if (isCompleted && !wasCompleted) {
                                 // Activation (Finished or Restored)
                                 await applyWorkoutScoring(tx, userId, pkValue);
-                                // Un-delete feed entries if they exist
+                                // Re-activate feed entries and reset seen status for everyone so it pops up as new
                                 await tx.update(schema.activityFeed)
-                                    .set({ deletedAt: null, updatedAt: new Date() })
+                                    .set({ deletedAt: null, updatedAt: new Date(), seenAt: null })
                                     .where(
                                         and(
                                             eq(schema.activityFeed.userId, userId),
@@ -296,6 +333,15 @@ export async function POST(req: NextRequest) {
                                                 eq(schema.activityFeed.id, `activity-workout-${pkValue}`),
                                                 like(schema.activityFeed.id, `activity-pr-${pkValue}-%`)
                                             )
+                                        )
+                                    );
+
+                                // Reset per-user seen records so friends see it as a new notification
+                                await tx.delete(schema.activitySeen)
+                                    .where(
+                                        or(
+                                            eq(schema.activitySeen.activityId, `activity-workout-${pkValue}`),
+                                            like(schema.activitySeen.activityId, `activity-pr-${pkValue}-%`)
                                         )
                                     );
                             } else if (!isCompleted && wasCompleted) {
@@ -337,7 +383,13 @@ export async function POST(req: NextRequest) {
 
                             // Allow deletion if the user is the owner OR it's a shared interaction table they participated in
                             // For system records, users cannot trigger deletes via sync (Zero Trust)
-                            if (!isSystemRecord && (ownerId === userId || ['friendships', 'changelog_reactions', 'notification_reactions', 'kudos'].includes(tableName))) {
+                            const isParticipant =
+                                ownerId === userId ||
+                                (tableName === 'friendships' && (record.userId === userId || record.friendId === userId)) ||
+                                (tableName === 'kudos' && record.giverId === userId) ||
+                                (tableName === 'shares_inbox' && (record.senderId === userId || record.receiverId === userId));
+
+                            if (!isSystemRecord && isParticipant) {
                                 const alreadyDeleted = !!(record as any).deletedAt;
                                 await tx.update(tableSchema).set({ deletedAt: new Date(), updatedAt: new Date() } as any).where(eq(pkCol, finalId));
 

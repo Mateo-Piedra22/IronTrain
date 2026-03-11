@@ -130,6 +130,29 @@ En la sección `## [VERSION] (Unreleased)`, describa los cambios realizados sigu
  4. `git push` de la rama y los tags hacia GitHub.
  
  Al finalizar el push, **GitHub Actions** detectará el nuevo tag y disparará automáticamente la build en EAS a través del flujo `release-android.yml`.
+
+ ---
+ 
+ ## 🚧 OPCIÓN DE EMERGENCIA: Despliegue de Hotfix (Local Build)
+ 
+ Si necesitas desplegar una corrección crítica (**hotfix**) y no puedes esperar a la cola de EAS Cloud, utiliza este flujo local. Esto compilará el APK en tu máquina usando los certificados oficiales de producción.
+ 
+ ### Requisitos en tu máquina:
+ 1.  **Java JDK 17+** y Android SDK instalados.
+ 2.  **eas-cli** instalado y logueado (`eas login`).
+ 3.  **GitHub CLI (gh)** instalado y logueado (`gh auth login`).
+ 
+ ### Comando:
+ `npm run deploy:hotfix`
+ 
+ ### ¿Qué hace internamente?
+ 1.  **Auditoría**: Ejecuta `audit` para asegurar integridad.
+ 2.  **Commit & Tag**: Realiza el commit (con `[skip eas]`) y el tagging de la versión actual.
+ 3.  **Push**: Sube el código y el tag a GitHub.
+ 4.  **Construcción Local**: Llama a `eas build --local` usando tus credenciales de producción.
+ 5.  **Publicación Directa**: Usa `gh` para crear el Release y subir el APK a GitHub de forma inmediata.
+ 
+ *Nota: Al igual que el comando One-Click, este comando asume que ya ejecutaste el **Paso 4 (release:finalize)**.*
  
  ---
  

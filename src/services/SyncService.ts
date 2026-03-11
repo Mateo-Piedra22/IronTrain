@@ -36,6 +36,9 @@ const PULL_UPSERT_ORDER: ReadonlyArray<string> = [
     'notification_reactions',
     'kudos',
     'activity_feed',
+    'activity_seen',
+    'shares_inbox',
+    'friendships',
     'user_exercise_prs',
     'score_events',
 ];
@@ -59,6 +62,8 @@ const TABLES_WITH_SOFT_DELETE: ReadonlySet<string> = new Set([
     'notification_reactions',
     'kudos',
     'activity_feed',
+    'shares_inbox',
+    'friendships',
     'user_exercise_prs',
     'score_events',
 ]);
@@ -69,6 +74,7 @@ const ALLOWED_TABLES = [
     'measurements', 'goals', 'plate_inventory', 'settings',
     'body_metrics', 'badges', 'exercise_badges', 'user_profiles',
     'changelog_reactions', 'notification_reactions', 'kudos', 'activity_feed',
+    'activity_seen', 'shares_inbox', 'friendships',
     'user_exercise_prs', 'score_events'
 ];
 

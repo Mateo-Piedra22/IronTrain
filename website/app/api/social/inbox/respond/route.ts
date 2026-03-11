@@ -36,12 +36,12 @@ export async function POST(req: NextRequest) {
 
         if (action === 'accept') {
             await db.update(schema.sharesInbox)
-                .set({ status: 'accepted', updatedAt: now })
+                .set({ status: 'accepted', updatedAt: now, seenAt: now })
                 .where(eq(schema.sharesInbox.id, inboxId));
         } else {
-            // Reject: set status and soft-delete in single update
+            // Reject: set status, mark as seen and soft-delete
             await db.update(schema.sharesInbox)
-                .set({ status: 'rejected', deletedAt: now, updatedAt: now })
+                .set({ status: 'rejected', deletedAt: now, updatedAt: now, seenAt: now })
                 .where(eq(schema.sharesInbox.id, inboxId));
         }
 

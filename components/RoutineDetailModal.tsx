@@ -10,8 +10,9 @@ import { Routine } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { Calendar, ChevronRight, Dumbbell, Edit3, GripVertical, Plus, Send, Share2, Trash2, User, Users, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors } from '../src/hooks/useColors';
 import { BadgePill } from './ui/BadgePill';
 
@@ -241,8 +242,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
         emptyText: { fontSize: 14, color: colors.textMuted, textAlign: 'center', paddingHorizontal: 32, lineHeight: 20 },
 
         innerOverlay: {
-            flex: 1,
-            backgroundColor: ThemeFx.backdropStrong,
+            flexGrow: 1,
             justifyContent: 'center',
             alignItems: 'center',
             padding: 16,
@@ -729,64 +729,84 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             {/* Edit Routine */}
             {editRoutineVisible && (
                 <Modal transparent visible animationType="fade" onRequestClose={() => setEditRoutineVisible(false)}>
-                    <View style={ss.innerOverlay}>
-                        <View style={ss.formBox}>
-                            <Text style={ss.formTitle}>Editar rutina</Text>
-                            <IronInput label="Nombre" value={editRoutineName} onChangeText={setEditRoutineName} autoFocus />
-                            <IronInput label="Descripción" value={editRoutineDesc} onChangeText={setEditRoutineDesc} multiline numberOfLines={2} />
+                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+                        <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: ThemeFx.backdropStrong }}>
+                            <ScrollView
+                                contentContainerStyle={ss.innerOverlay}
+                                keyboardShouldPersistTaps="handled"
+                                bounces={false}
+                                showsVerticalScrollIndicator={false}
+                            >
+                                <View style={ss.formBox}>
+                                    <Text style={ss.formTitle}>Editar rutina</Text>
+                                    <IronInput label="Nombre" value={editRoutineName} onChangeText={setEditRoutineName} autoFocus />
+                                    <IronInput label="Descripción" value={editRoutineDesc} onChangeText={setEditRoutineDesc} multiline numberOfLines={2} />
 
-                            <View style={ss.formControlRow}>
-                                <View style={ss.formLabelCol}>
-                                    <Text style={ss.formLabelMain}>Hacer Pública</Text>
-                                    <Text style={ss.formLabelSub}>Aparecerá en el Directorio Global para que otros la descarguen.</Text>
+                                    <View style={ss.formControlRow}>
+                                        <View style={ss.formLabelCol}>
+                                            <Text style={ss.formLabelMain}>Hacer Pública</Text>
+                                            <Text style={ss.formLabelSub}>Aparecerá en el Directorio Global para que otros la descarguen.</Text>
+                                        </View>
+                                        <Switch value={editRoutinePublic} onValueChange={setEditRoutinePublic} trackColor={{ true: colors.primary.DEFAULT }} />
+                                    </View>
+
+                                    <View style={ss.rowGap12}>
+                                        <View style={ss.flex1}><IronButton label="Cancelar" variant="ghost" onPress={() => setEditRoutineVisible(false)} /></View>
+                                        <View style={ss.flex1}><IronButton label="Guardar" onPress={handleSaveRoutineEdit} disabled={!editRoutineName.trim()} /></View>
+                                    </View>
                                 </View>
-                                <Switch value={editRoutinePublic} onValueChange={setEditRoutinePublic} trackColor={{ true: colors.primary.DEFAULT }} />
-                            </View>
-
-                            <View style={ss.rowGap12}>
-                                <View style={ss.flex1}><IronButton label="Cancelar" variant="ghost" onPress={() => setEditRoutineVisible(false)} /></View>
-                                <View style={ss.flex1}><IronButton label="Guardar" onPress={handleSaveRoutineEdit} disabled={!editRoutineName.trim()} /></View>
-                            </View>
-                        </View>
-                    </View>
+                            </ScrollView>
+                        </SafeAreaView>
+                    </KeyboardAvoidingView>
                 </Modal>
             )}
 
             {/* Edit Day */}
             {editDayVisible && (
                 <Modal transparent visible animationType="fade" onRequestClose={() => setEditDayVisible(false)}>
-                    <View style={ss.innerOverlay}>
-                        <View style={ss.formBox}>
-                            <Text style={ss.formTitle}>Renombrar día</Text>
-                            <IronInput label="Nombre del día" value={editDayName} onChangeText={setEditDayName} autoFocus />
-                            <View style={ss.rowGap12}>
-                                <View style={ss.flex1}><IronButton label="Cancelar" variant="ghost" onPress={() => setEditDayVisible(false)} /></View>
-                                <View style={ss.flex1}><IronButton label="Guardar" onPress={handleSaveDayEdit} disabled={!editDayName.trim()} /></View>
-                            </View>
-                        </View>
-                    </View>
+                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+                        <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: ThemeFx.backdropStrong }}>
+                            <ScrollView
+                                contentContainerStyle={ss.innerOverlay}
+                                keyboardShouldPersistTaps="handled"
+                                bounces={false}
+                                showsVerticalScrollIndicator={false}
+                            >
+                                <View style={ss.formBox}>
+                                    <Text style={ss.formTitle}>Renombrar día</Text>
+                                    <IronInput label="Nombre del día" value={editDayName} onChangeText={setEditDayName} autoFocus />
+                                    <View style={ss.rowGap12}>
+                                        <View style={ss.flex1}><IronButton label="Cancelar" variant="ghost" onPress={() => setEditDayVisible(false)} /></View>
+                                        <View style={ss.flex1}><IronButton label="Guardar" onPress={handleSaveDayEdit} disabled={!editDayName.trim()} /></View>
+                                    </View>
+                                </View>
+                            </ScrollView>
+                        </SafeAreaView>
+                    </KeyboardAvoidingView>
                 </Modal>
             )}
 
             {/* Exercise Picker */}
             {addExerciseVisible && (
-                <Modal visible transparent animationType="fade" onRequestClose={() => setAddExerciseVisible(false)}>
-                    <View style={ss.overlay}>
-                        <View style={ss.sheet}>
-                            <View style={ss.header}>
-                                <View style={ss.headerTextContainer}>
-                                    <Text style={ss.headerTitle}>Seleccionar ejercicio</Text>
-                                    <Text style={ss.headerSub}>Tocá uno para agregarlo a {selectedDay?.name}</Text>
+                <Modal visible transparent animationType="slide" onRequestClose={() => setAddExerciseVisible(false)}>
+                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+                        <SafeAreaView edges={['top', 'left', 'right']} style={ss.overlay}>
+                            <View style={ss.sheet}>
+                                <View style={ss.header}>
+                                    <View style={ss.headerTextContainer}>
+                                        <Text style={ss.headerTitle}>Seleccionar ejercicio</Text>
+                                        <Text style={ss.headerSub}>Tocá uno para agregarlo a {selectedDay?.name}</Text>
+                                    </View>
+                                    <TouchableOpacity onPress={() => setAddExerciseVisible(false)} style={ss.closeBtn}>
+                                        <X size={18} color={colors.text} />
+                                    </TouchableOpacity>
                                 </View>
-                                <TouchableOpacity onPress={() => setAddExerciseVisible(false)} style={ss.closeBtn}>
-                                    <X size={18} color={colors.text} />
-                                </TouchableOpacity>
+                                <View style={ss.flex1}>
+                                    <ExerciseList onSelect={handleAddExercise} inModal />
+                                </View>
                             </View>
-                            <View style={ss.flex1}>
-                                <ExerciseList onSelect={handleAddExercise} inModal />
-                            </View>
-                        </View>
-                    </View>
+                        </SafeAreaView>
+                    </KeyboardAvoidingView>
                 </Modal>
             )}
             {/* Friend Picker */}

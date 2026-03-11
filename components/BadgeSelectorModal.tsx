@@ -1,10 +1,11 @@
-import { ThemeFx, withAlpha } from '@/src/theme';
+import { withAlpha } from '@/src/theme';
 import { Badge } from '@/src/types/db';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { ChevronLeft, Edit2, Palette, Plus, Search, Trash2, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Dimensions, FlatList, LayoutAnimation, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, UIManager, View } from 'react-native';
+import { Dimensions, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, UIManager, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors } from '../src/hooks/useColors';
 import { badgeService } from '../src/services/BadgeService';
 import { BadgePill } from './ui/BadgePill';
@@ -37,7 +38,8 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
     const [showColorPicker, setShowColorPicker] = useState(false);
 
     const styles = useMemo(() => StyleSheet.create({
-        overlay: { flex: 1, backgroundColor: ThemeFx.backdrop, justifyContent: 'center', alignItems: 'center' },
+        overlay: { flex: 1, backgroundColor: withAlpha(colors.background, '80') },
+        scrollContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 16 },
         container: {
             width: '100%',
             maxWidth: 400,
@@ -89,7 +91,14 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
         sectionTitle: { fontSize: 10, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 12, marginLeft: 4 },
         badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
         badgeItem: { position: 'relative' },
-        badgeItemSelected: { transform: [{ scale: 1.05 }] },
+        badgeItemSelected: {
+            transform: [{ scale: 1.05 }],
+            shadowColor: colors.primary.DEFAULT,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 4,
+        },
         editBadgeIndicator: { position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center', elevation: 2, shadowColor: colors.black, shadowOpacity: 0.1, shadowRadius: 2 },
 
         footer: { padding: 16, borderTopWidth: 1.5, borderTopColor: colors.border, backgroundColor: colors.surface },
@@ -227,169 +236,176 @@ export function BadgeSelectorModal({ visible, onClose, onSave, initialSelectedId
 
     return (
         <Modal visible={visible} animationType="fade" transparent statusBarTranslucent onRequestClose={onClose}>
-            <View style={styles.overlay}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={styles.overlay}
+            >
                 {Platform.OS === 'ios' && (
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                 )}
-                <View style={[styles.container, { padding: 0 }]}>
-                    <View style={styles.header}>
-                        {isCreating ? (
-                            <TouchableOpacity
-                                onPress={() => { setIsCreating(false); setEditingBadge(null); }}
-                                style={styles.headerBtn}
-                            >
-                                <ChevronLeft size={20} color={colors.text} />
-                            </TouchableOpacity>
-                        ) : (
-                            <View style={{ width: 36 }} />
-                        )}
-                        <Text style={styles.headerTitle}>
-                            {isCreating ? (editingBadge ? 'Editar Badge' : 'Nuevo Badge') : 'Badges'}
-                        </Text>
-                        <TouchableOpacity onPress={onClose} style={styles.headerBtn}>
-                            <X size={20} color={colors.text} />
-                        </TouchableOpacity>
-                    </View>
-
-                    {isCreating ? (
-                        <View style={styles.formContent}>
-                            <Text style={styles.label}>Nombre</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={newName}
-                                onChangeText={setNewName}
-                                placeholder="Ej: Barra Z"
-                                placeholderTextColor={colors.textMuted}
-                                autoFocus
-                            />
-
-                            <Text style={styles.label}>Categoría</Text>
-                            <View style={styles.groupPicker}>
-                                {(['equipamiento', 'posicion', 'variacion', 'otro'] as const).map(g => (
+                <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
+                    <ScrollView
+                        contentContainerStyle={styles.scrollContent}
+                        keyboardShouldPersistTaps="handled"
+                        bounces={false}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        <View style={[styles.container, { padding: 0 }]}>
+                            <View style={styles.header}>
+                                {isCreating ? (
                                     <TouchableOpacity
-                                        key={g}
-                                        onPress={() => setNewGroup(g)}
-                                        style={[styles.groupChip, newGroup === g && styles.groupChipActive]}
+                                        onPress={() => { setIsCreating(false); setEditingBadge(null); }}
+                                        style={styles.headerBtn}
                                     >
-                                        <Text style={[styles.groupChipText, newGroup === g && styles.groupChipTextActive]}>
-                                            {g.charAt(0).toUpperCase() + g.slice(1)}
-                                        </Text>
+                                        <ChevronLeft size={20} color={colors.text} />
                                     </TouchableOpacity>
-                                ))}
-                            </View>
-
-                            <Text style={[styles.label, { marginTop: 20 }]}>Visual</Text>
-                            <TouchableOpacity
-                                onPress={() => setShowColorPicker(true)}
-                                style={styles.colorSelector}
-                            >
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                    <View style={[styles.colorDot, { backgroundColor: newColor }]} />
-                                    <Text style={styles.colorHex}>{newColor.toUpperCase()}</Text>
-                                </View>
-                                <Palette size={18} color={colors.textMuted} />
-                            </TouchableOpacity>
-
-                            <View style={styles.previewContainer}>
-                                <Text style={[styles.label, { marginBottom: 12 }]}>Vista Previa</Text>
-                                <BadgePill name={newName || 'Vista Previa'} color={newColor} size="md" variant="vibrant" />
-                            </View>
-
-                            <View style={styles.formFooter}>
-                                {editingBadge && (
-                                    <TouchableOpacity onPress={() => handleDeleteBadge(editingBadge.id)} style={styles.deleteBtn}>
-                                        <Trash2 size={18} color={colors.red} />
-                                    </TouchableOpacity>
+                                ) : (
+                                    <View style={{ width: 36 }} />
                                 )}
-                                <TouchableOpacity
-                                    onPress={handleCreateBadge}
-                                    style={[styles.saveBtn, !newName.trim() && styles.disabledBtn]}
-                                    disabled={!newName.trim()}
-                                >
-                                    <Text style={styles.saveBtnText}>{editingBadge ? 'Guardar' : 'Crear'}</Text>
+                                <Text style={styles.headerTitle}>
+                                    {isCreating ? (editingBadge ? 'Editar Badge' : 'Nuevo Badge') : 'Badges'}
+                                </Text>
+                                <TouchableOpacity onPress={onClose} style={styles.headerBtn}>
+                                    <X size={20} color={colors.text} />
                                 </TouchableOpacity>
                             </View>
-                        </View>
-                    ) : (
-                        <>
-                            <View style={styles.listHeader}>
-                                <View style={styles.searchBar}>
-                                    <Search size={16} color={colors.textMuted} />
+
+                            {isCreating ? (
+                                <View style={styles.formContent}>
+                                    <Text style={styles.label}>Nombre</Text>
                                     <TextInput
-                                        placeholder="Buscar..."
+                                        style={styles.input}
+                                        value={newName}
+                                        onChangeText={setNewName}
+                                        placeholder="Ej: Barra Z"
                                         placeholderTextColor={colors.textMuted}
-                                        value={search}
-                                        onChangeText={setSearch}
-                                        style={styles.searchInput}
+                                        autoFocus
                                     />
-                                </View>
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        setIsCreating(true);
-                                        setNewName('');
-                                        setNewColor(colors.blue);
-                                        setNewGroup('otro');
-                                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                                    }}
-                                    style={styles.addBtn}
-                                >
-                                    <Plus size={20} color={colors.onPrimary} />
-                                </TouchableOpacity>
-                            </View>
 
-                            <FlatList
-                                data={sections}
-                                keyExtractor={([group]) => group}
-                                renderItem={({ item: [group, items] }) => (
-                                    <View style={styles.section}>
-                                        <Text style={styles.sectionTitle}>{group}</Text>
-                                        <View style={styles.badgeGrid}>
-                                            {items.map(badge => {
-                                                const isSelected = selectedIds.includes(badge.id);
-                                                return (
-                                                    <TouchableOpacity
-                                                        key={badge.id}
-                                                        onPress={() => toggleBadge(badge.id)}
-                                                        onLongPress={() => !badge.is_system && startEditing(badge)}
-                                                        style={[
-                                                            styles.badgeItem,
-                                                            isSelected && styles.badgeItemSelected
-                                                        ]}
-                                                    >
-                                                        <BadgePill
-                                                            name={badge.name}
-                                                            color={badge.color}
-                                                            icon={badge.icon || undefined}
-                                                            size="sm"
-                                                            variant={isSelected ? 'vibrant' : 'default'}
-                                                        />
-                                                        {!badge.is_system && isSelected && (
-                                                            <TouchableOpacity onPress={() => startEditing(badge)} style={styles.editBadgeIndicator}>
-                                                                <Edit2 size={8} color={colors.text} />
-                                                            </TouchableOpacity>
-                                                        )}
-                                                    </TouchableOpacity>
-                                                );
-                                            })}
-                                        </View>
+                                    <Text style={styles.label}>Categoría</Text>
+                                    <View style={styles.groupPicker}>
+                                        {(['equipamiento', 'posicion', 'variacion', 'otro'] as const).map(g => (
+                                            <TouchableOpacity
+                                                key={g}
+                                                onPress={() => setNewGroup(g)}
+                                                style={[styles.groupChip, newGroup === g && styles.groupChipActive]}
+                                            >
+                                                <Text style={[styles.groupChipText, newGroup === g && styles.groupChipTextActive]}>
+                                                    {g.charAt(0).toUpperCase() + g.slice(1)}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
                                     </View>
-                                )}
-                                contentContainerStyle={styles.listContent}
-                                style={{ maxHeight: SCREEN_HEIGHT * 0.5 }}
-                            />
 
-                            <View style={styles.footer}>
-                                <TouchableOpacity
-                                    onPress={() => { onSave(selectedIds); onClose(); }}
-                                    style={styles.confirmBtn}
-                                >
-                                    <Text style={styles.confirmBtnText}>Confirmar ({selectedIds.length})</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </>
-                    )}
-                </View>
-            </View>
+                                    <Text style={[styles.label, { marginTop: 20 }]}>Visual</Text>
+                                    <TouchableOpacity
+                                        onPress={() => setShowColorPicker(true)}
+                                        style={styles.colorSelector}
+                                    >
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                            <View style={[styles.colorDot, { backgroundColor: newColor }]} />
+                                            <Text style={styles.colorHex}>{newColor.toUpperCase()}</Text>
+                                        </View>
+                                        <Palette size={18} color={colors.textMuted} />
+                                    </TouchableOpacity>
+
+                                    <View style={styles.previewContainer}>
+                                        <Text style={[styles.label, { marginBottom: 12 }]}>Vista Previa</Text>
+                                        <BadgePill name={newName || 'Vista Previa'} color={newColor} size="lg" />
+                                    </View>
+
+                                    <View style={styles.formFooter}>
+                                        {editingBadge && (
+                                            <TouchableOpacity onPress={() => handleDeleteBadge(editingBadge.id)} style={styles.deleteBtn}>
+                                                <Trash2 size={18} color={colors.red} />
+                                            </TouchableOpacity>
+                                        )}
+                                        <TouchableOpacity
+                                            onPress={handleCreateBadge}
+                                            style={[styles.saveBtn, !newName.trim() && styles.disabledBtn]}
+                                            disabled={!newName.trim()}
+                                        >
+                                            <Text style={styles.saveBtnText}>{editingBadge ? 'Guardar' : 'Crear'}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            ) : (
+                                <>
+                                    <View style={styles.listHeader}>
+                                        <View style={styles.searchBar}>
+                                            <Search size={16} color={colors.textMuted} />
+                                            <TextInput
+                                                placeholder="Buscar..."
+                                                placeholderTextColor={colors.textMuted}
+                                                value={search}
+                                                onChangeText={setSearch}
+                                                style={styles.searchInput}
+                                            />
+                                        </View>
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                setIsCreating(true);
+                                                setNewName('');
+                                                setNewColor(colors.blue);
+                                                setNewGroup('otro');
+                                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                            }}
+                                            style={styles.addBtn}
+                                        >
+                                            <Plus size={20} color={colors.onPrimary} />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={[styles.listContent, { maxHeight: SCREEN_HEIGHT * 0.5 }]}>
+                                        {sections.map(([group, items]) => (
+                                            <View key={group} style={styles.section}>
+                                                <Text style={styles.sectionTitle}>{group}</Text>
+                                                <View style={styles.badgeGrid}>
+                                                    {items.map(badge => {
+                                                        const isSelected = selectedIds.includes(badge.id);
+                                                        return (
+                                                            <TouchableOpacity
+                                                                key={badge.id}
+                                                                onPress={() => toggleBadge(badge.id)}
+                                                                onLongPress={() => !badge.is_system && startEditing(badge)}
+                                                                style={[
+                                                                    styles.badgeItem,
+                                                                    isSelected && styles.badgeItemSelected
+                                                                ]}
+                                                            >
+                                                                <BadgePill
+                                                                    name={badge.name}
+                                                                    color={badge.color}
+                                                                    icon={badge.icon || undefined}
+                                                                    size="md"
+                                                                />
+                                                                {!badge.is_system && isSelected && (
+                                                                    <TouchableOpacity onPress={() => startEditing(badge)} style={styles.editBadgeIndicator}>
+                                                                        <Edit2 size={8} color={colors.text} />
+                                                                    </TouchableOpacity>
+                                                                )}
+                                                            </TouchableOpacity>
+                                                        );
+                                                    })}
+                                                </View>
+                                            </View>
+                                        ))}
+                                    </View>
+
+                                    <View style={styles.footer}>
+                                        <TouchableOpacity
+                                            onPress={() => { onSave(selectedIds); onClose(); }}
+                                            style={styles.confirmBtn}
+                                        >
+                                            <Text style={styles.confirmBtnText}>Confirmar ({selectedIds.length})</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </>
+                            )}
+                        </View>
+                    </ScrollView>
+                </SafeAreaView>
+            </KeyboardAvoidingView>
 
             <ColorPicker
                 visible={showColorPicker}

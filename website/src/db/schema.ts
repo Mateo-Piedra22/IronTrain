@@ -213,6 +213,7 @@ export const sharesInbox = pgTable('shares_inbox', {
     payload: text('payload').notNull(), // JSON string representing the Routine/Exercise
     type: text('type').notNull(), // 'routine'
     status: text('status').notNull().default('pending'), // 'pending', 'accepted', 'rejected'
+    seenAt: timestamp('seen_at'),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
 });
@@ -226,7 +227,16 @@ export const activityFeed = pgTable('activity_feed', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
+    seenAt: timestamp('seen_at'), // Backwards compatibility for personal-only views
     kudoCount: integer('kudo_count').default(0).notNull(),
+});
+
+export const activitySeen = pgTable('activity_seen', {
+    id: text('id').primaryKey(), // user_id + activity_id
+    userId: text('user_id').notNull(),
+    activityId: text('activity_id').notNull(),
+    seenAt: timestamp('seen_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
 export const kudos = pgTable('kudos', {
