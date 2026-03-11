@@ -6,27 +6,25 @@ import { useColors } from '../../src/hooks/useColors';
 interface SafeAreaWrapperProps extends SafeAreaViewProps {
   children: React.ReactNode;
   centered?: boolean;
-  className?: string;
-  contentClassName?: string;
+  contentStyle?: any;
 }
 
-export function SafeAreaWrapper({ children, style, edges = ['top', 'left', 'right'], centered = false, className, contentClassName, ...props }: SafeAreaWrapperProps) {
+export function SafeAreaWrapper({ children, style, edges = ['top', 'left', 'right'], centered = false, contentStyle, ...props }: SafeAreaWrapperProps) {
   const colors = useColors();
   return (
     <SafeAreaView
-      className={`flex-1 ${className || ''}`}
-      style={[{ backgroundColor: colors.background }, style]}
+      style={[{ flex: 1, backgroundColor: colors.background }, style]}
       edges={edges}
       {...props}
     >
       {centered ? (
-        <View className="flex-1 w-full items-center">
-          <View className={`flex-1 w-full max-w-[600px] ${contentClassName || ''}`}>
+        <View style={{ flex: 1, width: '100%', alignItems: 'center' }}>
+          <View style={[{ flex: 1, width: '100%', maxWidth: 600 }, contentStyle]}>
             {children}
           </View>
         </View>
       ) : (
-        <View className={`flex-1 w-full ${contentClassName || ''}`}>
+        <View style={[{ flex: 1, width: '100%' }, contentStyle]}>
           {children}
         </View>
       )}

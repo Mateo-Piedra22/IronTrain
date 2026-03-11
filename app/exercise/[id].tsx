@@ -627,7 +627,7 @@ export default function ExerciseDetailScreen() {
         if (!workoutId) return <View style={{ paddingVertical: 40, alignItems: 'center' }}><Text style={{ color: colors.textMuted, fontWeight: '700' }}>No active workout</Text></View>;
 
         return (
-            <IronCard className="mb-4">
+            <IronCard style={{ marginBottom: 16 }}>
                 {workoutLocked && (
                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: withAlpha(colors.red, '10'), borderRadius: 12, borderWidth: 1, borderColor: withAlpha(colors.red, '25'), padding: 12, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: colors.red }}>
                         <Info size={14} color={colors.red} style={{ marginRight: 8, marginTop: 2 }} />
@@ -934,12 +934,12 @@ export default function ExerciseDetailScreen() {
             {analysisTab === 'overview' ? (
                 <View style={{ gap: 20 }}>
                     <View style={{ flexDirection: 'row', gap: 10 }}>
-                        <IronCard className="flex-1">
+                        <IronCard style={{ flex: 1 }}>
                             <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>Sesiones (30d)</Text>
                             <Text style={{ color: colors.text, fontSize: 24, fontWeight: '900', marginTop: 4 }}>{insights.sessions30}</Text>
                             <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700' }}>última: {insights.daysSince == null ? '—' : `${insights.daysSince}d`}</Text>
                         </IronCard>
-                        <IronCard className="flex-1">
+                        <IronCard style={{ flex: 1 }}>
                             <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                                 {exType === 'distance_time'
                                     ? cardioMetric === 'distance' ? 'Mejor distancia' : cardioMetric === 'time' ? 'Mayor tiempo' : cardioMetric === 'pace' ? 'Mejor ritmo' : 'Mejor velocidad'

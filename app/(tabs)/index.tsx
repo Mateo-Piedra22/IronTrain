@@ -325,7 +325,7 @@ export default function DailyLogScreen() {
 
       {
         loading ? (
-          <View className="flex-1 items-center justify-center">
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
           </View>
         ) : (

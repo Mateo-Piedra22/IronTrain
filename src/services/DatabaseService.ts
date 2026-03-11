@@ -265,12 +265,6 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
       CREATE INDEX IF NOT EXISTS idx_routine_days_routine ON routine_days(routine_id);
       CREATE INDEX IF NOT EXISTS idx_routine_exercises_day ON routine_exercises(routine_day_id);
-      CREATE INDEX IF NOT EXISTS idx_friendships_user ON friendships(user_id);
-      CREATE INDEX IF NOT EXISTS idx_friendships_friend ON friendships(friend_id);
-      CREATE INDEX IF NOT EXISTS idx_activity_feed_user ON activity_feed(user_id);
-      CREATE INDEX IF NOT EXISTS idx_activity_seen_user ON activity_seen(user_id);
-      CREATE INDEX IF NOT EXISTS idx_activity_seen_activity ON activity_seen(activity_id);
-      CREATE INDEX IF NOT EXISTS idx_shares_receiver ON shares_inbox(receiver_id);
 
       CREATE TABLE IF NOT EXISTS user_profiles (
         id TEXT PRIMARY KEY NOT NULL,
@@ -393,6 +387,13 @@ export class DatabaseService {
         seen_at INTEGER,
         kudo_count INTEGER DEFAULT 0 NOT NULL
       );
+
+      CREATE INDEX IF NOT EXISTS idx_friendships_user ON friendships(user_id);
+      CREATE INDEX IF NOT EXISTS idx_friendships_friend ON friendships(friend_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_feed_user ON activity_feed(user_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_seen_user ON activity_seen(user_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_seen_activity ON activity_seen(activity_id);
+      CREATE INDEX IF NOT EXISTS idx_shares_receiver ON shares_inbox(receiver_id);
     `;
 
         await this.executeRaw(schema);
@@ -1084,9 +1085,22 @@ export class DatabaseService {
                 );
             `);
 
+            await this.executeRaw(`
+                CREATE TABLE IF NOT EXISTS friendships (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    user_id TEXT NOT NULL,
+                    friend_id TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    updated_at INTEGER NOT NULL,
+                    deleted_at INTEGER
+                );
+            `);
+
             await this.executeRaw('CREATE INDEX IF NOT EXISTS idx_activity_seen_user ON activity_seen(user_id)');
             await this.executeRaw('CREATE INDEX IF NOT EXISTS idx_activity_seen_activity ON activity_seen(activity_id)');
             await this.executeRaw('CREATE INDEX IF NOT EXISTS idx_shares_receiver ON shares_inbox(receiver_id)');
+            await this.executeRaw('CREATE INDEX IF NOT EXISTS idx_friendships_user ON friendships(user_id)');
+            await this.executeRaw('CREATE INDEX IF NOT EXISTS idx_friendships_friend ON friendships(friend_id)');
         } catch (e) {
             logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 23 failed' });
         }

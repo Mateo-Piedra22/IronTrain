@@ -1,5 +1,6 @@
 import { IronButton } from '@/components/IronButton';
 import { BadgePill } from '@/components/ui/BadgePill';
+import { ModalScreenOverlayHost } from '@/components/ui/ModalScreenOverlayHost';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { routineService } from '@/src/services/RoutineService';
 import { notify } from '@/src/utils/notify';
@@ -396,47 +397,52 @@ export default function ShareRoutineScreen() {
 
     if (loading) {
         return (
-            <SafeAreaWrapper style={styles.screen} edges={['top']}>
-                <View style={styles.centered}>
-                    <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
-                    <Text style={styles.loadingText}>Conectando con IronTrain...</Text>
-                </View>
-            </SafeAreaWrapper>
+            <ModalScreenOverlayHost>
+                <SafeAreaWrapper style={styles.screen} edges={['top']}>
+                    <View style={styles.centered}>
+                        <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
+                        <Text style={styles.loadingText}>Conectando con IronTrain...</Text>
+                    </View>
+                </SafeAreaWrapper>
+            </ModalScreenOverlayHost>
         );
     }
 
     if (error || !payload) {
         return (
-            <SafeAreaWrapper style={styles.screen} edges={['top']}>
-                <View style={styles.centered}>
-                    <View style={styles.errorIconBox}>
-                        <AlertCircle size={48} color={colors.red} />
+            <ModalScreenOverlayHost>
+                <SafeAreaWrapper style={styles.screen} edges={['top']}>
+                    <View style={styles.centered}>
+                        <View style={styles.errorIconBox}>
+                            <AlertCircle size={48} color={colors.red} />
+                        </View>
+                        <Text style={styles.errorTitle}>Rutina Inaccesible</Text>
+                        <Text style={styles.errorText}>{error}</Text>
+                        <TouchableOpacity onPress={() => router.back()} style={styles.errorBtn}>
+                            <Text style={styles.errorBtnText}>Volver</Text>
+                        </TouchableOpacity>
                     </View>
-                    <Text style={styles.errorTitle}>Rutina Inaccesible</Text>
-                    <Text style={styles.errorText}>{error}</Text>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.errorBtn}>
-                        <Text style={styles.errorBtnText}>Volver</Text>
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaWrapper>
+                </SafeAreaWrapper>
+            </ModalScreenOverlayHost>
         );
     }
 
     const { routine, routine_days, routine_exercises, exercises, badges, exercise_badges } = payload;
 
     return (
-        <SafeAreaWrapper style={styles.screen} edges={['top', 'bottom']}>
-            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                {/* Custom Floating Header Style (Matching Changelog) */}
-                <View style={styles.headerRow}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                        <ChevronLeft size={20} color={colors.text} />
-                    </TouchableOpacity>
-                    <View>
-                        <Text style={styles.pageTitle}>Vista Previa</Text>
-                        <Text style={styles.pageSub}>IMPORTAR RUTINA</Text>
+        <ModalScreenOverlayHost>
+            <SafeAreaWrapper style={styles.screen} edges={['top', 'bottom']}>
+                <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                    {/* Custom Floating Header Style (Matching Changelog) */}
+                    <View style={styles.headerRow}>
+                        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                            <ChevronLeft size={20} color={colors.text} />
+                        </TouchableOpacity>
+                        <View>
+                            <Text style={styles.pageTitle}>Vista Previa</Text>
+                            <Text style={styles.pageSub}>IMPORTAR RUTINA</Text>
+                        </View>
                     </View>
-                </View>
 
                 {/* Hero Info Section */}
                 <View style={styles.heroSection}>
@@ -553,7 +559,8 @@ export default function ShareRoutineScreen() {
                         <Text style={styles.cancelBtnText}>Volver a la app</Text>
                     </TouchableOpacity>
                 </View>
-            </ScrollView>
-        </SafeAreaWrapper>
+                </ScrollView>
+            </SafeAreaWrapper>
+        </ModalScreenOverlayHost>
     );
 }

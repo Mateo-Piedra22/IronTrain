@@ -34,7 +34,7 @@ const showOsNotification = async (title: string, message: string) => {
 };
 
 export const notify = {
-    toast: (title: string, message?: string, type: ToastType = 'info', duration: number = 3000) => {
+    toast: (title: string, message?: string, type: ToastType = 'info', duration: number = 3000, onPress?: () => void) => {
         // Haptic feedback strategy based on type
         if (type === 'success') {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
@@ -51,7 +51,7 @@ export const notify = {
             return 'os_notify';
         }
 
-        return useNotificationStore.getState().addToast({ title, message, type, duration });
+        return useNotificationStore.getState().addToast({ title, message, type, duration, onPress });
     },
     success: (title: string, message?: string, duration?: number) => notify.toast(title, message, 'success', duration),
     error: (title: string, message?: string, duration?: number) => notify.toast(title, message, 'error', duration ?? 5000), // Errors stay longer

@@ -9,6 +9,7 @@ export interface ToastMessage {
     title: string;
     message?: string;
     duration: number;
+    onPress?: () => void;
 }
 
 export interface BannerMessage {

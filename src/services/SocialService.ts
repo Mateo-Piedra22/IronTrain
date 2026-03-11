@@ -268,7 +268,7 @@ export class SocialService {
 
                 // Per-user global tracking record (If viewing a friend's activity)
                 if (userId) {
-                    const seenId = `${userId}-${id}`;
+                    const seenId = `${userId}_${id}`;
                     await dbService.run(
                         'INSERT OR REPLACE INTO activity_seen (id, user_id, activity_id, seen_at, updated_at) VALUES (?, ?, ?, ?, ?)',
                         [seenId, userId, id, now, now]
@@ -291,8 +291,8 @@ export class SocialService {
             logger.warn('[SocialService] Local markAsSeen failed (record may not be in local DB)', { id, feedType });
         }
 
-        // Emit local event for immediate UI refresh
-        dataEventService.emit('SOCIAL_UPDATED');
+        // Track server update status
+        let serverUpdated = false;
 
         try {
             const headers = await this.getHeaders();
@@ -301,11 +301,18 @@ export class SocialService {
                 headers,
                 body: JSON.stringify({ id, feedType }),
             });
-            return data.success;
+            serverUpdated = data.success;
         } catch (e) {
-            // If offline, we return true because we've queued the sync
-            return true;
+            // Log but continue; local DB and sync queue are already handled
+            logger.info('[SocialService] Server markAsSeen pending (will sync)', { id, feedType });
         }
+
+        // Emit local event AFTER server request (successful or failed-but-queued)
+        // This ensures that when subscribers (like SocialTab) reload data, 
+        // they fetch the updated state from the server/synced pool.
+        dataEventService.emit('SOCIAL_UPDATED');
+
+        return true;
     }
 
     static async respondInbox(inboxId: string, action: 'accept' | 'reject') {

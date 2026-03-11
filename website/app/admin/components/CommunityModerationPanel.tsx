@@ -132,6 +132,18 @@ export default function CommunityModerationPanel({ routines, feedback }: Communi
                                 <div className="text-[9px] font-mono opacity-40">{new Date(f.createdAt).toLocaleDateString()}</div>
                             </div>
 
+                            {f.metadata?.subject && (
+                                <div className="mb-2 text-[10px] font-black uppercase flex items-center gap-1.5 text-[#1a1a2e]">
+                                    <Hash className="w-3 h-3 opacity-40" /> {f.metadata.subject}
+                                </div>
+                            )}
+
+                            {f.metadata?.contactEmail && (
+                                <div className="mb-3 text-[9px] font-mono bg-[#1a1a2e]/5 px-2 py-1 inline-block opacity-60">
+                                    {f.metadata.contactEmail}
+                                </div>
+                            )}
+
                             <p className="text-xs font-bold leading-tight mb-4 min-h-[40px]">"{f.message}"</p>
 
                             <div className="flex items-center justify-between mt-auto">
@@ -145,6 +157,7 @@ export default function CommunityModerationPanel({ routines, feedback }: Communi
                                 {f.status !== 'resolved' ? (
                                     <form action={markFeedbackStatus}>
                                         <input type="hidden" name="id" value={f.id} />
+                                        <input type="hidden" name="status" value="resolved" />
                                         <button type="submit" className="flex items-center gap-1 bg-green-400 px-2 py-1 text-[8px] font-black uppercase hover:bg-[#1a1a2e] hover:text-white transition-colors">
                                             <Check className="w-3 h-3" /> MARK_SOLVED
                                         </button>

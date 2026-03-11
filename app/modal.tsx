@@ -1,3 +1,4 @@
+import { ModalScreenOverlayHost } from '@/components/ui/ModalScreenOverlayHost';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { useColors } from '@/src/hooks/useColors';
 import { ThemeFx } from '@/src/theme';
@@ -63,20 +64,22 @@ export default function ModalScreen() {
   }), [colors]);
 
   return (
-    <SafeAreaWrapper style={ss.container}>
-      <View style={ss.brand}>
-        <Text style={ss.title}>IronTrain</Text>
-        <Text style={ss.tagline}>Strength Evolved</Text>
-      </View>
+    <ModalScreenOverlayHost>
+      <SafeAreaWrapper style={ss.container}>
+        <View style={ss.brand}>
+          <Text style={ss.title}>IronTrain</Text>
+          <Text style={ss.tagline}>Strength Evolved</Text>
+        </View>
 
-      <View style={ss.quoteCard}>
-        <Text style={ss.quoteText}>
-          "IronTrain is designed for purists. No nonsense, just heavy Iron and progress."
-        </Text>
-        <Text style={ss.quoteAuthor}>- The IronTeam</Text>
-      </View>
+        <View style={ss.quoteCard}>
+          <Text style={ss.quoteText}>
+            "IronTrain is designed for purists. No nonsense, just heavy Iron and progress."
+          </Text>
+          <Text style={ss.quoteAuthor}>- The IronTeam</Text>
+        </View>
 
-      <StatusBar style={Platform.OS === 'ios' ? (colors.isDark ? 'light' : 'dark') : 'auto'} />
-    </SafeAreaWrapper>
+        <StatusBar style={Platform.OS === 'ios' ? (colors.isDark ? 'light' : 'dark') : 'auto'} />
+      </SafeAreaWrapper>
+    </ModalScreenOverlayHost>
   );
 }

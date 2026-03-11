@@ -32,6 +32,7 @@ import { useColors } from '../../src/hooks/useColors';
 
 import { configService } from '@/src/services/ConfigService';
 import { useSettingsStore } from '@/src/store/useSettingsStore';
+import { dedupeByInboxKey, getInboxKey } from '@/src/utils/dedupe';
 
 type SocialTabKey = 'leaderboard' | 'friends' | 'inbox' | 'search';
 const USERNAME_REGEX = /^[a-z0-9_]+$/;
@@ -155,6 +156,37 @@ export default function SocialTab() {
             borderWidth: 1.5,
             borderColor: colors.border,
             ...ThemeFx.shadowSm,
+        },
+        headerLeft: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            zIndex: 10,
+            flex: 1,
+        },
+        headerLoadingWrapper: {
+            marginLeft: 12,
+        },
+        headerCenterIconWrapper: {
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+        },
+        headerCenterIcon: {
+            width: 100,
+            height: 100,
+            resizeMode: 'contain',
+        },
+        headerActionsBox: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            zIndex: 10,
+            flex: 0,
         },
         scrollContent: {
             paddingHorizontal: 20,
@@ -617,8 +649,8 @@ export default function SocialTab() {
         },
         premiumBtnTextPrimary: {
             color: colors.onPrimary,
-            fontWeight: '900',
             fontSize: 14,
+            fontWeight: '900',
             textTransform: 'uppercase',
             letterSpacing: 1,
         },
@@ -1370,6 +1402,69 @@ export default function SocialTab() {
             backgroundColor: withAlpha(colors.textMuted, '10'),
             borderRadius: 10,
         },
+        // Collapsible Profile Styles
+        mainScroll: {
+            flex: 1,
+        },
+        mainScrollContent: {
+            paddingHorizontal: 20,
+            paddingBottom: 100,
+            paddingTop: 20,
+            flexGrow: 1,
+        },
+        profileHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+        },
+        profileHeaderExpanded: {
+            marginBottom: 16,
+        },
+        profileInfoWrapper: {
+            flex: 1,
+            marginRight: 12,
+        },
+        profileBadgesRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+        },
+        metaSummaryRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginTop: 12,
+            gap: 8,
+            backgroundColor: colors.surfaceLighter,
+            alignSelf: 'flex-start',
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: colors.border,
+        },
+        metaSummaryText: {
+            fontSize: 13,
+            color: colors.textMuted,
+            fontWeight: '800',
+        },
+        toggleCollapseWrapper: {
+            marginTop: 12,
+            alignSelf: 'center',
+            width: 64,
+            height: 28,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: colors.surfaceLighter,
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: withAlpha(colors.border, '50'),
+        },
+        expandedDetails: {
+            marginTop: 8,
+        },
+        badgeSmall: {
+            paddingHorizontal: 8,
+        },
     }), [colors]);
     const [profile, setProfile] = useState<SocialProfile | null>(null);
     const [friends, setFriends] = useState<SocialFriend[]>([]);
@@ -1395,6 +1490,7 @@ export default function SocialTab() {
     const [profileSaving, setProfileSaving] = useState(false);
     const [trainingDays, setTrainingDays] = useState<number[]>([]);
     const [isGoalsExpanded, setIsGoalsExpanded] = useState(false);
+    const [isProfileExpanded, setIsProfileExpanded] = useState(false);
     const [isScoreModalVisible, setIsScoreModalVisible] = useState(false);
     const [isEventModalVisible, setIsEventModalVisible] = useState(false);
     const [isWeatherModalVisible, setIsWeatherModalVisible] = useState(false);
@@ -1419,7 +1515,11 @@ export default function SocialTab() {
                 weatherBonus: prof.weatherBonus || prev?.weatherBonus || null
             }));
             setFriends(fr);
-            setInbox(inb);
+            // Deduplicate and filter out potentially corrupt data
+            const uniqueInb = dedupeByInboxKey(inb);
+
+            // Re-apply optimistic local "seen" if a markers is pending
+            setInbox(uniqueInb);
             setLeaderboard(lb);
         } catch {
             confirm.error('Error', 'No se pudieron cargar los datos sociales.');
@@ -1797,9 +1897,18 @@ export default function SocialTab() {
         executeFriendAction(action);
     };
 
+    const pendingInboxCount = inbox.filter(i => i.status === 'pending').length;
+
+    // Sincronizar badge de la pestaña
+    useEffect(() => {
+        navigation.setOptions({
+            tabBarBadge: pendingInboxCount > 0 ? pendingInboxCount : undefined
+        });
+    }, [pendingInboxCount, navigation]);
+
     if (!authState.token) {
         return (
-            <SafeAreaWrapper style={styles.container} centered contentClassName="items-center justify-center">
+            <SafeAreaWrapper style={styles.container} centered contentStyle={{ alignItems: 'center', justifyContent: 'center' }}>
                 <View style={styles.loggedOutContainer}>
                     <View style={styles.loggedOutIcon}>
                         <Globe size={48} color={colors.textMuted} />
@@ -1819,28 +1928,24 @@ export default function SocialTab() {
         );
     }
 
-    const pendingInboxCount = inbox.filter(i => i.status === 'pending').length;
-
-    // Sincronizar badge de la pestaña
-    useEffect(() => {
-        navigation.setOptions({
-            tabBarBadge: pendingInboxCount > 0 ? pendingInboxCount : undefined
-        });
-    }, [pendingInboxCount, navigation]);
-
     return (
         <SafeAreaWrapper style={styles.container}>
             <View style={styles.header}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
+                <View style={styles.headerLeft}>
                     <Text style={styles.title}>IronSocial</Text>
+                    {loading && (
+                        <View style={styles.headerLoadingWrapper}>
+                            <ActivityIndicator size="small" color={colors.primary.DEFAULT} />
+                        </View>
+                    )}
                 </View>
-                <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                <View style={styles.headerCenterIconWrapper}>
                     <Image
                         source={require('../../assets/images/icon.png')}
-                        style={{ width: 100, height: 100, resizeMode: 'contain' }}
+                        style={styles.headerCenterIcon}
                     />
                 </View>
-                <View style={styles.headerActions}>
+                <View style={styles.headerActionsBox}>
                     <TouchableOpacity style={styles.headerIconBtn} onPress={() => router.push('/settings' as any)}>
                         <Settings size={20} color={colors.primary.DEFAULT} />
                     </TouchableOpacity>
@@ -1848,117 +1953,141 @@ export default function SocialTab() {
                         <Globe size={16} color={colors.onPrimary} />
                         <Text style={styles.publicBtnText}>Públicas</Text>
                     </TouchableOpacity>
-                    {loading && <ActivityIndicator size="small" color={colors.primary.DEFAULT} />}
                 </View>
             </View>
 
             <ScrollView
-                contentContainerStyle={styles.scrollContent}
+                style={styles.mainScroll}
+                contentContainerStyle={styles.mainScrollContent}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
             >
                 {profile && (
                     <View style={styles.profileCard}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.profileName}>{profile.displayName}</Text>
-                                {profile.username && (
-                                    <Text style={styles.profileUsername}>@{profile.username}</Text>
-                                )}
-                            </View>
-
-                            <View style={styles.bonusColumn}>
-                                {profile.activeEvent && (
-                                    <TouchableOpacity
-                                        style={styles.eventBadge}
-                                        onPress={() => setIsEventModalVisible(true)}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Zap size={10} color={colors.text} fill={colors.text} />
-                                        <Text style={styles.eventBadgeText}>Evento {profile.activeEvent.multiplier}x</Text>
-                                    </TouchableOpacity>
-                                )}
-                                <TouchableOpacity
-                                    style={profile.weatherBonus?.isActive ? styles.weatherBadge : styles.locationBadge}
-                                    onPress={() => refreshingLocation ? null : handleRefreshLocation(false)}
-                                    activeOpacity={0.7}
-                                    disabled={refreshingLocation}
-                                >
-                                    {refreshingLocation ? (
-                                        <ActivityIndicator size={10} color={colors.textMuted} />
-                                    ) : profile.weatherBonus?.isActive ? (
-                                        <CloudRain size={10} color={colors.onPrimary} />
-                                    ) : locationPermissionDenied ? (
-                                        <MapPinOff size={10} color={colors.textMuted} />
-                                    ) : (
-                                        <MapPin size={10} color={colors.textMuted} />
-                                    )}
-                                    <Text style={profile.weatherBonus?.isActive ? styles.weatherBadgeText : styles.locationBadgeText}>
-                                        {refreshingLocation ? 'Localizando...' :
-                                            profile.weatherBonus?.isActive ? 'Voluntad de Hierro' :
-                                                locationPermissionDenied ? 'Ubicación desactivada' :
-                                                    (profile.weatherBonus?.location || 'Activar ubicación')}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-
-                        <Text style={styles.profileStats}>Rutinas compartidas: {profile.shareStats || 0}</Text>
-                        <View style={styles.profileMetaRow}>
-                            <View style={styles.profileVisibilityBadge}>
-                                {profile.isPublic === 0 ? <LockIcon size={14} color={colors.textMuted} /> : <Globe size={14} color={colors.primary.DEFAULT} />}
-                                <Text style={styles.profileVisibilityText}>{profile.isPublic === 0 ? 'Perfil Privado' : 'Perfil Público'}</Text>
-                            </View>
-                            <TouchableOpacity style={styles.profileEditBtn} onPress={openProfileModal}>
-                                <ShieldIcon size={14} color={colors.onPrimary} />
-                                <Text style={styles.profileEditBtnText}>Editar Perfil</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <TouchableOpacity style={styles.idBox} onPress={handleCopyId}>
-                            <Text style={styles.idText} numberOfLines={1} ellipsizeMode="middle">ID: {profile.id}</Text>
-                            <Copy size={16} color={colors.textMuted} />
-                        </TouchableOpacity>
-
                         <TouchableOpacity
-                            style={styles.goalsTrigger}
-                            onPress={() => setIsGoalsExpanded(!isGoalsExpanded)}
+                            onPress={() => setIsProfileExpanded(!isProfileExpanded)}
+                            activeOpacity={0.9}
                         >
-                            <View style={styles.goalsTriggerLeft}>
-                                <CalendarDays size={18} color={colors.primary.DEFAULT} />
-                                <Text style={styles.goalsTriggerTitle}>Mi Meta Semanal</Text>
-                            </View>
-                            <View style={styles.goalsTriggerRight}>
-                                <Text style={styles.goalsSummaryText}>{trainingDays.length} días</Text>
-                                {isGoalsExpanded ? <ChevronUp size={18} color={colors.textMuted} /> : <ChevronDown size={18} color={colors.textMuted} />}
-                            </View>
-                        </TouchableOpacity>
+                            <View style={[styles.profileHeader, isProfileExpanded && styles.profileHeaderExpanded]}>
+                                <View style={styles.profileInfoWrapper}>
+                                    <Text style={styles.profileName} numberOfLines={1}>{profile.displayName}</Text>
+                                    {profile.username && (
+                                        <Text style={styles.profileUsername} numberOfLines={1}>@{profile.username}</Text>
+                                    )}
+                                </View>
 
-                        {isGoalsExpanded && (
-                            <View style={styles.goalsExpanded}>
-                                <Text style={styles.goalsDesc}>
-                                    Seleccioná los días que planeás entrenar. Los días no marcados como entrenamiento no cortarán tu racha de puntuación.
-                                </Text>
-                                <View style={styles.daysRow}>
-                                    {[
-                                        { id: 1, label: 'L' }, { id: 2, label: 'M' }, { id: 3, label: 'X' },
-                                        { id: 4, label: 'J' }, { id: 5, label: 'V' }, { id: 6, label: 'S' },
-                                        { id: 0, label: 'D' }
-                                    ].map(day => {
-                                        const isSelected = trainingDays.includes(day.id);
-                                        return (
-                                            <TouchableOpacity
-                                                key={day.id}
-                                                onPress={() => handleToggleTrainingDay(day.id)}
-                                                style={[styles.dayChip, isSelected && styles.dayChipActive]}
-                                                activeOpacity={0.7}
-                                            >
-                                                <Text style={[styles.dayChipText, isSelected && styles.dayChipTextActive]}>{day.label}</Text>
-                                            </TouchableOpacity>
-                                        );
-                                    })}
+                                <View style={styles.bonusColumn}>
+                                    {profile.activeEvent && (
+                                        <TouchableOpacity
+                                            style={styles.eventBadge}
+                                            onPress={() => setIsEventModalVisible(true)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Zap size={10} color={colors.text} fill={colors.text} />
+                                            <Text style={styles.eventBadgeText}>Evento {profile.activeEvent.multiplier}x</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    <TouchableOpacity
+                                        style={profile.weatherBonus?.isActive ? styles.weatherBadge : styles.locationBadge}
+                                        onPress={() => refreshingLocation ? null : handleRefreshLocation(false)}
+                                        activeOpacity={0.7}
+                                        disabled={refreshingLocation}
+                                    >
+                                        {refreshingLocation ? (
+                                            <ActivityIndicator size={10} color={colors.textMuted} />
+                                        ) : profile.weatherBonus?.isActive ? (
+                                            <CloudRain size={10} color={colors.onPrimary} />
+                                        ) : locationPermissionDenied ? (
+                                            <MapPinOff size={10} color={colors.textMuted} />
+                                        ) : (
+                                            <MapPin size={10} color={colors.textMuted} />
+                                        )}
+                                        <Text style={profile.weatherBonus?.isActive ? styles.weatherBadgeText : styles.locationBadgeText}>
+                                            {refreshingLocation ? 'Localizando...' :
+                                                profile.weatherBonus?.isActive ? 'Voluntad de Hierro' :
+                                                    locationPermissionDenied ? 'Ubicación desactivada' :
+                                                        (profile.weatherBonus?.location || 'Activar ubicación')}
+                                        </Text>
+                                    </TouchableOpacity>
                                 </View>
                             </View>
+
+                            {!isProfileExpanded && (
+                                <View style={styles.metaSummaryRow}>
+                                    <CalendarDays size={14} color={colors.primary.DEFAULT} />
+                                    <Text style={styles.metaSummaryText}>Meta: {trainingDays.length} días</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+
+                        {isProfileExpanded && (
+                            <View style={styles.expandedDetails}>
+                                <Text style={styles.profileStats}>Rutinas compartidas: {profile.shareStats || 0}</Text>
+                                <View style={styles.profileMetaRow}>
+                                    <View style={styles.profileVisibilityBadge}>
+                                        {profile.isPublic === 0 ? <LockIcon size={14} color={colors.textMuted} /> : <Globe size={14} color={colors.primary.DEFAULT} />}
+                                        <Text style={styles.profileVisibilityText}>{profile.isPublic === 0 ? 'Perfil Privado' : 'Perfil Público'}</Text>
+                                    </View>
+                                    <TouchableOpacity style={styles.profileEditBtn} onPress={openProfileModal}>
+                                        <ShieldIcon size={14} color={colors.onPrimary} />
+                                        <Text style={styles.profileEditBtnText}>Editar Perfil</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <TouchableOpacity style={styles.idBox} onPress={handleCopyId}>
+                                    <Text style={styles.idText} numberOfLines={1} ellipsizeMode="middle">ID: {profile.id}</Text>
+                                    <Copy size={16} color={colors.textMuted} />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.goalsTrigger}
+                                    onPress={() => setIsGoalsExpanded(!isGoalsExpanded)}
+                                >
+                                    <View style={styles.goalsTriggerLeft}>
+                                        <CalendarDays size={18} color={colors.primary.DEFAULT} />
+                                        <Text style={styles.goalsTriggerTitle}>Mi Meta Semanal</Text>
+                                    </View>
+                                    <View style={styles.goalsTriggerRight}>
+                                        <Text style={styles.goalsSummaryText}>{trainingDays.length} días</Text>
+                                        {isGoalsExpanded ? <ChevronUp size={18} color={colors.textMuted} /> : <ChevronDown size={18} color={colors.textMuted} />}
+                                    </View>
+                                </TouchableOpacity>
+
+                                {isGoalsExpanded && (
+                                    <View style={styles.goalsExpanded}>
+                                        <Text style={styles.goalsDesc}>
+                                            Seleccioná los días que planeás entrenar. Los días no marcados como entrenamiento no cortarán tu racha de puntuación.
+                                        </Text>
+                                        <View style={styles.daysRow}>
+                                            {[
+                                                { id: 1, label: 'L' }, { id: 2, label: 'M' }, { id: 3, label: 'X' },
+                                                { id: 4, label: 'J' }, { id: 5, label: 'V' }, { id: 6, label: 'S' },
+                                                { id: 0, label: 'D' }
+                                            ].map(day => {
+                                                const isSelected = trainingDays.includes(day.id);
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={day.id}
+                                                        onPress={() => handleToggleTrainingDay(day.id)}
+                                                        style={[styles.dayChip, isSelected && styles.dayChipActive]}
+                                                        activeOpacity={0.7}
+                                                    >
+                                                        <Text style={[styles.dayChipText, isSelected && styles.dayChipTextActive]}>{day.label}</Text>
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                        </View>
+                                    </View>
+                                )}
+                            </View>
                         )}
+
+                        <TouchableOpacity
+                            onPress={() => setIsProfileExpanded(!isProfileExpanded)}
+                            activeOpacity={0.7}
+                            style={styles.toggleCollapseWrapper}
+                        >
+                            {isProfileExpanded ? <ChevronUp size={18} color={colors.textMuted} /> : <ChevronDown size={18} color={colors.textMuted} />}
+                        </TouchableOpacity>
                     </View>
                 )}
 
@@ -2146,7 +2275,7 @@ export default function SocialTab() {
                                     .map((item) => {
                                         if (item.feedType === 'direct_share' || !item.feedType) {
                                             return (
-                                                <View key={item.id} style={styles.premiumCard}>
+                                                <View key={getInboxKey(item)} style={styles.premiumCard}>
                                                     <View style={styles.premiumHeader}>
                                                         <View style={styles.premiumIconBox}>
                                                             <Dumbbell size={24} color={colors.onPrimary} />
@@ -2210,7 +2339,7 @@ export default function SocialTab() {
                                             const isOwnActivity = profile?.id && item.senderId === profile.id;
 
                                             return (
-                                                <View key={item.id} style={styles.activityRow}>
+                                                <View key={getInboxKey(item)} style={styles.activityRow}>
                                                     <View style={styles.activityHeader}>
                                                         <View style={[styles.activityIconBox, isPr ? { backgroundColor: withAlpha(colors.yellow, '30') } : (isRoutineShared ? { backgroundColor: withAlpha(colors.primary.DEFAULT, '30') } : { backgroundColor: withAlpha(colors.primary.DEFAULT, '15') })]}>
                                                             {isPr ? <Trophy size={18} color={colors.yellow} /> : isRoutineShared ? <Globe size={18} color={colors.primary.DEFAULT} /> : <Dumbbell size={18} color={colors.primary.DEFAULT} />}

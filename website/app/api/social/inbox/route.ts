@@ -134,14 +134,23 @@ export async function GET(req: NextRequest) {
             }))
         ];
 
-        // Sort combined list by date descending
+        // Sort combined list by date descending before deduplication
         list.sort((a, b) => {
             const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt as string).getTime();
             const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt as string).getTime();
             return dateB - dateA;
         });
 
-        return NextResponse.json({ success: true, items: list });
+        // Deduplicate by composite key to avoid collisions between different feed types
+        const seenKeys = new Set<string>();
+        const uniqueList = list.filter(item => {
+            const key = `${item.feedType || 'direct_share'}:${item.id}`;
+            if (seenKeys.has(key)) return false;
+            seenKeys.add(key);
+            return true;
+        });
+
+        return NextResponse.json({ success: true, items: uniqueList });
     } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Internal server error';
         return NextResponse.json({ error: message }, { status: 500 });

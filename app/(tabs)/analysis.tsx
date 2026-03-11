@@ -58,6 +58,70 @@ export default function AnalysisScreen() {
     const [coreLoading, setCoreLoading] = useState(true);
     const [rangeLoading, setRangeLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    const ss = useMemo(() => {
+        const { StyleSheet } = require('react-native');
+        const { withAlpha } = require('@/src/theme');
+        return StyleSheet.create({
+            content: {
+                flex: 1,
+                paddingHorizontal: 16,
+                marginTop: 8,
+            },
+            tabsScroll: {
+                marginHorizontal: -16,
+                paddingHorizontal: 16,
+            },
+            tabsContainer: {
+                flexDirection: 'row',
+                gap: 8,
+                alignItems: 'center',
+            },
+            statsContainer: {
+                flex: 1,
+                position: 'relative',
+            },
+            loadingWrapper: {
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingVertical: 80,
+                paddingBottom: 0,
+            },
+            loadingText: {
+                color: colors.textMuted,
+                marginTop: 16,
+                fontWeight: 'bold',
+            },
+            errorCard: {
+                marginBottom: 24,
+                borderColor: withAlpha(colors.red, '50'),
+                backgroundColor: withAlpha(colors.red, '10'),
+            },
+            errorTitle: {
+                color: colors.red,
+                fontWeight: 'bold',
+                fontSize: 18,
+                marginBottom: 8,
+            },
+            errorMsg: {
+                color: colors.textMuted,
+                marginBottom: 16,
+            },
+            retryBtn: {
+                backgroundColor: withAlpha(colors.red, '40'),
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                borderRadius: 8,
+                alignItems: 'center',
+                alignSelf: 'flex-start',
+            },
+            retryText: {
+                color: colors.red,
+                fontWeight: 'bold',
+            }
+        });
+    }, [colors]);
     const [tab, setTab] = useState<'overview' | 'trends' | 'records' | 'tools'>('overview');
 
     // Combined State to prevent waterfall renders
@@ -212,10 +276,10 @@ export default function AnalysisScreen() {
                 <View style={{ zIndex: 10, width: 40 }} />
             </View>
 
-            <View className="flex-1 px-4 mt-2">
+            <View style={ss.content}>
                 <View style={{ height: 48, marginBottom: 16 }}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-4 px-4" contentContainerStyle={{ paddingRight: 20, alignItems: 'center' }}>
-                        <View className="flex-row gap-2 items-center">
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={ss.tabsScroll} contentContainerStyle={{ paddingRight: 20, alignItems: 'center' }}>
+                        <View style={ss.tabsContainer}>
                             {[
                                 { key: 'overview', label: 'Resumen' },
                                 { key: 'trends', label: 'Tendencias' },
@@ -247,7 +311,7 @@ export default function AnalysisScreen() {
                     </ScrollView>
                 </View>
 
-                <View className="flex-1 relative">
+                <View style={ss.statsContainer}>
                     <LinearGradient
                         colors={[colors.background, 'transparent']}
                         style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 16, zIndex: 10 }}
@@ -255,16 +319,16 @@ export default function AnalysisScreen() {
                     />
                     <ScrollView contentContainerStyle={{ paddingBottom: 100, paddingTop: 16 }} showsVerticalScrollIndicator={false}>
                         {isLoading && !rangeData.summary7 ? (
-                            <View className="flex-1 justify-center items-center py-20 pb-0">
+                            <View style={ss.loadingWrapper}>
                                 <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
-                                <Text className="text-iron-500 mt-4 font-bold">Analizando datos...</Text>
+                                <Text style={ss.loadingText}>Analizando datos...</Text>
                             </View>
                         ) : error ? (
-                            <IronCard className="mb-6 border-red-900/50 bg-red-900/10">
-                                <Text className="text-red-400 font-bold text-lg mb-2">Error de carga</Text>
-                                <Text className="text-iron-400 mb-4">{error}</Text>
-                                <Pressable onPress={loadStats} className="bg-red-900/40 px-4 py-2 rounded-lg items-center self-start">
-                                    <Text className="text-red-200 font-bold">Reintentar</Text>
+                            <IronCard style={ss.errorCard}>
+                                <Text style={ss.errorTitle}>Error de carga</Text>
+                                <Text style={ss.errorMsg}>{error}</Text>
+                                <Pressable onPress={loadStats} style={ss.retryBtn}>
+                                    <Text style={ss.retryText}>Reintentar</Text>
                                 </Pressable>
                             </IronCard>
                         ) : (

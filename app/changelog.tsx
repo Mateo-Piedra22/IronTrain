@@ -14,6 +14,7 @@ import {
     View,
 } from 'react-native';
 import { KudosButton } from '../components/ui/KudosButton';
+import { ModalScreenOverlayHost } from '../components/ui/ModalScreenOverlayHost';
 import { SafeAreaWrapper } from '../components/ui/SafeAreaWrapper';
 import { useColors } from '../src/hooks/useColors';
 import { BroadcastFeedService, type BroadcastItem } from '../src/services/BroadcastFeedService';
@@ -460,66 +461,68 @@ export default function ChangelogScreen() {
     };
 
     return (
-        <SafeAreaWrapper style={ss.container} edges={['top', 'left', 'right', 'bottom']}>
-            <Stack.Screen options={{ headerShown: false }} />
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={ss.scrollContent}>
-                <View style={ss.headerContainer}>
-                    <TouchableOpacity onPress={() => router.back()} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
-                        <ChevronLeft size={22} color={colors.text} strokeWidth={2.5} />
-                    </TouchableOpacity>
-                    <View>
-                        <Text style={ss.pageTitle}>Novedades</Text>
-                        <Text style={ss.pageSub}>Noticias y versiones de IronTrain</Text>
+        <ModalScreenOverlayHost>
+            <SafeAreaWrapper style={ss.container} edges={['top', 'left', 'right', 'bottom']}>
+                <Stack.Screen options={{ headerShown: false }} />
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={ss.scrollContent}>
+                    <View style={ss.headerContainer}>
+                        <TouchableOpacity onPress={() => router.back()} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
+                            <ChevronLeft size={22} color={colors.text} strokeWidth={2.5} />
+                        </TouchableOpacity>
+                        <View>
+                            <Text style={ss.pageTitle}>Novedades</Text>
+                            <Text style={ss.pageSub}>Noticias y versiones de IronTrain</Text>
+                        </View>
                     </View>
-                </View>
 
-                {isLoading ? (
-                    <View style={ss.loadingWrapper}>
-                        <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
-                        <Text style={ss.loadingText}>Sincronizando novedades...</Text>
-                    </View>
-                ) : (
-                    <View>
-                        {announcements.length > 0 && (
-                            <View style={{ marginBottom: 12 }}>
-                                <View style={ss.sectionHeader}>
-                                    <Text style={ss.sectionTitle}>ANUNCIOS</Text>
-                                    <View style={ss.sectionLine} />
+                    {isLoading ? (
+                        <View style={ss.loadingWrapper}>
+                            <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
+                            <Text style={ss.loadingText}>Sincronizando novedades...</Text>
+                        </View>
+                    ) : (
+                        <View>
+                            {announcements.length > 0 && (
+                                <View style={{ marginBottom: 12 }}>
+                                    <View style={ss.sectionHeader}>
+                                        <Text style={ss.sectionTitle}>ANUNCIOS</Text>
+                                        <View style={ss.sectionLine} />
+                                    </View>
+                                    {announcements.map(n => renderAnnouncement(n))}
                                 </View>
-                                {announcements.map(n => renderAnnouncement(n))}
-                            </View>
-                        )}
+                            )}
 
-                        {changelogs.length > 0 && (
-                            <View>
-                                <View style={ss.sectionHeader}>
-                                    <Text style={ss.sectionTitle}>HISTORIAL DE VERSIONES</Text>
-                                    <View style={ss.sectionLine} />
+                            {changelogs.length > 0 && (
+                                <View>
+                                    <View style={ss.sectionHeader}>
+                                        <Text style={ss.sectionTitle}>HISTORIAL DE VERSIONES</Text>
+                                        <View style={ss.sectionLine} />
+                                    </View>
+                                    {changelogs.map(r => renderChangelog(r))}
                                 </View>
-                                {changelogs.map(r => renderChangelog(r))}
-                            </View>
-                        )}
+                            )}
 
-                        {globalEvents.length > 0 && (
-                            <View>
-                                <View style={ss.sectionHeader}>
-                                    <Text style={ss.sectionTitle}>EVENTOS GLOBALES</Text>
-                                    <View style={ss.sectionLine} />
+                            {globalEvents.length > 0 && (
+                                <View>
+                                    <View style={ss.sectionHeader}>
+                                        <Text style={ss.sectionTitle}>EVENTOS GLOBALES</Text>
+                                        <View style={ss.sectionLine} />
+                                    </View>
+                                    {globalEvents.map(e => renderGlobalEvent(e))}
                                 </View>
-                                {globalEvents.map(e => renderGlobalEvent(e))}
-                            </View>
-                        )}
+                            )}
 
-                        {announcements.length === 0 && changelogs.length === 0 && globalEvents.length === 0 && (
-                            <View style={ss.emptyCard}>
-                                <Text style={ss.emptyTitle}>Sin novedades recientes</Text>
-                                <Text style={ss.emptySub}>No hemos encontrado anuncios ni versiones nuevas todavía.</Text>
-                            </View>
-                        )}
-                    </View>
-                )}
-            </ScrollView>
-        </SafeAreaWrapper>
+                            {announcements.length === 0 && changelogs.length === 0 && globalEvents.length === 0 && (
+                                <View style={ss.emptyCard}>
+                                    <Text style={ss.emptyTitle}>Sin novedades recientes</Text>
+                                    <Text style={ss.emptySub}>No hemos encontrado anuncios ni versiones nuevas todavía.</Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+                </ScrollView>
+            </SafeAreaWrapper>
+        </ModalScreenOverlayHost>
     );
 }
 

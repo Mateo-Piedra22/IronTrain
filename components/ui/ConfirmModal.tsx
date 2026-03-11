@@ -2,7 +2,7 @@ import { IronButton } from '@/components/IronButton';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { AlertTriangle, CheckCircle, Info, XCircle } from 'lucide-react-native';
 import React, { useMemo } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '../../src/hooks/useColors';
 
 type ModalVariant = 'info' | 'warning' | 'error' | 'success' | 'destructive';
@@ -47,7 +47,7 @@ export function ConfirmModal({ visible, onClose, title, message, variant = 'info
             backgroundColor: colors.surface,
             width: '100%',
             maxWidth: 400,
-            borderRadius: 24,
+            borderRadius: 20,
             padding: 28,
             borderWidth: 1.5,
             borderColor: colors.border,
@@ -80,7 +80,7 @@ export function ConfirmModal({ visible, onClose, title, message, variant = 'info
             maxHeight: 400,
             marginBottom: 28,
             backgroundColor: colors.surfaceLighter,
-            borderRadius: 18,
+            borderRadius: 16,
             padding: 4,
             borderWidth: 1,
             borderColor: colors.border,
@@ -138,12 +138,14 @@ export function ConfirmModal({ visible, onClose, title, message, variant = 'info
     ];
     const isStacked = resolvedButtons.length >= 2;
 
+    if (!visible) return null;
+
     return (
-        <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+        <View style={[StyleSheet.absoluteFill, { zIndex: 1000, elevation: 1000 }]} pointerEvents="auto">
             <View style={styles.overlay}>
-                <Pressable style={styles.overlay} onPress={onClose} />
+                <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
                 <View pointerEvents="box-none" style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
-                    <Pressable style={styles.card} onPress={e => e.stopPropagation()}>
+                    <View style={styles.card} pointerEvents="auto">
                         <View style={styles.header}>
                             <View style={[styles.iconCircle, { backgroundColor: withAlpha(cfg.accentColor, '15'), borderColor: withAlpha(cfg.accentColor, '25') }]}>
                                 {cfg.icon}
@@ -157,6 +159,7 @@ export function ConfirmModal({ visible, onClose, title, message, variant = 'info
                                     style={styles.messageScroll}
                                     contentContainerStyle={styles.messageContent}
                                     showsVerticalScrollIndicator={true}
+                                    nestedScrollEnabled={true}
                                 >
                                     <Text style={styles.message}>
                                         {message.split(/(\*\*.*?\*\*|\n)/g).map((part, i) => {
@@ -196,10 +199,10 @@ export function ConfirmModal({ visible, onClose, title, message, variant = 'info
                                 );
                             })}
                         </View>
-                    </Pressable>
+                    </View>
                 </View>
             </View>
-        </Modal>
+        </View>
     );
 }
 

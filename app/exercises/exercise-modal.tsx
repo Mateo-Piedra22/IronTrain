@@ -1,5 +1,6 @@
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
+import { ModalScreenOverlayHost } from '@/components/ui/ModalScreenOverlayHost';
 import { ExerciseService } from '@/src/services/ExerciseService';
 import { withAlpha } from '@/src/theme';
 import { ExerciseType } from '@/src/types/db';
@@ -74,75 +75,77 @@ export default function ExerciseModal() {
     }), [colors]);
 
     return (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.container}>
-            <Stack.Screen options={{
-                title: exerciseId ? 'Editar ejercicio' : 'Nuevo ejercicio',
-                presentation: 'modal',
-                headerTitleStyle: { fontWeight: '900', color: colors.text },
-                headerStyle: { backgroundColor: colors.background },
-                headerTintColor: colors.primary.DEFAULT,
-            }} />
+        <ModalScreenOverlayHost>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.container}>
+                <Stack.Screen options={{
+                    title: exerciseId ? 'Editar ejercicio' : 'Nuevo ejercicio',
+                    presentation: 'modal',
+                    headerTitleStyle: { fontWeight: '900', color: colors.text },
+                    headerStyle: { backgroundColor: colors.background },
+                    headerTintColor: colors.primary.DEFAULT,
+                }} />
 
-            <ScrollView contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled" bounces={false}>
-                {/* Exercise Name */}
-                <View style={s.section}>
-                    <View style={s.sectionHeader}>
-                        <View style={s.sectionIconCircle}><Tag size={14} color={colors.primary.DEFAULT} /></View>
-                        <Text style={s.sectionLabel}>Nombre del ejercicio</Text>
+                <ScrollView contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled" bounces={false}>
+                    {/* Exercise Name */}
+                    <View style={s.section}>
+                        <View style={s.sectionHeader}>
+                            <View style={s.sectionIconCircle}><Tag size={14} color={colors.primary.DEFAULT} /></View>
+                            <Text style={s.sectionLabel}>Nombre del ejercicio</Text>
+                        </View>
+                        <IronInput
+                            placeholder="Ej: Press de banca"
+                            value={name}
+                            onChangeText={setName}
+                            autoFocus={!exerciseId}
+                        />
                     </View>
-                    <IronInput
-                        placeholder="Ej: Press de banca"
-                        value={name}
-                        onChangeText={setName}
-                        autoFocus={!exerciseId}
-                    />
-                </View>
 
-                {/* Type */}
-                <View style={s.section}>
-                    <View style={s.sectionHeader}>
-                        <View style={s.sectionIconCircle}><Dumbbell size={14} color={colors.primary.DEFAULT} /></View>
-                        <Text style={s.sectionLabel}>Tipo</Text>
+                    {/* Type */}
+                    <View style={s.section}>
+                        <View style={s.sectionHeader}>
+                            <View style={s.sectionIconCircle}><Dumbbell size={14} color={colors.primary.DEFAULT} /></View>
+                            <Text style={s.sectionLabel}>Tipo</Text>
+                        </View>
+                        <View style={s.typeGrid}>
+                            {typeOptions.map((t) => (
+                                <TouchableOpacity
+                                    key={t.id}
+                                    onPress={() => setType(t.id)}
+                                    style={[s.typeCard, type === t.id && s.typeCardActive]}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`Seleccionar tipo ${t.label}`}
+                                >
+                                    <Text style={s.typeIcon}>{t.icon}</Text>
+                                    <Text style={[s.typeLabel, type === t.id && s.typeLabelActive]}>{t.label}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
                     </View>
-                    <View style={s.typeGrid}>
-                        {typeOptions.map((t) => (
-                            <TouchableOpacity
-                                key={t.id}
-                                onPress={() => setType(t.id)}
-                                style={[s.typeCard, type === t.id && s.typeCardActive]}
-                                accessibilityRole="button"
-                                accessibilityLabel={`Seleccionar tipo ${t.label}`}
-                            >
-                                <Text style={s.typeIcon}>{t.icon}</Text>
-                                <Text style={[s.typeLabel, type === t.id && s.typeLabelActive]}>{t.label}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
 
-                {/* Notes */}
-                <View style={s.section}>
-                    <View style={s.sectionHeader}>
-                        <View style={s.sectionIconCircle}><FileText size={14} color={colors.primary.DEFAULT} /></View>
-                        <Text style={s.sectionLabel}>Notas (opcional)</Text>
+                    {/* Notes */}
+                    <View style={s.section}>
+                        <View style={s.sectionHeader}>
+                            <View style={s.sectionIconCircle}><FileText size={14} color={colors.primary.DEFAULT} /></View>
+                            <Text style={s.sectionLabel}>Notas (opcional)</Text>
+                        </View>
+                        <IronInput
+                            placeholder="Ej: ancho de agarre…"
+                            value={notes}
+                            onChangeText={setNotes}
+                            multiline
+                            numberOfLines={3}
+                        />
                     </View>
-                    <IronInput
-                        placeholder="Ej: ancho de agarre…"
-                        value={notes}
-                        onChangeText={setNotes}
-                        multiline
-                        numberOfLines={3}
-                    />
-                </View>
 
-                <View style={{ marginTop: 'auto', paddingTop: 16, paddingBottom: 16 }}>
-                    <IronButton
-                        label={exerciseId ? "Actualizar ejercicio" : "Crear ejercicio"}
-                        onPress={handleSave}
-                        loading={loading}
-                    />
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+                    <View style={{ marginTop: 'auto', paddingTop: 16, paddingBottom: 16 }}>
+                        <IronButton
+                            label={exerciseId ? "Actualizar ejercicio" : "Crear ejercicio"}
+                            onPress={handleSave}
+                            loading={loading}
+                        />
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </ModalScreenOverlayHost>
     );
 }

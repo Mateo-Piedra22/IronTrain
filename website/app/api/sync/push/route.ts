@@ -172,13 +172,13 @@ export async function POST(req: NextRequest) {
                     // Special Rule: Auto-generate deterministic IDs for social reactions if missing
                     if (!pkValue) {
                         if (tableName === 'changelog_reactions' && filteredData.changelogId) {
-                            pkValue = `${filteredData.changelogId}-${userId}`;
+                            pkValue = `${filteredData.changelogId}_${userId}`;
                             filteredData.id = pkValue;
                         } else if (tableName === 'kudos' && filteredData.feedId) {
-                            pkValue = `${filteredData.feedId}-${userId}`;
+                            pkValue = `${filteredData.feedId}_${userId}`;
                             filteredData.id = pkValue;
                         } else if (tableName === 'notification_reactions' && filteredData.notificationId) {
-                            pkValue = `${filteredData.notificationId}-${userId}`;
+                            pkValue = `${filteredData.notificationId}_${userId}`;
                             filteredData.id = pkValue;
                         }
                     }

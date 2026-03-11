@@ -108,7 +108,15 @@ export async function GET(req: NextRequest) {
                     // Global/Social Tables: Allow visibility for public activities
                     // The app filters what the user sees, but sync provides the data pool
                     const userCol = tableName === 'kudos' ? tableSchema.giverId : tableSchema.userId;
-                    conditions.push(sql`(${userCol} = ${userId} OR EXISTS (SELECT 1 FROM friendships WHERE ((user_id = ${userId} AND friend_id = ${userCol}) OR (user_id = ${userCol} AND friend_id = ${userId})) AND status = 'accepted'))`);
+
+                    // Direct qualification for friendships tables to avoid ambiguity with outer query columns
+                    conditions.push(sql`(${userCol} = ${userId} OR EXISTS (
+                        SELECT 1 FROM friendships f 
+                        WHERE ((f.user_id = ${userId} AND f.friend_id = ${userCol}) 
+                           OR (f.user_id = ${userCol} AND f.friend_id = ${userId})) 
+                        AND f.status = 'accepted'
+                        AND f.deleted_at IS NULL
+                    ))`);
                 } else if (tableName === 'friendships') {
                     conditions.push(sql`(${tableSchema.userId} = ${userId} OR ${tableSchema.friendId} = ${userId})`);
                 } else if (tableName === 'shares_inbox') {
