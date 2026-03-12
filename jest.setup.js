@@ -8,6 +8,7 @@ jest.mock('@notifee/react-native', () => ({
         requestPermission: jest.fn(() => Promise.resolve({ authorizationStatus: 1 })),
         getNotificationSettings: jest.fn(() => Promise.resolve({ authorizationStatus: 1 })),
         onBackgroundEvent: jest.fn(),
+        registerForegroundService: jest.fn(),
     },
     AndroidImportance: { HIGH: 4, DEFAULT: 3 },
     TriggerType: { TIMESTAMP: 0 },

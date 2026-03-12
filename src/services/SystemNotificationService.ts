@@ -319,10 +319,11 @@ class SystemNotificationServiceImpl {
                     foregroundServiceTypes: [1], // DATA_SYNC
                     category: AndroidCategory.PROGRESS,
                     autoCancel: false,
+                    ongoing: true,
                     color: Colors.primary.DEFAULT,
                     pressAction: { id: 'default' },
                     onlyAlertOnce: true,
-                    showChronometer: true,
+                    showChronometer: false,
                     importance: AndroidImportance.HIGH,
                 },
                 ios: {

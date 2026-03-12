@@ -132,6 +132,11 @@ En la sección `## [VERSION] (Unreleased)`, describa los cambios realizados sigu
  Al finalizar el push, **GitHub Actions** detectará el nuevo tag y disparará automáticamente la build en EAS a través del flujo `release-android.yml`.
 
  ---
+ ## AUXILIAR: En caso de build/tests fallidos en Github
+ 1. Ejecuta el siguiente comando para eliminar el tag de tu máquina: `git tag -d vx.x.x`
+ 2. Ejecuta el siguiente comando para eliminar el tag de Github: `git push origin --delete vx.x.x`
+
+ ---
  
  ## 🚧 OPCIÓN DE EMERGENCIA: Despliegue de Hotfix (Local Build)
  

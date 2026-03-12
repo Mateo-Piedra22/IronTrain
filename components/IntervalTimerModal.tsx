@@ -323,17 +323,33 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                 if (lastSecPulseRef.current !== remaining) { lastSecPulseRef.current = remaining; feedbackService.countdown(); triggerPulse(); }
             } else { lastSecPulseRef.current = null; }
             if (remaining <= 0) { endAtMsRef.current = null; }
+
+            // Sync notification with current progress
+            systemNotificationService.showIntervalTimerNotification({
+                phase,
+                currentRound,
+                totalRounds: rounds,
+                timeLeft: remaining,
+                isPaused: false // Tick only runs when not paused
+            });
         };
         tick();
         intervalRef.current = setInterval(tick, 1000);
         return () => { if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; } };
-    }, [phase, isPaused, triggerPulse, progressAnim]);
+    }, [phase, isPaused, triggerPulse, progressAnim, currentRound, rounds]);
 
     useEffect(() => {
         if (timeLeft === 0 && phase !== 'idle' && phase !== 'finished' && !isPaused) {
             transitionToNextPhase(phase, currentRound);
         }
     }, [timeLeft, phase, currentRound, isPaused, transitionToNextPhase]);
+
+    // Cleanup: Dismiss notification if component unmounts while timer is active
+    useEffect(() => {
+        return () => {
+            systemNotificationService.dismissIntervalTimerNotification();
+        };
+    }, []);
 
     const handleStart = () => {
         setPhase('prepare'); setCurrentRound(1); setIsPaused(false); setElapsedTotal(0); transitionPendingRef.current = false;
@@ -362,6 +378,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
     const handleReset = useCallback(() => {
         setPhase('idle'); setIsPaused(false); setTimeLeft(0); setCurrentRound(1); setElapsedTotal(0);
         endAtMsRef.current = null; pausedTimeLeftRef.current = 0; transitionPendingRef.current = false; progressAnim.setValue(0);
+        if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
         systemNotificationService.dismissIntervalTimerNotification();
     }, [progressAnim]);
 
