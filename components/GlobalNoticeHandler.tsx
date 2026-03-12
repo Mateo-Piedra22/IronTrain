@@ -8,6 +8,7 @@ import { configService } from '@/src/services/ConfigService';
 import { useAuthStore } from '@/src/store/authStore';
 import { useSettingsStore } from '@/src/store/useSettingsStore';
 import { ThemeFx, withAlpha } from '@/src/theme';
+import { logger } from '@/src/utils/logger';
 import { useRouter } from 'expo-router';
 import { Bell, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -251,7 +252,7 @@ export const GlobalNoticeHandler: React.FC = () => {
                 setActiveAnnouncement(null);
                 setShowToast(false);
             } catch (e) {
-                console.error('[GlobalNoticeHandler] Error fetching feed', e);
+                logger.captureException(e, { scope: 'GlobalNoticeHandler.fetchAll', message: 'Failed to fetch broadcast feed' });
             }
         };
 

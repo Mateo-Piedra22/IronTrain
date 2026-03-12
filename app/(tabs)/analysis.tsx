@@ -16,6 +16,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { useColors } from '../../src/hooks/useColors';
 import { ThemeFx } from '../../src/theme';
+import { logger } from '../../src/utils/logger';
 
 interface RangeAnalysisState {
     summary7: WorkoutSummary | null;
@@ -184,7 +185,7 @@ export default function AnalysisScreen() {
             } catch { /* non-critical, streak notification scheduling failure should not block UI */ }
         } catch (e) {
             if (coreRequestIdRef.current !== requestId) return;
-            console.error('Failed to load stats', e);
+            logger.captureException(e, { scope: 'AnalysisTab.loadStats', message: 'Failed to load stats' });
             setError('No se pudieron cargar tus analíticas.');
         } finally {
             if (coreRequestIdRef.current !== requestId) return;
@@ -228,7 +229,7 @@ export default function AnalysisScreen() {
 
         } catch (e) {
             if (rangeRequestIdRef.current !== requestId) return;
-            console.error('Failed to load range stats', e);
+            logger.captureException(e, { scope: 'AnalysisTab.loadRangeStats', message: 'Failed to load range stats' });
             setError('No se pudieron cargar tus analíticas.');
         } finally {
             if (rangeRequestIdRef.current !== requestId) return;

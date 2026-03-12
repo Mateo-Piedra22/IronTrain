@@ -6,8 +6,9 @@ import { confirm } from '@/src/store/confirmStore';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { Stack, router } from 'expo-router';
 import { Check, ChevronLeft, Lightbulb, MessageSquareQuote, ShieldAlert } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const FEEDBACK_TYPES = [
     { id: 'bug', label: 'Reportar Bug', icon: ShieldAlert, colorKey: 'red' },
@@ -17,12 +18,15 @@ const FEEDBACK_TYPES = [
 
 export default function FeedbackScreen() {
     const colors = useColors();
+    const insets = useSafeAreaInsets();
     const [type, setType] = useState<typeof FEEDBACK_TYPES[number]['id']>('feature_request');
     const [subject, setSubject] = useState('');
     const [contactEmail, setContactEmail] = useState('');
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const [messageFocused, setMessageFocused] = useState(false);
 
     const ss = useMemo(() => StyleSheet.create({
         container: {
@@ -223,8 +227,75 @@ export default function FeedbackScreen() {
         },
         submitBtn: {
             marginTop: 10
-        }
+        },
+        floatingComposer: {
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            backgroundColor: colors.background,
+            borderTopWidth: 1.5,
+            borderTopColor: colors.border,
+            paddingHorizontal: 16,
+            paddingTop: 12,
+            paddingBottom: 12,
+        },
+        floatingLabel: {
+            fontSize: 12,
+            fontWeight: '900',
+            color: colors.textMuted,
+            textTransform: 'uppercase',
+            letterSpacing: 1,
+            marginBottom: 10,
+            marginLeft: 4,
+        },
+        floatingInputWrapper: {
+            backgroundColor: colors.surface,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            borderRadius: 20,
+            padding: 4,
+        },
+        floatingInput: {
+            minHeight: 120,
+            maxHeight: 220,
+            padding: 16,
+            fontSize: 16,
+            color: colors.text,
+            fontWeight: '500',
+        },
+        floatingHintRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: 10,
+            marginBottom: 10,
+            paddingHorizontal: 4,
+        },
+        floatingHint: {
+            fontSize: 11,
+            color: colors.textMuted,
+            fontWeight: '700',
+        },
     }), [colors]);
+
+    useEffect(() => {
+        const onShow = (e: any) => {
+            const h = Number(e?.endCoordinates?.height ?? 0);
+            setKeyboardHeight(h);
+        };
+        const onHide = () => {
+            setKeyboardHeight(0);
+            setMessageFocused(false);
+        };
+
+        const showSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', onShow);
+        const hideSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', onHide);
+
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
+    }, []);
 
     const handleSubmit = async () => {
         if (!message.trim()) {
@@ -277,7 +348,13 @@ export default function FeedbackScreen() {
             <Stack.Screen options={{ headerShown: false }} />
 
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={ss.scrollContent} keyboardShouldPersistTaps="handled">
+                <ScrollView
+                    contentContainerStyle={{
+                        ...ss.scrollContent,
+                        paddingBottom: keyboardHeight > 0 ? keyboardHeight + 220 : ss.scrollContent.paddingBottom,
+                    }}
+                    keyboardShouldPersistTaps="handled"
+                >
                     <View style={ss.header}>
                         <TouchableOpacity onPress={() => router.back()} style={ss.backBtn}>
                             <ChevronLeft size={22} color={colors.text} strokeWidth={2.5} />
@@ -353,24 +430,69 @@ export default function FeedbackScreen() {
                         />
                     </View>
 
-                    <Text style={ss.sectionTitle}>Tus comentarios</Text>
-                    <View style={ss.inputWrapper}>
-                        <TextInput
-                            style={ss.input}
-                            placeholder="Describe el problema o sugerencia..."
-                            placeholderTextColor={colors.textMuted}
-                            multiline
-                            numberOfLines={6}
-                            textAlignVertical="top"
-                            value={message}
-                            onChangeText={setMessage}
-                            autoCorrect
-                            maxLength={4000}
-                        />
-                    </View>
-                    <Text style={ss.inputHint}>{message.trim().length}/4000 caracteres</Text>
+                    {keyboardHeight === 0 ? (
+                        <>
+                            <Text style={ss.sectionTitle}>Tus comentarios</Text>
+                            <View style={ss.inputWrapper}>
+                                <TextInput
+                                    style={ss.input}
+                                    placeholder="Describe el problema o sugerencia..."
+                                    placeholderTextColor={colors.textMuted}
+                                    multiline
+                                    numberOfLines={6}
+                                    textAlignVertical="top"
+                                    value={message}
+                                    onChangeText={setMessage}
+                                    autoCorrect
+                                    maxLength={4000}
+                                    onFocus={() => setMessageFocused(true)}
+                                />
+                            </View>
+                            <Text style={ss.inputHint}>{message.trim().length}/4000 caracteres</Text>
 
-                    <View style={ss.submitBtn}>
+                            <View style={ss.submitBtn}>
+                                <IronButton
+                                    label="Enviar Informe"
+                                    onPress={handleSubmit}
+                                    loading={loading}
+                                    disabled={!message.trim() || loading}
+                                />
+                            </View>
+                        </>
+                    ) : null}
+                </ScrollView>
+
+                {keyboardHeight > 0 && messageFocused ? (
+                    <View
+                        style={[
+                            ss.floatingComposer,
+                            {
+                                bottom: Math.max(0, keyboardHeight - insets.bottom),
+                            }
+                        ]}
+                    >
+                        <Text style={ss.floatingLabel}>Tus comentarios</Text>
+                        <View style={ss.floatingInputWrapper}>
+                            <TextInput
+                                style={ss.floatingInput}
+                                placeholder="Describe el problema o sugerencia..."
+                                placeholderTextColor={colors.textMuted}
+                                multiline
+                                textAlignVertical="top"
+                                value={message}
+                                onChangeText={setMessage}
+                                autoCorrect
+                                maxLength={4000}
+                                onBlur={() => setMessageFocused(false)}
+                                autoFocus
+                            />
+                        </View>
+
+                        <View style={ss.floatingHintRow}>
+                            <Text style={ss.floatingHint}>{message.trim().length}/4000 caracteres</Text>
+                            <Text style={ss.floatingHint}>{loading ? 'Enviando…' : ''}</Text>
+                        </View>
+
                         <IronButton
                             label="Enviar Informe"
                             onPress={handleSubmit}
@@ -378,7 +500,7 @@ export default function FeedbackScreen() {
                             disabled={!message.trim() || loading}
                         />
                     </View>
-                </ScrollView>
+                ) : null}
             </KeyboardAvoidingView>
         </SafeAreaWrapper>
     );

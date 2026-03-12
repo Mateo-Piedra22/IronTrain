@@ -1,6 +1,8 @@
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { ChevronDown, Minus, Pause, Play, Plus, RotateCcw, X, Zap } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
@@ -45,11 +47,13 @@ const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const KEEP_AWAKE_TAG = 'irontrain-interval-timer';
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps) {
     const colors = useColors();
     const insets = useSafeAreaInsets();
+
 
     const ss = useMemo(() => StyleSheet.create({
         container: { flex: 1, backgroundColor: colors.surface },
@@ -214,6 +218,21 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
     const [isPaused, setIsPaused] = useState(false);
     const [elapsedTotal, setElapsedTotal] = useState(0);
 
+    useEffect(() => {
+        if (visible && phase !== 'idle' && phase !== 'finished' && !isPaused) {
+            activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => { });
+        } else {
+            deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => { });
+        }
+    }, [visible, phase, isPaused]);
+
+    useEffect(() => {
+        return () => {
+            deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => { });
+        };
+    }, []);
+
+
     const endAtMsRef = useRef<number | null>(null);
     const pausedTimeLeftRef = useRef<number>(0);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -241,7 +260,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
         if (!resume) {
             progressAnim.setValue(0);
         }
-        Animated.timing(progressAnim, { toValue: 1, duration: duration * 1000, easing: Easing.linear, useNativeDriver: true }).start();
+        Animated.timing(progressAnim, { toValue: 1, duration: duration * 1000, easing: Easing.linear, useNativeDriver: false }).start();
     }, [progressAnim]);
 
     const strokeDashoffset = progressAnim.interpolate({ inputRange: [0, 1], outputRange: [0, RING_CIRCUMFERENCE] });
@@ -380,38 +399,43 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
         switch (phase) {
             case 'prepare':
                 return {
-                    bg: isDark ? withAlpha(colors.yellow, '20') : colors.yellow,
+                    bg: isDark ? colors.iron[100] : colors.yellow,
                     label: 'PREPÁRATE',
-                    ringColor: colors.yellow,
-                    accentBg: withAlpha(colors.yellow, '26')
+                    ringColor: isDark ? colors.yellow : colors.white,
+                    accentBg: withAlpha(colors.yellow, '26'),
+                    textColor: isDark ? colors.text : colors.white,
                 };
             case 'work':
                 return {
-                    bg: isDark ? withAlpha(colors.primary.dark, '40') : colors.primary.DEFAULT,
+                    bg: isDark ? colors.iron[100] : colors.primary.DEFAULT,
                     label: '¡TRABAJO!',
                     ringColor: colors.primary.DEFAULT,
-                    accentBg: withAlpha(colors.primary.DEFAULT, '26')
+                    accentBg: withAlpha(colors.primary.DEFAULT, '26'),
+                    textColor: isDark ? colors.primary.DEFAULT : colors.onPrimary,
                 };
             case 'rest':
                 return {
-                    bg: isDark ? withAlpha(colors.green, '20') : colors.green,
+                    bg: isDark ? colors.iron[100] : colors.green,
                     label: 'DESCANSO',
                     ringColor: colors.green,
-                    accentBg: withAlpha(colors.green, '26')
+                    accentBg: withAlpha(colors.green, '26'),
+                    textColor: isDark ? colors.green : colors.white,
                 };
             case 'finished':
                 return {
-                    bg: isDark ? colors.surface : colors.primary.dark,
+                    bg: isDark ? colors.iron[100] : colors.primary.dark,
                     label: '¡COMPLETADO!',
                     ringColor: colors.primary.DEFAULT,
-                    accentBg: withAlpha(colors.primary.DEFAULT, '26')
+                    accentBg: withAlpha(colors.primary.DEFAULT, '26'),
+                    textColor: isDark ? colors.text : colors.onPrimary,
                 };
             default:
                 return {
-                    bg: isDark ? colors.surface : colors.background,
+                    bg: colors.background,
                     label: '',
                     ringColor: colors.primary.DEFAULT,
-                    accentBg: 'transparent'
+                    accentBg: 'transparent',
+                    textColor: colors.text,
                 };
         }
     };
@@ -527,14 +551,14 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
             <View style={[ss.activeContainer, { backgroundColor: phaseConfig.bg }]}>
                 {/* Top Bar: phase + close */}
                 <View style={[ss.activeTopBar, { top: insets.top }]}>
-                    <View style={ss.activePhaseChip}>
+                    <View style={[ss.activePhaseChip, { backgroundColor: withAlpha(phaseConfig.textColor, '12') }]}>
                         <View style={[ss.activePhaseIndicator, { backgroundColor: phaseConfig.ringColor }]} />
-                        <Text style={ss.activePhaseChipText}>
+                        <Text style={[ss.activePhaseChipText, { color: phaseConfig.textColor }]}>
                             {phase === 'finished' ? 'FINALIZADO' : phase === 'prepare' ? 'PREPARACIÓN' : phase === 'work' ? 'TRABAJO' : 'DESCANSO'}
                         </Text>
                     </View>
-                    <TouchableOpacity onPress={handleClose} style={ss.activeCloseBtn} activeOpacity={0.8}>
-                        <X color={colors.text} size={18} />
+                    <TouchableOpacity onPress={handleClose} style={[ss.activeCloseBtn, { backgroundColor: withAlpha(phaseConfig.textColor, '12') }]} activeOpacity={0.8}>
+                        <X color={phaseConfig.textColor} size={18} />
                     </TouchableOpacity>
                 </View>
 
@@ -553,31 +577,31 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
 
                 {/* Main Content */}
                 <View style={{ alignItems: 'center' }}>
-                    <Text style={ss.phaseLabel}>{phaseConfig.label}</Text>
+                    <Text style={[ss.phaseLabel, { color: phaseConfig.textColor }]}>{phaseConfig.label}</Text>
 
                     {phase !== 'finished' ? (
                         <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
                             <View style={{ alignItems: 'center', justifyContent: 'center', width: RING_SIZE, height: RING_SIZE }}>
                                 <Svg width={RING_SIZE} height={RING_SIZE} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
-                                    <Circle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS} stroke={withAlpha(colors.text, '14')} strokeWidth={RING_STROKE} fill="none" />
+                                    <Circle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS} stroke={withAlpha(phaseConfig.textColor, '14')} strokeWidth={RING_STROKE} fill="none" />
                                     <AnimatedCircle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS} stroke={phaseConfig.ringColor} strokeWidth={RING_STROKE} fill="none" strokeLinecap="round" strokeDasharray={`${RING_CIRCUMFERENCE}`} strokeDashoffset={strokeDashoffset} />
                                 </Svg>
-                                <Text style={ss.timerBig}>{formatTime(timeLeft)}</Text>
+                                <Text style={[ss.timerBig, { color: phaseConfig.textColor }]}>{formatTime(timeLeft)}</Text>
                             </View>
                         </Animated.View>
                     ) : (
                         <View style={{ alignItems: 'center', marginVertical: 16 }}>
-                            <Text style={[ss.timerBig, { fontSize: 56 }]}>¡LISTO!</Text>
+                            <Text style={[ss.timerBig, { fontSize: 56, color: phaseConfig.textColor }]}>¡LISTO!</Text>
                         </View>
                     )}
 
-                    <Text style={ss.roundInfo}>
+                    <Text style={[ss.roundInfo, { color: withAlpha(phaseConfig.textColor, '80') }]}>
                         {phase === 'finished' ? `${rounds} rondas completadas` : phase === 'prepare' ? 'Comienza en...' : `Ronda ${currentRound} de ${rounds}`}
                     </Text>
                     {phase !== 'prepare' && (
-                        <View style={ss.elapsedChip}>
-                            <RotateCcw size={12} color={withAlpha(colors.text, '80')} />
-                            <Text style={ss.elapsedInfo}>{formatDuration(elapsedTotal)}</Text>
+                        <View style={[ss.elapsedChip, { backgroundColor: withAlpha(phaseConfig.textColor, '10') }]}>
+                            <RotateCcw size={12} color={withAlpha(phaseConfig.textColor, '80')} />
+                            <Text style={[ss.elapsedInfo, { color: withAlpha(phaseConfig.textColor, '80') }]}>{formatDuration(elapsedTotal)}</Text>
                         </View>
                     )}
                 </View>
@@ -586,19 +610,19 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                 {phase !== 'finished' && phase !== 'prepare' && (
                     <View style={[ss.controlsRow, { bottom: insets.bottom + 48 }]}>
                         <View style={ss.alignCenter}>
-                            <TouchableOpacity onPress={handleReset} style={ss.controlBtn} activeOpacity={0.8}>
-                                <RotateCcw color={colors.text} size={22} />
+                            <TouchableOpacity onPress={handleReset} style={[ss.controlBtn, { backgroundColor: withAlpha(phaseConfig.textColor, '10') }]} activeOpacity={0.8}>
+                                <RotateCcw color={phaseConfig.textColor} size={22} />
                             </TouchableOpacity>
-                            <Text style={ss.controlLabel}>Reset</Text>
+                            <Text style={[ss.controlLabel, { color: withAlpha(phaseConfig.textColor, '80') }]}>Reset</Text>
                         </View>
-                        <TouchableOpacity onPress={handlePause} style={ss.pauseBtn} activeOpacity={0.9}>
-                            {isPaused ? <Play color={colors.text} size={32} fill={colors.text} /> : <Pause color={colors.text} size={32} fill={colors.text} />}
+                        <TouchableOpacity onPress={handlePause} style={[ss.pauseBtn, { backgroundColor: phaseConfig.textColor }]} activeOpacity={0.9}>
+                            {isPaused ? <Play color={phaseConfig.bg} size={32} fill={phaseConfig.bg} /> : <Pause color={phaseConfig.bg} size={32} fill={phaseConfig.bg} />}
                         </TouchableOpacity>
                         <View style={ss.alignCenter}>
-                            <TouchableOpacity onPress={handleSkipPhase} style={ss.controlBtn} activeOpacity={0.8}>
-                                <ChevronDown color={colors.text} size={22} style={{ transform: [{ rotate: '-90deg' }] }} />
+                            <TouchableOpacity onPress={handleSkipPhase} style={[ss.controlBtn, { backgroundColor: withAlpha(phaseConfig.textColor, '10') }]} activeOpacity={0.8}>
+                                <ChevronDown color={phaseConfig.textColor} size={22} style={{ transform: [{ rotate: '-90deg' }] }} />
                             </TouchableOpacity>
-                            <Text style={ss.controlLabel}>Saltar</Text>
+                            <Text style={[ss.controlLabel, { color: withAlpha(phaseConfig.textColor, '80') }]}>Saltar</Text>
                         </View>
                     </View>
                 )}

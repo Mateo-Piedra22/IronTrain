@@ -2,12 +2,15 @@ import { withAlpha } from '@/src/theme';
 import { Plus } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors } from '../src/hooks/useColors';
 import { badgeService } from '../src/services/BadgeService';
 import { CategoryService } from '../src/services/CategoryService';
 import { ExerciseService } from '../src/services/ExerciseService';
+import { confirm } from '../src/store/confirmStore';
 import { Badge, Category, Exercise, ExerciseType } from '../src/types/db';
+import { buildDuplicateMessage, findExerciseDuplicates, type ExerciseDuplicateCandidate } from '../src/utils/duplicates';
 import { BadgeSelectorModal } from './BadgeSelectorModal';
 import { BadgePill } from './ui/BadgePill';
 
@@ -159,6 +162,51 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
 
     const handleSave = async () => {
         if (!name.trim() || !categoryId) return;
+
+        const existingExercises = await ExerciseService.search('', categoryId);
+        const candidates: ExerciseDuplicateCandidate[] = existingExercises.map((e: any) => ({
+            id: e.id,
+            name: e.name,
+            category_id: e.category_id,
+            type: e.type,
+            badge_ids: (e.badges ?? []).map((b: any) => b.id).filter(Boolean),
+            category_name: e.category_name,
+        }));
+
+        const duplicates = findExerciseDuplicates(
+            {
+                id: initialData?.id,
+                name,
+                category_id: categoryId,
+                type,
+                badge_ids: selectedBadgeIds,
+            },
+            candidates,
+            3
+        );
+
+        if (duplicates.length > 0) {
+            const preview = duplicates.map((d) => ({
+                title: d.name,
+                subtitle: d.category_name ?? undefined,
+            }));
+
+            confirm.custom({
+                title: 'Posible duplicado',
+                message: buildDuplicateMessage('Ya existe un ejercicio muy similar. ¿Querés guardarlo igual?', preview),
+                variant: 'warning',
+                buttons: [
+                    { label: 'Cancelar', onPress: confirm.hide, variant: 'ghost' },
+                    { label: 'Guardar igualmente', onPress: async () => { confirm.hide(); await doSave(); }, variant: 'solid' },
+                ]
+            });
+            return;
+        }
+
+        await doSave();
+    };
+
+    const doSave = async () => {
         try {
             let exerciseId = '';
             if (initialData) {
@@ -193,118 +241,120 @@ export function ExerciseFormModal({ visible, onClose, onSave, initialData }: Exe
                 style={ss.overlay}
             >
                 <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
-                    <ScrollView
-                        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}
-                        keyboardShouldPersistTaps="handled"
-                        bounces={false}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        <View style={ss.modalContent}>
-                            <Text style={ss.title}>
-                                {initialData ? 'Editar ejercicio' : 'Nuevo ejercicio'}
-                            </Text>
+                    <GestureHandlerRootView style={{ flex: 1 }}>
+                        <ScrollView
+                            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}
+                            keyboardShouldPersistTaps="handled"
+                            bounces={false}
+                            showsVerticalScrollIndicator={false}
+                        >
+                            <View style={ss.modalContent}>
+                                <Text style={ss.title}>
+                                    {initialData ? 'Editar ejercicio' : 'Nuevo ejercicio'}
+                                </Text>
 
-                            {/* Name */}
-                            <Text style={ss.label}>Nombre</Text>
-                            <TextInput
-                                value={name}
-                                onChangeText={setName}
-                                placeholder="Ej: Press de banca"
-                                placeholderTextColor={colors.textMuted}
-                                style={ss.input}
-                                accessibilityLabel="Nombre del ejercicio"
-                            />
+                                {/* Name */}
+                                <Text style={ss.label}>Nombre</Text>
+                                <TextInput
+                                    value={name}
+                                    onChangeText={setName}
+                                    placeholder="Ej: Press de banca"
+                                    placeholderTextColor={colors.textMuted}
+                                    style={ss.input}
+                                    accessibilityLabel="Nombre del ejercicio"
+                                />
 
-                            {/* Category */}
-                            <Text style={ss.label}>Categoría</Text>
-                            <View style={[ss.chipRow, ss.section]}>
-                                {categories.map(cat => {
-                                    const isActive = categoryId === cat.id;
-                                    const catColor = (cat as any).color || colors.primary.DEFAULT;
-                                    return (
-                                        <TouchableOpacity
-                                            key={cat.id}
-                                            onPress={() => setCategoryId(cat.id)}
-                                            style={[
-                                                ss.catChip,
-                                                isActive && { backgroundColor: withAlpha(catColor, '14'), borderColor: catColor }
-                                            ]}
-                                            accessibilityRole="button"
-                                        >
-                                            <View style={[ss.catDot, { backgroundColor: catColor }]} />
-                                            <Text style={[ss.catText, isActive && { color: catColor, fontWeight: '900' }]}>{cat.name}</Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </View>
+                                {/* Category */}
+                                <Text style={ss.label}>Categoría</Text>
+                                <View style={[ss.chipRow, ss.section]}>
+                                    {categories.map(cat => {
+                                        const isActive = categoryId === cat.id;
+                                        const catColor = (cat as any).color || colors.primary.DEFAULT;
+                                        return (
+                                            <TouchableOpacity
+                                                key={cat.id}
+                                                onPress={() => setCategoryId(cat.id)}
+                                                style={[
+                                                    ss.catChip,
+                                                    isActive && { backgroundColor: withAlpha(catColor, '14'), borderColor: catColor }
+                                                ]}
+                                                accessibilityRole="button"
+                                            >
+                                                <View style={[ss.catDot, { backgroundColor: catColor }]} />
+                                                <Text style={[ss.catText, isActive && { color: catColor, fontWeight: '900' }]}>{cat.name}</Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
 
-                            {/* Badges Selection */}
-                            <Text style={ss.label}>Badges / Etiquetas</Text>
-                            <View style={ss.section}>
-                                <TouchableOpacity
-                                    onPress={() => setShowBadgeSelector(true)}
-                                    style={ss.badgePicker}
-                                >
-                                    {selectedBadgeIds.length === 0 ? (
-                                        <View style={ss.badgePlaceholder}>
-                                            <Plus size={16} color={colors.textMuted} />
-                                            <Text style={ss.badgePlaceholderText}>Añadir badges...</Text>
-                                        </View>
-                                    ) : (
-                                        <>
-                                            {selectedBadgeIds.map(id => {
-                                                const badge = allBadges.find(b => b.id === id);
-                                                if (!badge) return null;
-                                                return (
-                                                    <BadgePill
-                                                        key={badge.id}
-                                                        name={badge.name}
-                                                        color={badge.color}
-                                                        icon={badge.icon || undefined}
-                                                        size="md"
-                                                    />
-                                                );
-                                            })}
-                                            <View style={ss.addBadgeIcon}>
-                                                <Plus size={14} color={colors.textMuted} />
+                                {/* Badges Selection */}
+                                <Text style={ss.label}>Badges / Etiquetas</Text>
+                                <View style={ss.section}>
+                                    <TouchableOpacity
+                                        onPress={() => setShowBadgeSelector(true)}
+                                        style={ss.badgePicker}
+                                    >
+                                        {selectedBadgeIds.length === 0 ? (
+                                            <View style={ss.badgePlaceholder}>
+                                                <Plus size={16} color={colors.textMuted} />
+                                                <Text style={ss.badgePlaceholderText}>Añadir badges...</Text>
                                             </View>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
-                            </View>
+                                        ) : (
+                                            <>
+                                                {selectedBadgeIds.map(id => {
+                                                    const badge = allBadges.find(b => b.id === id);
+                                                    if (!badge) return null;
+                                                    return (
+                                                        <BadgePill
+                                                            key={badge.id}
+                                                            name={badge.name}
+                                                            color={badge.color}
+                                                            icon={badge.icon || undefined}
+                                                            size="md"
+                                                        />
+                                                    );
+                                                })}
+                                                <View style={ss.addBadgeIcon}>
+                                                    <Plus size={14} color={colors.textMuted} />
+                                                </View>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
 
-                            {/* Type/Registro Selection */}
-                            <Text style={ss.label}>Registro</Text>
-                            <View style={[ss.typeContainer, ss.section]}>
-                                {EXERCISE_TYPES.map(t => {
-                                    const isActive = type === t.id;
-                                    return (
-                                        <TouchableOpacity
-                                            key={t.id}
-                                            onPress={() => setType(t.id)}
-                                            style={[ss.typeCard, isActive && ss.typeCardActive]}
-                                            accessibilityRole="button"
-                                        >
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={[ss.typeLabel, isActive && ss.typeLabelActive]}>{t.label}</Text>
-                                                <Text style={ss.typeDesc}>{t.desc}</Text>
-                                            </View>
-                                            {isActive && <View style={ss.typeIndicator} />}
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </View>
+                                {/* Type/Registro Selection */}
+                                <Text style={ss.label}>Registro</Text>
+                                <View style={[ss.typeContainer, ss.section]}>
+                                    {EXERCISE_TYPES.map(t => {
+                                        const isActive = type === t.id;
+                                        return (
+                                            <TouchableOpacity
+                                                key={t.id}
+                                                onPress={() => setType(t.id)}
+                                                style={[ss.typeCard, isActive && ss.typeCardActive]}
+                                                accessibilityRole="button"
+                                            >
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={[ss.typeLabel, isActive && ss.typeLabelActive]}>{t.label}</Text>
+                                                    <Text style={ss.typeDesc}>{t.desc}</Text>
+                                                </View>
+                                                {isActive && <View style={ss.typeIndicator} />}
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
 
-                            <View style={ss.footer}>
-                                <TouchableOpacity onPress={onClose} style={ss.cancelBtn}>
-                                    <Text style={ss.cancelText}>Cancelar</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={handleSave} style={ss.saveBtn}>
-                                    <Text style={ss.saveText}>Guardar</Text>
-                                </TouchableOpacity>
+                                <View style={ss.footer}>
+                                    <TouchableOpacity onPress={onClose} style={ss.cancelBtn}>
+                                        <Text style={ss.cancelText}>Cancelar</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={handleSave} style={ss.saveBtn}>
+                                        <Text style={ss.saveText}>Guardar</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
-                        </View>
-                    </ScrollView>
+                        </ScrollView>
+                    </GestureHandlerRootView>
                 </SafeAreaView>
 
                 <BadgeSelectorModal

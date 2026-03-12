@@ -7,11 +7,13 @@ import { useAuthStore } from '@/src/store/authStore';
 import { confirm } from '@/src/store/confirmStore';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { Routine } from '@/src/types/db';
+import { buildDuplicateMessage, findNameDuplicates } from '@/src/utils/duplicates';
 import { notify } from '@/src/utils/notify';
 import { Calendar, ChevronRight, Dumbbell, Edit3, GripVertical, Plus, Send, Share2, Trash2, User, Users, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors } from '../src/hooks/useColors';
 import { BadgePill } from './ui/BadgePill';
@@ -72,6 +74,11 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             minHeight: '100%',
         },
         scrollContent: { paddingBottom: 40 },
+        listContent: {
+            padding: 16,
+            paddingBottom: 40,
+            backgroundColor: colors.surfaceLighter,
+        },
         sectionLabel: {
             color: colors.textMuted,
             fontSize: 10,
@@ -303,11 +310,12 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
 
     const [routine, setRoutine] = useState<Routine | null>(null);
     const [days, setDays] = useState<RoutineDayWithExercises[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
+    const [dayLoading, setDayLoading] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
 
     const [viewMode, setViewMode] = useState<ViewMode>('routine');
     const [selectedDay, setSelectedDay] = useState<RoutineDayWithExercises | null>(null);
-    const [dayLoading, setDayLoading] = useState(false);
 
     const [editRoutineVisible, setEditRoutineVisible] = useState(false);
     const [editRoutineName, setEditRoutineName] = useState('');
@@ -358,21 +366,69 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
 
     const handleAddDay = async () => {
         if (!routineId) return;
+        const nextName = `Día ${days.length + 1}`;
+
+        const run = async () => {
+            try {
+                await routineService.addRoutineDay(routineId, nextName, days.length);
+                notify.success('Añadido', `${nextName} creado.`);
+                loadRoutine();
+            } catch (e: any) { notify.error('Error', e?.message || 'No se pudo añadir.'); }
+        };
+
         try {
-            await routineService.addRoutineDay(routineId, `Día ${days.length + 1}`, days.length);
-            notify.success('Añadido', `Día ${days.length + 1} creado.`);
-            loadRoutine();
-        } catch (e: any) { notify.error('Error', e?.message || 'No se pudo añadir.'); }
+            const duplicates = findNameDuplicates({ name: nextName }, days, 3);
+            if (duplicates.length > 0) {
+                confirm.custom({
+                    title: 'Posible duplicado',
+                    message: buildDuplicateMessage('Ya existe un día con un nombre muy similar en esta rutina. ¿Querés crearlo igual?', duplicates.map((d) => ({ title: d.name }))),
+                    variant: 'warning',
+                    buttons: [
+                        { label: 'Cancelar', onPress: confirm.hide, variant: 'ghost' },
+                        { label: 'Crear igualmente', onPress: async () => { confirm.hide(); await run(); }, variant: 'solid' },
+                    ]
+                });
+                return;
+            }
+        } catch {
+            // If duplicate check fails, do not block creation.
+        }
+
+        await run();
     };
 
     const handleSaveRoutineEdit = async () => {
         if (!editRoutineName.trim() || !routineId) return;
+
+        const run = async () => {
+            try {
+                await routineService.updateRoutine(routineId, editRoutineName.trim(), editRoutineDesc.trim() || undefined, editRoutinePublic ? 1 : 0);
+                notify.success('Actualizado', 'Rutina actualizada.');
+                setEditRoutineVisible(false);
+                loadRoutine();
+            } catch (e: any) { notify.error('Error', e?.message || 'Error.'); }
+        };
+
         try {
-            await routineService.updateRoutine(routineId, editRoutineName.trim(), editRoutineDesc.trim() || undefined, editRoutinePublic ? 1 : 0);
-            notify.success('Actualizado', 'Rutina actualizada.');
-            setEditRoutineVisible(false);
-            loadRoutine();
-        } catch (e: any) { notify.error('Error', e?.message || 'Error.'); }
+            const all = await routineService.getAllRoutines();
+            const duplicates = findNameDuplicates({ id: routineId, name: editRoutineName }, all, 3);
+            if (duplicates.length > 0) {
+                confirm.custom({
+                    title: 'Posible duplicado',
+                    message: buildDuplicateMessage('Ya existe una rutina con un nombre muy similar. ¿Querés guardarla igual?', duplicates.map((d) => ({ title: d.name }))),
+                    variant: 'warning',
+                    buttons: [
+                        { label: 'Cancelar', onPress: confirm.hide, variant: 'ghost' },
+                        { label: 'Guardar igualmente', onPress: async () => { confirm.hide(); await run(); }, variant: 'solid' },
+                    ]
+                });
+                return;
+            }
+        } catch {
+            // If duplicate check fails, do not block save.
+        }
+
+        await run();
     };
 
     const handleDeleteRoutine = () => {
@@ -393,12 +449,40 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
 
     const handleSaveDayEdit = async () => {
         if (!editDayName.trim() || !selectedDay) return;
+
+        const run = async () => {
+            try {
+                await routineService.updateRoutineDay(selectedDay.id, editDayName.trim(), selectedDay.order_index);
+                notify.success('Actualizado', 'Nombre cambiado.');
+                setEditDayVisible(false);
+                loadDayDetail(selectedDay.id);
+            } catch (e: any) { notify.error('Error', e?.message || 'Error.'); }
+        };
+
         try {
-            await routineService.updateRoutineDay(selectedDay.id, editDayName.trim(), selectedDay.order_index);
-            notify.success('Actualizado', 'Nombre cambiado.');
-            setEditDayVisible(false);
-            loadDayDetail(selectedDay.id);
-        } catch (e: any) { notify.error('Error', e?.message || 'Error.'); }
+            const duplicates = findNameDuplicates(
+                { id: selectedDay.id, name: editDayName },
+                (days ?? []).filter((d) => d.routine_id === selectedDay.routine_id),
+                3
+            );
+
+            if (duplicates.length > 0) {
+                confirm.custom({
+                    title: 'Posible duplicado',
+                    message: buildDuplicateMessage('Ya existe un día con un nombre muy similar en esta rutina. ¿Querés guardarlo igual?', duplicates.map((d) => ({ title: d.name }))),
+                    variant: 'warning',
+                    buttons: [
+                        { label: 'Cancelar', onPress: confirm.hide, variant: 'ghost' },
+                        { label: 'Guardar igualmente', onPress: async () => { confirm.hide(); await run(); }, variant: 'solid' },
+                    ]
+                });
+                return;
+            }
+        } catch {
+            // If duplicate check fails, do not block save.
+        }
+
+        await run();
     };
 
     const handleDeleteDay = () => {
@@ -581,181 +665,184 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
 
     return (
         <Modal visible={visible} animationType="fade" transparent onRequestClose={handleClose}>
-            <View style={ss.overlay}>
-                <View style={ss.sheet}>
-                    {/* Header */}
-                    <View style={ss.header}>
-                        <View style={ss.headerTextContainer}>
-                            <Text style={ss.headerTitle}>
-                                {viewMode === 'day' && selectedDay ? selectedDay.name : routine?.name || 'Rutina'}
-                            </Text>
-                            <Text style={ss.headerSub}>
-                                {viewMode === 'day'
-                                    ? `${selectedDay?.exercises?.length || 0} ejercicios`
-                                    : `${days.length} ${days.length === 1 ? 'día' : 'días'} de entrenamiento`}
-                            </Text>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+                <View style={ss.overlay}>
+                    <View style={ss.sheet}>
+                        {/* Header */}
+                        <View style={ss.header}>
+                            <View style={ss.headerTextContainer}>
+                                <Text style={ss.headerTitle}>
+                                    {viewMode === 'day' && selectedDay ? selectedDay.name : routine?.name || 'Rutina'}
+                                </Text>
+                                <Text style={ss.headerSub}>
+                                    {viewMode === 'day'
+                                        ? `${selectedDay?.exercises?.length || 0} ejercicios`
+                                        : `${days.length} ${days.length === 1 ? 'día' : 'días'} de entrenamiento`}
+                                </Text>
+                            </View>
+                            <TouchableOpacity onPress={handleClose} style={ss.closeBtn}>
+                                <X size={18} color={colors.text} />
+                            </TouchableOpacity>
                         </View>
-                        <TouchableOpacity onPress={handleClose} style={ss.closeBtn}>
-                            <X size={18} color={colors.text} />
-                        </TouchableOpacity>
-                    </View>
 
-                    {loading ? (
-                        <View style={ss.centered}><ActivityIndicator size="large" color={colors.primary.DEFAULT} /></View>
-                    ) : viewMode === 'routine' ? (
-                        <ScrollView contentContainerStyle={ss.scrollContent}>
-                            <View style={ss.contentArea}>
-                                {routine?.is_moderated === 1 ? (
-                                    <View style={[ss.infoCard, ss.warningCard]}>
-                                        <Text style={ss.warningLabel}>⚠️ ESTADO: OCULTA</Text>
-                                        <Text style={ss.infoCardText}>
-                                            {routine.moderation_message || 'Esta rutina ha sido ocultada del directorio público por un administrador.'}
-                                        </Text>
-                                    </View>
-                                ) : routine?.description ? (
-                                    <View style={ss.infoCard}>
-                                        <Text style={ss.infoCardText}>{routine.description}</Text>
-                                    </View>
-                                ) : null}
+                        {loading ? (
+                            <View style={ss.centered}><ActivityIndicator size="large" color={colors.primary.DEFAULT} /></View>
+                        ) : viewMode === 'routine' ? (
+                            <DraggableFlatList
+                                data={days}
+                                keyExtractor={(item) => item.id}
+                                scrollEnabled={!isDragging}
+                                onDragBegin={() => setIsDragging(true)}
+                                onDragEnd={({ data }) => { setIsDragging(false); handleReorderDays(data); }}
+                                renderItem={renderDayItem}
+                                activationDistance={20}
+                                contentContainerStyle={ss.listContent}
+                                ListHeaderComponent={(
+                                    <View>
+                                        {routine?.is_moderated === 1 ? (
+                                            <View style={[ss.infoCard, ss.warningCard]}>
+                                                <Text style={ss.warningLabel}>⚠️ ESTADO: OCULTA</Text>
+                                                <Text style={ss.infoCardText}>
+                                                    {routine.moderation_message || 'Esta rutina ha sido ocultada del directorio público por un administrador.'}
+                                                </Text>
+                                            </View>
+                                        ) : routine?.description ? (
+                                            <View style={ss.infoCard}>
+                                                <Text style={ss.infoCardText}>{routine.description}</Text>
+                                            </View>
+                                        ) : null}
 
-                                {/* Action buttons row */}
-                                <View style={ss.btnRow}>
-                                    <View style={ss.btnCol}>
-                                        <TouchableOpacity style={[ss.smallBtn, ss.smallBtnPrimary]} onPress={handleShareRoutine}>
-                                            <Share2 size={12} color={colors.onPrimary} />
-                                            <Text style={[ss.smallBtnText, ss.smallBtnTextWhite]}>Link</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                    <View style={ss.btnCol}>
-                                        <TouchableOpacity style={ss.smallBtn} onPress={handleOpenFriendPicker}>
-                                            <Send size={12} color={colors.primary.DEFAULT} />
-                                            <Text style={ss.smallBtnText}>Amigo</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                    <View style={ss.btnCol}>
-                                        <TouchableOpacity style={ss.smallBtn} onPress={() => {
-                                            setEditRoutineName(routine?.name || ''); setEditRoutineDesc(routine?.description || ''); setEditRoutinePublic(routine?.is_public === 1); setEditRoutineVisible(true);
-                                        }}>
-                                            <Edit3 size={12} color={colors.primary.DEFAULT} />
-                                            <Text style={ss.smallBtnText}>Edit</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                    <View style={ss.btnCol}>
-                                        <TouchableOpacity style={[ss.smallBtn, ss.smallBtnDanger]} onPress={handleDeleteRoutine}>
-                                            <Trash2 size={12} color={colors.red} />
-                                            <Text style={[ss.smallBtnText, ss.smallBtnTextDanger]}>Del</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
+                                        <View style={ss.btnRow}>
+                                            <View style={ss.btnCol}>
+                                                <TouchableOpacity style={[ss.smallBtn, ss.smallBtnPrimary]} onPress={handleShareRoutine}>
+                                                    <Share2 size={12} color={colors.onPrimary} />
+                                                    <Text style={[ss.smallBtnText, ss.smallBtnTextWhite]}>Link</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                            <View style={ss.btnCol}>
+                                                <TouchableOpacity style={ss.smallBtn} onPress={handleOpenFriendPicker}>
+                                                    <Send size={12} color={colors.primary.DEFAULT} />
+                                                    <Text style={ss.smallBtnText}>Amigo</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                            <View style={ss.btnCol}>
+                                                <TouchableOpacity style={ss.smallBtn} onPress={() => {
+                                                    setEditRoutineName(routine?.name || ''); setEditRoutineDesc(routine?.description || ''); setEditRoutinePublic(routine?.is_public === 1); setEditRoutineVisible(true);
+                                                }}>
+                                                    <Edit3 size={12} color={colors.primary.DEFAULT} />
+                                                    <Text style={ss.smallBtnText}>Edit</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                            <View style={ss.btnCol}>
+                                                <TouchableOpacity style={[ss.smallBtn, ss.smallBtnDanger]} onPress={handleDeleteRoutine}>
+                                                    <Trash2 size={12} color={colors.red} />
+                                                    <Text style={[ss.smallBtnText, ss.smallBtnTextDanger]}>Del</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
 
-                                {/* Section label */}
-                                <Text style={ss.sectionLabel}>Días de entrenamiento</Text>
-
-                                {/* Days */}
-                                {days.length === 0 ? (
+                                        <Text style={ss.sectionLabel}>Días de entrenamiento</Text>
+                                    </View>
+                                )}
+                                ListEmptyComponent={(
                                     <View style={ss.emptyBlock}>
                                         <Calendar size={28} color={colors.textMuted} />
                                         <Text style={ss.emptyTitle}>Sin días definidos</Text>
                                         <Text style={ss.emptyText}>Tocá el botón para agregar estructura.</Text>
                                     </View>
-                                ) : (
-                                    <DraggableFlatList
-                                        data={days}
-                                        keyExtractor={(item) => item.id}
-                                        onDragEnd={({ data }) => handleReorderDays(data)}
-                                        renderItem={renderDayItem}
-                                        activationDistance={20}
-                                        scrollEnabled={false}
-                                    />
                                 )}
-
-                                {/* Add day button */}
-                                <TouchableOpacity style={ss.addRow} onPress={handleAddDay}>
-                                    <Plus size={18} color={colors.primary.DEFAULT} />
-                                    <Text style={ss.addRowText}>Agregar día</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </ScrollView>
-                    ) : (
-                        <ScrollView contentContainerStyle={ss.scrollContent}>
-                            <View style={ss.contentArea}>
-                                {/* Day action buttons */}
-                                <View style={ss.btnRow}>
-                                    <View style={ss.btnCol}>
-                                        <TouchableOpacity style={ss.smallBtn} onPress={() => { setEditDayName(selectedDay?.name || ''); setEditDayVisible(true); }}>
-                                            <Edit3 size={14} color={colors.primary.DEFAULT} />
-                                            <Text style={ss.smallBtnText}>Renombrar</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                    <View style={ss.btnCol}>
-                                        <TouchableOpacity style={[ss.smallBtn, ss.smallBtnDanger]} onPress={handleDeleteDay}>
-                                            <Trash2 size={14} color={colors.red} />
-                                            <Text style={[ss.smallBtnText, ss.smallBtnTextDanger]}>Eliminar día</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-
-                                <Text style={ss.sectionLabel}>Ejercicios del día</Text>
-
-                                {dayLoading ? (
-                                    <View style={ss.loadingContainer}><ActivityIndicator color={colors.primary.DEFAULT} /></View>
-                                ) : (selectedDay?.exercises || []).length === 0 ? (
-                                    <View style={ss.emptyBlock}>
-                                        <Dumbbell size={28} color={colors.textMuted} />
-                                        <Text style={ss.emptyTitle}>Sin ejercicios</Text>
-                                        <Text style={ss.emptyText}>Agregá ejercicios a este día.</Text>
-                                    </View>
-                                ) : (
-                                    <DraggableFlatList
-                                        data={selectedDay?.exercises || []}
-                                        keyExtractor={(item) => item.id}
-                                        onDragEnd={({ data }) => handleReorderExercises(data)}
-                                        renderItem={renderExerciseItem}
-                                        activationDistance={20}
-                                        scrollEnabled={false}
-                                    />
+                                ListFooterComponent={(
+                                    <TouchableOpacity style={ss.addRow} onPress={handleAddDay}>
+                                        <Plus size={18} color={colors.primary.DEFAULT} />
+                                        <Text style={ss.addRowText}>Agregar día</Text>
+                                    </TouchableOpacity>
                                 )}
+                            />
+                        ) : (
+                            dayLoading ? (
+                                <View style={ss.loadingContainer}><ActivityIndicator color={colors.primary.DEFAULT} /></View>
+                            ) : (
+                                <DraggableFlatList
+                                    data={selectedDay?.exercises || []}
+                                    keyExtractor={(item) => item.id}
+                                    scrollEnabled={!isDragging}
+                                    onDragBegin={() => setIsDragging(true)}
+                                    onDragEnd={({ data }) => { setIsDragging(false); handleReorderExercises(data); }}
+                                    renderItem={renderExerciseItem}
+                                    activationDistance={20}
+                                    contentContainerStyle={ss.listContent}
+                                    ListHeaderComponent={(
+                                        <View>
+                                            <View style={ss.btnRow}>
+                                                <View style={ss.btnCol}>
+                                                    <TouchableOpacity style={ss.smallBtn} onPress={() => { setEditDayName(selectedDay?.name || ''); setEditDayVisible(true); }}>
+                                                        <Edit3 size={14} color={colors.primary.DEFAULT} />
+                                                        <Text style={ss.smallBtnText}>Renombrar</Text>
+                                                    </TouchableOpacity>
+                                                </View>
+                                                <View style={ss.btnCol}>
+                                                    <TouchableOpacity style={[ss.smallBtn, ss.smallBtnDanger]} onPress={handleDeleteDay}>
+                                                        <Trash2 size={14} color={colors.red} />
+                                                        <Text style={[ss.smallBtnText, ss.smallBtnTextDanger]}>Eliminar día</Text>
+                                                    </TouchableOpacity>
+                                                </View>
+                                            </View>
 
-                                <TouchableOpacity style={ss.addRow} onPress={() => setAddExerciseVisible(true)}>
-                                    <Plus size={18} color={colors.primary.DEFAULT} />
-                                    <Text style={ss.addRowText}>Agregar ejercicio</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </ScrollView>
-                    )}
+                                            <Text style={ss.sectionLabel}>Ejercicios del día</Text>
+                                        </View>
+                                    )}
+                                    ListEmptyComponent={(
+                                        <View style={ss.emptyBlock}>
+                                            <Dumbbell size={28} color={colors.textMuted} />
+                                            <Text style={ss.emptyTitle}>Sin ejercicios</Text>
+                                            <Text style={ss.emptyText}>Agregá ejercicios a este día.</Text>
+                                        </View>
+                                    )}
+                                    ListFooterComponent={(
+                                        <TouchableOpacity style={ss.addRow} onPress={() => setAddExerciseVisible(true)}>
+                                            <Plus size={18} color={colors.primary.DEFAULT} />
+                                            <Text style={ss.addRowText}>Agregar ejercicio</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                />
+                            )
+                        )}
+                    </View>
                 </View>
-            </View>
+            </GestureHandlerRootView>
 
             {/* Edit Routine */}
             {editRoutineVisible && (
                 <Modal transparent visible animationType="fade" onRequestClose={() => setEditRoutineVisible(false)}>
                     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
                         <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: ThemeFx.backdropStrong }}>
-                            <ScrollView
-                                contentContainerStyle={ss.innerOverlay}
-                                keyboardShouldPersistTaps="handled"
-                                bounces={false}
-                                showsVerticalScrollIndicator={false}
-                            >
-                                <View style={ss.formBox}>
-                                    <Text style={ss.formTitle}>Editar rutina</Text>
-                                    <IronInput label="Nombre" value={editRoutineName} onChangeText={setEditRoutineName} autoFocus />
-                                    <IronInput label="Descripción" value={editRoutineDesc} onChangeText={setEditRoutineDesc} multiline numberOfLines={2} />
+                            <GestureHandlerRootView style={{ flex: 1 }}>
+                                <ScrollView
+                                    contentContainerStyle={ss.innerOverlay}
+                                    keyboardShouldPersistTaps="handled"
+                                    bounces={false}
+                                    showsVerticalScrollIndicator={false}
+                                >
+                                    <View style={ss.formBox}>
+                                        <Text style={ss.formTitle}>Editar rutina</Text>
+                                        <IronInput label="Nombre" value={editRoutineName} onChangeText={setEditRoutineName} autoFocus />
+                                        <IronInput label="Descripción" value={editRoutineDesc} onChangeText={setEditRoutineDesc} multiline numberOfLines={2} />
 
-                                    <View style={ss.formControlRow}>
-                                        <View style={ss.formLabelCol}>
-                                            <Text style={ss.formLabelMain}>Hacer Pública</Text>
-                                            <Text style={ss.formLabelSub}>Aparecerá en el Directorio Global para que otros la descarguen.</Text>
+                                        <View style={ss.formControlRow}>
+                                            <View style={ss.formLabelCol}>
+                                                <Text style={ss.formLabelMain}>Hacer Pública</Text>
+                                                <Text style={ss.formLabelSub}>Aparecerá en el Directorio Global para que otros la descarguen.</Text>
+                                            </View>
+                                            <Switch value={editRoutinePublic} onValueChange={setEditRoutinePublic} trackColor={{ true: colors.primary.DEFAULT }} />
                                         </View>
-                                        <Switch value={editRoutinePublic} onValueChange={setEditRoutinePublic} trackColor={{ true: colors.primary.DEFAULT }} />
-                                    </View>
 
-                                    <View style={ss.rowGap12}>
-                                        <View style={ss.flex1}><IronButton label="Cancelar" variant="ghost" onPress={() => setEditRoutineVisible(false)} /></View>
-                                        <View style={ss.flex1}><IronButton label="Guardar" onPress={handleSaveRoutineEdit} disabled={!editRoutineName.trim()} /></View>
+                                        <View style={ss.rowGap12}>
+                                            <View style={ss.flex1}><IronButton label="Cancelar" variant="ghost" onPress={() => setEditRoutineVisible(false)} /></View>
+                                            <View style={ss.flex1}><IronButton label="Guardar" onPress={handleSaveRoutineEdit} disabled={!editRoutineName.trim()} /></View>
+                                        </View>
                                     </View>
-                                </View>
-                            </ScrollView>
+                                </ScrollView>
+                            </GestureHandlerRootView>
                         </SafeAreaView>
                     </KeyboardAvoidingView>
                 </Modal>
@@ -766,21 +853,23 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                 <Modal transparent visible animationType="fade" onRequestClose={() => setEditDayVisible(false)}>
                     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
                         <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1, backgroundColor: ThemeFx.backdropStrong }}>
-                            <ScrollView
-                                contentContainerStyle={ss.innerOverlay}
-                                keyboardShouldPersistTaps="handled"
-                                bounces={false}
-                                showsVerticalScrollIndicator={false}
-                            >
-                                <View style={ss.formBox}>
-                                    <Text style={ss.formTitle}>Renombrar día</Text>
-                                    <IronInput label="Nombre del día" value={editDayName} onChangeText={setEditDayName} autoFocus />
-                                    <View style={ss.rowGap12}>
-                                        <View style={ss.flex1}><IronButton label="Cancelar" variant="ghost" onPress={() => setEditDayVisible(false)} /></View>
-                                        <View style={ss.flex1}><IronButton label="Guardar" onPress={handleSaveDayEdit} disabled={!editDayName.trim()} /></View>
+                            <GestureHandlerRootView style={{ flex: 1 }}>
+                                <ScrollView
+                                    contentContainerStyle={ss.innerOverlay}
+                                    keyboardShouldPersistTaps="handled"
+                                    bounces={false}
+                                    showsVerticalScrollIndicator={false}
+                                >
+                                    <View style={ss.formBox}>
+                                        <Text style={ss.formTitle}>Renombrar día</Text>
+                                        <IronInput label="Nombre del día" value={editDayName} onChangeText={setEditDayName} autoFocus />
+                                        <View style={ss.rowGap12}>
+                                            <View style={ss.flex1}><IronButton label="Cancelar" variant="ghost" onPress={() => setEditDayVisible(false)} /></View>
+                                            <View style={ss.flex1}><IronButton label="Guardar" onPress={handleSaveDayEdit} disabled={!editDayName.trim()} /></View>
+                                        </View>
                                     </View>
-                                </View>
-                            </ScrollView>
+                                </ScrollView>
+                            </GestureHandlerRootView>
                         </SafeAreaView>
                     </KeyboardAvoidingView>
                 </Modal>
@@ -790,21 +879,23 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             {addExerciseVisible && (
                 <Modal visible transparent animationType="slide" onRequestClose={() => setAddExerciseVisible(false)}>
                     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-                        <SafeAreaView edges={['top', 'left', 'right']} style={ss.overlay}>
-                            <View style={ss.sheet}>
-                                <View style={ss.header}>
-                                    <View style={ss.headerTextContainer}>
-                                        <Text style={ss.headerTitle}>Seleccionar ejercicio</Text>
-                                        <Text style={ss.headerSub}>Tocá uno para agregarlo a {selectedDay?.name}</Text>
+                        <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={{ flex: 1 }}>
+                            <GestureHandlerRootView style={{ flex: 1 }}>
+                                <View style={ss.sheet}>
+                                    <View style={ss.header}>
+                                        <View style={ss.headerTextContainer}>
+                                            <Text style={ss.headerTitle}>Seleccionar ejercicio</Text>
+                                            <Text style={ss.headerSub}>Tocá uno para agregarlo a {selectedDay?.name}</Text>
+                                        </View>
+                                        <TouchableOpacity onPress={() => setAddExerciseVisible(false)} style={ss.closeBtn}>
+                                            <X size={18} color={colors.text} />
+                                        </TouchableOpacity>
                                     </View>
-                                    <TouchableOpacity onPress={() => setAddExerciseVisible(false)} style={ss.closeBtn}>
-                                        <X size={18} color={colors.text} />
-                                    </TouchableOpacity>
+                                    <View style={ss.flex1}>
+                                        <ExerciseList onSelect={handleAddExercise} inModal />
+                                    </View>
                                 </View>
-                                <View style={ss.flex1}>
-                                    <ExerciseList onSelect={handleAddExercise} inModal />
-                                </View>
-                            </View>
+                            </GestureHandlerRootView>
                         </SafeAreaView>
                     </KeyboardAvoidingView>
                 </Modal>
@@ -812,53 +903,55 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             {/* Friend Picker */}
             {friendPickerVisible && (
                 <Modal visible transparent animationType="fade" onRequestClose={() => setFriendPickerVisible(false)}>
-                    <View style={ss.overlay}>
-                        <View style={ss.sheet}>
-                            <View style={ss.header}>
-                                <View style={ss.headerTextContainer}>
-                                    <Text style={ss.headerTitle}>Enviar a amigo</Text>
-                                    <Text style={ss.headerSub}>Comparte esta rutina al inbox de un amigo</Text>
-                                </View>
-                                <TouchableOpacity onPress={() => setFriendPickerVisible(false)} style={ss.closeBtn}>
-                                    <X size={18} color={colors.text} />
-                                </TouchableOpacity>
-                            </View>
-                            <View style={ss.friendPickerContent}>
-                                {friends.length === 0 ? (
-                                    <View style={ss.centered}>
-                                        <Users size={40} color={colors.textMuted} strokeWidth={1} />
-                                        <Text style={ss.dayMetaEmpty}>No tienes amigos agregados.</Text>
+                    <GestureHandlerRootView style={{ flex: 1 }}>
+                        <View style={ss.overlay}>
+                            <View style={ss.sheet}>
+                                <View style={ss.header}>
+                                    <View style={ss.headerTextContainer}>
+                                        <Text style={ss.headerTitle}>Enviar a amigo</Text>
+                                        <Text style={ss.headerSub}>Comparte esta rutina al inbox de un amigo</Text>
                                     </View>
-                                ) : (
-                                    <FlatList
-                                        data={friends}
-                                        keyExtractor={(item) => item.friendId}
-                                        renderItem={({ item }) => (
-                                            <TouchableOpacity
-                                                style={ss.friendItem}
-                                                onPress={() => handleSendToFriend(item.friendId)}
-                                                disabled={sendingRoutine}
-                                            >
-                                                <View style={ss.friendInfo}>
-                                                    <View style={ss.friendAvatar}>
-                                                        <User size={18} color={colors.primary.DEFAULT} />
+                                    <TouchableOpacity onPress={() => setFriendPickerVisible(false)} style={ss.closeBtn}>
+                                        <X size={18} color={colors.text} />
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={ss.friendPickerContent}>
+                                    {friends.length === 0 ? (
+                                        <View style={ss.centered}>
+                                            <Users size={40} color={colors.textMuted} strokeWidth={1} />
+                                            <Text style={ss.dayMetaEmpty}>No tienes amigos agregados.</Text>
+                                        </View>
+                                    ) : (
+                                        <FlatList
+                                            data={friends}
+                                            keyExtractor={(item) => item.friendId}
+                                            renderItem={({ item }) => (
+                                                <TouchableOpacity
+                                                    style={ss.friendItem}
+                                                    onPress={() => handleSendToFriend(item.friendId)}
+                                                    disabled={sendingRoutine}
+                                                >
+                                                    <View style={ss.friendInfo}>
+                                                        <View style={ss.friendAvatar}>
+                                                            <User size={18} color={colors.primary.DEFAULT} />
+                                                        </View>
+                                                        <Text style={ss.friendName}>{item.displayName}</Text>
                                                     </View>
-                                                    <Text style={ss.friendName}>{item.displayName}</Text>
-                                                </View>
-                                                {sendingRoutine ? (
-                                                    <ActivityIndicator size="small" color={colors.primary.DEFAULT} />
-                                                ) : (
-                                                    <View style={ss.friendSendBtn}>
-                                                        <Send size={14} color={colors.primary.DEFAULT} />
-                                                    </View>
-                                                )}
-                                            </TouchableOpacity>
-                                        )}
-                                    />
-                                )}
+                                                    {sendingRoutine ? (
+                                                        <ActivityIndicator size="small" color={colors.primary.DEFAULT} />
+                                                    ) : (
+                                                        <View style={ss.friendSendBtn}>
+                                                            <Send size={14} color={colors.primary.DEFAULT} />
+                                                        </View>
+                                                    )}
+                                                </TouchableOpacity>
+                                            )}
+                                        />
+                                    )}
+                                </View>
                             </View>
                         </View>
-                    </View>
+                    </GestureHandlerRootView>
                 </Modal>
             )}
         </Modal>

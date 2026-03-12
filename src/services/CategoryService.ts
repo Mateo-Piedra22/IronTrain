@@ -1,4 +1,6 @@
 import { Category } from '../types/db';
+import { capitalizeWords } from '../utils/text';
+import { uuidV4 } from '../utils/uuid';
 import { dbService } from './DatabaseService';
 export { Category };
 
@@ -45,12 +47,10 @@ export class CategoryService {
     }
 
     static async create(name: string, color: string = '#3b82f6'): Promise<string> {
-        const id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-        await dbService.run('INSERT INTO categories (id, name, color, is_system) VALUES (?, ?, ?, 0)', [id, name, color]);
-        await dbService.queueSyncMutation('categories', id, 'INSERT', { id, name, color, is_system: 0 });
+        const normalizedName = capitalizeWords(name);
+        const id = uuidV4();
+        await dbService.run('INSERT INTO categories (id, name, color, is_system) VALUES (?, ?, ?, 0)', [id, normalizedName, color]);
+        await dbService.queueSyncMutation('categories', id, 'INSERT', { id, name: normalizedName, color, is_system: 0 });
         return id;
     }
 
@@ -59,6 +59,8 @@ export class CategoryService {
         if (!category) {
             throw new Error('Category not found');
         }
+
+        const normalizedName = capitalizeWords(name);
         const isProtectedUncategorized =
             category.id === CategoryService.UNCATEGORIZED_ID ||
             (category.is_system === 1 && category.name === CategoryService.UNCATEGORIZED_NAME);
@@ -67,11 +69,11 @@ export class CategoryService {
         }
 
         if (color) {
-            await dbService.run('UPDATE categories SET name = ?, color = ? WHERE id = ?', [name, color, id]);
-            await dbService.queueSyncMutation('categories', id, 'UPDATE', { name, color });
+            await dbService.run('UPDATE categories SET name = ?, color = ? WHERE id = ?', [normalizedName, color, id]);
+            await dbService.queueSyncMutation('categories', id, 'UPDATE', { name: normalizedName, color });
         } else {
-            await dbService.run('UPDATE categories SET name = ? WHERE id = ?', [name, id]);
-            await dbService.queueSyncMutation('categories', id, 'UPDATE', { name });
+            await dbService.run('UPDATE categories SET name = ? WHERE id = ?', [normalizedName, id]);
+            await dbService.queueSyncMutation('categories', id, 'UPDATE', { name: normalizedName });
         }
     }
 

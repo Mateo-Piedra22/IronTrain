@@ -12,6 +12,7 @@ import { CategoryService } from '../src/services/CategoryService';
 import { ExerciseService } from '../src/services/ExerciseService';
 import { confirm } from '../src/store/confirmStore';
 import { Category, Exercise } from '../src/types/db';
+import { matchesKeywordAndQuery } from '../src/utils/text';
 import { ExerciseFormModal } from './ExerciseFormModal';
 import { BadgePill } from './ui/BadgePill';
 
@@ -120,13 +121,21 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
         setLoading(true);
         try {
             const [exs, cats] = await Promise.all([
-                ExerciseService.search(searchQuery, selectedCategory),
+                // Fetch a superset, then apply the full in-memory matcher for consistent semantics
+                ExerciseService.search('', selectedCategory),
                 CategoryService.getAll()
             ]);
-            setExercises(exs);
+
+            const filtered = exs.filter((e) => {
+                const badgeNames = (e.badges ?? []).map((b: any) => b?.name).filter(Boolean);
+                const badgeGroups = (e.badges ?? []).map((b: any) => b?.group_name).filter(Boolean);
+                return matchesKeywordAndQuery(searchQuery, [e.name, e.category_name, ...badgeNames, ...badgeGroups]);
+            });
+
+            setExercises(filtered);
             setCategories(cats);
         } catch (e) {
-            console.error(e);
+            confirm.error('Error', (e as Error)?.message || 'No se pudieron cargar los ejercicios.');
         } finally {
             setLoading(false);
         }
@@ -156,19 +165,41 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
     };
 
     const handleDelete = (ex: Exercise) => {
-        confirm.destructive(
-            'Eliminar ejercicio',
-            `¿Eliminar "${ex.name}"?`,
-            async () => {
-                try {
-                    await ExerciseService.delete(ex.id);
-                    await loadData();
-                } catch (e: any) {
-                    confirm.error('No se pudo eliminar', e?.message ?? 'Error');
+        const run = async () => {
+            try {
+                await ExerciseService.delete(ex.id);
+                await loadData();
+            } catch (e: any) {
+                confirm.error('No se pudo eliminar', e?.message ?? 'Error');
+            }
+        };
+
+        (async () => {
+            try {
+                const impact = await ExerciseService.getDeleteImpact(ex.id);
+                if (impact.routinesCount > 0 || impact.daysCount > 0) {
+                    const sampleLines = impact.sample
+                        .map((s) => `- ${s.routine_name} / ${s.day_name}`)
+                        .join('\n');
+
+                    const message = [
+                        `¿Eliminar "${ex.name}"?`,
+                        '',
+                        `Este ejercicio está vinculado a ${impact.routinesCount} rutinas y ${impact.daysCount} días.`,
+                        'Se des-vinculará automáticamente antes de eliminarlo.',
+                        sampleLines ? '' : undefined,
+                        sampleLines ? `Ejemplos:\n${sampleLines}` : undefined,
+                    ].filter((x): x is string => Boolean(x)).join('\n');
+
+                    confirm.destructive('Eliminar ejercicio', message, run, 'Eliminar');
+                    return;
                 }
-            },
-            'Eliminar'
-        );
+            } catch {
+                // fall back to basic confirm
+            }
+
+            confirm.destructive('Eliminar ejercicio', `¿Eliminar "${ex.name}"?`, run, 'Eliminar');
+        })();
     };
 
     const handlePress = (ex: Exercise) => {

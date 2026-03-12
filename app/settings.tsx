@@ -5,6 +5,7 @@ import { backupService } from '@/src/services/BackupService';
 import { ChangelogService } from '@/src/services/ChangelogService';
 import { AppConfig, configService, NotificationPreferences } from '@/src/services/ConfigService';
 import { dbService } from '@/src/services/DatabaseService';
+import { NameNormalizationService } from '@/src/services/NameNormalizationService';
 import { updateService } from '@/src/services/UpdateService';
 import { useUpdateStore } from '@/src/store/updateStore';
 import { ThemeFx, withAlpha } from '@/src/theme';
@@ -114,6 +115,75 @@ export default function SettingsScreen() {
         loadSettings();
     }, ['SETTINGS_UPDATED']);
 
+    const formatNormalizationPreview = (preview: Awaited<ReturnType<typeof NameNormalizationService.previewTitleCaseNormalization>>): string => {
+        const formatSamples = (rows: ReadonlyArray<{ before: string; after: string }>) => {
+            if (rows.length === 0) return '';
+            return rows
+                .slice(0, 4)
+                .map((r) => `- "${r.before}" -> "${r.after}"`)
+                .join('\n');
+        };
+
+        const blocks: string[] = [];
+        blocks.push(`Ejercicios: ${preview.exercises.count}`);
+        if (preview.exercises.samples.length > 0) blocks.push(`Ejemplos:\n${formatSamples(preview.exercises.samples)}`);
+        blocks.push('');
+
+        blocks.push(`Categorías: ${preview.categories.count}`);
+        if (preview.categories.samples.length > 0) blocks.push(`Ejemplos:\n${formatSamples(preview.categories.samples)}`);
+        blocks.push('');
+
+        blocks.push(`Badges: ${preview.badges.count}`);
+        if (preview.badges.samples.length > 0) blocks.push(`Ejemplos:\n${formatSamples(preview.badges.samples)}`);
+        blocks.push('');
+
+        blocks.push(`Rutinas: ${preview.routines.count}`);
+        if (preview.routines.samples.length > 0) blocks.push(`Ejemplos:\n${formatSamples(preview.routines.samples)}`);
+        blocks.push('');
+
+        blocks.push(`Días de rutina: ${preview.routineDays.count}`);
+        if (preview.routineDays.samples.length > 0) blocks.push(`Ejemplos:\n${formatSamples(preview.routineDays.samples)}`);
+
+        return blocks.join('\n');
+    };
+
+    const handleNormalizeNames = async () => {
+        try {
+            notify.info('Analizando...', 'Buscando nombres para normalizar.');
+            const preview = await NameNormalizationService.previewTitleCaseNormalization(4);
+
+            if (preview.total === 0) {
+                notify.success('Listo', 'No hay nombres para normalizar.');
+                return;
+            }
+
+            confirm.custom({
+                title: 'Normalizar nombres (Title Case)',
+                message: `Se aplicará Title Case a registros existentes.\n\nTotal de cambios: ${preview.total}\n\n${formatNormalizationPreview(preview)}\n\n¿Querés aplicar esta limpieza ahora?`,
+                variant: 'warning',
+                buttons: [
+                    { label: 'Cancelar', variant: 'ghost', onPress: confirm.hide },
+                    {
+                        label: 'Aplicar',
+                        variant: 'solid',
+                        onPress: async () => {
+                            confirm.hide();
+                            try {
+                                notify.info('Aplicando...', 'Actualizando nombres existentes.');
+                                await NameNormalizationService.applyTitleCaseNormalization();
+                                notify.success('Éxito', 'Normalización completada.');
+                            } catch (e: any) {
+                                notify.error('Error', e?.message || 'No se pudo completar la normalización.');
+                            }
+                        }
+                    },
+                ]
+            });
+        } catch (e: any) {
+            notify.error('Error', e?.message || 'No se pudo preparar la normalización.');
+        }
+    };
+
     useEffect(() => { loadSettings(); }, []);
 
     useEffect(() => {
@@ -126,6 +196,7 @@ export default function SettingsScreen() {
                 : candidateDate;
             setFooterDate(typeof normalizedDate === 'string' ? normalizedDate : null);
         };
+
         resolveFooterDate();
     }, []);
 
@@ -775,6 +846,17 @@ export default function SettingsScreen() {
                         <View style={s.settingLeft}>
                             <View style={s.settingIconCircle}><Ruler size={16} color={colors.primary.DEFAULT} /></View>
                             <Text style={s.settingLabel}>Evolución Física</Text>
+                        </View>
+                        <ChevronRight size={16} color={colors.textMuted} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={handleNormalizeNames} style={[s.settingRow, s.settingRowBorder]}>
+                        <View style={s.settingLeft}>
+                            <View style={s.settingIconCircle}><RefreshCw size={16} color={colors.primary.DEFAULT} /></View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={s.settingLabel}>Normalizar nombres (Title Case)</Text>
+                                <Text style={s.settingSubtitle}>Corrige nombres viejos (ejercicios, categorías, badges y rutinas).</Text>
+                            </View>
                         </View>
                         <ChevronRight size={16} color={colors.textMuted} />
                     </TouchableOpacity>

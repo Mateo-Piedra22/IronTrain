@@ -27,6 +27,7 @@ import { updateService } from '../src/services/UpdateService';
 import { useAuthStore } from '../src/store/authStore';
 import { useConfirmStore } from '../src/store/confirmStore';
 import { useUpdateStore } from '../src/store/updateStore';
+import { logger } from '../src/utils/logger';
 import { notify } from '../src/utils/notify';
 
 SplashScreen.preventAutoHideAsync();
@@ -143,7 +144,8 @@ export default function RootLayout() {
         await notificationPermissionsService.requestPermission(false);
         await locationPermissionsService.requestWeatherBonusPermissionOnce();
       } catch (e) {
-        console.error('CRITICAL: Initialization failed:', e);
+        logger.captureException(e, { scope: 'RootLayout.initInfo', message: 'Initialization failed' });
+        notify.error('Error', 'No se pudo iniciar la aplicación. Reiniciá e intentá de nuevo.');
       }
     }
     initInfo();
@@ -165,10 +167,12 @@ export default function RootLayout() {
 
         // Register for push notifications
         const { PushRegistrationService } = await import('../src/services/PushRegistrationService');
-        PushRegistrationService.registerForPushNotifications().catch(e => console.warn('Push registration failed:', e));
+        PushRegistrationService.registerForPushNotifications().catch(e => {
+          logger.captureException(e, { scope: 'RootLayout.runInitialSync', message: 'Push registration failed' });
+        });
       } catch (e) {
         notify.error('Sync fallido', 'No se pudo sincronizar con Neon');
-        console.error('Initial sync trigger failed:', e);
+        logger.captureException(e, { scope: 'RootLayout.runInitialSync', message: 'Initial sync trigger failed' });
       }
     };
     runInitialSync();
@@ -178,7 +182,9 @@ export default function RootLayout() {
     if (!dbInitialized) return;
     const unsubscribe = NetInfo.addEventListener(state => {
       if (state.isConnected && state.isInternetReachable) {
-        syncService.syncBidirectional().catch(e => console.error('Background sync failed:', e));
+        syncService.syncBidirectional().catch(e => {
+          logger.captureException(e, { scope: 'RootLayout.netinfo', message: 'Background sync failed' });
+        });
       }
     });
     return () => unsubscribe();

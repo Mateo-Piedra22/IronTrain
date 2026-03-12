@@ -130,7 +130,7 @@ class FeedbackServiceImpl {
     async countdown(): Promise<void> {
         await this.haptic('heavy');
         const prefs = configService.get('notificationPreferences');
-        if (prefs.sounds.countdown) this.playSound('countdown_tick');
+        if (prefs?.sounds?.countdown) this.playSound('countdown_tick');
     }
 
     /** Success haptic + sound when interval timer phase changes */
@@ -138,10 +138,10 @@ class FeedbackServiceImpl {
         const prefs = configService.get('notificationPreferences');
         if (nextPhase === 'work') {
             await this.haptic('success');
-            if (prefs.sounds.intervalTimer) this.playSound('phase_work');
+            if (prefs?.sounds?.intervalTimer) this.playSound('phase_work');
         } else {
             await this.haptic('medium');
-            if (prefs.sounds.intervalTimer) this.playSound('phase_rest');
+            if (prefs?.sounds?.intervalTimer) this.playSound('phase_rest');
         }
     }
 
@@ -149,28 +149,28 @@ class FeedbackServiceImpl {
     async workoutFinished(): Promise<void> {
         await this.haptic('success');
         const prefs = configService.get('notificationPreferences');
-        if (prefs.sounds.intervalTimer) this.playSound('workout_complete');
+        if (prefs?.sounds?.intervalTimer) this.playSound('workout_complete');
     }
 
     /** Timer/rest timer completion feedback */
     async timerComplete(): Promise<void> {
         await this.haptic('success');
         const prefs = configService.get('notificationPreferences');
-        if (prefs.sounds.restTimer) this.playSound('timer_complete');
+        if (prefs?.sounds?.restTimer) this.playSound('timer_complete');
     }
 
     /** Rest timer expired feedback (matches timerStore behavior) */
     async restTimerExpired(): Promise<void> {
         await this.haptic('warning');
         const prefs = configService.get('notificationPreferences');
-        if (prefs.sounds.restTimer) this.playSound('timer_complete');
+        if (prefs?.sounds?.restTimer) this.playSound('timer_complete');
     }
 
     /** Day completed feedback */
     async dayCompleted(): Promise<void> {
         await this.haptic('success');
         const prefs = configService.get('notificationPreferences');
-        if (prefs.sounds.workoutComplete) this.playSound('workout_complete');
+        if (prefs?.sounds?.workoutComplete) this.playSound('workout_complete');
     }
 
     /** Set completed / marked as done */

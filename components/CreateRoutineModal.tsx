@@ -1,7 +1,9 @@
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
 import { routineService } from '@/src/services/RoutineService';
+import { confirm } from '@/src/store/confirmStore';
 import { ThemeFx, withAlpha } from '@/src/theme';
+import { buildDuplicateMessage, findNameDuplicates } from '@/src/utils/duplicates';
 import { notify } from '@/src/utils/notify';
 import { BookOpen } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
@@ -69,6 +71,30 @@ export function CreateRoutineModal({ visible, onClose, onCreated, editRoutine }:
             notify.error('Datos incompletos', 'La rutina debe tener un nombre.');
             return;
         }
+
+        try {
+            const all = await routineService.getAllRoutines();
+            const duplicates = findNameDuplicates({ id: editRoutine?.id, name }, all, 3);
+            if (duplicates.length > 0) {
+                confirm.custom({
+                    title: 'Posible duplicado',
+                    message: buildDuplicateMessage('Ya existe una rutina con un nombre muy similar. ¿Querés guardarla igual?', duplicates.map((d) => ({ title: d.name }))),
+                    variant: 'warning',
+                    buttons: [
+                        { label: 'Cancelar', onPress: confirm.hide, variant: 'ghost' },
+                        { label: 'Guardar igualmente', onPress: async () => { confirm.hide(); await doSave(); }, variant: 'solid' },
+                    ]
+                });
+                return;
+            }
+        } catch {
+            // If duplicate check fails, do not block save.
+        }
+
+        await doSave();
+    };
+
+    const doSave = async () => {
 
         setLoading(true);
         try {

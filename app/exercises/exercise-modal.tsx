@@ -2,8 +2,10 @@ import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
 import { ModalScreenOverlayHost } from '@/components/ui/ModalScreenOverlayHost';
 import { ExerciseService } from '@/src/services/ExerciseService';
+import { confirm } from '@/src/store/confirmStore';
 import { withAlpha } from '@/src/theme';
 import { ExerciseType } from '@/src/types/db';
+import { buildDuplicateMessage, findExerciseDuplicates, type ExerciseDuplicateCandidate } from '@/src/utils/duplicates';
 import { notify } from '@/src/utils/notify';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Dumbbell, FileText, Tag } from 'lucide-react-native';
@@ -35,18 +37,58 @@ export default function ExerciseModal() {
         }
     };
 
+    const doSave = async () => {
+        if (exerciseId) {
+            await ExerciseService.update(exerciseId, { name, type, notes });
+            notify.success('Actualizado', `"${name}" fue modificado.`);
+        } else {
+            await ExerciseService.create({ category_id: categoryId, name, type, notes });
+            notify.success('Creado', `"${name}" fue añadido.`);
+        }
+        router.back();
+    };
+
     const handleSave = async () => {
         if (!name.trim()) { notify.error('Falta el nombre', 'El nombre es obligatorio para guardar el ejercicio.'); return; }
         setLoading(true);
         try {
-            if (exerciseId) {
-                await ExerciseService.update(exerciseId, { name, type, notes });
-                notify.success('Actualizado', `"${name}" fue modificado.`);
-            } else {
-                await ExerciseService.create({ category_id: categoryId, name, type, notes });
-                notify.success('Creado', `"${name}" fue añadido.`);
+            const existing = await ExerciseService.search('', categoryId);
+            const candidates: ExerciseDuplicateCandidate[] = existing.map((e: any) => ({
+                id: e.id,
+                name: e.name,
+                category_id: e.category_id,
+                type: e.type,
+                badge_ids: (e.badges ?? []).map((b: any) => b.id).filter(Boolean),
+                category_name: e.category_name,
+            }));
+
+            const duplicates = findExerciseDuplicates(
+                {
+                    id: exerciseId || undefined,
+                    name,
+                    category_id: categoryId,
+                    type,
+                    badge_ids: [],
+                },
+                candidates,
+                3
+            );
+
+            if (duplicates.length > 0) {
+                const preview = duplicates.map((d) => ({ title: d.name, subtitle: d.category_name ?? undefined }));
+                confirm.custom({
+                    title: 'Posible duplicado',
+                    message: buildDuplicateMessage('Ya existe un ejercicio muy similar. ¿Querés guardarlo igual?', preview),
+                    variant: 'warning',
+                    buttons: [
+                        { label: 'Cancelar', onPress: confirm.hide, variant: 'ghost' },
+                        { label: 'Guardar igualmente', onPress: async () => { confirm.hide(); await doSave(); }, variant: 'solid' },
+                    ]
+                });
+                return;
             }
-            router.back();
+
+            await doSave();
         } catch (e: any) {
             notify.error('Error al guardar', e?.message || 'Error tratando de guardar tu progreso.');
         } finally { setLoading(false); }

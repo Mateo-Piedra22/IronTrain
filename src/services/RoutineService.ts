@@ -1,5 +1,6 @@
 import { Badge, Routine, RoutineDay, RoutineExercise } from '../types/db';
 import { logger } from '../utils/logger';
+import { capitalizeWords } from '../utils/text';
 import { uuidV4 } from '../utils/uuid';
 import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
@@ -125,8 +126,9 @@ class RoutineService {
 
     public async createRoutine(name: string, description?: string, isPublic: number = 0): Promise<string> {
         const id = uuidV4();
-        await dbService.run('INSERT INTO routines (id, name, description, is_public) VALUES (?, ?, ?, ?)', [id, name, description || null, isPublic]);
-        await dbService.queueSyncMutation('routines', id, 'INSERT', { id, name, description: description || null, is_public: isPublic });
+        const normalizedName = capitalizeWords(name);
+        await dbService.run('INSERT INTO routines (id, name, description, is_public) VALUES (?, ?, ?, ?)', [id, normalizedName, description || null, isPublic]);
+        await dbService.queueSyncMutation('routines', id, 'INSERT', { id, name: normalizedName, description: description || null, is_public: isPublic });
 
         // Emit for real-time UI updates
         dataEventService.emit('DATA_UPDATED');
@@ -135,8 +137,9 @@ class RoutineService {
     }
 
     public async updateRoutine(id: string, name: string, description?: string, isPublic: number = 0): Promise<void> {
-        await dbService.run('UPDATE routines SET name = ?, description = ?, is_public = ? WHERE id = ?', [name, description || null, isPublic, id]);
-        await dbService.queueSyncMutation('routines', id, 'UPDATE', { name, description: description || null, is_public: isPublic });
+        const normalizedName = capitalizeWords(name);
+        await dbService.run('UPDATE routines SET name = ?, description = ?, is_public = ? WHERE id = ?', [normalizedName, description || null, isPublic, id]);
+        await dbService.queueSyncMutation('routines', id, 'UPDATE', { name: normalizedName, description: description || null, is_public: isPublic });
 
         // Emit for real-time UI updates
         dataEventService.emit('DATA_UPDATED');
@@ -185,14 +188,16 @@ class RoutineService {
 
     public async addRoutineDay(routineId: string, name: string, orderIndex: number): Promise<string> {
         const id = uuidV4();
-        await dbService.run('INSERT INTO routine_days (id, routine_id, name, order_index) VALUES (?, ?, ?, ?)', [id, routineId, name, orderIndex]);
-        await dbService.queueSyncMutation('routine_days', id, 'INSERT', { id, routine_id: routineId, name, order_index: orderIndex });
+        const normalizedName = capitalizeWords(name);
+        await dbService.run('INSERT INTO routine_days (id, routine_id, name, order_index) VALUES (?, ?, ?, ?)', [id, routineId, normalizedName, orderIndex]);
+        await dbService.queueSyncMutation('routine_days', id, 'INSERT', { id, routine_id: routineId, name: normalizedName, order_index: orderIndex });
         return id;
     }
 
     public async updateRoutineDay(id: string, name: string, orderIndex: number): Promise<void> {
-        await dbService.run('UPDATE routine_days SET name = ?, order_index = ? WHERE id = ?', [name, orderIndex, id]);
-        await dbService.queueSyncMutation('routine_days', id, 'UPDATE', { name, order_index: orderIndex });
+        const normalizedName = capitalizeWords(name);
+        await dbService.run('UPDATE routine_days SET name = ?, order_index = ? WHERE id = ?', [normalizedName, orderIndex, id]);
+        await dbService.queueSyncMutation('routine_days', id, 'UPDATE', { name: normalizedName, order_index: orderIndex });
     }
 
     public async deleteRoutineDay(id: string): Promise<void> {

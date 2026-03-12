@@ -39,8 +39,9 @@ export class BroadcastEngagementService {
             });
 
             if (!response.ok) return 'error';
-            const data = (await response.json()) as { status?: 'added' | 'removed' };
-            return data.status === 'added' || data.status === 'removed' ? data.status : 'error';
+            const data = (await response.json()) as { action?: 'added' | 'removed'; status?: 'added' | 'removed' };
+            const result = data.action || data.status;
+            return result === 'added' || result === 'removed' ? result : 'error';
         } catch {
             return 'error';
         }

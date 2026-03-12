@@ -6,6 +6,7 @@ import { SocialComparisonEntry, SocialFriend, SocialInboxItem, SocialLeaderboard
 import { useAuthStore } from '@/src/store/authStore';
 import { confirm } from '@/src/store/confirmStore';
 import { ThemeFx, withAlpha } from '@/src/theme';
+import { logger } from '@/src/utils/logger';
 import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
@@ -1592,7 +1593,7 @@ export default function SocialTab() {
                         if (!silent) confirm.success('Ubicación Actualizada', `Se detectó: ${location.city || 'Tu ubicación'}`);
                     }
                 } catch (err) {
-                    console.warn('[SocialTab] Weather API failed, keeping local location:', err);
+                    logger.captureException(err, { scope: 'SocialTab.refreshLocation', message: 'Weather API failed, keeping local location' });
                     if (!silent) confirm.error('Servicio de Clima', 'No pudimos verificar bonificaciones climáticas, pero detectamos tu ubicación.');
                 }
             } else {
@@ -1602,7 +1603,7 @@ export default function SocialTab() {
                 if (!silent) confirm.error('Error de GPS', 'No pudimos obtener tu ubicación exacta. Verificá los permisos.');
             }
         } catch (e: unknown) {
-            console.error('[SocialTab] Error refreshing location:', e);
+            logger.captureException(e, { scope: 'SocialTab.refreshLocation', message: 'Error refreshing location' });
             if (!silent) confirm.error('Error de GPS', 'Ocurrió un error al intentar obtener tu ubicación.');
         } finally {
             setRefreshingLocation(false);

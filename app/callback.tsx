@@ -7,6 +7,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '../src/hooks/useColors';
 import { useAuthStore } from '../src/store/authStore';
 import { ThemeFx, withAlpha } from '../src/theme';
+import { logger } from '../src/utils/logger';
 import { notify } from '../src/utils/notify';
 
 const TOKEN_KEY = 'irontrain_auth_token';
@@ -88,7 +89,7 @@ export default function AuthCallback() {
             const rawToken = Array.isArray(token) ? token[0] : token;
 
             if (!rawToken) {
-                console.warn('Auth callback: Token missing in query params');
+                logger.warn('Auth callback: token missing in query params', { scope: 'callback.handleToken' });
                 setStatus('error');
                 return;
             }
@@ -97,7 +98,7 @@ export default function AuthCallback() {
                 // Validate JWT structure (should be 3 parts)
                 const parts = rawToken.split('.');
                 if (parts.length !== 3) {
-                    console.error('Invalid token format received:', rawToken.substring(0, 10) + '...', 'Parts:', parts.length);
+                    logger.error('Auth callback: invalid token format received', { scope: 'callback.handleToken', partsLength: parts.length });
                     throw new Error('Token mal formed (missing parts). Check encoding/decoding.');
                 }
 
@@ -116,7 +117,7 @@ export default function AuthCallback() {
                     }
                 }, 2000);
             } catch (err) {
-                console.error('Auth callback error:', err);
+                logger.captureException(err, { scope: 'callback.handleToken', message: 'Auth callback failed' });
                 setStatus('error');
                 notify.error('Autenticación fallida', 'El token recibido no es válido.');
             }

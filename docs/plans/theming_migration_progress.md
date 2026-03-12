@@ -122,3 +122,5 @@ Refactorización de la UI de comunidad, posts y componentes sociales.
   - Reactividad total mediante `useColors()`.
   - Herramientas recomendadas: `IronButton`, `IronInput`, `BadgePill`.
 - **Estrategia para archivos grandes:** Dividir la edición en bloques funcionales para evitar degradación de la IA.
+- `flex-1`, `items-center`, `justify-center`, `bg-*`, `text-*` y similares debe ser migrado OBLIGATORIAMENTE.
+- Para casos debe usarse el "isDark" para que no fallen contrastes y evitar cualquier tipo de elemento claro en/sobre bloque claro y similares.

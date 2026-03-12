@@ -317,14 +317,12 @@ class SystemNotificationServiceImpl {
                     channelId: CHANNELS.INTERVAL_TIMER,
                     asForegroundService: true,
                     foregroundServiceTypes: [1], // DATA_SYNC
-                    category: AndroidCategory.PROGRESS, // Use PROGRESS category for better system handling
+                    category: AndroidCategory.PROGRESS,
                     autoCancel: false,
                     color: Colors.primary.DEFAULT,
                     pressAction: { id: 'default' },
                     onlyAlertOnce: true,
-                    // Remove chronometer if it's causing issues with rendering updating body
-                    showChronometer: false,
-                    // Set importance explicitly even if channel has it
+                    showChronometer: true,
                     importance: AndroidImportance.HIGH,
                 },
                 ios: {

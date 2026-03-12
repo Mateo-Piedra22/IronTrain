@@ -16,6 +16,7 @@ import { workoutService } from '@/src/services/WorkoutService';
 import { useTimerStore } from '@/src/store/timerStore';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { Exercise, WorkoutSet } from '@/src/types/db';
+import { logger } from '@/src/utils/logger';
 import { notify } from '@/src/utils/notify';
 import { formatTimeSeconds } from '@/src/utils/time';
 import * as Haptics from 'expo-haptics';
@@ -130,7 +131,8 @@ export default function ExerciseDetailScreen() {
             const exSets = allSets.filter(s => s.exercise_id === exerciseId);
             setSets(exSets);
         } catch (e) {
-            console.error(e);
+            logger.captureException(e, { scope: 'ExerciseDetail.loadTrackData', message: 'Failed to load track data' });
+            notify.error('Error', 'No se pudo cargar el entrenamiento.');
         }
     };
 
@@ -143,7 +145,8 @@ export default function ExerciseDetailScreen() {
             setNotes(exerciseDetails?.notes || null);
             setCurrentExercise(exerciseDetails || null);
         } catch (e) {
-            console.error(e);
+            logger.captureException(e, { scope: 'ExerciseDetail.loadHistoryData', message: 'Failed to load history data' });
+            notify.error('Error', 'No se pudo cargar el historial del ejercicio.');
         }
     };
 

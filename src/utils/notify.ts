@@ -10,6 +10,13 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
     logger.debug('Notifee background event', { type, detail });
 });
 
+notifee.registerForegroundService((_notification) => {
+    return new Promise(() => {
+        // IronTrain: satisfy Notifee requirement for foreground service registration.
+        // This keeps the workout/timer notification alive in the background on Android.
+    });
+});
+
 const showOsNotification = async (title: string, message: string) => {
     try {
         await notifee.createChannel({

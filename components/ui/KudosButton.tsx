@@ -4,6 +4,8 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity } from 'react-nat
 import { useColors } from '../../src/hooks/useColors';
 import { BroadcastEngagementService } from '../../src/services/BroadcastEngagementService';
 import { ThemeFx } from '../../src/theme';
+import { logger } from '../../src/utils/logger';
+import { notify } from '../../src/utils/notify';
 
 interface KudosButtonProps {
     id: string;
@@ -54,19 +56,39 @@ export const KudosButton: React.FC<KudosButtonProps> = ({
 
     const handlePress = async () => {
         if (isLoading) return;
+
+        // Save original state for possible revert
+        const originalReacted = initialReacted;
+        const originalCount = initialCount;
+
+        // Optimistic UI Update
+        const targetReacted = !originalReacted;
+        const targetCount = targetReacted ? originalCount + 1 : Math.max(0, originalCount - 1);
+        onUpdated(targetReacted, targetCount);
+
         setIsLoading(true);
         try {
             const action = kind === 'announcement'
                 ? await BroadcastEngagementService.toggleAnnouncementReaction(id)
                 : await BroadcastEngagementService.toggleChangelogReaction(id);
 
-            if (action !== 'error') {
-                const newReacted = action === 'added';
-                const newCount = newReacted ? initialCount + 1 : Math.max(0, initialCount - 1);
-                onUpdated(newReacted, newCount);
+            if (action === 'error') {
+                // Revert on error
+                onUpdated(originalReacted, originalCount);
+                notify.error('Sincronización', 'Hubo un problema al guardar tu kudo. Reintentando...');
+            } else {
+                // Ensure UI state matches server's reported action
+                const confirmedReacted = action === 'added';
+                if (confirmedReacted !== targetReacted) {
+                    const confirmedCount = confirmedReacted ? originalCount + 1 : Math.max(0, originalCount - 1);
+                    onUpdated(confirmedReacted, confirmedCount);
+                }
             }
         } catch (error) {
-            console.error('[KudosButton] Error toggling reaction:', error);
+            // Revert on exception
+            onUpdated(originalReacted, originalCount);
+            logger.captureException(error, { scope: 'KudosButton.handlePress', message: 'Failed to toggle reaction' });
+            notify.error('Error', 'No se pudo conectar con el servidor.');
         } finally {
             setIsLoading(false);
         }

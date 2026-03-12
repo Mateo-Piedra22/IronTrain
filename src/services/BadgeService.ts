@@ -1,5 +1,6 @@
 import { useAuthStore } from '../store/authStore';
 import { Badge, ExerciseBadge } from '../types/db';
+import { capitalizeWords } from '../utils/text';
 import { uuidV4 } from '../utils/uuid';
 import { dbService } from './DatabaseService';
 
@@ -78,8 +79,10 @@ class BadgeService {
     public async createCustomBadge(badge: Omit<Badge, 'id' | 'is_system' | 'updated_at'>): Promise<Badge> {
         const id = uuidV4();
         const now = Date.now();
+        const name = capitalizeWords(badge.name);
         const newBadge: Badge = {
             ...badge,
+            name,
             id,
             is_system: 0,
             updated_at: now
@@ -87,10 +90,10 @@ class BadgeService {
 
         await dbService.run(
             'INSERT INTO badges (id, name, color, icon, group_name, is_system, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
-            [id, badge.name, badge.color, badge.icon || null, badge.group_name || null, now]
+            [id, name, badge.color, badge.icon || null, badge.group_name || null, now]
         );
         await dbService.queueSyncMutation('badges', id, 'INSERT', {
-            id, name: badge.name, color: badge.color, icon: badge.icon || null, group_name: badge.group_name || null, is_system: 0, updated_at: now
+            id, name, color: badge.color, icon: badge.icon || null, group_name: badge.group_name || null, is_system: 0, updated_at: now
         });
 
         return newBadge;
@@ -98,17 +101,22 @@ class BadgeService {
 
     public async updateBadge(id: string, updates: Partial<Omit<Badge, 'id' | 'is_system' | 'updated_at'>>): Promise<void> {
         const now = Date.now();
-        const fields = Object.values(updates).length > 0 ? Object.keys(updates) : [];
+        const normalizedUpdates: Partial<Omit<Badge, 'id' | 'is_system' | 'updated_at'>> = {
+            ...updates,
+            ...(updates.name !== undefined ? { name: capitalizeWords(updates.name) } : null),
+        };
+
+        const fields = Object.values(normalizedUpdates).length > 0 ? Object.keys(normalizedUpdates) : [];
         if (fields.length === 0) return;
 
         const setClause = fields.map(f => `${f === 'group_name' ? 'group_name' : f} = ?`).join(', ');
-        const values = [...Object.values(updates), now, id];
+        const values = [...Object.values(normalizedUpdates), now, id];
 
         await dbService.run(
             `UPDATE badges SET ${setClause}, updated_at = ? WHERE id = ?`,
             values
         );
-        await dbService.queueSyncMutation('badges', id, 'UPDATE', { ...updates, updated_at: now });
+        await dbService.queueSyncMutation('badges', id, 'UPDATE', { ...normalizedUpdates, updated_at: now });
     }
 
     public async deleteBadge(id: string): Promise<void> {

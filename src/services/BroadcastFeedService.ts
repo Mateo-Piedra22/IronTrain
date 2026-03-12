@@ -2,7 +2,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 import { Config } from '../constants/Config';
 import { useAuthStore } from '../store/authStore';
-import { ChangelogService } from './ChangelogService';
+import { getAppVersion } from '../utils/appInfo';
 
 export type BroadcastKind = 'changelog' | 'announcement' | 'global_event';
 export type BroadcastUiType = 'toast' | 'modal' | 'system' | null;
@@ -48,7 +48,7 @@ function normalizePlatform(): 'android' | 'ios' | null {
 }
 
 function buildFeedUrl(params: { isFeed: boolean; includeUnreleased: boolean }): string {
-    const version = ChangelogService.getAppVersion();
+    const version = getAppVersion();
     const platform = normalizePlatform();
 
     const url = new URL('/api/broadcast/feed', Config.API_URL);

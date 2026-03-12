@@ -5,6 +5,7 @@ import { CategoryService } from '@/src/services/CategoryService';
 import { Exercise, ExerciseService } from '@/src/services/ExerciseService';
 import { withAlpha } from '@/src/theme';
 import { ExerciseType } from '@/src/types/db';
+import { buildDuplicateMessage, findExerciseDuplicates, type ExerciseDuplicateCandidate } from '@/src/utils/duplicates';
 import { notify } from '@/src/utils/notify';
 import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -48,24 +49,90 @@ export default function CategoryDetailScreen() {
     const handleCreate = async () => {
         if (!newName.trim() || !id) { notify.error('Campo requerido', 'Escribe un nombre para el ejercicio.'); return; }
         try {
+            const existing = await ExerciseService.search('', id);
+            const candidates: ExerciseDuplicateCandidate[] = existing.map((e: any) => ({
+                id: e.id,
+                name: e.name,
+                category_id: e.category_id,
+                type: e.type,
+                badge_ids: (e.badges ?? []).map((b: any) => b.id).filter(Boolean),
+                category_name: e.category_name,
+            }));
+
+            const duplicates = findExerciseDuplicates(
+                { name: newName, category_id: id, type: newType, badge_ids: [] },
+                candidates,
+                3
+            );
+
+            if (duplicates.length > 0) {
+                const preview = duplicates.map((d) => ({ title: d.name, subtitle: d.category_name ?? undefined }));
+                confirm.custom({
+                    title: 'Posible duplicado',
+                    message: buildDuplicateMessage('Ya existe un ejercicio muy similar. ¿Querés guardarlo igual?', preview),
+                    variant: 'warning',
+                    buttons: [
+                        { label: 'Cancelar', onPress: confirm.hide, variant: 'ghost' },
+                        { label: 'Guardar igualmente', onPress: async () => { confirm.hide(); await doCreate(); }, variant: 'solid' },
+                    ]
+                });
+                return;
+            }
+
+            await doCreate();
+        } catch (e: any) {
+            notify.error('Error al crear', e?.message || 'Error de base de datos.');
+        }
+    };
+
+    const doCreate = async () => {
+        if (!newName.trim() || !id) return;
+        try {
             await ExerciseService.create({ category_id: id, name: newName.trim(), type: newType, notes: '' });
             setNewName('');
             setIsAdding(false);
             loadData();
             notify.success('Creado', `"${newName.trim()}" fue añadido.`);
-        } catch (e: any) { notify.error('Error al crear', e?.message || 'Error de base de datos.'); }
+        } catch (e: any) {
+            notify.error('Error al crear', e?.message || 'Error de base de datos.');
+        }
     };
 
     const handleDelete = async (exId: string, name: string) => {
-        confirm.destructive(
-            'Eliminar ejercicio',
-            `¿Eliminar "${name}"?`,
-            async () => {
-                try { await ExerciseService.delete(exId); loadData(); notify.info('Eliminado', `"${name}" fue removido.`); }
-                catch (e: any) { notify.error('Eliminación fallida', e?.message || 'No se pudo eliminar de la base de datos.'); }
-            },
-            'Eliminar'
-        );
+        const run = async () => {
+            try {
+                await ExerciseService.delete(exId);
+                loadData();
+                notify.info('Eliminado', `"${name}" fue removido.`);
+            } catch (e: any) {
+                notify.error('Eliminación fallida', e?.message || 'No se pudo eliminar de la base de datos.');
+            }
+        };
+
+        try {
+            const impact = await ExerciseService.getDeleteImpact(exId);
+            if (impact.routinesCount > 0 || impact.daysCount > 0) {
+                const sampleLines = impact.sample
+                    .map((s) => `- ${s.routine_name} / ${s.day_name}`)
+                    .join('\n');
+
+                const message = [
+                    `¿Eliminar "${name}"?`,
+                    '',
+                    `Este ejercicio está vinculado a ${impact.routinesCount} rutinas y ${impact.daysCount} días.`,
+                    'Se des-vinculará automáticamente antes de eliminarlo.',
+                    sampleLines ? '' : undefined,
+                    sampleLines ? `Ejemplos:\n${sampleLines}` : undefined,
+                ].filter((x): x is string => Boolean(x)).join('\n');
+
+                confirm.destructive('Eliminar ejercicio', message, run, 'Eliminar');
+                return;
+            }
+        } catch {
+            // fall back to basic confirm
+        }
+
+        confirm.destructive('Eliminar ejercicio', `¿Eliminar "${name}"?`, run, 'Eliminar');
     };
 
     const typeLabel = (t: ExerciseType) => {

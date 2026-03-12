@@ -1,6 +1,6 @@
-import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useAuthStore } from '../store/authStore';
+import { getAppVersion } from '../utils/appInfo';
 import { logger } from '../utils/logger';
 import { BroadcastFeedService, type BroadcastItem } from './BroadcastFeedService';
 import { configService } from './ConfigService';
@@ -25,8 +25,7 @@ export class ChangelogService {
     }
 
     static getAppVersion(): string {
-        const v = (Constants.expoConfig as any)?.version;
-        return typeof v === 'string' && v.length > 0 ? v : '0.0.0';
+        return getAppVersion();
     }
 
     private static mapToRelease(i: BroadcastItem): ChangelogRelease {
@@ -112,7 +111,8 @@ export class ChangelogService {
 
             if (response.ok) {
                 const data = await response.json();
-                return data.action;
+                const result = data.action || data.status;
+                return result === 'added' || result === 'removed' ? result : 'error';
             }
             return 'error';
         } catch (e) {

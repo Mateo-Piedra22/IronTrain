@@ -64,11 +64,22 @@ describe('CategoryService', () => {
       (dbService.getFirst as jest.Mock)
         .mockResolvedValueOnce({ id: 'c1', name: 'Pecho', is_system: 1, sort_order: 0 });
 
-      await CategoryService.update('c1', 'Pecho (editado)', '#123456');
+      await CategoryService.update('c1', 'pecho (editado)', '#123456');
 
       expect(dbService.run).toHaveBeenCalledWith(
         'UPDATE categories SET name = ?, color = ? WHERE id = ?',
-        ['Pecho (editado)', '#123456', 'c1']
+        ['Pecho (Editado)', '#123456', 'c1']
+      );
+    });
+  });
+
+  describe('create', () => {
+    it('should Title Case category name on create', async () => {
+      await CategoryService.create('press de banca', '#ffffff');
+
+      expect(dbService.run).toHaveBeenCalledWith(
+        'INSERT INTO categories (id, name, color, is_system) VALUES (?, ?, ?, 0)',
+        expect.arrayContaining(['Press de Banca', '#ffffff'])
       );
     });
   });

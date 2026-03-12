@@ -2,7 +2,7 @@ import { IronButton } from '@/components/IronButton';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { AlertTriangle, CheckCircle, Info, XCircle } from 'lucide-react-native';
 import React, { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '../../src/hooks/useColors';
 
 type ModalVariant = 'info' | 'warning' | 'error' | 'success' | 'destructive';
@@ -141,7 +141,13 @@ export function ConfirmModal({ visible, onClose, title, message, variant = 'info
     if (!visible) return null;
 
     return (
-        <View style={[StyleSheet.absoluteFill, { zIndex: 1000, elevation: 1000 }]} pointerEvents="auto">
+        <Modal
+            visible={visible}
+            transparent={true}
+            animationType="fade"
+            statusBarTranslucent={true}
+            onRequestClose={onClose}
+        >
             <View style={styles.overlay}>
                 <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
                 <View pointerEvents="box-none" style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
@@ -202,7 +208,7 @@ export function ConfirmModal({ visible, onClose, title, message, variant = 'info
                     </View>
                 </View>
             </View>
-        </View>
+        </Modal>
     );
 }
 

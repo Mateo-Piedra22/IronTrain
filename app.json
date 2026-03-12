@@ -30,7 +30,12 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_DATA_SYNC",
+        "POST_NOTIFICATIONS",
+        "VIBRATE",
+        "WAKE_LOCK"
       ]
     },
     "web": {

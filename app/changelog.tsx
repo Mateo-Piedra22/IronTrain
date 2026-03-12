@@ -20,6 +20,8 @@ import { useColors } from '../src/hooks/useColors';
 import { BroadcastFeedService, type BroadcastItem } from '../src/services/BroadcastFeedService';
 import { configService } from '../src/services/ConfigService';
 import { ThemeFx, withAlpha } from '../src/theme';
+import { logger } from '../src/utils/logger';
+import { notify } from '../src/utils/notify';
 
 function isSameVersion(v1: string, v2: string) {
     return String(v1).trim() === String(v2).trim();
@@ -120,7 +122,7 @@ export default function ChangelogScreen() {
             padding: 20,
             paddingBottom: 12,
             flexDirection: 'row',
-            alignItems: 'flex-start',
+            alignItems: 'center',
             gap: 14
         },
         newsIconWrapper: {
@@ -239,13 +241,34 @@ export default function ChangelogScreen() {
             alignItems: 'center',
             justifyContent: 'center'
         },
-        releaseFooter: {
-            marginTop: 16,
-            paddingTop: 16,
-            borderTopWidth: 1.5,
-            borderTopColor: colors.border,
-            alignItems: 'flex-end'
+        newsInfo: {
+            flex: 1
         },
+        releaseInfo: {
+            flex: 1,
+            paddingRight: 12
+        },
+        headerActions: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12
+        },
+        releaseBodyList: {
+            gap: 10
+        },
+        globalEventCard: {
+            borderColor: withAlpha(colors.primary.DEFAULT, '20')
+        },
+        globalEventIconWrapper: {
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '10')
+        },
+        itemContent: {
+            flex: 1
+        },
+        sectionSpacing: {
+            marginBottom: 12
+        },
+
         sectionHeader: {
             flexDirection: 'row',
             alignItems: 'center',
@@ -300,7 +323,8 @@ export default function ChangelogScreen() {
                 configService.set('lastViewedChangelogVersion' as any, latestVersion);
             }
         } catch (e) {
-            console.error('Failed to fetch broadcast feed', e);
+            logger.captureException(e, { scope: 'Changelog.fetchItems', message: 'Failed to fetch broadcast feed' });
+            notify.error('Error', 'No se pudieron cargar las novedades.');
         } finally {
             setIsLoading(false);
         }
@@ -333,7 +357,7 @@ export default function ChangelogScreen() {
                     <View style={ss.newsIconWrapper}>
                         <Bell size={18} color={colors.primary.DEFAULT} />
                     </View>
-                    <View style={{ flex: 1 }}>
+                    <View style={ss.newsInfo}>
                         <Text style={ss.newsLabel}>NOTICIA OFICIAL</Text>
                         <Text style={ss.newsTitle}>{n.title}</Text>
                         {n.createdAt && (
@@ -342,18 +366,16 @@ export default function ChangelogScreen() {
                             </Text>
                         )}
                     </View>
+                    <KudosButton
+                        id={n.id}
+                        kind="announcement"
+                        initialCount={n.engagement.reactionCount}
+                        initialReacted={n.engagement.userReacted === true}
+                        onUpdated={(reacted: boolean, count: number) => handleKudosUpdated({ id: n.id, reacted, count })}
+                    />
                 </View>
                 <View style={ss.newsBody}>
                     <Text style={ss.newsMessage}>{n.body}</Text>
-                    <View style={ss.releaseFooter}>
-                        <KudosButton
-                            id={n.id}
-                            kind="announcement"
-                            initialCount={n.engagement.reactionCount}
-                            initialReacted={n.engagement.userReacted === true}
-                            onUpdated={(reacted: boolean, count: number) => handleKudosUpdated({ id: n.id, reacted, count })}
-                        />
-                    </View>
                 </View>
             </View>
         );
@@ -374,7 +396,7 @@ export default function ChangelogScreen() {
                     onPress={() => setExpandedVersion(isExpanded ? null : version)}
                     style={ss.releaseHeader}
                 >
-                    <View style={{ flex: 1, paddingRight: 12 }}>
+                    <View style={ss.releaseInfo}>
                         <View style={ss.releaseTop}>
                             <Text style={ss.releaseVersion}>v{version}</Text>
                             {isCurrent && (
@@ -393,39 +415,40 @@ export default function ChangelogScreen() {
                             </Text>
                         )}
                     </View>
-                    <View style={ss.expandIconWrapper}>
-                        {isExpanded ? (
-                            <ChevronUp size={20} color={colors.primary.DEFAULT} />
-                        ) : (
-                            <ChevronDown size={20} color={colors.textMuted} />
-                        )}
+                    <View style={ss.headerActions}>
+                        <KudosButton
+                            id={r.id}
+                            kind="changelog"
+                            initialCount={r.engagement.reactionCount}
+                            initialReacted={r.engagement.userReacted === true}
+                            onUpdated={(reacted: boolean, count: number) => handleKudosUpdated({ id: r.id, reacted, count })}
+                        />
+                        <View style={ss.expandIconWrapper}>
+                            {isExpanded ? (
+                                <ChevronUp size={20} color={colors.primary.DEFAULT} />
+                            ) : (
+                                <ChevronDown size={20} color={colors.textMuted} />
+                            )}
+                        </View>
                     </View>
                 </TouchableOpacity>
 
                 {isExpanded && (
                     <View style={ss.releaseBody}>
-                        <View style={{ gap: 10 }}>
+                        <View style={ss.releaseBodyList}>
                             {itemsList.map((it, idx) => (
                                 <View key={`${version}-${idx}`} style={ss.itemRow}>
                                     <View style={ss.itemBulletWrapper}>
                                         <View style={ss.itemBulletDot} />
                                     </View>
-                                    <View style={{ flex: 1 }}>
+                                    <View style={ss.itemContent}>
                                         {renderFormattedText(it, ss.itemText, ss.itemBold)}
                                     </View>
                                 </View>
                             ))}
                         </View>
 
-                        <View style={ss.releaseFooter}>
-                            <KudosButton
-                                id={r.id}
-                                kind="changelog"
-                                initialCount={r.engagement.reactionCount}
-                                initialReacted={r.engagement.userReacted === true}
-                                onUpdated={(reacted: boolean, count: number) => handleKudosUpdated({ id: r.id, reacted, count })}
-                            />
-                        </View>
+
                     </View>
                 )}
             </View>
@@ -438,12 +461,12 @@ export default function ChangelogScreen() {
 
     const renderGlobalEvent = (e: BroadcastItem) => {
         return (
-            <View key={e.id} style={[ss.releaseCard, { borderColor: withAlpha(colors.primary.DEFAULT, '20') }]}>
+            <View key={e.id} style={[ss.releaseCard, ss.globalEventCard]}>
                 <View style={ss.newsHeader}>
-                    <View style={[ss.newsIconWrapper, { backgroundColor: withAlpha(colors.primary.DEFAULT, '10') }]}>
+                    <View style={[ss.newsIconWrapper, ss.globalEventIconWrapper]}>
                         <Bell size={18} color={colors.primary.DEFAULT} />
                     </View>
-                    <View style={{ flex: 1 }}>
+                    <View style={ss.newsInfo}>
                         <Text style={ss.newsLabel}>EVENTO GLOBAL</Text>
                         <Text style={ss.newsTitle}>{e.title}</Text>
                         {e.createdAt && (
@@ -464,7 +487,7 @@ export default function ChangelogScreen() {
         <ModalScreenOverlayHost>
             <SafeAreaWrapper style={ss.container} edges={['top', 'left', 'right', 'bottom']}>
                 <Stack.Screen options={{ headerShown: false }} />
-                <ScrollView style={{ flex: 1 }} contentContainerStyle={ss.scrollContent}>
+                <ScrollView style={ss.newsInfo} contentContainerStyle={ss.scrollContent}>
                     <View style={ss.headerContainer}>
                         <TouchableOpacity onPress={() => router.back()} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
                             <ChevronLeft size={22} color={colors.text} strokeWidth={2.5} />
@@ -483,7 +506,7 @@ export default function ChangelogScreen() {
                     ) : (
                         <View>
                             {announcements.length > 0 && (
-                                <View style={{ marginBottom: 12 }}>
+                                <View style={ss.sectionSpacing}>
                                     <View style={ss.sectionHeader}>
                                         <Text style={ss.sectionTitle}>ANUNCIOS</Text>
                                         <View style={ss.sectionLine} />

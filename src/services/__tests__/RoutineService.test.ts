@@ -21,6 +21,44 @@ describe('RoutineService', () => {
     jest.clearAllMocks();
   });
 
+  describe('title case on write', () => {
+    it('Title Cases routine name on create', async () => {
+      (uuidV4 as jest.Mock).mockReturnValueOnce('r-new');
+
+      await routineService.createRoutine('press de banca', undefined, 0);
+
+      expect(dbService.run).toHaveBeenCalledWith(
+        'INSERT INTO routines (id, name, description, is_public) VALUES (?, ?, ?, ?)',
+        ['r-new', 'Press de Banca', null, 0]
+      );
+
+      expect(dbService.queueSyncMutation).toHaveBeenCalledWith(
+        'routines',
+        'r-new',
+        'INSERT',
+        expect.objectContaining({ name: 'Press de Banca' })
+      );
+    });
+
+    it('Title Cases routine day name on create', async () => {
+      (uuidV4 as jest.Mock).mockReturnValueOnce('d-new');
+
+      await routineService.addRoutineDay('r1', 'dia 1', 0);
+
+      expect(dbService.run).toHaveBeenCalledWith(
+        'INSERT INTO routine_days (id, routine_id, name, order_index) VALUES (?, ?, ?, ?)',
+        ['d-new', 'r1', 'Dia 1', 0]
+      );
+
+      expect(dbService.queueSyncMutation).toHaveBeenCalledWith(
+        'routine_days',
+        'd-new',
+        'INSERT',
+        expect.objectContaining({ name: 'Dia 1' })
+      );
+    });
+  });
+
   it('imports shared routines with mapped categories', async () => {
     (uuidV4 as jest.Mock)
       .mockReturnValueOnce('cat-new')

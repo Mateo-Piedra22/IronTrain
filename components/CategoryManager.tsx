@@ -10,6 +10,7 @@ import { useColors } from '../src/hooks/useColors';
 import { CategoryService } from '../src/services/CategoryService';
 import { confirm } from '../src/store/confirmStore';
 import { Category } from '../src/types/db';
+import { buildDuplicateMessage, findNameDuplicates } from '../src/utils/duplicates';
 
 import { ColorPicker } from './ui/ColorPicker';
 
@@ -81,7 +82,7 @@ export function CategoryManager() {
             const data = await CategoryService.getAll();
             setCategories(data);
         } catch (e) {
-            console.error(e);
+            confirm.error('Error', (e as Error)?.message || 'No se pudieron cargar las categorías.');
         } finally {
             setLoading(false);
         }
@@ -93,6 +94,35 @@ export function CategoryManager() {
 
     const handleSave = async () => {
         if (!categoryName.trim()) return;
+
+        try {
+            const all = await CategoryService.getAll();
+            const duplicates = findNameDuplicates(
+                { id: editingCategory?.id, name: categoryName },
+                all,
+                3
+            );
+
+            if (duplicates.length > 0) {
+                confirm.custom({
+                    title: 'Posible duplicado',
+                    message: buildDuplicateMessage('Ya existe una categoría con un nombre muy similar. ¿Querés guardarla igual?', duplicates.map((d) => ({ title: d.name }))),
+                    variant: 'warning',
+                    buttons: [
+                        { label: 'Cancelar', onPress: confirm.hide, variant: 'ghost' },
+                        { label: 'Guardar igualmente', onPress: async () => { confirm.hide(); await doSave(); }, variant: 'solid' },
+                    ]
+                });
+                return;
+            }
+        } catch {
+            // If duplicate check fails, do not block save.
+        }
+
+        await doSave();
+    };
+
+    const doSave = async () => {
 
         try {
             if (editingCategory) {

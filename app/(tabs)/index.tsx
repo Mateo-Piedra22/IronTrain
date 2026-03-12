@@ -12,7 +12,6 @@ import { ChangelogService } from '@/src/services/ChangelogService';
 import { configService } from '@/src/services/ConfigService';
 import { RoutineDayWithExercises } from '@/src/services/RoutineService';
 import { useTimerStore } from '@/src/store/timerStore';
-import { notify } from '@/src/utils/notify';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { addDays, subDays } from 'date-fns';
 import * as Haptics from 'expo-haptics';
@@ -27,6 +26,8 @@ import { useColors } from '../../src/hooks/useColors';
 import { workoutService } from '../../src/services/WorkoutService';
 import { ThemeFx } from '../../src/theme';
 import { ExerciseType, Workout, WorkoutSet } from '../../src/types/db';
+import { logger } from '../../src/utils/logger';
+import { notify } from '../../src/utils/notify';
 
 export default function DailyLogScreen() {
   const router = useRouter();
@@ -67,7 +68,8 @@ export default function DailyLogScreen() {
       setMarkedDates(events);
 
     } catch (e) {
-      console.error('Failed to load workout data', e);
+      logger.captureException(e, { scope: 'HomeTab.loadData', message: 'Failed to load workout data' });
+      notify.error('Error', 'No se pudo cargar el entrenamiento.');
     } finally {
       setLoading(false);
     }
@@ -81,7 +83,7 @@ export default function DailyLogScreen() {
       const events = await workoutService.getCalendarEvents();
       setMarkedDates(events);
     } catch (e) {
-      console.error('Failed to refresh workout', e);
+      logger.captureException(e, { scope: 'HomeTab.refreshWorkoutOnly', message: 'Failed to refresh workout' });
     }
   };
 

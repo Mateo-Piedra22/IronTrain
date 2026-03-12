@@ -7,6 +7,7 @@ jest.mock('../DatabaseService', () => ({
     run: jest.fn(),
     getAll: jest.fn(),
     getFirst: jest.fn(),
+    withTransaction: jest.fn(async (cb: () => Promise<void>) => { await cb(); }),
     queueSyncMutation: jest.fn(),
   },
 }));
@@ -45,12 +46,44 @@ describe('ExerciseService', () => {
         .mockResolvedValueOnce({ is_system: 0 })
         .mockResolvedValueOnce({ count: 0 });
 
+      (dbService.getAll as jest.Mock).mockResolvedValueOnce([]);
+
       await ExerciseService.delete('ex1');
 
+      expect(dbService.run).toHaveBeenCalledWith(
+        'DELETE FROM routine_exercises WHERE exercise_id = ?',
+        ['ex1']
+      );
       expect(dbService.run).toHaveBeenCalledWith(
         'DELETE FROM exercises WHERE id = ?',
         ['ex1']
       );
+
+      expect(dbService.queueSyncMutation).toHaveBeenCalledWith('exercises', 'ex1', 'DELETE');
+    });
+
+    it('should auto-unlink routine references before deleting exercise (transactional)', async () => {
+      (dbService.getFirst as jest.Mock)
+        .mockResolvedValueOnce({ is_system: 0 })
+        .mockResolvedValueOnce({ count: 0 });
+
+      (dbService.getAll as jest.Mock).mockResolvedValueOnce([{ id: 're1' }, { id: 're2' }]);
+
+      await ExerciseService.delete('ex1');
+
+      expect(dbService.withTransaction).toHaveBeenCalledTimes(1);
+      expect(dbService.run).toHaveBeenCalledWith(
+        'DELETE FROM routine_exercises WHERE exercise_id = ?',
+        ['ex1']
+      );
+      expect(dbService.run).toHaveBeenCalledWith(
+        'DELETE FROM exercises WHERE id = ?',
+        ['ex1']
+      );
+
+      expect(dbService.queueSyncMutation).toHaveBeenCalledWith('routine_exercises', 're1', 'DELETE');
+      expect(dbService.queueSyncMutation).toHaveBeenCalledWith('routine_exercises', 're2', 'DELETE');
+      expect(dbService.queueSyncMutation).toHaveBeenCalledWith('exercises', 'ex1', 'DELETE');
     });
   });
 
@@ -58,13 +91,20 @@ describe('ExerciseService', () => {
     it('should insert new exercise', async () => {
       await ExerciseService.create({
         category_id: 'c1',
-        name: 'New Exercise',
+        name: 'new exercise',
         type: 'weight_reps'
       });
 
       expect(dbService.run).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO exercises'),
         expect.arrayContaining(['c1', 'New Exercise'])
+      );
+
+      expect(dbService.queueSyncMutation).toHaveBeenCalledWith(
+        'exercises',
+        expect.any(String),
+        'INSERT',
+        expect.objectContaining({ name: 'New Exercise' })
       );
     });
   });
