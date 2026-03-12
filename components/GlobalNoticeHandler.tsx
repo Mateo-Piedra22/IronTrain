@@ -11,7 +11,7 @@ import { ThemeFx, withAlpha } from '@/src/theme';
 import { logger } from '@/src/utils/logger';
 import { useRouter } from 'expo-router';
 import { Bell, X } from 'lucide-react-native';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { SlideInUp, SlideOutUp } from 'react-native-reanimated';
 import { useColors } from '../src/hooks/useColors';
@@ -24,6 +24,7 @@ export const GlobalNoticeHandler: React.FC = () => {
     const [whatsNew, setWhatsNew] = useState<ChangelogRelease | null>(null);
     const [activeAnnouncement, setActiveAnnouncement] = useState<BroadcastItem | null>(null);
     const [showToast, setShowToast] = useState(false);
+    const hideToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const router = useRouter();
 
     const ss = useMemo(() => StyleSheet.create({
@@ -203,6 +204,13 @@ export const GlobalNoticeHandler: React.FC = () => {
     useEffect(() => {
         let cancelled = false;
 
+        const clearHideToastTimeout = () => {
+            if (hideToastTimeoutRef.current) {
+                clearTimeout(hideToastTimeoutRef.current);
+                hideToastTimeoutRef.current = null;
+            }
+        };
+
         const fetchAll = async () => {
             try {
                 const feed = await BroadcastFeedService.getFeed({ isFeed: false, includeUnreleased: false });
@@ -240,9 +248,13 @@ export const GlobalNoticeHandler: React.FC = () => {
                     const n = decision.announcement;
                     setActiveAnnouncement(n);
                     if (n.uiType === 'toast') {
+                        clearHideToastTimeout();
                         setShowToast(true);
-                        setTimeout(() => setShowToast(false), 6000);
+                        hideToastTimeoutRef.current = setTimeout(() => {
+                            setShowToast(false);
+                        }, 6000);
                     } else {
+                        clearHideToastTimeout();
                         setShowToast(false);
                     }
                     return;
@@ -250,6 +262,7 @@ export const GlobalNoticeHandler: React.FC = () => {
 
                 setWhatsNew(null);
                 setActiveAnnouncement(null);
+                clearHideToastTimeout();
                 setShowToast(false);
             } catch (e) {
                 logger.captureException(e, { scope: 'GlobalNoticeHandler.fetchAll', message: 'Failed to fetch broadcast feed' });
@@ -279,6 +292,7 @@ export const GlobalNoticeHandler: React.FC = () => {
         return () => {
             cancelled = true;
             cleanup();
+            clearHideToastTimeout();
         };
     }, []);
 

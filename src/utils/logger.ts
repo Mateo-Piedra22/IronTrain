@@ -33,11 +33,13 @@ export const logger = {
 
     captureException: (error: unknown, context?: Record<string, unknown>) => {
         const message = safeString(error);
+        const safeContext: Record<string, unknown> =
+            context && typeof context === 'object' ? context : {};
         push({
             level: 'error',
             message,
             context: {
-                ...context,
+                ...safeContext,
                 errorName: error instanceof Error ? error.name : undefined,
                 stack: error instanceof Error ? error.stack : undefined,
             },

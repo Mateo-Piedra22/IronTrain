@@ -9,6 +9,8 @@ export interface ToastMessage {
     title: string;
     message?: string;
     duration: number;
+    createdAtMs: number;
+    expiresAtMs: number;
     onPress?: () => void;
 }
 
@@ -25,8 +27,9 @@ export interface NotificationState {
     toasts: ToastMessage[];
     globalBanner: BannerMessage | null;
 
-    addToast: (toast: Omit<ToastMessage, 'id' | 'duration'> & { duration?: number }) => string;
+    addToast: (toast: Omit<ToastMessage, 'id' | 'duration' | 'createdAtMs' | 'expiresAtMs'> & { duration?: number }) => string;
     removeToast: (id: string) => void;
+    sweepExpiredToasts: () => void;
 
     setGlobalBanner: (banner: Omit<BannerMessage, 'id' | 'dismissible'> & { dismissible?: boolean } | null) => void;
     clearGlobalBanner: () => void;
@@ -39,7 +42,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     addToast: (toast) => {
         const id = Math.random().toString(36).substring(2, 9);
         const duration = toast.duration ?? 3000;
-        const newToast = { ...toast, id, duration };
+        const nowMs = Date.now();
+        const effectiveDuration = duration > 0 ? duration : 60_000;
+        const newToast: ToastMessage = { ...toast, id, duration, createdAtMs: nowMs, expiresAtMs: nowMs + effectiveDuration };
 
         set((state) => {
             // Maximum 3 toasts at a time, FIFO
@@ -63,6 +68,13 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     removeToast: (id) => {
         set((state) => ({
             toasts: state.toasts.filter((t) => t.id !== id),
+        }));
+    },
+
+    sweepExpiredToasts: () => {
+        const nowMs = Date.now();
+        set((state) => ({
+            toasts: state.toasts.filter((t) => t.expiresAtMs > nowMs),
         }));
     },
 

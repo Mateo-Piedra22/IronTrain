@@ -13,7 +13,8 @@ import { workoutService } from '@/src/services/WorkoutService';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { IronTrainLogo } from '../../components/IronTrainLogo';
 import { useColors } from '../../src/hooks/useColors';
 import { ThemeFx } from '../../src/theme';
 import { logger } from '../../src/utils/logger';
@@ -269,10 +270,7 @@ export default function AnalysisScreen() {
                     <Text style={{ color: colors.text, fontWeight: '900', fontSize: 20, letterSpacing: -0.5 }}>Análisis</Text>
                 </View>
                 <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                    <Image
-                        source={require('../../assets/images/icon.png')}
-                        style={{ width: 100, height: 100, resizeMode: 'contain' }}
-                    />
+                    <IronTrainLogo size={60} />
                 </View>
                 <View style={{ zIndex: 10, width: 40 }} />
             </View>

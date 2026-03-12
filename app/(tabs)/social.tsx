@@ -14,7 +14,6 @@ import { Award, CalendarDays, CheckCircle, ChevronDown, ChevronUp, CloudRain, Co
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Image,
     KeyboardAvoidingView,
     Linking,
     Modal,
@@ -29,6 +28,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { IronTrainLogo } from '../../components/IronTrainLogo';
 import { useColors } from '../../src/hooks/useColors';
 
 import { configService } from '@/src/services/ConfigService';
@@ -1941,10 +1941,7 @@ export default function SocialTab() {
                     )}
                 </View>
                 <View style={styles.headerCenterIconWrapper}>
-                    <Image
-                        source={require('../../assets/images/icon.png')}
-                        style={styles.headerCenterIcon}
-                    />
+                    <IronTrainLogo size={60} />
                 </View>
                 <View style={styles.headerActionsBox}>
                     <TouchableOpacity style={styles.headerIconBtn} onPress={() => router.push('/settings' as any)}>

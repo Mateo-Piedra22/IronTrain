@@ -34,42 +34,6 @@ function patch(content) {
         }
     }
 
-    // 2. Patch activateKeepAwakeAsync definition (Atomic fix)
-    if (!patched.includes("// IronTrain: Suppress activation errors")) {
-        const targetDef = `export async function activateKeepAwakeAsync(tag: string = ExpoKeepAwakeTag): Promise<void> {
-  await ExpoKeepAwake.activate?.(tag);
-}`;
-        const patchedDef = `export async function activateKeepAwakeAsync(tag: string = ExpoKeepAwakeTag): Promise<void> {
-  try {
-    await ExpoKeepAwake.activate?.(tag);
-  } catch (e) {
-    // IronTrain: Suppress activation errors to prevent app crashes or freezes
-    console.warn('[IronTrain] Failed to activate keep awake:', e);
-  }
-}`;
-        if (patched.includes(targetDef)) {
-            patched = patched.replace(targetDef, patchedDef);
-        }
-    }
-
-    // 3. Patch deactivateKeepAwake definition (Atomic fix)
-    if (!patched.includes("// IronTrain: Suppress deactivation errors")) {
-        const targetDef = `export async function deactivateKeepAwake(tag: string = ExpoKeepAwakeTag): Promise<void> {
-  await ExpoKeepAwake.deactivate?.(tag);
-}`;
-        const patchedDef = `export async function deactivateKeepAwake(tag: string = ExpoKeepAwakeTag): Promise<void> {
-  try {
-    await ExpoKeepAwake.deactivate?.(tag);
-  } catch (e) {
-    // IronTrain: Suppress deactivation errors
-    console.warn('[IronTrain] Failed to deactivate keep awake:', e);
-  }
-}`;
-        if (patched.includes(targetDef)) {
-            patched = patched.replace(targetDef, patchedDef);
-        }
-    }
-
     return patched;
 }
 

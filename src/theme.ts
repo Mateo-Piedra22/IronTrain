@@ -65,31 +65,31 @@ export type SubthemePack = {
 // --- CORE DESIGN SCALES ---
 
 const LIGHT_IRON: IronScale = {
-    50: '#fff7f1',  // Fondo base (Cálido)
-    100: '#fcfcfc', // Superficie secundaria
-    200: '#efebe9', // Bordes suaves
-    300: '#e0e0e0', // Divisores estándar
-    400: '#d7ccc8', // Marrón pálido
-    500: '#8d6e63', // Texto mutado / Íconos secundarios
-    600: '#795548', // Marrón medio
-    700: '#5d4037', // Marrón oscuro
-    800: '#4e342e', // Marrón profundo
-    900: '#382721', // Marrón contraste
-    950: '#321414', // Texto principal (Contraste máximo)
+    50: '#f6f7f9',
+    100: '#eef1f4',
+    200: '#e2e7ed',
+    300: '#cfd7e1',
+    400: '#aeb9c7',
+    500: '#7f8a99',
+    600: '#5e6877',
+    700: '#404a59',
+    800: '#2b3340',
+    900: '#1c2430',
+    950: '#0f172a',
 };
 
 const DARK_IRON: IronScale = {
-    50: '#0a0a0a',  // Fondo base
-    100: '#171717', // Superficie principal
-    200: '#262626', // Superficie secundaria / Bordes
-    300: '#404040', // Bordes activos
-    400: '#525252', // Gris medio
-    500: '#737373', // Gris mutado
-    600: '#a1a1aa', // Texto secundario
-    700: '#d4d4d8', // Texto medio
-    800: '#e5e5e5', // Texto claro
-    900: '#f5f5f5', // Casi blanco
-    950: '#fafafa', // Contraste máximo
+    50: '#36434c',
+    100: '#3b4a54',
+    200: '#445560',
+    300: '#516471',
+    400: '#607686',
+    500: '#7a93a3',
+    600: '#a0b4c0',
+    700: '#c4d0d8',
+    800: '#dee6eb',
+    900: '#f0f4f6',
+    950: '#fffefb',
 };
 
 // --- PRESET TOKENS ---
@@ -103,22 +103,22 @@ export const LightThemeTokens: ThemeTokens = {
         isDark: false,
         iron: LIGHT_IRON,
         primary: {
-            DEFAULT: '#5c2e2e',
-            light: LIGHT_IRON[500],
-            dark: '#3e1c1c',
+            DEFAULT: '#8aa0b8',
+            light: '#b7c7d8',
+            dark: '#5f768f',
         },
-        onPrimary: '#ffffff', // White on dark-brown primary
+        onPrimary: LIGHT_IRON[950],
         white: '#ffffff',
         black: '#000000',
-        blue: '#3b82f6',
-        red: '#ef4444',
-        green: '#22c55e',
-        yellow: '#d97706',
+        blue: '#5b8def',
+        red: '#e76a7a',
+        green: '#35b585',
+        yellow: '#d5a24f',
         background: LIGHT_IRON[50],
         surface: '#ffffff',
         surfaceLighter: LIGHT_IRON[100],
         text: LIGHT_IRON[950],
-        textMuted: LIGHT_IRON[500],
+        textMuted: LIGHT_IRON[600],
         border: LIGHT_IRON[200],
     },
 };
@@ -132,14 +132,14 @@ export const DarkThemeTokens: ThemeTokens = {
         isDark: true,
         iron: DARK_IRON,
         primary: {
-            DEFAULT: '#d4ff3f', // Cyber Volt
-            light: '#e1ff70',
-            dark: '#aacc00',
+            DEFAULT: '#ff8a80', //#d4ff3e DEFAULT del tema anterior
+            light: '#ffb4ad', //#e6ff6b light del tema anterior
+            dark: '#e85b54', //#b8e62a dark del tema anterior
         },
-        onPrimary: '#000000', // Black on volt-green primary for maximum contrast
+        onPrimary: '#000000',
         white: '#ffffff',
         black: '#000000',
-        blue: '#38bdf8',
+        blue: '#60a5fa',
         red: '#fb7185',
         green: '#4ade80',
         yellow: '#fbbf24',

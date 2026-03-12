@@ -18,10 +18,11 @@ import * as Haptics from 'expo-haptics';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
 import { Info, Plus, Timer, X } from 'lucide-react-native';
 import React, { useCallback, useContext, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { IronTrainLogo } from '../../components/IronTrainLogo';
 import { useColors } from '../../src/hooks/useColors';
 import { workoutService } from '../../src/services/WorkoutService';
 import { ThemeFx } from '../../src/theme';
@@ -284,10 +285,7 @@ export default function DailyLogScreen() {
             onExpandedChange={setIsCalendarExpanded}
             markedDates={markedDates}
             headerCenter={
-              <Image
-                source={require('../../assets/images/icon.png')}
-                style={{ width: 100, height: 100, resizeMode: 'contain' }}
-              />
+              <IronTrainLogo size={60} />
             }
             headerRight={
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>

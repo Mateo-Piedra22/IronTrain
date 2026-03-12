@@ -13,8 +13,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import { BookOpen, Pencil, Plus, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useContext, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { IronTrainLogo } from '../../components/IronTrainLogo';
 import { useColors } from '../../src/hooks/useColors';
 import { ThemeFx, withAlpha } from '../../src/theme';
 
@@ -296,7 +297,7 @@ export default function LibraryScreen() {
                     <Text style={ss.headerTitle}>Biblioteca</Text>
                 </View>
                 <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                    <Image source={require('../../assets/images/icon.png')} style={{ width: 100, height: 100, resizeMode: 'contain' }} />
+                    <IronTrainLogo size={60} />
                 </View>
                 <View style={{ zIndex: 10, width: 24 }} />
             </View>

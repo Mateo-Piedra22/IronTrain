@@ -7,7 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { AlertTriangle, Download } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Platform, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ import { ThemeProvider as AppThemeProvider } from '../src/contexts/ThemeContext'
 import { useTheme } from '../src/hooks/useTheme';
 import { configService } from '../src/services/ConfigService';
 import { dbService } from '../src/services/DatabaseService';
+import { feedbackService } from '../src/services/FeedbackService';
 import { MetricsAndFeedbackService } from '../src/services/MetricsAndFeedbackService';
 import { syncService } from '../src/services/SyncService';
 import { updateService } from '../src/services/UpdateService';
@@ -136,12 +137,22 @@ export default function RootLayout() {
       try {
         const { notificationPermissionsService } = await import('../src/services/NotificationPermissionsService');
         const { locationPermissionsService } = await import('../src/services/LocationPermissionsService');
+
+        if (Platform.OS === 'android') {
+          try {
+            const { default: notifee } = await import('@notifee/react-native');
+            notifee.registerForegroundService(() => new Promise(() => { }));
+          } catch (e) {
+            logger.captureException(e, { scope: 'RootLayout.initInfo', message: 'Notifee foreground service registration failed' });
+          }
+        }
+
         await useAuthStore.getState().initialize();
         await dbService.init();
         await configService.init();
         setDbInitialized(true);
         MetricsAndFeedbackService.trackInstallIfNeeded();
-        await notificationPermissionsService.requestPermission(false);
+        await notificationPermissionsService.requestPermissionOnce(false);
         await locationPermissionsService.requestWeatherBonusPermissionOnce();
       } catch (e) {
         logger.captureException(e, { scope: 'RootLayout.initInfo', message: 'Initialization failed' });
@@ -149,6 +160,14 @@ export default function RootLayout() {
       }
     }
     initInfo();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      feedbackService.dispose().catch((e) => {
+        logger.captureException(e, { scope: 'RootLayout.cleanup', message: 'feedbackService.dispose failed' });
+      });
+    };
   }, []);
 
   useEffect(() => {

@@ -1,7 +1,7 @@
 import { ToastMessage, useNotificationStore } from '@/src/store/notificationStore';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { AlertTriangle, CheckCircle, Info, X, XCircle } from 'lucide-react-native';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, TouchableOpacity, View, type TextStyle, type ViewStyle } from 'react-native';
 import Animated, { FadeInDown, LinearTransition, SlideOutUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -164,10 +164,24 @@ export const ToastContainer = () => {
 
     const toasts = useNotificationStore(state => state.toasts);
     const removeToast = useNotificationStore(state => state.removeToast);
+    const sweepExpiredToasts = useNotificationStore(state => state.sweepExpiredToasts);
     const insets = useSafeAreaInsets();
 
     const hasToasts = toasts.length > 0;
     const visibleToasts = useMemo(() => [...toasts].reverse(), [toasts]);
+
+    useEffect(() => {
+        if (!hasToasts) return;
+
+        sweepExpiredToasts();
+        const interval = setInterval(() => {
+            sweepExpiredToasts();
+        }, 1000);
+
+        return () => {
+            clearInterval(interval);
+        };
+    }, [hasToasts, sweepExpiredToasts]);
 
     if (!hasToasts) return null;
 

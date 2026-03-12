@@ -1,14 +1,16 @@
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { ChevronDown, Minus, Pause, Play, Plus, RotateCcw, X, Zap } from 'lucide-react-native';
 
-import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { activateKeepAwakeAsync, deactivateKeepAwake, isAvailableAsync } from 'expo-keep-awake';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, AppState, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { useColors } from '../src/hooks/useColors';
 import { feedbackService } from '../src/services/FeedbackService';
+import { notificationPermissionsService } from '../src/services/NotificationPermissionsService';
 import { systemNotificationService } from '../src/services/SystemNotificationService';
+import { logger } from '../src/utils/logger';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface IntervalTimerModalProps {
@@ -53,6 +55,17 @@ const KEEP_AWAKE_TAG = 'irontrain-interval-timer';
 export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps) {
     const colors = useColors();
     const insets = useSafeAreaInsets();
+
+    const [appState, setAppState] = useState(AppState.currentState);
+
+    useEffect(() => {
+        const sub = AppState.addEventListener('change', (nextState) => {
+            setAppState(nextState);
+        });
+        return () => {
+            sub.remove();
+        };
+    }, []);
 
 
     const ss = useMemo(() => StyleSheet.create({
@@ -219,16 +232,52 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
     const [elapsedTotal, setElapsedTotal] = useState(0);
 
     useEffect(() => {
-        if (visible && phase !== 'idle' && phase !== 'finished' && !isPaused) {
-            activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => { });
+        const shouldKeepAwake = visible && phase !== 'idle' && phase !== 'finished' && !isPaused && appState === 'active';
+
+        if (shouldKeepAwake) {
+            void (async () => {
+                const available = await isAvailableAsync();
+                if (!available) {
+                    logger.error('KeepAwake unavailable', {
+                        scope: 'IntervalTimerModal.keepAwake.unavailable',
+                        phase,
+                        visible,
+                        isPaused,
+                        appState,
+                    });
+                    return;
+                }
+
+                await activateKeepAwakeAsync(KEEP_AWAKE_TAG);
+            })().catch((e) => {
+                logger.captureException(e, {
+                    scope: 'IntervalTimerModal.keepAwake.activate',
+                    phase,
+                    visible,
+                    isPaused,
+                    appState,
+                });
+            });
         } else {
-            deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => { });
+            deactivateKeepAwake(KEEP_AWAKE_TAG).catch((e) => {
+                logger.captureException(e, {
+                    scope: 'IntervalTimerModal.keepAwake.deactivate',
+                    phase,
+                    visible,
+                    isPaused,
+                    appState,
+                });
+            });
         }
-    }, [visible, phase, isPaused]);
+    }, [visible, phase, isPaused, appState]);
 
     useEffect(() => {
         return () => {
-            deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => { });
+            deactivateKeepAwake(KEEP_AWAKE_TAG).catch((e) => {
+                logger.captureException(e, {
+                    scope: 'IntervalTimerModal.keepAwake.cleanup',
+                });
+            });
         };
     }, []);
 
@@ -282,17 +331,17 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
         transitionPendingRef.current = true;
         if (currentPhase === 'prepare') {
             setPhase('work'); startPhaseTimer(workSec); feedbackService.phaseChange('work');
-            systemNotificationService.showIntervalTimerNotification({ phase: 'work', currentRound, totalRounds: rounds, timeLeft: workSec, isPaused: false });
+            systemNotificationService.showIntervalTimerNotification({ phase: 'work', currentRound, totalRounds: rounds, timeLeft: workSec, isPaused: false }).catch(() => { });
         } else if (currentPhase === 'work') {
             if (currentRound >= rounds) {
                 setPhase('finished'); setTimeLeft(0); endAtMsRef.current = null; feedbackService.workoutFinished();
                 systemNotificationService.dismissIntervalTimerNotification();
             } else if (restSec > 0) {
                 setPhase('rest'); startPhaseTimer(restSec); feedbackService.phaseChange('rest');
-                systemNotificationService.showIntervalTimerNotification({ phase: 'rest', currentRound, totalRounds: rounds, timeLeft: restSec, isPaused: false });
+                systemNotificationService.showIntervalTimerNotification({ phase: 'rest', currentRound, totalRounds: rounds, timeLeft: restSec, isPaused: false }).catch(() => { });
             } else {
                 setCurrentRound(prev => prev + 1); startPhaseTimer(workSec); feedbackService.phaseChange('work');
-                systemNotificationService.showIntervalTimerNotification({ phase: 'work', currentRound: currentRound + 1, totalRounds: rounds, timeLeft: workSec, isPaused: false });
+                systemNotificationService.showIntervalTimerNotification({ phase: 'work', currentRound: currentRound + 1, totalRounds: rounds, timeLeft: workSec, isPaused: false }).catch(() => { });
             }
         } else if (currentPhase === 'rest') {
             if (currentRound >= rounds) {
@@ -300,7 +349,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                 systemNotificationService.dismissIntervalTimerNotification();
             } else {
                 setCurrentRound(prev => prev + 1); setPhase('work'); startPhaseTimer(workSec); feedbackService.phaseChange('work');
-                systemNotificationService.showIntervalTimerNotification({ phase: 'work', currentRound: currentRound + 1, totalRounds: rounds, timeLeft: workSec, isPaused: false });
+                systemNotificationService.showIntervalTimerNotification({ phase: 'work', currentRound: currentRound + 1, totalRounds: rounds, timeLeft: workSec, isPaused: false }).catch(() => { });
             }
         }
         requestAnimationFrame(() => { transitionPendingRef.current = false; });
@@ -331,7 +380,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                 totalRounds: rounds,
                 timeLeft: remaining,
                 isPaused: false // Tick only runs when not paused
-            });
+            }).catch(() => { });
         };
         tick();
         intervalRef.current = setInterval(tick, 1000);
@@ -354,7 +403,8 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
     const handleStart = () => {
         setPhase('prepare'); setCurrentRound(1); setIsPaused(false); setElapsedTotal(0); transitionPendingRef.current = false;
         startPhaseTimer(PREPARE_DURATION); feedbackService.buttonPress();
-        systemNotificationService.showIntervalTimerNotification({ phase: 'prepare', currentRound: 1, totalRounds: rounds, timeLeft: PREPARE_DURATION, isPaused: false });
+        notificationPermissionsService.requestPermissionIfNeeded(false).catch(() => { });
+        systemNotificationService.showIntervalTimerNotification({ phase: 'prepare', currentRound: 1, totalRounds: rounds, timeLeft: PREPARE_DURATION, isPaused: false }).catch(() => { });
     };
 
     const handlePause = () => {
@@ -365,12 +415,12 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
                 progressAnim.setValue(value);
             });
             setIsPaused(true);
-            systemNotificationService.showIntervalTimerNotification({ phase, currentRound, totalRounds: rounds, timeLeft, isPaused: true });
+            systemNotificationService.showIntervalTimerNotification({ phase, currentRound, totalRounds: rounds, timeLeft, isPaused: true }).catch(() => { });
         } else {
             const remaining = pausedTimeLeftRef.current > 0 ? pausedTimeLeftRef.current : timeLeft;
             if (remaining > 0) { endAtMsRef.current = Date.now() + remaining * 1000; animateProgress(remaining, true); }
             setIsPaused(false);
-            systemNotificationService.showIntervalTimerNotification({ phase, currentRound, totalRounds: rounds, timeLeft: remaining, isPaused: false });
+            systemNotificationService.showIntervalTimerNotification({ phase, currentRound, totalRounds: rounds, timeLeft: remaining, isPaused: false }).catch(() => { });
         }
         feedbackService.buttonPress();
     };

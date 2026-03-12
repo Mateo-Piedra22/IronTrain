@@ -1,5 +1,7 @@
-import { Audio } from 'expo-av';
+import { AudioPlayer, createAudioPlayer, setAudioModeAsync, setIsAudioActiveAsync } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
+import { Platform } from 'react-native';
+import { logger } from '../utils/logger';
 import { configService } from './ConfigService';
 
 // Pre-loaded require calls (evaluated at bundle time, not runtime)
@@ -27,17 +29,25 @@ const SOUND_VOLUMES: Record<SoundKey, number> = {
  * Sound assets are lazy-loaded and cached for performance.
  */
 class FeedbackServiceImpl {
-    private soundCache: Map<SoundKey, Audio.Sound> = new Map();
+    private soundCache: Map<SoundKey, AudioPlayer> = new Map();
     private audioConfigured = false;
 
     // ─── Audio Configuration ──────────────────────────────────────────────────
     private async ensureAudioConfig(): Promise<void> {
         if (this.audioConfigured) return;
         try {
-            await Audio.setAudioModeAsync({
-                playsInSilentModeIOS: true,
-                staysActiveInBackground: false,
-                shouldDuckAndroid: true,
+            if (__DEV__ && Platform.OS === 'android') {
+                try {
+                    await setIsAudioActiveAsync(true);
+                } catch (e) {
+                    logger.captureException(e, { scope: 'FeedbackService.ensureAudioConfig', message: 'setIsAudioActiveAsync(true) failed' });
+                }
+            }
+
+            await setAudioModeAsync({
+                playsInSilentMode: true,
+                shouldPlayInBackground: false,
+                interruptionMode: 'mixWithOthers',
             });
             this.audioConfigured = true;
         } catch {
@@ -55,12 +65,9 @@ class FeedbackServiceImpl {
             const cached = this.soundCache.get(soundKey);
             if (cached) {
                 try {
-                    const status = await cached.getStatusAsync();
-                    if (status.isLoaded) {
-                        await cached.setPositionAsync(0);
-                        await cached.playAsync();
-                        return;
-                    }
+                    await cached.seekTo(0);
+                    cached.play();
+                    return;
                 } catch {
                     this.soundCache.delete(soundKey);
                 }
@@ -69,11 +76,13 @@ class FeedbackServiceImpl {
             const source = SOUND_SOURCES[soundKey];
             const volume = SOUND_VOLUMES[soundKey];
 
-            const { sound } = await Audio.Sound.createAsync(
-                source,
-                { volume, shouldPlay: true }
-            );
-            this.soundCache.set(soundKey, sound);
+            const player = createAudioPlayer(source, {
+                keepAudioSessionActive: false,
+            });
+            player.volume = volume;
+            player.loop = false;
+            player.play();
+            this.soundCache.set(soundKey, player);
         } catch {
             // Sound playback is non-critical; never crash the app for audio failure
         }
@@ -190,15 +199,38 @@ class FeedbackServiceImpl {
 
     // ─── Cleanup ──────────────────────────────────────────────────────────────
     async dispose(): Promise<void> {
-        for (const [, sound] of this.soundCache) {
+        for (const [, player] of this.soundCache) {
             try {
-                await sound.unloadAsync();
+                player.remove();
             } catch {
                 // Ignore cleanup errors
             }
         }
         this.soundCache.clear();
+        this.audioConfigured = false;
     }
 }
 
 export const feedbackService = new FeedbackServiceImpl();
+
+declare const module: {
+    hot?: {
+        dispose: (cb: () => void) => void;
+    };
+};
+
+if (__DEV__ && Platform.OS === 'android' && typeof module !== 'undefined' && module?.hot?.dispose) {
+    module.hot.dispose(() => {
+        void (async () => {
+            try {
+                await setIsAudioActiveAsync(false);
+            } catch (e) {
+                logger.captureException(e, { scope: 'FeedbackService.hmrDispose', message: 'setIsAudioActiveAsync(false) failed' });
+            }
+
+            await feedbackService.dispose();
+        })().catch((e) => {
+            logger.captureException(e, { scope: 'FeedbackService.hmrDispose' });
+        });
+    });
+}

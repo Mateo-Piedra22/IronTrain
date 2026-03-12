@@ -126,17 +126,27 @@ class SystemNotificationServiceImpl {
 
     // ─── Permission & Config Gates ───────────────────────────────────────────
     private async canNotify(): Promise<boolean> {
-        if (!configService.get('systemNotificationsEnabled')) return false;
-        const prefs = this.getPrefs();
-        if (!prefs.system.enabled) return false;
-        return await notificationPermissionsService.checkPermission();
+        try {
+            if (!configService.get('systemNotificationsEnabled')) return false;
+            const prefs = this.getPrefs();
+            if (!prefs.system.enabled) return false;
+            return await notificationPermissionsService.checkPermission();
+        } catch (e) {
+            logger.captureException(e, { scope: 'SystemNotificationService.canNotify', message: 'Failed to check notification gates' });
+            return false;
+        }
     }
 
     private async canNotifyType(type: keyof NotificationPreferences['system']): Promise<boolean> {
-        if (type === 'enabled') return await this.canNotify();
-        if (!(await this.canNotify())) return false;
-        const prefs = this.getPrefs();
-        return prefs.system[type] ?? true;
+        try {
+            if (type === 'enabled') return await this.canNotify();
+            if (!(await this.canNotify())) return false;
+            const prefs = this.getPrefs();
+            return prefs.system[type] ?? true;
+        } catch (e) {
+            logger.captureException(e, { scope: 'SystemNotificationService.canNotifyType', message: 'Failed to check notification gates for type' });
+            return false;
+        }
     }
 
     private getPrefs(): NotificationPreferences {
