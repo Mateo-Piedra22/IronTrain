@@ -17,6 +17,28 @@ import SystemStatusPanel from './components/SystemStatusPanel';
 export const revalidate = 0;
 export const runtime = 'nodejs';
 
+function toDateSafe(value: unknown): Date | null {
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? null : value;
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    return null;
+}
+
+function toIsoSafe(value: unknown): string | null {
+    const d = toDateSafe(value);
+    return d ? d.toISOString() : null;
+}
+
+const ISO_EPOCH_FALLBACK = new Date(0).toISOString();
+
 interface AdminPageProps {
     params: Promise<any>;
     searchParams: Promise<{
@@ -233,16 +255,25 @@ export default async function AdminPage({
         message: '',
     };
 
+    const now = new Date();
     const metrics = {
         installs: Number(installsCount[0]?.count || 0),
         users: Number(profilesCount[0]?.count || 0),
-        activeEvents: globalEventsData.filter(e => e.isActive === 1 && e.startDate <= new Date() && e.endDate >= new Date()).length,
+        activeEvents: globalEventsData.filter((e) => {
+            if (e.isActive !== 1) return false;
+            const start = toDateSafe((e as any)?.startDate);
+            const end = toDateSafe((e as any)?.endDate);
+            if (!start || !end) return false;
+            return start <= now && end >= now;
+        }).length,
         pendingFeedback: feedbackRows.filter(f => f.status === 'open').length,
     };
 
     const lastChangelogSync = changelogsRaw.reduce<Date | null>((latest, row) => {
-        if (!latest) return row.updatedAt;
-        return row.updatedAt > latest ? row.updatedAt : latest;
+        const updated = toDateSafe((row as any)?.updatedAt);
+        if (!updated) return latest;
+        if (!latest) return updated;
+        return updated > latest ? updated : latest;
     }, null);
 
     const currentDateDisplay = new Date().toLocaleDateString('es-AR', {
@@ -253,42 +284,42 @@ export default async function AdminPage({
     // Convert all dates to strings for safe serialization to client components
     const sanitizedChangelogs = changelogs.map(c => ({
         ...c,
-        date: c.date.toISOString(),
-        createdAt: c.createdAt.toISOString(),
-        updatedAt: c.updatedAt.toISOString(),
+        date: toIsoSafe((c as any)?.date),
+        createdAt: toIsoSafe((c as any)?.createdAt),
+        updatedAt: toIsoSafe((c as any)?.updatedAt),
     }));
 
     const sanitizedNotifications = adminNotificationsData.map(n => ({
         ...n,
-        scheduledAt: n.scheduledAt.toISOString(),
-        createdAt: n.createdAt.toISOString(),
-        updatedAt: n.updatedAt.toISOString(),
-        expiresAt: n.expiresAt?.toISOString() || null,
+        scheduledAt: toIsoSafe((n as any)?.scheduledAt),
+        createdAt: toIsoSafe((n as any)?.createdAt),
+        updatedAt: toIsoSafe((n as any)?.updatedAt),
+        expiresAt: toIsoSafe((n as any)?.expiresAt),
         stats: getNotifStats(n.id)
     }));
 
     const sanitizedGlobalEvents = globalEventsData.map(e => ({
         ...e,
-        startDate: e.startDate.toISOString(),
-        endDate: e.endDate.toISOString(),
-        createdAt: e.createdAt.toISOString(),
-        updatedAt: e.updatedAt.toISOString(),
+        startDate: toIsoSafe((e as any)?.startDate) ?? ISO_EPOCH_FALLBACK,
+        endDate: toIsoSafe((e as any)?.endDate) ?? ISO_EPOCH_FALLBACK,
+        createdAt: toIsoSafe((e as any)?.createdAt),
+        updatedAt: toIsoSafe((e as any)?.updatedAt),
     }));
 
     const sanitizedRoutines = routinesData.map(r => ({
         ...r,
-        updatedAt: r.updatedAt.toISOString(),
+        updatedAt: toIsoSafe((r as any)?.updatedAt),
     }));
 
     const sanitizedFeedback = feedbackRows.map(f => ({
         ...f,
-        createdAt: f.createdAt.toISOString(),
-        updatedAt: f.updatedAt.toISOString(),
+        createdAt: toIsoSafe((f as any)?.createdAt),
+        updatedAt: toIsoSafe((f as any)?.updatedAt),
     }));
 
     const sanitizedLeaderboard = leaderboardData.map(p => ({
         ...p,
-        updatedAt: p.updatedAt.toISOString(),
+        updatedAt: toIsoSafe((p as any)?.updatedAt),
     }));
 
     const sanitizedBreakdown = Object.fromEntries(
@@ -300,25 +331,25 @@ export default async function AdminPage({
             uid,
             events.map(e => ({
                 ...e,
-                createdAt: e.createdAt.toISOString(),
-                updatedAt: e.updatedAt.toISOString(),
+                createdAt: toIsoSafe((e as any)?.createdAt),
+                updatedAt: toIsoSafe((e as any)?.updatedAt),
             }))
         ])
     );
 
     const sanitizedOfficialExercises = (officialExercisesRaw || []).map(e => ({
         ...e,
-        updatedAt: e.updatedAt.toISOString(),
+        updatedAt: toIsoSafe((e as any)?.updatedAt),
     }));
 
     const sanitizedOfficialCategories = (officialCategoriesRaw || []).map(c => ({
         ...c,
-        updatedAt: c.updatedAt.toISOString(),
+        updatedAt: toIsoSafe((c as any)?.updatedAt),
     }));
 
     const sanitizedOfficialBadges = (officialBadgesRaw || []).map(b => ({
         ...b,
-        updatedAt: b.updatedAt.toISOString(),
+        updatedAt: toIsoSafe((b as any)?.updatedAt),
     }));
 
     const sanitizedWorkoutsForSync = (workoutsForSyncPanel || []).map((w) => ({
@@ -329,8 +360,8 @@ export default async function AdminPage({
         date: Number(w.date),
         startTime: Number(w.startTime),
         endTime: w.endTime === null || w.endTime === undefined ? null : Number(w.endTime),
-        updatedAt: w.updatedAt.toISOString(),
-        deletedAt: w.deletedAt ? w.deletedAt.toISOString() : null,
+        updatedAt: toIsoSafe((w as any)?.updatedAt) ?? ISO_EPOCH_FALLBACK,
+        deletedAt: toIsoSafe((w as any)?.deletedAt),
         setCount: Number(w.setCount || 0),
     }));
 
@@ -383,7 +414,7 @@ export default async function AdminPage({
                         editingNotification={editNotifId ? (sanitizedNotifications.find(n => n.id === editNotifId) ?? null) : null}
                         editingGlobalEvent={editEventId ? (sanitizedGlobalEvents.find(e => e.id === editEventId) ?? null) : null}
                         syncStatus={{
-                            lastSyncAt: lastChangelogSync instanceof Date ? lastChangelogSync.toISOString() : lastChangelogSync,
+                            lastSyncAt: toIsoSafe(lastChangelogSync),
                             totalInDb: sanitizedChangelogs.length,
                             syncStatus: changelogSyncStatus || null,
                             upsertedCount: changelogUpserted || null,
