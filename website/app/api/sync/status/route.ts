@@ -42,9 +42,9 @@ export async function GET(req: NextRequest) {
                 const integrityClause = t.key === 'workout_sets'
                     ? sql`exists (
                         select 1
-                        from ${schema.workouts} w
-                        where w.id = ${(t.table as any).workoutId}
-                          and w.userId = ${userId}
+                        from ${schema.workouts}
+                        where ${schema.workouts.id} = ${(t.table as any).workoutId}
+                          and ${schema.workouts.userId} = ${userId}
                     )`
                     : sql`true`;
 
