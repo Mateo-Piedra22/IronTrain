@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
         const routines = normalizeSnapshotArray<RoutineInsert>(snapshot.routines, userId, ['id', 'name', 'userId']);
         const routineDays = normalizeSnapshotArray<RoutineDayInsert>(snapshot.routine_days, userId, ['id', 'name', 'userId', 'routineId', 'orderIndex']);
         const routineExercises = normalizeSnapshotArray<RoutineExerciseInsert>(snapshot.routine_exercises, userId, ['id', 'userId', 'routineDayId', 'exerciseId', 'orderIndex']);
-        const workouts = normalizeSnapshotArray<WorkoutInsert>(snapshot.workouts, userId, ['id', 'name', 'userId', 'date', 'startTime']);
+        const workouts = normalizeSnapshotArray<WorkoutInsert>(snapshot.workouts, userId, ['id', 'userId', 'date', 'startTime']);
         const workoutSets = normalizeSnapshotArray<WorkoutSetInsert>(snapshot.workout_sets, userId, ['id', 'userId', 'workoutId', 'exerciseId']);
 
         const workoutIdSet = new Set(workouts.map((w) => String((w as any).id || '')).filter((id) => id.length > 0));

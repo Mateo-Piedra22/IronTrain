@@ -842,14 +842,20 @@ export class SyncService {
         const counts: Record<string, { active: number; deleted: number; total: number }> = {};
         for (const t of tables) {
             const hasDeleteAt = t.supportsDelete && TABLES_WITH_SOFT_DELETE.has(t.table);
+            const authUserId = useAuthStore.getState().user?.id;
+
             const activeSql = hasDeleteAt
                 ? `SELECT COUNT(*) as count FROM ${t.table} WHERE deleted_at IS NULL`
-                : `SELECT COUNT(*) as count FROM ${t.table}`;
+                : t.table === 'user_profiles' && typeof authUserId === 'string' && authUserId.length > 0
+                    ? `SELECT COUNT(*) as count FROM ${t.table} WHERE id = ?`
+                    : `SELECT COUNT(*) as count FROM ${t.table}`;
             const deletedSql = hasDeleteAt
                 ? `SELECT COUNT(*) as count FROM ${t.table} WHERE deleted_at IS NOT NULL`
                 : null;
 
-            const activeRes = await dbService.getFirst<{ count: number }>(activeSql);
+            const activeRes = t.table === 'user_profiles' && typeof authUserId === 'string' && authUserId.length > 0 && !hasDeleteAt
+                ? await dbService.getFirst<{ count: number }>(activeSql, [authUserId])
+                : await dbService.getFirst<{ count: number }>(activeSql);
             const deletedRes = deletedSql ? await dbService.getFirst<{ count: number }>(deletedSql) : { count: 0 };
             const active = activeRes?.count || 0;
             const deleted = deletedRes?.count || 0;

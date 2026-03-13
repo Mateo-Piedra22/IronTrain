@@ -28,7 +28,7 @@ jest.mock('../../store/authStore', () => ({
 describe('SyncService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (useAuthStore.getState as jest.Mock).mockReturnValue({ token: 'token-1' });
+    (useAuthStore.getState as jest.Mock).mockReturnValue({ token: 'token-1', user: { id: 'user-1' } });
     global.fetch = jest.fn();
   });
 
@@ -56,10 +56,13 @@ describe('SyncService', () => {
     // We return 1 active and 2 deleted for all soft-delete tables, and 5 for non-soft-delete tables.
     const getFirst = dbService.getFirst as jest.Mock;
 
-    getFirst.mockImplementation(async (sql: string) => {
+    getFirst.mockImplementation(async (sql: string, params?: any[]) => {
+      if (sql.includes('FROM user_profiles') && sql.includes('WHERE id = ?')) {
+        expect(params).toEqual(['user-1']);
+        return { count: 5 };
+      }
       if (sql.includes('FROM plate_inventory')) return { count: 5 };
       if (sql.includes('FROM settings')) return { count: 5 };
-      if (sql.includes('FROM user_profiles')) return { count: 5 };
       if (sql.includes('deleted_at IS NULL')) return { count: 1 };
       if (sql.includes('deleted_at IS NOT NULL')) return { count: 2 };
       return { count: 0 };
