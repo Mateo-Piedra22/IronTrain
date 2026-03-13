@@ -4,6 +4,15 @@ import { verifyAuth } from '../../../../src/lib/auth';
 import { buildBroadcastFeed } from '../../../../src/lib/broadcast/feed';
 import { parseBroadcastFeedQuery } from '../../../../src/lib/broadcast/query';
 
+function toIsoSafe(value: unknown): string | null {
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'string' && value.trim().length > 0) {
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+    }
+    return null;
+}
+
 export const revalidate = 0;
 export const runtime = 'nodejs';
 
@@ -22,11 +31,11 @@ export async function GET(request: NextRequest) {
             generatedAt: new Date().toISOString(),
             items: items.map((i) => ({
                 ...i,
-                createdAt: i.createdAt.toISOString(),
+                createdAt: toIsoSafe((i as any)?.createdAt),
                 lifecycle: {
                     ...i.lifecycle,
-                    startsAt: i.lifecycle.startsAt ? i.lifecycle.startsAt.toISOString() : null,
-                    endsAt: i.lifecycle.endsAt ? i.lifecycle.endsAt.toISOString() : null,
+                    startsAt: toIsoSafe((i as any)?.lifecycle?.startsAt),
+                    endsAt: toIsoSafe((i as any)?.lifecycle?.endsAt),
                 },
             })),
         });

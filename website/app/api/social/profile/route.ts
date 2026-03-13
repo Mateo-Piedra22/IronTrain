@@ -5,6 +5,15 @@ import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
 import { hasProfanity, validateUsername } from '../../../../src/lib/moderation';
 
+function toIsoSafe(value: unknown): string | null {
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'string' && value.trim().length > 0) {
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+    }
+    return null;
+}
+
 export async function GET(req: NextRequest) {
     try {
         const userId = await verifyAuth(req);
@@ -46,7 +55,7 @@ export async function GET(req: NextRequest) {
                     id: activeEvent.id,
                     title: activeEvent.name,
                     multiplier: activeEvent.multiplier,
-                    endDate: activeEvent.endDate.toISOString(),
+                    endDate: toIsoSafe((activeEvent as any)?.endDate),
                 } : null
             }
         });

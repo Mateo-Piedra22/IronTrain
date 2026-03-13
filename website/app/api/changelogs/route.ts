@@ -9,6 +9,15 @@ export const revalidate = 60; // Cache for 1 minute
 export const dynamic = 'force-dynamic';
 type ApiRelease = ChangelogRelease & { id: string; metadata: unknown };
 
+function toIsoSafe(value: unknown): string | null {
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'string' && value.trim().length > 0) {
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+    }
+    return null;
+}
+
 export async function GET(request: NextRequest) {
     try {
         const includeUnreleasedParam = new URL(request.url).searchParams.get('includeUnreleased');
@@ -23,7 +32,7 @@ export async function GET(request: NextRequest) {
         const releases = data.map((c) => ({
             id: c.id,
             version: c.version,
-            date: c.date.toISOString(),
+            date: toIsoSafe((c as any)?.date),
             items: JSON.parse(c.items || '[]'),
             unreleased: c.isUnreleased === 1,
             metadata: c.metadata ? JSON.parse(c.metadata) : null,

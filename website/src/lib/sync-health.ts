@@ -39,9 +39,16 @@ export type SyncHealthReport = {
     };
 };
 
-function toIsoOrNull(value: Date | null | undefined): string | null {
+function toIsoOrNull(value: unknown): string | null {
     if (!value) return null;
-    return value.toISOString();
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? null : value.toISOString();
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+    }
+    return null;
 }
 
 export async function getSyncHealthReport(): Promise<SyncHealthReport> {
