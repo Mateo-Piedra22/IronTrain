@@ -5,6 +5,7 @@ import { Category, Exercise, ExerciseType, Workout, WorkoutSet } from '../types/
 
 import { logger } from '../utils/logger';
 import { uuidV4 } from '../utils/uuid';
+import { dataEventService } from './DataEventService';
 
 const DB_NAME = 'irontrain_v1.db';
 const SEED_DISABLED_KEY = 'irontrain_seed_disabled';
@@ -1648,6 +1649,8 @@ export class DatabaseService {
                     Date.now()
                 ]
             );
+
+            dataEventService.emit('SYNC_QUEUE_ENQUEUED', { tableName, recordId, operation });
         } catch (e) {
             logger.captureException(e, { scope: 'DatabaseService.queueSyncMutation', message: '[SyncQueue] Failed to enqueue mutation' });
         }

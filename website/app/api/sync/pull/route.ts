@@ -1,9 +1,14 @@
-import { and, eq, gt, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { SYNC_TABLES } from '../../../../src/constants/sync';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
+import {
+    collectMissingParentIdsFromChanges,
+    type SyncChange,
+    type SyncParentRelation,
+} from '../../../../src/lib/sync-parent-workouts';
 
 export const runtime = 'nodejs';
 
@@ -72,7 +77,7 @@ export async function GET(req: NextRequest) {
         };
 
         const MAX_PULL_RECORDS = 1000;
-        const changes: any[] = [];
+        const changes: SyncChange[] = [];
         let totalCount = 0;
 
         // Fetch data for each table in shared list
@@ -153,6 +158,106 @@ export async function GET(req: NextRequest) {
                     payload: snakeRow
                 });
                 totalCount++;
+            }
+        }
+
+        const relations: SyncParentRelation[] = [
+            { childTable: 'workout_sets', parentTable: 'workouts', fkField: 'workout_id' },
+            { childTable: 'workout_sets', parentTable: 'exercises', fkField: 'exercise_id' },
+            { childTable: 'exercises', parentTable: 'categories', fkField: 'category_id' },
+            { childTable: 'routine_days', parentTable: 'routines', fkField: 'routine_id' },
+            { childTable: 'routine_exercises', parentTable: 'routine_days', fkField: 'routine_day_id' },
+            { childTable: 'routine_exercises', parentTable: 'exercises', fkField: 'exercise_id' },
+            { childTable: 'exercise_badges', parentTable: 'exercises', fkField: 'exercise_id' },
+            { childTable: 'exercise_badges', parentTable: 'badges', fkField: 'badge_id' },
+            { childTable: 'user_exercise_prs', parentTable: 'exercises', fkField: 'exercise_id' },
+            { childTable: 'score_events', parentTable: 'workouts', fkField: 'workout_id' },
+            { childTable: 'kudos', parentTable: 'activity_feed', fkField: 'feed_id' },
+            { childTable: 'activity_seen', parentTable: 'activity_feed', fkField: 'activity_id' },
+            { childTable: 'changelog_reactions', parentTable: 'changelogs', fkField: 'changelog_id' },
+        ];
+
+        const fetchParents = async (parentTable: string, ids: string[]): Promise<void> => {
+            if (totalCount >= MAX_PULL_RECORDS) return;
+            if (ids.length === 0) return;
+            const tableSchema = tableMap[parentTable];
+            if (!tableSchema) return;
+
+            const remaining = MAX_PULL_RECORDS - totalCount;
+            const limited = ids.slice(0, remaining);
+            const pkField = parentTable === 'settings' ? tableSchema.key : tableSchema.id;
+
+            const SYSTEM_ASSET_TABLES = ['categories', 'badges', 'exercises', 'exercise_badges'];
+            const PURE_GLOBAL_TABLES = ['changelogs'];
+
+            const baseConditions: any[] = [];
+
+            if (parentTable === 'activity_feed') {
+                baseConditions.push(inArray(pkField, limited));
+                baseConditions.push(sql`(${tableSchema.userId} = ${userId} OR EXISTS (
+                    SELECT 1 FROM friendships f
+                    WHERE ((f.user_id = ${userId} AND f.friend_id = ${tableSchema.userId})
+                       OR (f.user_id = ${tableSchema.userId} AND f.friend_id = ${userId}))
+                    AND f.status = 'accepted'
+                    AND f.deleted_at IS NULL
+                ))`);
+            } else if (SYSTEM_ASSET_TABLES.includes(parentTable)) {
+                baseConditions.push(inArray(pkField, limited));
+                if ('userId' in tableSchema && 'isSystem' in tableSchema) {
+                    baseConditions.push(sql`(${tableSchema.isSystem} = 1 OR ${tableSchema.userId} = ${userId})`);
+                } else if ('isSystem' in tableSchema) {
+                    baseConditions.push(eq(tableSchema.isSystem, 1));
+                } else if ('userId' in tableSchema) {
+                    baseConditions.push(eq(tableSchema.userId, userId));
+                }
+            } else if (parentTable === 'user_profiles') {
+                baseConditions.push(inArray(pkField, limited));
+                baseConditions.push(sql`(${tableSchema.id} = ${userId} OR ${tableSchema.isPublic} = 1)`);
+            } else if (!PURE_GLOBAL_TABLES.includes(parentTable)) {
+                baseConditions.push(inArray(pkField, limited));
+                if (parentTable === 'friendships') {
+                    baseConditions.push(sql`(${tableSchema.userId} = ${userId} OR ${tableSchema.friendId} = ${userId})`);
+                } else if (parentTable === 'shares_inbox') {
+                    baseConditions.push(sql`(${tableSchema.senderId} = ${userId} OR ${tableSchema.receiverId} = ${userId})`);
+                } else if (parentTable === 'activity_seen') {
+                    baseConditions.push(eq(tableSchema.userId, userId));
+                } else if (parentTable === 'kudos') {
+                    baseConditions.push(eq(tableSchema.giverId, userId));
+                } else if ('userId' in tableSchema) {
+                    baseConditions.push(eq(tableSchema.userId, userId));
+                }
+            } else {
+                baseConditions.push(inArray(pkField, limited));
+            }
+
+            const rows = await db.select().from(tableSchema).where(and(...baseConditions));
+
+            const SENSITIVE_FIELDS = ['push_token', 'password', 'token', 'secret', 'ip_hash'];
+            for (const row of rows) {
+                const snakeRow = toSnakeCase(row as Record<string, unknown>);
+                for (const field of SENSITIVE_FIELDS) {
+                    if (field in snakeRow) delete (snakeRow as any)[field];
+                }
+                if (parentTable === 'settings') {
+                    (snakeRow as any).key = unscopedSettingsKey(userId, String((snakeRow as any).key || ''));
+                }
+                changes.push({
+                    table: parentTable,
+                    operation: (snakeRow as any).deleted_at ? 'DELETE' : 'UPDATE',
+                    payload: snakeRow,
+                });
+                totalCount++;
+                if (totalCount >= MAX_PULL_RECORDS) break;
+            }
+        };
+
+        for (let pass = 0; pass < 3 && totalCount < MAX_PULL_RECORDS; pass++) {
+            const missingByTable = collectMissingParentIdsFromChanges(changes, relations);
+            const entries = Object.entries(missingByTable);
+            if (entries.length === 0) break;
+            for (const [parentTable, ids] of entries) {
+                await fetchParents(parentTable, ids);
+                if (totalCount >= MAX_PULL_RECORDS) break;
             }
         }
 

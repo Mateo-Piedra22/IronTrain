@@ -4,6 +4,7 @@ import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
 import { applyWorkoutScoring, revertWorkoutScoring } from '../../../../src/lib/social-scoring';
+import { collectIncomingRecordIdsByTable, shouldDeferWorkoutSetUpsert, type PushOperation } from '../../../../src/lib/sync-push-defer';
 
 export const runtime = 'nodejs';
 
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
         }
 
-        const operations = body?.operations;
+        const operations = body?.operations as unknown;
 
         if (!Array.isArray(operations)) {
             return NextResponse.json({ error: 'Invalid payload: operations must be an array' }, { status: 400 });
@@ -69,13 +70,18 @@ export async function POST(req: NextRequest) {
             'friendships': schema.friendships,
         };
 
-        const results = [];
+        const results: Array<{ id: string; status: string; reason?: string }> = [];
         let processedCount = 0;
 
         // BigInt columns in DB (snake_case from app)
         const knownBigIntColumns = new Set(['date', 'start_time', 'end_time', 'duration', 'time', 'order_index']);
 
-        for (const op of operations) {
+        const incomingIdsByTable = collectIncomingRecordIdsByTable(operations as PushOperation[]);
+        const incomingWorkouts = incomingIdsByTable.get('workouts') ?? new Set<string>();
+
+        const deferredWorkoutSetOps: any[] = [];
+
+        const handleOperation = async (op: any): Promise<void> => {
             const opId = op.id || crypto.randomUUID();
             const tableName = op.table;
             const operation = op.operation?.toUpperCase();
@@ -83,7 +89,7 @@ export async function POST(req: NextRequest) {
 
             if (!tableMap[tableName] || !SUPPORTED_OPERATIONS.has(operation)) {
                 results.push({ id: opId, status: 'ignored', reason: 'unsupported_table_or_op' });
-                continue;
+                return;
             }
 
             const tableSchema = tableMap[tableName];
@@ -187,6 +193,30 @@ export async function POST(req: NextRequest) {
 
                     if (!pkValue) {
                         throw new Error(`Missing primary key (id/key) for table ${tableName}`);
+                    }
+
+                    if (tableName === 'workout_sets' && (operation === 'INSERT' || operation === 'UPDATE')) {
+                        const workoutId = filteredData.workoutId;
+                        if (typeof workoutId !== 'string' || workoutId.length === 0) {
+                            throw new Error('Missing workout_id for workout_sets');
+                        }
+                        const existingWorkout = await db.select({ id: schema.workouts.id })
+                            .from(schema.workouts)
+                            .where(and(eq(schema.workouts.id, workoutId), eq(schema.workouts.userId, userId)))
+                            .limit(1);
+                        if (!existingWorkout[0]?.id) {
+                            const defer = shouldDeferWorkoutSetUpsert({
+                                workoutId,
+                                parentExistsInDb: false,
+                                incomingWorkouts,
+                            });
+                            if (defer) {
+                                deferredWorkoutSetOps.push({ ...op, id: opId });
+                                return;
+                            }
+                            results.push({ id: opId, status: 'error', reason: 'missing_parent_workout' });
+                            return;
+                        }
                     }
 
                     await db.transaction(async (tx) => {
@@ -430,6 +460,16 @@ export async function POST(req: NextRequest) {
             } catch (err: any) {
                 console.error(`[Push] Error in ${tableName}:${opId}: ${err.message}`);
                 results.push({ id: opId, status: 'error', reason: err.message });
+            }
+        };
+
+        for (const op of operations) {
+            await handleOperation(op);
+        }
+
+        if (deferredWorkoutSetOps.length > 0) {
+            for (const op of deferredWorkoutSetOps) {
+                await handleOperation(op);
             }
         }
 

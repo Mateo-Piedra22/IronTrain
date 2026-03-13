@@ -1,6 +1,7 @@
 import notifee, { AndroidImportance } from '@notifee/react-native';
 import * as Haptics from 'expo-haptics';
 import { AppState, Platform } from 'react-native';
+import { configService } from '../services/ConfigService';
 import { BannerMessage, ToastType, useNotificationStore } from '../store/notificationStore';
 import { logger } from './logger';
 
@@ -11,12 +12,18 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
 });
 
 if (Platform.OS === 'android' && notifee.registerForegroundService) {
-    notifee.registerForegroundService((_notification) => {
-        return new Promise(() => {
-            // IronTrain: satisfy Notifee requirement for foreground service registration.
-            // This keeps the workout/timer notification alive in the background on Android.
+    try {
+        notifee.registerForegroundService((_notification) => {
+            const enabled = !!configService.get('androidForegroundServiceNotificationsEnabled');
+            if (!enabled) {
+                return Promise.resolve();
+            }
+            return new Promise(() => undefined);
         });
-    });
+    } catch (e) {
+        logger.captureException(e, { scope: 'notify.registerForegroundService', message: 'Failed to register Notifee foreground service' });
+        configService.set('androidForegroundServiceNotificationsEnabled', false).catch(() => undefined);
+    }
 }
 
 const showOsNotification = async (title: string, message: string) => {

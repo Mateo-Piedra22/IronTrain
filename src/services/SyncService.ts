@@ -110,6 +110,12 @@ export interface SyncDiagnostics {
 export class SyncService {
     private isSyncing = false;
 
+    private syncPreconditionError(code: 'ALREADY_SYNCING' | 'UNAUTHENTICATED' | 'OFFLINE', message: string): Error {
+        const e = new Error(message);
+        (e as any).code = code;
+        return e;
+    }
+
     private async wait(ms: number): Promise<void> {
         await new Promise(resolve => setTimeout(resolve, ms));
     }
@@ -280,18 +286,20 @@ export class SyncService {
      * Executes a full bidirectional sync: Push local changes, then Pull remote changes.
      */
     public async syncBidirectional(options?: { forcePull?: boolean }): Promise<void> {
-        if (this.isSyncing) return;
+        if (this.isSyncing) {
+            throw this.syncPreconditionError('ALREADY_SYNCING', 'Sync en progreso');
+        }
         this.isSyncing = true;
 
         try {
             const token = useAuthStore.getState().token;
             if (!token) {
-                return;
+                throw this.syncPreconditionError('UNAUTHENTICATED', 'Usuario no autenticado');
             }
 
             const netState = await NetInfo.fetch();
             if (!netState.isConnected || !netState.isInternetReachable) {
-                return;
+                throw this.syncPreconditionError('OFFLINE', 'Sin conexión a internet');
             }
 
             // Reintentar los fallidos que aún no superaron el límite
@@ -945,7 +953,9 @@ export class SyncService {
         });
 
         if (!response.ok) {
-            throw new Error(`Snapshot pull failed! status: ${response.status}`);
+            const bodyText = await response.text().catch(() => '');
+            const suffix = bodyText ? ` body=${bodyText}` : '';
+            throw new Error(`Snapshot pull failed! status: ${response.status}${suffix}`);
         }
 
         const data = await response.json();

@@ -38,20 +38,30 @@ export async function GET(req: NextRequest) {
         const countsEntries = await Promise.all(
             tables.map(async (t) => {
                 const ownerClause = eq((t.table as any)[t.ownerField], userId);
+
+                const integrityClause = t.key === 'workout_sets'
+                    ? sql`exists (
+                        select 1
+                        from ${schema.workouts} w
+                        where w.id = ${(t.table as any).workoutId}
+                          and w.userId = ${userId}
+                    )`
+                    : sql`true`;
+
                 const [active] = await db
                     .select({ count: sql<number>`count(*)` })
                     .from(t.table)
                     .where(
                         t.supportsDelete
-                            ? and(ownerClause, isNull((t.table as any).deletedAt))
-                            : ownerClause
+                            ? and(ownerClause, isNull((t.table as any).deletedAt), integrityClause)
+                            : and(ownerClause, integrityClause)
                     );
 
                 const [deleted] = t.supportsDelete
                     ? await db
                         .select({ count: sql<number>`count(*)` })
                         .from(t.table)
-                        .where(and(ownerClause, sql`${(t.table as any).deletedAt} is not null`))
+                        .where(and(ownerClause, sql`${(t.table as any).deletedAt} is not null`, integrityClause))
                     : [{ count: 0 }];
 
                 const activeCount = Number(active?.count || 0);

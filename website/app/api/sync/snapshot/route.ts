@@ -104,7 +104,13 @@ export async function GET(req: NextRequest) {
         snapshot.categories = await db.select().from(schema.categories).where(eq(schema.categories.userId, userId));
         snapshot.exercises = await db.select().from(schema.exercises).where(eq(schema.exercises.userId, userId));
         snapshot.workouts = await db.select().from(schema.workouts).where(eq(schema.workouts.userId, userId));
-        snapshot.workout_sets = await db.select().from(schema.workoutSets).where(eq(schema.workoutSets.userId, userId));
+        const workoutIds = new Set((snapshot.workouts ?? []).map((w: any) => w?.id).filter((id: any) => typeof id === 'string' && id.length > 0));
+
+        const rawWorkoutSets = await db.select().from(schema.workoutSets).where(eq(schema.workoutSets.userId, userId));
+        snapshot.workout_sets = (rawWorkoutSets ?? []).filter((s: any) => {
+            const wid = s?.workoutId;
+            return typeof wid === 'string' && workoutIds.has(wid);
+        });
         snapshot.routines = await db.select().from(schema.routines).where(eq(schema.routines.userId, userId));
         snapshot.routine_days = await db.select().from(schema.routineDays).where(eq(schema.routineDays.userId, userId));
         snapshot.routine_exercises = await db.select().from(schema.routineExercises).where(eq(schema.routineExercises.userId, userId));
@@ -164,6 +170,28 @@ export async function POST(req: NextRequest) {
         const routineExercises = normalizeSnapshotArray<RoutineExerciseInsert>(snapshot.routine_exercises, userId, ['id', 'userId', 'routineDayId', 'exerciseId', 'orderIndex']);
         const workouts = normalizeSnapshotArray<WorkoutInsert>(snapshot.workouts, userId, ['id', 'name', 'userId', 'date', 'startTime']);
         const workoutSets = normalizeSnapshotArray<WorkoutSetInsert>(snapshot.workout_sets, userId, ['id', 'userId', 'workoutId', 'exerciseId']);
+
+        const workoutIdSet = new Set(workouts.map((w) => String((w as any).id || '')).filter((id) => id.length > 0));
+        const exerciseIdSet = new Set(exercises.map((e) => String((e as any).id || '')).filter((id) => id.length > 0));
+
+        const invalidWorkoutSets = workoutSets.filter((s) => {
+            const wid = String((s as any).workoutId || '');
+            const eid = String((s as any).exerciseId || '');
+            if (!wid || !eid) return true;
+            if (!workoutIdSet.has(wid)) return true;
+            if (!exerciseIdSet.has(eid)) return true;
+            return false;
+        });
+
+        if (invalidWorkoutSets.length > 0) {
+            return NextResponse.json({
+                error: 'Invalid snapshot: workout_sets contains orphan references',
+                details: {
+                    invalidWorkoutSets: invalidWorkoutSets.slice(0, 5),
+                    invalidCount: invalidWorkoutSets.length,
+                }
+            }, { status: 400 });
+        }
         const measurements = normalizeSnapshotArray<MeasurementInsert>(snapshot.measurements, userId, ['id', 'userId', 'date', 'type', 'value', 'unit']);
         const goals = normalizeSnapshotArray<GoalInsert>(snapshot.goals, userId, ['id', 'userId', 'type', 'title', 'targetValue']);
         const bodyMetrics = normalizeSnapshotArray<BodyMetricInsert>(snapshot.body_metrics, userId, ['id', 'userId', 'date']);

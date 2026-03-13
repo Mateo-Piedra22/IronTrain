@@ -161,6 +161,40 @@ En la sección `## [VERSION] (Unreleased)`, describa los cambios realizados sigu
  
  ---
  
+ ## 🛠️ Herramientas de Desarrollo: Builds Locales (Solo Binarios)
+ 
+ Si solo necesitas el archivo `.apk` o `.aab` para testing manual o enviárselo a alguien, sin disparar procesos de Git ni publicar en GitHub, utilizá estos comandos.
+ 
+ ### Android (Local Build via WSL)
+ Estos comandos automatizan la restauración de secretos y usan **WSL** internamente. Son ideales para generar binarios rápidos y gratuitos.
+ 
+ - **Generar APK (Instalable directo)**:
+   ```powershell
+   npm run build:android:apk
+   ```
+ - **Generar App Bundle (Para la Store)**:
+   ```powershell
+   npm run build:android:aab
+   ```
+ 
+ ### iOS (Cloud Build)
+ Como estás en Windows, la build local no es posible. Usá este comando para compilar en la nube:
+ 
+ - **Generar Build de Test**:
+   ```powershell
+   npm run build:ios:preview
+   ```
+ 
+ ---
+ 
+ ### Resumen de Flags Útiles:
+ - `--local`: Compila usando tu CPU (WSL en Windows). Gratis e ilimitado.
+ - `--profile preview`: Usa configuración de producción pero genera un APK instalable.
+ - `--profile production`: Genera el archivo final para tiendas (App Bundle).
+ - `--non-interactive`: Evita que EAS te haga preguntas durante el proceso.
+ 
+ ---
+ 
  ## Paso 7 - Verificación Final (Checklist)
 
 ### GitHub Releases

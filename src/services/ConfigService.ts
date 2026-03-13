@@ -1,6 +1,7 @@
 import { logger } from '../utils/logger';
 import { dbService } from './DatabaseService';
 import { dataEventService } from './DataEventService';
+import type { GlobalEvent, ScoreConfig, WeatherInfo } from './SocialService';
 
 export interface NotificationPreferences {
     inApp: {
@@ -37,10 +38,13 @@ export interface AppConfig {
     language: 'en' | 'es';
     showGhostValues: boolean;
     autoFinishWorkout: boolean;
+    runningWorkoutTimerWorkoutId: string | null;
+    ignoredDuplicateKeys: string[];
 
     hapticFeedbackEnabled: boolean;
     soundFeedbackEnabled: boolean;
     systemNotificationsEnabled: boolean;
+    androidForegroundServiceNotificationsEnabled: boolean;
     notificationPreferences: NotificationPreferences;
 
     analyticsDefaultRangeDays: 7 | 30 | 90 | 365;
@@ -57,6 +61,11 @@ export interface AppConfig {
     exerciseCardioPrimaryPRById: Record<string, 'distance' | 'time' | 'pace' | 'speed'>;
     lastViewedChangelogVersion: string;
     training_days: number[];
+
+    cachedSocialScoreConfig: ScoreConfig | null;
+    cachedSocialActiveEvent: GlobalEvent | null;
+    cachedSocialWeatherBonus: WeatherInfo | null;
+    cachedSocialScoringRefreshedAt: number;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -68,9 +77,13 @@ const DEFAULT_CONFIG: AppConfig = {
     showGhostValues: true,
     autoFinishWorkout: false,
 
+    runningWorkoutTimerWorkoutId: null,
+    ignoredDuplicateKeys: [],
+
     hapticFeedbackEnabled: true,
     soundFeedbackEnabled: true,
     systemNotificationsEnabled: true,
+    androidForegroundServiceNotificationsEnabled: false,
     notificationPreferences: {
         inApp: { enabled: true, restTimer: true, workoutStatus: true, updates: true, intervalTimer: true },
         system: { enabled: true, restTimer: true, workoutPersistent: true, inactivityReminder: true, workoutComplete: true, intervalTimer: true, updateAvailable: true, appUpdated: true, streakReminder: true },
@@ -91,6 +104,11 @@ const DEFAULT_CONFIG: AppConfig = {
     exerciseCardioPrimaryPRById: {},
     lastViewedChangelogVersion: '0.0.0',
     training_days: [1, 2, 3, 4, 5, 6], // default Mon-Sat
+
+    cachedSocialScoreConfig: null,
+    cachedSocialActiveEvent: null,
+    cachedSocialWeatherBonus: null,
+    cachedSocialScoringRefreshedAt: 0,
 };
 
 class ConfigService {
@@ -124,8 +142,21 @@ class ConfigService {
                         s.key === 'plateCalculatorPreferFewerPlates' ||
                         s.key === 'hapticFeedbackEnabled' ||
                         s.key === 'soundFeedbackEnabled' ||
-                        s.key === 'systemNotificationsEnabled'
+                        s.key === 'systemNotificationsEnabled' ||
+                        s.key === 'androidForegroundServiceNotificationsEnabled'
                     ) loadedConfig[s.key] = s.value === 'true';
+                    else if (s.key === 'runningWorkoutTimerWorkoutId') {
+                        const v = String(s.value ?? '').trim();
+                        loadedConfig[s.key] = v && v !== 'null' && v !== 'undefined' ? v : null;
+                    }
+                    else if (s.key === 'ignoredDuplicateKeys') {
+                        try {
+                            const parsed = JSON.parse(s.value);
+                            loadedConfig[s.key] = Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string').slice(0, 2000) : [];
+                        } catch {
+                            loadedConfig[s.key] = [];
+                        }
+                    }
                     else if (
                         s.key === 'analyticsDefaultRangeDays' ||
                         s.key === 'plateCalculatorDefaultBarWeightKg' ||
@@ -133,10 +164,14 @@ class ConfigService {
                         s.key === 'calculatorsRoundingKg' ||
                         s.key === 'calculatorsRoundingLbs'
                     ) loadedConfig[s.key] = parseFloat(s.value);
+                    else if (s.key === 'cachedSocialScoringRefreshedAt') loadedConfig[s.key] = parseFloat(s.value);
                     else if (
                         s.key === 'exerciseCardioMetricById' ||
                         s.key === 'exerciseCardioPrimaryPRById' ||
-                        s.key === 'training_days'
+                        s.key === 'training_days' ||
+                        s.key === 'cachedSocialScoreConfig' ||
+                        s.key === 'cachedSocialActiveEvent' ||
+                        s.key === 'cachedSocialWeatherBonus'
                     ) {
                         try {
                             loadedConfig[s.key] = JSON.parse(s.value);

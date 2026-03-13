@@ -2,6 +2,13 @@ import { useAuthStore } from '../../store/authStore';
 import { dbService } from '../DatabaseService';
 import { syncService } from '../SyncService';
 
+jest.mock('@react-native-community/netinfo', () => ({
+  __esModule: true,
+  default: {
+    fetch: jest.fn(async () => ({ isConnected: true, isInternetReachable: true })),
+  },
+}));
+
 jest.mock('../DatabaseService', () => ({
   dbService: {
     getAll: jest.fn(),
@@ -23,6 +30,25 @@ describe('SyncService', () => {
     jest.clearAllMocks();
     (useAuthStore.getState as jest.Mock).mockReturnValue({ token: 'token-1' });
     global.fetch = jest.fn();
+  });
+
+  it('syncBidirectional throws when unauthenticated (no silent no-op)', async () => {
+    (useAuthStore.getState as jest.Mock).mockReturnValue({ token: null });
+
+    await expect(syncService.syncBidirectional()).rejects.toThrow('Usuario no autenticado');
+  });
+
+  it('syncBidirectional throws when offline (no silent no-op)', async () => {
+    const NetInfo = require('@react-native-community/netinfo').default;
+    (NetInfo.fetch as jest.Mock).mockResolvedValue({ isConnected: false, isInternetReachable: false });
+
+    await expect(syncService.syncBidirectional()).rejects.toThrow('Sin conexión a internet');
+  });
+
+  it('syncBidirectional throws when already syncing (no silent no-op)', async () => {
+    (syncService as any).isSyncing = true;
+    await expect(syncService.syncBidirectional()).rejects.toThrow('Sync en progreso');
+    (syncService as any).isSyncing = false;
   });
 
   it('computes local status with per-table active/deleted counts and aggregates only active', async () => {

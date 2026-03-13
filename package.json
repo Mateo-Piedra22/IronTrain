@@ -16,6 +16,9 @@
     "eas-build-pre-install": "node scripts/recreate-secrets.js",
     "deploy:mobile": "node scripts/deploy-mobile.js",
     "deploy:hotfix": "node scripts/deploy-hotfix.js",
+    "build:android:apk": "node scripts/recreate-secrets.js && wsl bash -ic \"export EAS_SKIP_AUTO_FINGERPRINT=1 && eas build --platform android --profile preview --local --output ./builds/IronTrain-Preview.apk\"",
+    "build:android:aab": "node scripts/recreate-secrets.js && wsl bash -ic \"export EAS_SKIP_AUTO_FINGERPRINT=1 && eas build --platform android --profile production --local --output ./builds/IronTrain-Production.aab\"",
+    "build:ios:preview": "node scripts/recreate-secrets.js && eas build --platform ios --profile preview",
     "prebuild:eas": "npm run audit && npm run generate-changelog && npm run website:sync-content",
     "pretest": "node scripts/generate-changelog.js",
     "test": "jest"
@@ -39,6 +42,7 @@
     "date-fns": "^4.1.0",
     "expo": "~54.0.33",
     "expo-application": "~7.0.8",
+    "expo-asset": "~12.0.12",
     "expo-audio": "~1.1.1",
     "expo-blur": "~15.0.8",
     "expo-clipboard": "~8.0.8",

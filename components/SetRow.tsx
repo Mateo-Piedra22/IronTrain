@@ -73,7 +73,7 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
     const ss = useMemo(() => StyleSheet.create({
         card: { borderRadius: 16, borderWidth: 1.5, overflow: 'hidden' },
         cardDefault: { borderColor: colors.border, backgroundColor: colors.surface },
-        cardCompleted: { borderColor: colors.primary.DEFAULT, backgroundColor: withAlpha(colors.primary.DEFAULT, '03') },
+        cardCompleted: { borderColor: colors.primary.DEFAULT, backgroundColor: colors.surface },
         header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1.5 },
         headerDefault: { backgroundColor: colors.surfaceLighter, borderBottomColor: colors.border },
         headerCompleted: { backgroundColor: withAlpha(colors.primary.DEFAULT, '08'), borderBottomColor: withAlpha(colors.primary.DEFAULT, '20') },
@@ -131,10 +131,8 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
     useEffect(() => {
         if (set.weight != null) {
             setWeight(normalize(toDisplayWeight(set.weight)).toString());
-            return;
-        }
-        if (!set.weight && set.previous_weight) {
-            setWeight(normalize(toDisplayWeight(set.previous_weight)).toString());
+        } else {
+            setWeight('');
         }
     }, [set.weight, set.previous_weight, unit]);
 

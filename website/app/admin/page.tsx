@@ -11,6 +11,7 @@ import CommunityModerationPanel from './components/CommunityModerationPanel';
 import ContentManagementPanel from './components/ContentManagementPanel';
 import IronSocialPanel from './components/IronSocialPanel';
 import MarketplaceManagementPanel from './components/MarketplaceManagementPanel';
+import SyncWorkoutsPanel from './components/SyncWorkoutsPanel';
 import SystemStatusPanel from './components/SystemStatusPanel';
 
 export const revalidate = 0;
@@ -84,7 +85,8 @@ export default async function AdminPage({
         officialExercisesRaw,
         officialCategoriesRaw,
         officialBadgesRaw,
-        systemStatusData
+        systemStatusData,
+        workoutsForSyncPanel
     ] = await Promise.all([
         db.select({
             id: schema.routines.id,
@@ -164,6 +166,24 @@ export default async function AdminPage({
         db.select().from(schema.categories).where(eq(schema.categories.isSystem, 1)),
         db.select().from(schema.badges).where(eq(schema.badges.isSystem, 1)),
         db.select().from(schema.systemStatus).where(eq(schema.systemStatus.id, 'global')).limit(1),
+        db.select({
+            id: schema.workouts.id,
+            userId: schema.workouts.userId,
+            username: schema.userProfiles.username,
+            status: schema.workouts.status,
+            date: schema.workouts.date,
+            startTime: schema.workouts.startTime,
+            endTime: schema.workouts.endTime,
+            updatedAt: schema.workouts.updatedAt,
+            deletedAt: schema.workouts.deletedAt,
+            setCount: sql<number>`count(${schema.workoutSets.id})`,
+        })
+            .from(schema.workouts)
+            .leftJoin(schema.workoutSets, eq(schema.workoutSets.workoutId, schema.workouts.id))
+            .leftJoin(schema.userProfiles, eq(schema.userProfiles.id, schema.workouts.userId))
+            .groupBy(schema.workouts.id, schema.userProfiles.username)
+            .orderBy(desc(schema.workouts.updatedAt))
+            .limit(800),
     ]);
 
     // Data Transformation
@@ -301,6 +321,19 @@ export default async function AdminPage({
         updatedAt: b.updatedAt.toISOString(),
     }));
 
+    const sanitizedWorkoutsForSync = (workoutsForSyncPanel || []).map((w) => ({
+        id: w.id,
+        userId: w.userId,
+        username: w.username ?? null,
+        status: w.status ?? null,
+        date: Number(w.date),
+        startTime: Number(w.startTime),
+        endTime: w.endTime === null || w.endTime === undefined ? null : Number(w.endTime),
+        updatedAt: w.updatedAt.toISOString(),
+        deletedAt: w.deletedAt ? w.deletedAt.toISOString() : null,
+        setCount: Number(w.setCount || 0),
+    }));
+
     return (
         <div className="min-h-screen bg-[#f5f1e8] text-[#1a1a2e] font-mono p-4 md:p-8 selection:bg-[#1a1a2e] selection:text-[#f5f1e8]">
             <header className="mb-12 border-b-2 border-[#1a1a2e] pb-8">
@@ -328,6 +361,9 @@ export default async function AdminPage({
                         syncHealth={syncHealth}
                         systemStatus={systemStatus}
                     />
+                }
+                syncPanel={
+                    <SyncWorkoutsPanel workouts={sanitizedWorkoutsForSync} />
                 }
                 socialPanel={
                     <IronSocialPanel

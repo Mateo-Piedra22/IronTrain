@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger';
 
-export type DataEventType = 'DATA_UPDATED' | 'SETTINGS_UPDATED' | 'SYNC_COMPLETED' | 'SOCIAL_UPDATED';
+export type DataEventType = 'DATA_UPDATED' | 'SETTINGS_UPDATED' | 'SYNC_COMPLETED' | 'SOCIAL_UPDATED' | 'SYNC_QUEUE_ENQUEUED';
 
 type Listener = (payload?: any) => void;
 

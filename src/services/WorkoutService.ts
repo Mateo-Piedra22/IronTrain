@@ -1,6 +1,7 @@
 import { endOfDay, format, getUnixTime, startOfDay } from 'date-fns';
 import { useAuthStore } from '../store/authStore';
 import { ExerciseType, SetType, Workout, WorkoutSet } from '../types/db';
+import { logger } from '../utils/logger';
 import { uuidV4 } from '../utils/uuid';
 import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
@@ -456,36 +457,57 @@ class WorkoutService {
         const currentSets = await dbService.getSetsForWorkout(workoutId);
         const nextIndex = currentSets.length;
 
-        // 2. Fetch Ghost Values (History) if not provided
-        const sameExerciseSets = currentSets.filter(s => s.exercise_id === exerciseId);
-        const lastInWorkout = sameExerciseSets.length > 0 ? sameExerciseSets[sameExerciseSets.length - 1] : null;
-        const lastHistorySet = (!lastInWorkout) ? await dbService.getLastSetForExercise(exerciseId) : null;
-
-        const pick = (k: keyof WorkoutSet) => (overrides as any)?.[k] ?? (lastInWorkout as any)?.[k] ?? (lastHistorySet as any)?.[k];
-
-        const weight = (exerciseType === 'weight_reps' || exerciseType === 'weight_only') ? pick('weight') : null;
-        const reps = (exerciseType === 'weight_reps' || exerciseType === 'reps_only') ? pick('reps') : null;
-        const distance = (exerciseType === 'distance_time') ? pick('distance') : null;
-        const time = (exerciseType === 'distance_time') ? pick('time') : null;
-        const rpe = pick('rpe');
-        const notes = pick('notes');
+        const orderIndex = typeof overrides?.order_index === 'number' ? overrides.order_index : nextIndex;
         const superset_id = (overrides as any)?.superset_id;
+
+        const allowWeight = exerciseType === 'weight_reps' || exerciseType === 'weight_only';
+        const allowReps = exerciseType === 'weight_reps' || exerciseType === 'reps_only';
+        const allowDistanceTime = exerciseType === 'distance_time';
+
+        const filteredOverrides: Partial<WorkoutSet> = { ...(overrides ?? {}) };
+        if (!allowWeight) filteredOverrides.weight = undefined;
+        if (!allowReps) filteredOverrides.reps = undefined;
+        if (!allowDistanceTime) {
+            filteredOverrides.distance = undefined;
+            filteredOverrides.time = undefined;
+        }
+
+        if (filteredOverrides.weight !== undefined && filteredOverrides.weight !== null && filteredOverrides.weight < 0) {
+            throw new Error('Weight cannot be negative');
+        }
+        if (filteredOverrides.reps !== undefined && filteredOverrides.reps !== null && filteredOverrides.reps < 0) {
+            throw new Error('Reps cannot be negative');
+        }
+        if (filteredOverrides.distance !== undefined && filteredOverrides.distance !== null && filteredOverrides.distance < 0) {
+            throw new Error('Distance cannot be negative');
+        }
+        if (filteredOverrides.time !== undefined && filteredOverrides.time !== null && filteredOverrides.time < 0) {
+            throw new Error('Time cannot be negative');
+        }
 
         // 3. Create Set
         const payload: any = {
             workout_id: workoutId,
             exercise_id: exerciseId,
             type: type,
-            order_index: nextIndex,
-            weight: exerciseType === 'weight_reps' || exerciseType === 'weight_only' ? (weight ?? 0) : null,
-            reps: exerciseType === 'weight_reps' || exerciseType === 'reps_only' ? (reps ?? 0) : null,
-            distance: exerciseType === 'distance_time' ? (distance ?? null) : null,
-            time: exerciseType === 'distance_time' ? (time ?? null) : null,
-            notes: typeof notes === 'string' ? notes : null,
-            rpe: typeof rpe === 'number' ? rpe : null,
+            order_index: orderIndex,
+            weight: exerciseType === 'weight_reps' || exerciseType === 'weight_only' ? null : null,
+            reps: exerciseType === 'weight_reps' || exerciseType === 'reps_only' ? null : null,
+            distance: exerciseType === 'distance_time' ? null : null,
+            time: exerciseType === 'distance_time' ? null : null,
+            notes: null,
+            rpe: null,
             superset_id,
             completed: 0
         };
+
+        if (filteredOverrides.weight !== undefined) payload.weight = filteredOverrides.weight;
+        if (filteredOverrides.reps !== undefined) payload.reps = filteredOverrides.reps;
+        if (filteredOverrides.distance !== undefined) payload.distance = filteredOverrides.distance;
+        if (filteredOverrides.time !== undefined) payload.time = filteredOverrides.time;
+        if (filteredOverrides.notes !== undefined) payload.notes = filteredOverrides.notes;
+        if (filteredOverrides.rpe !== undefined) payload.rpe = filteredOverrides.rpe;
+        if ((filteredOverrides as any).completed !== undefined) payload.completed = (filteredOverrides as any).completed;
         const id = await dbService.addSet(payload);
         this.invalidateCaches();
         return id;
@@ -554,6 +576,14 @@ class WorkoutService {
             );
             await dbService.queueSyncMutation('workouts', id, 'UPDATE', { status: 'completed', end_time: now, updated_at: now });
         }
+
+        try {
+            const { IronScoreService } = await import('./IronScoreService');
+            await IronScoreService.awardForFinishedWorkout(id, now);
+        } catch (e) {
+            logger.captureException(e, { scope: 'WorkoutService.finishWorkout', message: 'IronScore awarding failed', workoutId: id });
+        }
+
         await this.createSocialFeedEventsForFinishedWorkout(id, now);
 
         dataEventService.emit('DATA_UPDATED');

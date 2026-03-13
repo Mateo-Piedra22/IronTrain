@@ -1,9 +1,12 @@
 import { CategoryManager } from '@/components/CategoryManager';
 import { CreateRoutineModal } from '@/components/CreateRoutineModal';
+import { DuplicateResolutionModal } from '@/components/DuplicateResolutionModal';
 import { ExerciseList } from '@/components/ExerciseList';
 import { RoutineDetailModal } from '@/components/RoutineDetailModal';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { useDataReload } from '@/src/hooks/useDataReload';
+import { configService } from '@/src/services/ConfigService';
+import { DuplicateResolutionService } from '@/src/services/DuplicateResolutionService';
 import { routineService } from '@/src/services/RoutineService';
 import { confirm } from '@/src/store/confirmStore';
 import { Routine } from '@/src/types/db';
@@ -11,7 +14,7 @@ import { notify } from '@/src/utils/notify';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
-import { BookOpen, Pencil, Plus, Trash2 } from 'lucide-react-native';
+import { AlertTriangle, BookOpen, Pencil, Plus, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useContext, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +27,9 @@ type SegmentMode = 'exercises' | 'categories' | 'routines';
 export default function LibraryScreen() {
     const colors = useColors();
     const [mode, setMode] = useState<SegmentMode>('exercises');
+
+    const [duplicatesVisible, setDuplicatesVisible] = useState(false);
+    const [duplicateCount, setDuplicateCount] = useState(0);
 
     // Routines state
     const [routines, setRoutines] = useState<Routine[]>([]);
@@ -206,13 +212,27 @@ export default function LibraryScreen() {
         }
     }, []);
 
+    const loadDuplicateCount = useCallback(async () => {
+        try {
+            const scan = await DuplicateResolutionService.scanAllDuplicates();
+            const ignored = new Set(configService.get('ignoredDuplicateKeys') ?? []);
+            const hard = (scan.hard ?? []).filter((g) => !ignored.has(g.key));
+            const soft = (scan.soft ?? []).filter((g) => !ignored.has(g.key));
+            setDuplicateCount(hard.length + soft.length);
+        } catch {
+            setDuplicateCount(0);
+        }
+    }, []);
+
     useFocusEffect(useCallback(() => {
+        loadDuplicateCount();
         if (mode === 'routines') {
             loadRoutines();
         }
-    }, [mode, loadRoutines]));
+    }, [mode, loadRoutines, loadDuplicateCount]));
 
     useDataReload(() => {
+        loadDuplicateCount();
         if (mode === 'routines') {
             loadRoutines();
         }
@@ -299,7 +319,48 @@ export default function LibraryScreen() {
                 <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                     <IronTrainLogo size={60} />
                 </View>
-                <View style={{ zIndex: 10, width: 24 }} />
+                <View style={{ zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <TouchableOpacity
+                        onPress={() => setDuplicatesVisible(true)}
+                        disabled={duplicateCount <= 0}
+                        style={{
+                            opacity: duplicateCount > 0 ? 1 : 0.35,
+                            width: 42,
+                            height: 42,
+                            borderRadius: 21,
+                            backgroundColor: colors.surface,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1.5,
+                            borderColor: duplicateCount > 0 ? withAlpha(colors.yellow, '66') : colors.border,
+                            ...ThemeFx.shadowSm,
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Resolver duplicados"
+                    >
+                        <AlertTriangle size={18} color={duplicateCount > 0 ? colors.yellow : colors.textMuted} />
+                        {duplicateCount > 0 && (
+                            <View
+                                style={{
+                                    position: 'absolute',
+                                    top: -2,
+                                    right: -2,
+                                    minWidth: 18,
+                                    height: 18,
+                                    paddingHorizontal: 5,
+                                    borderRadius: 9,
+                                    backgroundColor: colors.yellow,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderWidth: 1.5,
+                                    borderColor: colors.background,
+                                }}
+                            >
+                                <Text style={{ color: colors.black, fontSize: 10, fontWeight: '900' }}>{duplicateCount}</Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Segment Control */}
@@ -408,6 +469,14 @@ export default function LibraryScreen() {
                 routineId={detailRoutineId}
                 onClose={() => { setDetailVisible(false); setDetailRoutineId(null); loadRoutines(); }}
                 onDeleted={loadRoutines}
+            />
+
+            <DuplicateResolutionModal
+                visible={duplicatesVisible}
+                onClose={() => {
+                    setDuplicatesVisible(false);
+                    loadDuplicateCount();
+                }}
             />
         </SafeAreaWrapper>
     );

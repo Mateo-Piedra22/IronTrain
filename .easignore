@@ -1,14 +1,22 @@
-# EAS Build Ignore File
-# Prevents unnecessary files from being uploaded to EAS Build servers.
-# Documentation: https://docs.expo.dev/build-reference/easignore/
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# --- Inherited from .gitignore (Explicitly re-stated for clarity) ---
+# dependencies
 node_modules/
+
+# trae
+.trae
+.claude/
+.trae/
+.windsurf/
+.serena/
+
+# Expo
 .expo/
 dist/
 web-build/
-ios/
-android/
+expo-env.d.ts
+
+# Native
 .kotlin/
 *.orig.*
 *.jks
@@ -16,52 +24,39 @@ android/
 *.p12
 *.key
 *.mobileprovision
-.env
-.env.*
-.env*.local
-*.tsbuildinfo
+_backup_web/
+
+# Metro
+.metro-health-check*
+
+# debug
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+
+# macOS
 .DS_Store
 *.pem
 
-# --- AI & Tool Metadata ---
-.agent/
-.agents/
-.claude/
-.trae/
-.windsurf/
-.serena/
-.vscode/
-.github/
+# local env files
+.env
+.env.*
+.env*.local
 
-# --- Project-Specific Exclusions (NOT needed for mobile build) ---
-# The website is a separate Next.js project and is the largest source of "bloat" in builds.
-website/
-docs/
-_backup_web/
-
-# Credentials & Secrets (Security)
-# These should be handled via EAS Secrets, not uploaded in the context if possible.
-# Note: google-services.json is ignored to ensure secrets from EAS are used.
-google-services.json
-GoogleService-Info.plist
+# Firebase / Push credentials
 app-irontrain-firebase-adminsdk-*.json
 firebase-adminsdk-*.json
 
-# Source Assets & Reference Files
-Logo IronTrain.*
-batch_migration_log.md
+# agent
+.agent/
+.agents/
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
 jest_out.txt
 tmp/
-start_dev.ps1
-
-# Non-build scripts
-# We keep scripts/patch-css-interop.js and scripts/recreate-secrets.js (used in EAS hooks)
-# but skip those that are clearly for local development or website management.
-scripts/sync-website-content.js
-scripts/release-prepare.js
-scripts/release-finalize.js
-scripts/generate-sounds.js
-
+website/tmp/

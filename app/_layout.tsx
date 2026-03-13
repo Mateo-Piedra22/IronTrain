@@ -1,4 +1,3 @@
-import NetInfo from '@react-native-community/netinfo';
 import { ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
@@ -7,7 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { AlertTriangle, Download } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Platform, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -23,7 +22,7 @@ import { configService } from '../src/services/ConfigService';
 import { dbService } from '../src/services/DatabaseService';
 import { feedbackService } from '../src/services/FeedbackService';
 import { MetricsAndFeedbackService } from '../src/services/MetricsAndFeedbackService';
-import { syncService } from '../src/services/SyncService';
+import { syncScheduler } from '../src/services/SyncSchedulerService';
 import { updateService } from '../src/services/UpdateService';
 import { useAuthStore } from '../src/store/authStore';
 import { useConfirmStore } from '../src/store/confirmStore';
@@ -138,15 +137,6 @@ export default function RootLayout() {
         const { notificationPermissionsService } = await import('../src/services/NotificationPermissionsService');
         const { locationPermissionsService } = await import('../src/services/LocationPermissionsService');
 
-        if (Platform.OS === 'android') {
-          try {
-            const { default: notifee } = await import('@notifee/react-native');
-            notifee.registerForegroundService(() => new Promise(() => { }));
-          } catch (e) {
-            logger.captureException(e, { scope: 'RootLayout.initInfo', message: 'Notifee foreground service registration failed' });
-          }
-        }
-
         await useAuthStore.getState().initialize();
         await dbService.init();
         await configService.init();
@@ -181,7 +171,8 @@ export default function RootLayout() {
         if (!res) {
           await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', '0']);
         }
-        await syncService.syncBidirectional();
+        syncScheduler.init();
+        await syncScheduler.syncNow();
         await configService.reload();
 
         // Register for push notifications
@@ -199,14 +190,10 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!dbInitialized) return;
-    const unsubscribe = NetInfo.addEventListener(state => {
-      if (state.isConnected && state.isInternetReachable) {
-        syncService.syncBidirectional().catch(e => {
-          logger.captureException(e, { scope: 'RootLayout.netinfo', message: 'Background sync failed' });
-        });
-      }
-    });
-    return () => unsubscribe();
+    syncScheduler.init();
+    return () => {
+      syncScheduler.dispose();
+    };
   }, [dbInitialized]);
 
   useEffect(() => {

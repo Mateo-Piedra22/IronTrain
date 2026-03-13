@@ -21,7 +21,7 @@ import { notify } from '@/src/utils/notify';
 import { formatTimeSeconds } from '@/src/utils/time';
 import * as Haptics from 'expo-haptics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Info, Pencil, Timer, Trophy, Zap } from 'lucide-react-native';
+import { Dumbbell, Info, Pencil, Timer, Trophy, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Dimensions, Text, TouchableOpacity, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
@@ -1496,17 +1496,64 @@ export default function ExerciseDetailScreen() {
     return (
         <SafeAreaWrapper style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom', 'left', 'right']}>
             <Stack.Screen options={{
-                title: currentExercise?.name || exerciseName || 'Exercise',
+                title: '',
                 headerBackTitle: 'Volver',
-                headerTitleStyle: { fontWeight: '900', color: colors.text, fontSize: 16, letterSpacing: -0.3 } as any,
-                headerStyle: { backgroundColor: colors.background },
+                headerTitleAlign: 'left',
+                headerShadowVisible: false,
+                headerStyle: { backgroundColor: colors.surface },
                 headerTintColor: colors.primary.DEFAULT,
+                headerTitle: () => (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 }}>
+                        <View
+                            style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: 12,
+                                backgroundColor: withAlpha(colors.primary.DEFAULT, '12'),
+                                borderWidth: 1,
+                                borderColor: withAlpha(colors.primary.DEFAULT, '25'),
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}
+                        >
+                            <Dumbbell size={16} color={colors.primary.DEFAULT} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text
+                                numberOfLines={1}
+                                style={{
+                                    fontWeight: '900',
+                                    color: colors.text,
+                                    fontSize: 16,
+                                    letterSpacing: -0.3,
+                                }}
+                            >
+                                {currentExercise?.name || exerciseName || 'Ejercicio'}
+                            </Text>
+                            <Text
+                                numberOfLines={1}
+                                style={{
+                                    marginTop: 1,
+                                    fontSize: 11,
+                                    fontWeight: '800',
+                                    color: workoutId
+                                        ? (workoutLocked ? colors.red : colors.textMuted)
+                                        : colors.textMuted,
+                                }}
+                            >
+                                {workoutId
+                                    ? (workoutLocked ? 'ENTRENAMIENTO FINALIZADO' : 'REGISTRANDO SERIES')
+                                    : 'HISTORIAL Y ANÁLISIS'}
+                            </Text>
+                        </View>
+                    </View>
+                ),
                 headerRight: () => (
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                         {!workoutId && (
                             <TouchableOpacity
                                 onPress={() => setIsConfigVisible(true)}
-                                style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}
+                                style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: colors.surfaceLighter, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}
                             >
                                 <Pencil size={16} color={colors.textMuted} />
                             </TouchableOpacity>
@@ -1517,7 +1564,7 @@ export default function ExerciseDetailScreen() {
                                     if (workoutLocked) { notify.info('Bloqueado', 'El entrenamiento finalizó. Para editar debés reabrirlo.'); return; }
                                     setWarmupVisible(true);
                                 }}
-                                style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: withAlpha(colors.yellow, '15'), borderWidth: 1, borderColor: withAlpha(colors.yellow, '30'), justifyContent: 'center', alignItems: 'center' }}
+                                style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: withAlpha(colors.yellow, '15'), borderWidth: 1, borderColor: withAlpha(colors.yellow, '30'), justifyContent: 'center', alignItems: 'center' }}
                                 accessibilityRole="button"
                                 accessibilityLabel="Abrir calculadora de calentamiento"
                             >

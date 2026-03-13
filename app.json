@@ -62,7 +62,8 @@
       ],
       "expo-secure-store",
       "expo-location",
-      "expo-audio"
+      "expo-audio",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,6 +1,6 @@
+import { useAuthStore } from '../../store/authStore';
 import { dbService } from '../DatabaseService';
 import { workoutService } from '../WorkoutService';
-import { useAuthStore } from '../../store/authStore';
 
 // Mock dependencies
 jest.mock('../DatabaseService', () => ({
@@ -86,13 +86,12 @@ describe('WorkoutService', () => {
   });
 
   describe('addSet (Ghost Logic)', () => {
-    it('should copy values from the previous set in the SAME workout if available', async () => {
+    it('should create a blank set (null values) even if previous sets exist in the same workout', async () => {
       const workoutId = 'w1';
       const exerciseId = 'e1';
 
       (dbService.getExerciseById as jest.Mock).mockResolvedValue({ id: 'e1', type: 'weight_reps' });
 
-      // Mock current sets: one set already exists
       (dbService.getSetsForWorkout as jest.Mock).mockResolvedValue([
         { id: 's1', exercise_id: 'e1', weight: 100, reps: 5, order_index: 0 }
       ]);
@@ -100,50 +99,79 @@ describe('WorkoutService', () => {
       await workoutService.addSet(workoutId, exerciseId);
 
       expect(dbService.addSet).toHaveBeenCalledWith(expect.objectContaining({
+        workout_id: workoutId,
+        exercise_id: exerciseId,
+        order_index: 1,
+        weight: null,
+        reps: null,
+        notes: null,
+        rpe: null,
+      }));
+    });
+
+    it('should allow overrides for copy/duplicate set for weight_reps exercises', async () => {
+      const workoutId = 'w1';
+      const exerciseId = 'e1';
+
+      (dbService.getExerciseById as jest.Mock).mockResolvedValue({ id: 'e1', type: 'weight_reps' });
+      (dbService.getSetsForWorkout as jest.Mock).mockResolvedValue([]);
+
+      await workoutService.addSet(workoutId, exerciseId, 'normal', {
         weight: 100,
-        reps: 5,
-        order_index: 1
-      }));
-    });
-
-    it('should fetch from HISTORY if no set exists in current workout', async () => {
-      const workoutId = 'w1';
-      const exerciseId = 'e1';
-
-      (dbService.getExerciseById as jest.Mock).mockResolvedValue({ id: 'e1', type: 'weight_reps' });
-
-      // No current sets
-      (dbService.getSetsForWorkout as jest.Mock).mockResolvedValue([]);
-
-      // History set exists
-      (dbService.getLastSetForExercise as jest.Mock).mockResolvedValue({
-        weight: 90,
-        reps: 8
-      });
-
-      await workoutService.addSet(workoutId, exerciseId);
-
-      expect(dbService.addSet).toHaveBeenCalledWith(expect.objectContaining({
-        weight: 90,
         reps: 8,
-        order_index: 0
+        rpe: 8,
+        notes: 'x',
+      } as any);
+
+      expect(dbService.addSet).toHaveBeenCalledWith(expect.objectContaining({
+        workout_id: workoutId,
+        exercise_id: exerciseId,
+        weight: 100,
+        reps: 8,
+        rpe: 8,
+        notes: 'x',
+        completed: 0,
       }));
     });
 
-    it('should default to 0 if no history exists', async () => {
+    it('should allow overrides for copy/duplicate set for distance_time exercises (distance/time only)', async () => {
+      const workoutId = 'w1';
+      const exerciseId = 'bike';
+
+      (dbService.getExerciseById as jest.Mock).mockResolvedValue({ id: 'bike', type: 'distance_time' });
+      (dbService.getSetsForWorkout as jest.Mock).mockResolvedValue([]);
+
+      await workoutService.addSet(workoutId, exerciseId, 'normal', {
+        weight: 100,
+        reps: 10,
+        distance: 1500,
+        time: 300,
+      } as any);
+
+      expect(dbService.addSet).toHaveBeenCalledWith(expect.objectContaining({
+        workout_id: workoutId,
+        exercise_id: exerciseId,
+        weight: null,
+        reps: null,
+        distance: 1500,
+        time: 300,
+        completed: 0,
+      }));
+    });
+
+    it('should not query history values when creating a new blank set', async () => {
       const workoutId = 'w1';
       const exerciseId = 'e1';
 
       (dbService.getExerciseById as jest.Mock).mockResolvedValue({ id: 'e1', type: 'weight_reps' });
-
       (dbService.getSetsForWorkout as jest.Mock).mockResolvedValue([]);
-      (dbService.getLastSetForExercise as jest.Mock).mockResolvedValue(null);
 
       await workoutService.addSet(workoutId, exerciseId);
 
+      expect(dbService.getLastSetForExercise).not.toHaveBeenCalled();
       expect(dbService.addSet).toHaveBeenCalledWith(expect.objectContaining({
-        weight: 0,
-        reps: 0
+        weight: null,
+        reps: null,
       }));
     });
 
@@ -153,7 +181,6 @@ describe('WorkoutService', () => {
 
       (dbService.getExerciseById as jest.Mock).mockResolvedValue({ id: 'bike', type: 'distance_time' });
       (dbService.getSetsForWorkout as jest.Mock).mockResolvedValue([]);
-      (dbService.getLastSetForExercise as jest.Mock).mockResolvedValue({ distance: 2500, time: 600 });
 
       await workoutService.addSet(workoutId, exerciseId);
 
@@ -162,6 +189,8 @@ describe('WorkoutService', () => {
         exercise_id: exerciseId,
         weight: null,
         reps: null,
+        distance: null,
+        time: null,
       }));
     });
   });

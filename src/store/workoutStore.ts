@@ -71,6 +71,10 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
             lastTickAtMs: Date.now()
         });
 
+        if (workout.status !== 'completed' && workout.is_template !== 1) {
+            await configService.set('runningWorkoutTimerWorkoutId', workout.id);
+        }
+
         // Load sets if resuming or created
         await get().loadSetsForWorkout(workout.id);
     },
@@ -83,6 +87,9 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
             isTimerRunning: workout.status !== 'completed' && workout.is_template !== 1,
             lastTickAtMs: Date.now()
         });
+        if (workout.status !== 'completed' && workout.is_template !== 1) {
+            await configService.set('runningWorkoutTimerWorkoutId', workout.id);
+        }
         await get().loadSetsForWorkout(workout.id);
     },
 
@@ -90,6 +97,9 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
         const { activeWorkout, workoutTimer, lastTickAtMs, isTimerRunning } = get();
         if (!activeWorkout || !isTimerRunning) return;
         if (activeWorkout.status === 'completed' || activeWorkout.is_template === 1) return;
+
+        const ownerId = configService.get('runningWorkoutTimerWorkoutId');
+        if (!ownerId || ownerId !== activeWorkout.id) return;
 
         const now = Date.now();
         const last = lastTickAtMs ?? now;
@@ -123,6 +133,9 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
             isTimerRunning: workout.status !== 'completed' && workout.is_template !== 1,
             lastTickAtMs: Date.now()
         });
+        if (workout.status !== 'completed' && workout.is_template !== 1) {
+            await configService.set('runningWorkoutTimerWorkoutId', workout.id);
+        }
         await Promise.all([get().loadExercises(), get().loadSetsForWorkout(workout.id)]);
     },
 
@@ -131,6 +144,10 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
         if (!activeWorkout) return;
 
         await workoutService.finishWorkout(activeWorkout.id);
+        const ownerId = configService.get('runningWorkoutTimerWorkoutId');
+        if (ownerId === activeWorkout.id) {
+            await configService.set('runningWorkoutTimerWorkoutId', null);
+        }
         set({
             activeWorkout: { ...activeWorkout, status: 'completed', end_time: Date.now() } as any,
             isTimerRunning: false,
@@ -142,6 +159,10 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
         const { activeWorkout } = get();
         if (activeWorkout) {
             await workoutService.delete(activeWorkout.id);
+            const ownerId = configService.get('runningWorkoutTimerWorkoutId');
+            if (ownerId === activeWorkout.id) {
+                await configService.set('runningWorkoutTimerWorkoutId', null);
+            }
         }
         set({ activeWorkout: null, activeSets: [], isTimerRunning: false, lastTickAtMs: null });
     },
@@ -153,6 +174,10 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
 
         if (status === 'completed') {
             await workoutService.finishWorkout(activeWorkout.id);
+            const ownerId = configService.get('runningWorkoutTimerWorkoutId');
+            if (ownerId === activeWorkout.id) {
+                await configService.set('runningWorkoutTimerWorkoutId', null);
+            }
             set({
                 activeWorkout: { ...activeWorkout, status: 'completed', end_time: Date.now() } as any,
                 isTimerRunning: false,
@@ -162,6 +187,7 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
         }
 
         await workoutService.resumeWorkout(activeWorkout.id);
+        await configService.set('runningWorkoutTimerWorkoutId', activeWorkout.id);
         set({
             activeWorkout: { ...activeWorkout, status: 'in_progress', end_time: undefined } as any,
             isTimerRunning: true,

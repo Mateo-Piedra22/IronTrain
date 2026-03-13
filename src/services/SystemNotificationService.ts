@@ -5,6 +5,7 @@ import notifee, {
     TimestampTrigger,
     TriggerType
 } from '@notifee/react-native';
+import { Platform } from 'react-native';
 import { Colors } from '../theme';
 import { logger } from '../utils/logger';
 import { configService, NotificationPreferences } from './ConfigService';
@@ -55,6 +56,11 @@ const INACTIVITY_TIMEOUT_MS = 2.5 * 60 * 60 * 1000;
  */
 class SystemNotificationServiceImpl {
     private channelsCreated = false;
+
+    private shouldUseForegroundService(): boolean {
+        if (Platform.OS !== 'android') return false;
+        return !!configService.get('androidForegroundServiceNotificationsEnabled');
+    }
 
     // ─── Channel Setup ───────────────────────────────────────────────────────
     async ensureChannels(): Promise<void> {
@@ -170,16 +176,17 @@ class SystemNotificationServiceImpl {
         const timeStr = this.formatDuration(elapsedSeconds);
         const statusEmoji = isPaused ? '⏸️' : '💪';
 
-        try {
+        const show = async (asForegroundService: boolean) => {
             await notifee.displayNotification({
                 id: NOTIFICATION_IDS.PERSISTENT_WORKOUT,
                 title: `${statusEmoji} Entrenamiento ${isPaused ? 'Pausado' : 'Activo'}`,
                 body: `⏱ ${timeStr}  ·  ${completedSets} series  ·  ${totalExercises} ejercicios`,
                 android: {
                     channelId: CHANNELS.WORKOUT_ACTIVE,
-                    asForegroundService: true,
-                    foregroundServiceTypes: [1], // DATA_SYNC = 1
+                    asForegroundService: Platform.OS === 'android' ? asForegroundService : undefined,
                     category: AndroidCategory.PROGRESS,
+                    ongoing: true,
+                    autoCancel: false,
                     pressAction: { id: 'default' },
                     timestamp: Date.now() - elapsedSeconds * 1000,
                     showTimestamp: true,
@@ -197,13 +204,27 @@ class SystemNotificationServiceImpl {
                     }
                 },
             });
+        };
+
+        const wantsFg = this.shouldUseForegroundService();
+
+        try {
+            await show(wantsFg);
         } catch (e) {
             logger.captureException(e, { scope: 'SystemNotificationService.showPersistentWorkout', message: 'Error showing persistent workout notification' });
+            if (wantsFg) {
+                try {
+                    await show(false);
+                    await configService.set('androidForegroundServiceNotificationsEnabled', false);
+                } catch (e2) {
+                    logger.captureException(e2, { scope: 'SystemNotificationService.showPersistentWorkout', message: 'Fallback display failed' });
+                }
+            }
         }
     }
 
     async dismissPersistentWorkout(): Promise<void> {
-        try { await notifee.cancelNotification(NOTIFICATION_IDS.PERSISTENT_WORKOUT); } catch { /* */ }
+        try { await notifee.cancelNotification(NOTIFICATION_IDS.PERSISTENT_WORKOUT); } catch (e) { logger.captureException(e, { scope: 'SystemNotificationService.dismissPersistentWorkout' }); /* */ }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -229,11 +250,11 @@ class SystemNotificationServiceImpl {
                 android: { channelId: CHANNELS.REMINDERS, pressAction: { id: 'default' }, autoCancel: true },
                 ios: { sound: 'default' },
             }, trigger);
-        } catch { /* non-critical */ }
+        } catch (e) { logger.captureException(e, { scope: 'SystemNotificationService.scheduleInactivityReminder' }); /* non-critical */ }
     }
 
     async cancelInactivityReminder(): Promise<void> {
-        try { await notifee.cancelNotification(NOTIFICATION_IDS.INACTIVITY_REMINDER); } catch { /* */ }
+        try { await notifee.cancelNotification(NOTIFICATION_IDS.INACTIVITY_REMINDER); } catch (e) { logger.captureException(e, { scope: 'SystemNotificationService.cancelInactivityReminder' }); /* */ }
     }
 
     recordInteraction(): void {
@@ -268,7 +289,7 @@ class SystemNotificationServiceImpl {
                 },
                 ios: { sound: 'default' },
             });
-        } catch { /* non-critical */ }
+        } catch (e) { logger.captureException(e, { scope: 'SystemNotificationService.showCongratulation' }); /* non-critical */ }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -293,11 +314,11 @@ class SystemNotificationServiceImpl {
                 },
                 ios: { sound: 'default' },
             }, trigger);
-        } catch { /* non-critical */ }
+        } catch (e) { logger.captureException(e, { scope: 'SystemNotificationService.scheduleRestTimerNotification' }); /* non-critical */ }
     }
 
     async cancelRestTimerNotification(): Promise<void> {
-        try { await notifee.cancelNotification(NOTIFICATION_IDS.REST_TIMER); } catch { /* */ }
+        try { await notifee.cancelNotification(NOTIFICATION_IDS.REST_TIMER); } catch (e) { logger.captureException(e, { scope: 'SystemNotificationService.cancelRestTimerNotification' }); /* */ }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -318,15 +339,14 @@ class SystemNotificationServiceImpl {
         const timeStr = this.formatDuration(timeLeft);
         const statusEmoji = isPaused ? '⏸️' : '💪';
 
-        try {
+        const show = async (asForegroundService: boolean) => {
             await notifee.displayNotification({
                 id: NOTIFICATION_IDS.INTERVAL_TIMER,
                 title: `${statusEmoji} ${phaseLabel}`,
                 body: `Ronda ${currentRound}/${totalRounds}  ·  ${timeStr} restante`,
                 android: {
                     channelId: CHANNELS.INTERVAL_TIMER,
-                    asForegroundService: true,
-                    foregroundServiceTypes: [1], // DATA_SYNC
+                    asForegroundService: Platform.OS === 'android' ? asForegroundService : undefined,
                     category: AndroidCategory.PROGRESS,
                     autoCancel: false,
                     ongoing: true,
@@ -346,13 +366,27 @@ class SystemNotificationServiceImpl {
                     }
                 },
             });
+        };
+
+        const wantsFg = this.shouldUseForegroundService();
+
+        try {
+            await show(wantsFg);
         } catch (e) {
             logger.captureException(e, { scope: 'SystemNotificationService.showIntervalTimerNotification', message: 'Error showing interval timer notification' });
+            if (wantsFg) {
+                try {
+                    await show(false);
+                    await configService.set('androidForegroundServiceNotificationsEnabled', false);
+                } catch (e2) {
+                    logger.captureException(e2, { scope: 'SystemNotificationService.showIntervalTimerNotification', message: 'Fallback display failed' });
+                }
+            }
         }
     }
 
     async dismissIntervalTimerNotification(): Promise<void> {
-        try { await notifee.cancelNotification(NOTIFICATION_IDS.INTERVAL_TIMER); } catch { /* */ }
+        try { await notifee.cancelNotification(NOTIFICATION_IDS.INTERVAL_TIMER); } catch (e) { logger.captureException(e, { scope: 'SystemNotificationService.dismissIntervalTimerNotification' }); /* */ }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -381,7 +415,7 @@ class SystemNotificationServiceImpl {
                 },
                 ios: { sound: 'default' },
             });
-        } catch { /* non-critical */ }
+        } catch (e) { logger.captureException(e, { scope: 'SystemNotificationService.showUpdateAvailable' }); /* non-critical */ }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -406,7 +440,7 @@ class SystemNotificationServiceImpl {
                 },
                 ios: { sound: 'default' },
             });
-        } catch { /* non-critical */ }
+        } catch (e) { logger.captureException(e, { scope: 'SystemNotificationService.showAppUpdated' }); /* non-critical */ }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -478,11 +512,11 @@ class SystemNotificationServiceImpl {
                 },
                 trigger
             );
-        } catch { /* non-critical */ }
+        } catch (e) { logger.captureException(e, { scope: 'SystemNotificationService.scheduleStreakReminder' }); /* non-critical */ }
     }
 
     async cancelStreakReminder(): Promise<void> {
-        try { await notifee.cancelNotification(NOTIFICATION_IDS.STREAK_REMINDER); } catch { /* */ }
+        try { await notifee.cancelNotification(NOTIFICATION_IDS.STREAK_REMINDER); } catch (e) { logger.captureException(e, { scope: 'SystemNotificationService.cancelStreakReminder' }); /* */ }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -491,46 +525,50 @@ class SystemNotificationServiceImpl {
 
     async testOne(type: keyof typeof NOTIFICATION_IDS): Promise<void> {
         await this.ensureChannels();
-        switch (type) {
-            case 'PERSISTENT_WORKOUT':
-                await this.showPersistentWorkout({ elapsedSeconds: 3661, completedSets: 12, totalExercises: 5, isPaused: false }, true);
-                break;
-            case 'INACTIVITY_REMINDER':
-                // For test, trigger in 5 seconds
-                const trigger: TimestampTrigger = { type: TriggerType.TIMESTAMP, timestamp: Date.now() + 5000 };
-                await notifee.createTriggerNotification({
-                    id: NOTIFICATION_IDS.INACTIVITY_REMINDER,
-                    title: '🧪 TEST: Inactividad',
-                    body: 'Este es un test de recordatorio por inactividad (5s).',
-                    android: { channelId: CHANNELS.REMINDERS, pressAction: { id: 'default' }, autoCancel: true },
-                }, trigger);
-                break;
-            case 'CONGRATULATION':
-                await this.showCongratulation({ durationSeconds: 3600, completedSets: 20, totalExercises: 8 }, true);
-                break;
-            case 'REST_TIMER':
-                await this.scheduleRestTimerNotification(Date.now() + 3000, true);
-                break;
-            case 'INTERVAL_TIMER':
-                await this.showIntervalTimerNotification({ phase: 'work', currentRound: 1, totalRounds: 8, timeLeft: 20, isPaused: false }, true);
-                break;
-            case 'UPDATE_AVAILABLE':
-                await this.showUpdateAvailable({ latestVersion: '3.0.0-BETA' }, true);
-                break;
-            case 'APP_UPDATED':
-                await this.showAppUpdated({ newVersion: '2.0.0' }, true);
-                break;
-            case 'STREAK_REMINDER':
-                await notifee.displayNotification({
-                    title: '🧪 TEST: Racha Diaria',
-                    body: '¡Así se vería tu recordatorio de racha!',
-                    android: {
-                        channelId: CHANNELS.STREAK,
-                        pressAction: { id: 'default' },
-                    },
-                    ios: { categoryId: 'streak-reminder' }
-                });
-                break;
+        try {
+            switch (type) {
+                case 'PERSISTENT_WORKOUT':
+                    await this.showPersistentWorkout({ elapsedSeconds: 3661, completedSets: 12, totalExercises: 5, isPaused: false }, true);
+                    break;
+                case 'INACTIVITY_REMINDER':
+                    // For test, trigger in 5 seconds
+                    const trigger: TimestampTrigger = { type: TriggerType.TIMESTAMP, timestamp: Date.now() + 5000 };
+                    await notifee.createTriggerNotification({
+                        id: NOTIFICATION_IDS.INACTIVITY_REMINDER,
+                        title: '🧪 TEST: Inactividad',
+                        body: 'Este es un test de recordatorio por inactividad (5s).',
+                        android: { channelId: CHANNELS.REMINDERS, pressAction: { id: 'default' }, autoCancel: true },
+                    }, trigger);
+                    break;
+                case 'CONGRATULATION':
+                    await this.showCongratulation({ durationSeconds: 3600, completedSets: 20, totalExercises: 8 }, true);
+                    break;
+                case 'REST_TIMER':
+                    await this.scheduleRestTimerNotification(Date.now() + 3000, true);
+                    break;
+                case 'INTERVAL_TIMER':
+                    await this.showIntervalTimerNotification({ phase: 'work', currentRound: 1, totalRounds: 8, timeLeft: 20, isPaused: false }, true);
+                    break;
+                case 'UPDATE_AVAILABLE':
+                    await this.showUpdateAvailable({ latestVersion: '3.0.0-BETA' }, true);
+                    break;
+                case 'APP_UPDATED':
+                    await this.showAppUpdated({ newVersion: '2.0.0' }, true);
+                    break;
+                case 'STREAK_REMINDER':
+                    await notifee.displayNotification({
+                        title: '🧪 TEST: Racha Diaria',
+                        body: '¡Así se vería tu recordatorio de racha!',
+                        android: {
+                            channelId: CHANNELS.STREAK,
+                            pressAction: { id: 'default' },
+                        },
+                        ios: { categoryId: 'streak-reminder' }
+                    });
+                    break;
+            }
+        } catch (e) {
+            logger.captureException(e, { scope: 'SystemNotificationService.testOne' });
         }
     }
 
@@ -541,7 +579,7 @@ class SystemNotificationServiceImpl {
     async cancelAll(): Promise<void> {
         try {
             await notifee.cancelAllNotifications();
-        } catch { /* */ }
+        } catch (e) { logger.captureException(e, { scope: 'SystemNotificationService.cancelAll' }); /* */ }
     }
 
     // ─── Utility ─────────────────────────────────────────────────────────────

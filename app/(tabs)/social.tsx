@@ -1511,6 +1511,15 @@ export default function SocialTab() {
                 SocialService.getInbox(),
                 SocialService.getAnalytics(),
             ]);
+
+            try {
+                await Promise.all([
+                    configService.set('cachedSocialScoreConfig', prof?.scoreConfig ?? null),
+                    configService.set('cachedSocialActiveEvent', prof?.activeEvent ?? null),
+                    configService.set('cachedSocialWeatherBonus', prof?.weatherBonus ?? null),
+                ]);
+            } catch { }
+
             setProfile(prev => ({
                 ...prof,
                 weatherBonus: prof.weatherBonus || prev?.weatherBonus || null

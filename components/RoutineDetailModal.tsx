@@ -14,7 +14,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '../src/hooks/useColors';
 import { BadgePill } from './ui/BadgePill';
 
@@ -29,6 +29,8 @@ type ViewMode = 'routine' | 'day';
 
 export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: RoutineDetailModalProps) {
     const colors = useColors();
+    const insets = useSafeAreaInsets();
+    const footerPad = Math.max(40, (insets.bottom || 0) + 28);
 
     const ss = useMemo(() => StyleSheet.create({
         overlay: {
@@ -73,10 +75,10 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             backgroundColor: colors.surfaceLighter,
             minHeight: '100%',
         },
-        scrollContent: { paddingBottom: 40 },
+        scrollContent: { paddingBottom: footerPad },
         listContent: {
             padding: 16,
-            paddingBottom: 40,
+            paddingBottom: footerPad + 64,
             backgroundColor: colors.surfaceLighter,
         },
         sectionLabel: {
@@ -306,7 +308,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
         utilGripPad: { paddingRight: 8, paddingVertical: 4 },
         utilBadgePillGap: { backgroundColor: colors.border, paddingHorizontal: 4, borderRadius: 4, justifyContent: 'center' },
         utilBadgePillText: { fontSize: 8, fontWeight: '800', color: colors.textMuted },
-    }), [colors]);
+    }), [colors, footerPad]);
 
     const [routine, setRoutine] = useState<Routine | null>(null);
     const [days, setDays] = useState<RoutineDayWithExercises[]>([]);

@@ -17,6 +17,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useColors } from '../src/hooks/useColors';
 import { notificationPermissionsService } from '../src/services/NotificationPermissionsService';
+import { syncScheduler } from '../src/services/SyncSchedulerService';
 import { syncService } from '../src/services/SyncService';
 import { useAuthStore } from '../src/store/authStore';
 import { confirm } from '../src/store/confirmStore';
@@ -288,12 +289,16 @@ export default function SettingsScreen() {
                 return;
             }
 
-            const diag = await Promise.race([
-                syncService.getDiagnostics(),
-                new Promise<never>((_, reject) => {
-                    setTimeout(() => reject(new Error('Tiempo de espera agotado')), 15000);
-                }),
-            ]);
+            const getDiag = async () => {
+                return await Promise.race([
+                    syncService.getDiagnostics(),
+                    new Promise<never>((_, reject) => {
+                        setTimeout(() => reject(new Error('Tiempo de espera agotado')), 15000);
+                    }),
+                ]);
+            };
+
+            const diag = await getDiag();
             const { local, remote, queue } = diag;
 
             confirm.hide();
@@ -348,7 +353,60 @@ export default function SettingsScreen() {
                 return lines.length > 0 ? `\n\n**Comparativa por tabla (activos):**\n${lines.join('\n')}` : '';
             };
 
-            confirm.custom({
+            const openConflictModal = (nextDiag: typeof diag) => {
+                const { local, remote, queue } = nextDiag;
+
+                const contextLine = local.hasData && remote.hasData
+                    ? 'Tenes datos en ambas partes.'
+                    : (local.hasData && !remote.hasData)
+                        ? 'La nube parece vacía.'
+                        : (!local.hasData && remote.hasData)
+                            ? 'Este dispositivo parece vacío.'
+                            : 'No hay datos detectados en ninguna parte.';
+
+                const formatMergedDetail = () => {
+                    const order = [
+                        'categories', 'exercises', 'badges', 'exercise_badges',
+                        'routines', 'routine_days', 'routine_exercises',
+                        'workouts', 'workout_sets', 'user_exercise_prs',
+                        'measurements', 'goals', 'body_metrics',
+                        'plate_inventory', 'settings', 'user_profiles',
+                        'score_events', 'kudos', 'activity_feed', 'changelog_reactions'
+                    ];
+                    const labels: Record<string, string> = {
+                        categories: 'Categorías',
+                        exercises: 'Ejercicios',
+                        badges: 'Equipamiento',
+                        exercise_badges: 'Posición / Equipo',
+                        routines: 'Rutinas',
+                        routine_days: 'Días de Rutina',
+                        routine_exercises: 'Ejercicios en Rutina',
+                        workouts: 'Entrenamientos',
+                        workout_sets: 'Series',
+                        user_exercise_prs: 'Récords Personales',
+                        measurements: 'Mediciones',
+                        goals: 'Objetivos',
+                        body_metrics: 'Métricas Corporales',
+                        plate_inventory: 'Inventario de Discos',
+                        settings: 'Ajustes',
+                        user_profiles: 'Perfiles',
+                        score_events: 'Eventos de Puntos',
+                        kudos: 'Kudos/Likes',
+                        activity_feed: 'Muro Social',
+                        changelog_reactions: 'Reacciones'
+                    };
+
+                    const lines: string[] = [];
+                    for (const k of order) {
+                        const l = Number(local.counts?.[k]?.active || 0);
+                        const r = Number(remote.counts?.[k]?.active || 0);
+                        if (l === 0 && r === 0) continue;
+                        lines.push(`**${labels[k] || k}**: Cel ${l} vs Nube ${r}`);
+                    }
+                    return lines.length > 0 ? `\n\n**Comparativa por tabla (activos):**\n${lines.join('\n')}` : '';
+                };
+
+                confirm.custom({
                 title: 'Resolución de Conflictos',
                 message: `${contextLine}\n\n**Resumen Global:**\n**Celular**: ${Number(local.recordCount)} registros\n**Nube Neon**: ${Number(remote.recordCount)} registros${formatMergedDetail()}\n\n**Estado de la Cola de Sync:**\n**Pendientes**: ${queue.pending}\n**Fallidos**: ${queue.failed}\n**Procesando**: ${queue.processing}\n**Total**: ${queue.totalOutstanding}\n\n¿Qué querés hacer?`,
                 variant: 'warning',
@@ -365,12 +423,15 @@ export default function SettingsScreen() {
                             confirm.hide();
                             try {
                                 notify.info('Sincronizando...', 'Fusionando datos local-nube sin perder métricas.');
+                                syncScheduler.init();
                                 await syncService.syncBidirectional({ forcePull: true });
                                 await configService.reload();
                                 await loadSettings();
                                 const { useSettingsStore } = await import('../src/store/useSettingsStore');
                                 await useSettingsStore.getState().loadSettings();
                                 notify.success('Éxito', 'Sincronización híbrida completa.');
+                                const next = await getDiag();
+                                openConflictModal(next);
                             } catch (e: any) {
                                 notify.error('Error', e?.message || 'No se pudo sincronizar.');
                             }
@@ -389,6 +450,8 @@ export default function SettingsScreen() {
                                 const { useSettingsStore } = await import('../src/store/useSettingsStore');
                                 await useSettingsStore.getState().loadSettings();
                                 notify.success('Éxito', 'Celular actualizado con los datos de la nube.');
+                                const next = await getDiag();
+                                openConflictModal(next);
                             } catch (e: any) {
                                 notify.error('Error', e?.message || 'No se pudo descargar el snapshot.');
                             }
@@ -403,13 +466,18 @@ export default function SettingsScreen() {
                                 notify.info('Cargando...', 'Subiendo Snapshot a la Nube...');
                                 await syncService.pushLocalSnapshot();
                                 notify.success('Éxito', 'Nube actualizada con los datos de tu celular.');
+                                const next = await getDiag();
+                                openConflictModal(next);
                             } catch (e: any) {
                                 notify.error('Error', e?.message || 'No se pudo subir el snapshot.');
                             }
                         }
                     }
                 ]
-            });
+                });
+            };
+
+            openConflictModal(diag);
         } catch (error: any) {
             confirm.hide();
             notify.error('Fallo en Reconocimiento', error?.message || 'Error conectando con los servidores Neon. Revisa tu conexión.');

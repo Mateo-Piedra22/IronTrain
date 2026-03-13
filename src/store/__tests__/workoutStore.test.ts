@@ -2,7 +2,11 @@ import { useWorkoutStore } from '../workoutStore';
 
 jest.mock('../../services/ConfigService', () => ({
   configService: {
-    get: jest.fn(() => false),
+    get: jest.fn((key: string) => {
+      if (key === 'runningWorkoutTimerWorkoutId') return 'w1';
+      return false;
+    }),
+    set: jest.fn(async () => {}),
   },
 }));
 

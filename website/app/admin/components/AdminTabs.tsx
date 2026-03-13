@@ -2,6 +2,7 @@
 
 import {
     Bell,
+    Database,
     LayoutDashboard,
     Share2,
     ShieldAlert,
@@ -16,6 +17,7 @@ interface AdminTabsProps {
     contentPanel: React.ReactNode;
     moderationPanel: React.ReactNode;
     marketplacePanel: React.ReactNode;
+    syncPanel: React.ReactNode;
 }
 
 export default function AdminTabs({
@@ -23,11 +25,12 @@ export default function AdminTabs({
     socialPanel,
     contentPanel,
     moderationPanel,
-    marketplacePanel
+    marketplacePanel,
+    syncPanel
 }: AdminTabsProps) {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const activeTab = (searchParams.get('tab') as 'status' | 'social' | 'content' | 'moderation' | 'marketplace') || 'status';
+    const activeTab = (searchParams.get('tab') as 'status' | 'social' | 'content' | 'moderation' | 'marketplace' | 'sync') || 'status';
 
     const setActiveTab = (tab: string) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -41,6 +44,7 @@ export default function AdminTabs({
         { id: 'social', label: 'IRONSOCIAL_MGMT', icon: Share2 },
         { id: 'content', label: 'PUBLICADOR_UNIFICADO', icon: Bell },
         { id: 'moderation', label: 'MODERACION_COMUNIDAD', icon: ShieldAlert },
+        { id: 'sync', label: 'SYNC_WORKOUTS', icon: Database },
     ] as const;
 
     return (
@@ -73,6 +77,7 @@ export default function AdminTabs({
                 {activeTab === 'content' && contentPanel}
                 {activeTab === 'moderation' && moderationPanel}
                 {activeTab === 'marketplace' && marketplacePanel}
+                {activeTab === 'sync' && syncPanel}
             </div>
         </div>
     );
