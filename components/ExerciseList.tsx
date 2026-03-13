@@ -1,6 +1,7 @@
 import { useDataReload } from '@/src/hooks/useDataReload';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
+import { FlashList } from '@shopify/flash-list';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react-native';
@@ -25,6 +26,81 @@ interface ExerciseListProps {
 type ExerciseItem = Exercise & { category_name: string; category_color: string; badges: any[] };
 
 type CategoryItem = Category | { id: string; name: string; color: string };
+
+const ExerciseCard = React.memo(({ item, colors, st, onSelect, handleEdit, handleDelete, handlePress }: {
+    item: ExerciseItem;
+    colors: any;
+    st: any;
+    onSelect?: (id: string) => void;
+    handleEdit: (ex: Exercise) => void;
+    handleDelete: (ex: Exercise) => void;
+    handlePress: (ex: Exercise) => void;
+}) => (
+    <TouchableOpacity
+        onPress={() => handlePress(item)}
+        style={st.card}
+        accessibilityRole="button"
+        accessibilityLabel={`Abrir ejercicio ${item.name}`}
+    >
+        <View style={st.cardInfo}>
+            <View style={[st.cardIcon, {
+                backgroundColor: withAlpha(item.category_color || colors.textMuted, '15'),
+                borderColor: withAlpha(item.category_color || colors.textMuted, '30'),
+            }]}>
+                <View style={[st.cardDot, { backgroundColor: item.category_color || colors.textMuted }]} />
+            </View>
+            <View style={st.cardText}>
+                <Text style={st.cardTitle} numberOfLines={1}>{item.name}</Text>
+                <View style={st.cardMeta}>
+                    <Text style={st.cardCategory} numberOfLines={1}>{item.category_name}</Text>
+
+                    {/* Badges Preview */}
+                    {item.badges && item.badges.length > 0 && (
+                        <View style={st.cardBadges}>
+                            {item.badges.slice(0, 3).map((badge, idx) => (
+                                <View key={`${item.id}-badge-${idx}`} style={{ flexShrink: 1 }}>
+                                    <BadgePill
+                                        name={badge.name}
+                                        color={badge.color}
+                                        icon={badge.icon}
+                                        size="xs"
+                                    />
+                                </View>
+                            ))}
+                            {item.badges.length > 3 && (
+                                <View style={st.badgeMore}>
+                                    <Text style={st.badgeMoreText}>+{item.badges.length - 3}</Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+                </View>
+            </View>
+        </View>
+        {!onSelect && (
+            <View style={st.actions}>
+                <TouchableOpacity
+                    onPress={() => handleEdit(item)}
+                    style={st.actionBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Editar ejercicio ${item.name}`}
+                >
+                    <Pencil size={15} color={colors.textMuted} />
+                </TouchableOpacity>
+                {!item.is_system && (
+                    <TouchableOpacity
+                        onPress={() => handleDelete(item)}
+                        style={st.deleteBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Eliminar ejercicio ${item.name}`}
+                    >
+                        <Trash2 size={15} color={colors.red} />
+                    </TouchableOpacity>
+                )}
+            </View>
+        )}
+    </TouchableOpacity>
+));
 
 export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
     const colors = useColors();
@@ -154,17 +230,17 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
 
     const router = useRouter(); // Required
 
-    const handleCreate = () => {
+    const handleCreate = useCallback(() => {
         setEditingExercise(null);
         setIsFormVisible(true);
-    };
+    }, []);
 
-    const handleEdit = (ex: Exercise) => {
+    const handleEdit = useCallback((ex: Exercise) => {
         setEditingExercise(ex);
         setIsFormVisible(true);
-    };
+    }, []);
 
-    const handleDelete = (ex: Exercise) => {
+    const handleDelete = useCallback((ex: Exercise) => {
         const run = async () => {
             try {
                 await ExerciseService.delete(ex.id);
@@ -200,9 +276,9 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
 
             confirm.destructive('Eliminar ejercicio', `¿Eliminar "${ex.name}"?`, run, 'Eliminar');
         })();
-    };
+    }, [loadData]);
 
-    const handlePress = (ex: Exercise) => {
+    const handlePress = useCallback((ex: Exercise) => {
         if (onSelect) {
             onSelect(ex.id);
         } else {
@@ -217,7 +293,19 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
                 }
             });
         }
-    };
+    }, [onSelect, router]);
+
+    const renderItem = useCallback(({ item }: { item: ExerciseItem }) => (
+        <ExerciseCard
+            item={item}
+            colors={colors}
+            st={st}
+            onSelect={onSelect}
+            handleEdit={handleEdit}
+            handleDelete={handleDelete}
+            handlePress={handlePress}
+        />
+    ), [colors, st, onSelect, handleEdit, handleDelete, handlePress]);
 
     return (
         <View style={st.container}>
@@ -262,77 +350,12 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
                     <ActivityIndicator color={colors.primary.DEFAULT} />
                 </View>
             ) : (
-                <FlatList<ExerciseItem>
+                <FlashList<ExerciseItem>
                     data={exercises}
                     contentContainerStyle={st.listContent}
                     onEndReachedThreshold={0.5}
                     keyExtractor={(item) => item.id}
-                    renderItem={({ item }) => (
-                        <TouchableOpacity
-                            onPress={() => handlePress(item)}
-                            style={st.card}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Abrir ejercicio ${item.name}`}
-                        >
-                            <View style={st.cardInfo}>
-                                <View style={[st.cardIcon, {
-                                    backgroundColor: withAlpha(item.category_color || colors.textMuted, '15'),
-                                    borderColor: withAlpha(item.category_color || colors.textMuted, '30'),
-                                }]}>
-                                    <View style={[st.cardDot, { backgroundColor: item.category_color || colors.textMuted }]} />
-                                </View>
-                                <View style={st.cardText}>
-                                    <Text style={st.cardTitle} numberOfLines={1}>{item.name}</Text>
-                                    <View style={st.cardMeta}>
-                                        <Text style={st.cardCategory} numberOfLines={1}>{item.category_name}</Text>
-
-                                        {/* Badges Preview */}
-                                        {item.badges && item.badges.length > 0 && (
-                                            <View style={st.cardBadges}>
-                                                {item.badges.slice(0, 3).map((badge, idx) => (
-                                                    <View key={`${item.id}-badge-${idx}`} style={{ flexShrink: 1 }}>
-                                                        <BadgePill
-                                                            name={badge.name}
-                                                            color={badge.color}
-                                                            icon={badge.icon}
-                                                            size="xs"
-                                                        />
-                                                    </View>
-                                                ))}
-                                                {item.badges.length > 3 && (
-                                                    <View style={st.badgeMore}>
-                                                        <Text style={st.badgeMoreText}>+{item.badges.length - 3}</Text>
-                                                    </View>
-                                                )}
-                                            </View>
-                                        )}
-                                    </View>
-                                </View>
-                            </View>
-                            {!onSelect && (
-                                <View style={st.actions}>
-                                    <TouchableOpacity
-                                        onPress={() => handleEdit(item)}
-                                        style={st.actionBtn}
-                                        accessibilityRole="button"
-                                        accessibilityLabel={`Editar ejercicio ${item.name}`}
-                                    >
-                                        <Pencil size={15} color={colors.textMuted} />
-                                    </TouchableOpacity>
-                                    {!item.is_system && (
-                                        <TouchableOpacity
-                                            onPress={() => handleDelete(item)}
-                                            style={st.deleteBtn}
-                                            accessibilityRole="button"
-                                            accessibilityLabel={`Eliminar ejercicio ${item.name}`}
-                                        >
-                                            <Trash2 size={15} color={colors.red} />
-                                        </TouchableOpacity>
-                                    )}
-                                </View>
-                            )}
-                        </TouchableOpacity>
-                    )}
+                    renderItem={renderItem}
                 />
             )}
 

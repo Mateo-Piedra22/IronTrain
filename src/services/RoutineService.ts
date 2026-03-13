@@ -78,12 +78,52 @@ const getNumber = (value: unknown): number | null =>
     typeof value === 'number' && Number.isFinite(value) ? value : null;
 
 class RoutineService {
+    private cache = new Map<string, { value: any; timestamp: number }>();
+    private CACHE_TTL = 300000; // 5 minutes
+    private isSubscribed = false;
+
+    private init() {
+        if (this.isSubscribed) return;
+        dataEventService.subscribe('DATA_UPDATED', () => this.clearCache());
+        dataEventService.subscribe('SYNC_COMPLETED', () => this.clearCache());
+        this.isSubscribed = true;
+    }
+
+    public clearCache() {
+        this.cache.clear();
+    }
+
+    private getCached<T>(key: string): T | null {
+        const entry = this.cache.get(key);
+        if (!entry) return null;
+        if (Date.now() - entry.timestamp > this.CACHE_TTL) {
+            this.cache.delete(key);
+            return null;
+        }
+        return entry.value as T;
+    }
+
+    private setCache(key: string, value: any) {
+        this.init();
+        this.cache.set(key, { value, timestamp: Date.now() });
+    }
+
     // --- ROUTINES ---
     public async getAllRoutines(): Promise<Routine[]> {
-        return await dbService.getAll<Routine>('SELECT * FROM routines ORDER BY name ASC');
+        const cacheKey = 'all_routines';
+        const cached = this.getCached<Routine[]>(cacheKey);
+        if (cached) return cached;
+
+        const results = await dbService.getAll<Routine>('SELECT * FROM routines ORDER BY name ASC');
+        this.setCache(cacheKey, results);
+        return results;
     }
 
     public async getRoutineDetails(routineId: string): Promise<RoutineWithDays | null> {
+        const cacheKey = `routine_details_${routineId}`;
+        const cached = this.getCached<RoutineWithDays>(cacheKey);
+        if (cached) return cached;
+
         const routine = await dbService.getFirst<Routine>('SELECT * FROM routines WHERE id = ?', [routineId]);
         if (!routine) return null;
 
@@ -118,10 +158,12 @@ class RoutineService {
             });
         }
 
-        return {
+        const result = {
             ...routine,
             days: routineDaysWithEx
         };
+        this.setCache(cacheKey, result);
+        return result;
     }
 
     public async createRoutine(name: string, description?: string, isPublic: number = 0): Promise<string> {
@@ -157,6 +199,10 @@ class RoutineService {
 
     // --- ROUTINE DAYS ---
     public async getRoutineDayDetails(dayId: string): Promise<RoutineDayWithExercises | null> {
+        const cacheKey = `routine_day_details_${dayId}`;
+        const cached = this.getCached<RoutineDayWithExercises>(cacheKey);
+        if (cached) return cached;
+
         const day = await dbService.getFirst<RoutineDay>('SELECT * FROM routine_days WHERE id = ?', [dayId]);
         if (!day) return null;
 
@@ -180,10 +226,12 @@ class RoutineService {
             return { ...ex, badges };
         }));
 
-        return {
+        const result = {
             ...day,
             exercises: exercisesWithBadges
         };
+        this.setCache(cacheKey, result);
+        return result;
     }
 
     public async addRoutineDay(routineId: string, name: string, orderIndex: number): Promise<string> {

@@ -1113,15 +1113,23 @@ export class DatabaseService {
      */
     public async repairDataConsistency(): Promise<void> {
         await this.executeRaw('PRAGMA foreign_keys = OFF;');
+
+        // Helper to queue deletions for merged records
+        const queueDelete = async (table: string, id: string) => {
+            try { await this.queueSyncMutation(table, id, 'DELETE'); } catch (e) { /* non-critical */ }
+        };
+
+        const safeStep = async (name: string, fn: () => Promise<void>) => {
+            try {
+                await fn();
+            } catch (e) {
+                logger.captureException(e, { scope: `DatabaseService.repair.${name}` });
+            }
+        };
+
         try {
-            await this.withTransaction(async () => {
-
-                // Helper to queue deletions for merged records
-                const queueDelete = async (table: string, id: string) => {
-                    await this.queueSyncMutation(table, id, 'DELETE');
-                };
-
-                // 1. Uncategorized Consistency
+            // 1. Uncategorized Consistency
+            await safeStep('uncategorized', async () => {
                 const uncategorizedRows = await this.getAll<{ id: string }>(
                     "SELECT id FROM categories WHERE name = ? OR id = ? OR id = ?",
                     [UNCATEGORIZED_NAME, UNCATEGORIZED_ID, LEGACY_UNCATEGORIZED_ID]
@@ -1139,9 +1147,10 @@ export class DatabaseService {
                         [UNCATEGORIZED_ID, UNCATEGORIZED_NAME]
                     );
                 }
+            });
 
-                // 2. Generic Category Deduplication (Marketplace Aware)
-                // Priority: origin_id > is_system > id
+            // 2. Generic Category Deduplication (Marketplace Aware)
+            await safeStep('categories', async () => {
                 const duplicateCats = await this.getAll<{ name: string }>(
                     "SELECT name FROM categories WHERE name != ? GROUP BY name HAVING COUNT(*) > 1",
                     [UNCATEGORIZED_NAME]
@@ -1154,14 +1163,15 @@ export class DatabaseService {
                     const master = instances[0];
                     const duplicates = instances.slice(1);
                     for (const dupe of duplicates) {
-                        // Level 3: Auto-Link if dupe has NO origin_id but master DOES
                         await this.run('UPDATE exercises SET category_id = ? WHERE category_id = ?', [master.id, dupe.id]);
                         await this.run('DELETE FROM categories WHERE id = ?', [dupe.id]);
                         await queueDelete('categories', dupe.id);
                     }
                 }
+            });
 
-                // 3. Generic Badge Deduplication (Marketplace Aware)
+            // 3. Generic Badge Deduplication (Marketplace Aware)
+            await safeStep('badges', async () => {
                 const duplicateBadges = await this.getAll<{ name: string }>("SELECT name FROM badges GROUP BY name HAVING COUNT(*) > 1");
                 for (const b of duplicateBadges) {
                     const instances = await this.getAll<{ id: string, origin_id: string }>(
@@ -1176,9 +1186,10 @@ export class DatabaseService {
                         await queueDelete('badges', dupe.id);
                     }
                 }
+            });
 
-                // 4. Badge-Aware Exercise Deduplication (Marketplace Aware)
-                // Signature includes category_id, name (lowercased), and sorted badges
+            // 4. Badge-Aware Exercise Deduplication (Marketplace Aware)
+            await safeStep('exercises', async () => {
                 const allExs = await this.getAll<{ id: string, name: string, category_id: string, origin_id: string }>(
                     "SELECT id, name, category_id, origin_id FROM exercises"
                 );
@@ -1199,9 +1210,8 @@ export class DatabaseService {
                     exerciseMap.get(signature)!.push({ id: ex.id, origin_id: ex.origin_id || '' });
                 }
 
-                for (const [signature, records] of exerciseMap.entries()) {
+                for (const [, records] of exerciseMap.entries()) {
                     if (records.length > 1) {
-                        // Priority: record with origin_id
                         const sorted = [...records].sort((a, b) => b.origin_id.localeCompare(a.origin_id) || a.id.localeCompare(b.id));
                         const master = sorted[0];
                         const duplicates = sorted.slice(1);
@@ -1211,12 +1221,10 @@ export class DatabaseService {
                             await this.run('UPDATE routine_exercises SET exercise_id = ? WHERE exercise_id = ?', [master.id, dupe.id]);
                             await this.run('UPDATE user_exercise_prs SET exercise_id = ? WHERE exercise_id = ?', [master.id, dupe.id]);
 
-                            // Deduplicate badges before moving to avoid PK/Unique issues on the master
                             const masterBadges = await this.getAll<{ badge_id: string }>('SELECT badge_id FROM exercise_badges WHERE exercise_id = ?', [master.id]);
                             const masterBadgeIds = masterBadges.map(b => b.badge_id);
 
                             if (masterBadgeIds.length > 0) {
-                                // Delete badges from the duplicate that already exist on the master
                                 const placeHolders = masterBadgeIds.map(() => '?').join(',');
                                 await this.run(`DELETE FROM exercise_badges WHERE exercise_id = ? AND badge_id IN (${placeHolders})`, [dupe.id, ...masterBadgeIds]);
                             }
@@ -1227,20 +1235,76 @@ export class DatabaseService {
                         }
                     }
                 }
+            });
 
-                // 5. Workout Sets Deduplication (Sync Glitch: same workout_id + order_index)
+            // 4.5 Workout Deduplication (By Date)
+            await safeStep('workouts', async () => {
+                const allWorkouts = await this.getAll<{ id: string, date: number, status: string }>(
+                    "SELECT id, date, status FROM workouts WHERE deleted_at IS NULL"
+                );
+
+                const workoutMap = new Map<string, Array<{ id: string, date: number, status: string, set_count: number }>>();
+
+                for (const w of allWorkouts) {
+                    // Group by YYYY-MM-DD
+                    const d = new Date(w.date);
+                    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+                    const setRow = await this.getFirst<{ count: number }>("SELECT COUNT(*) as count FROM workout_sets WHERE workout_id = ? AND deleted_at IS NULL", [w.id]);
+                    const set_count = Number(setRow?.count ?? 0);
+
+                    if (!workoutMap.has(key)) workoutMap.set(key, []);
+                    workoutMap.get(key)!.push({ ...w, set_count });
+                }
+
+                for (const [, records] of workoutMap.entries()) {
+                    if (records.length > 1) {
+                        // Master is the one with most sets, then completed status, then newest
+                        const sorted = [...records].sort((a, b) => {
+                            if (b.set_count !== a.set_count) return b.set_count - a.set_count;
+                            if (a.status === 'completed' && b.status !== 'completed') return -1;
+                            if (b.status === 'completed' && a.status !== 'completed') return 1;
+                            return b.date - a.date;
+                        });
+
+                        const master = sorted[0];
+                        const duplicates = sorted.slice(1);
+
+                        for (const dupe of duplicates) {
+                            // Move sets to master
+                            await this.run('UPDATE workout_sets SET workout_id = ? WHERE workout_id = ?', [master.id, dupe.id]);
+                            // Delete duplicate workout
+                            await this.run('DELETE FROM workouts WHERE id = ?', [dupe.id]);
+                            await queueDelete('workouts', dupe.id);
+                        }
+                    }
+                }
+            });
+
+            // 5. Workout Sets Deduplication
+            await safeStep('workoutSets', async () => {
                 const dupeSets = await this.getAll<{ id: string }>(`
                     SELECT id FROM workout_sets 
-                    WHERE rowid NOT IN (
-                        SELECT MIN(rowid) FROM workout_sets GROUP BY workout_id, order_index
-                    )
+                    WHERE id NOT IN (
+                        SELECT id FROM (
+                            SELECT id, ROW_NUMBER() OVER (
+                                PARTITION BY workout_id, order_index, exercise_id 
+                                ORDER BY completed DESC, weight DESC, updated_at DESC
+                            ) as rn
+                            FROM workout_sets
+                            WHERE deleted_at IS NULL
+                        ) WHERE rn = 1
+                    ) AND deleted_at IS NULL
                 `);
+
                 for (const s of dupeSets) {
                     await this.run('DELETE FROM workout_sets WHERE id = ?', [s.id]);
                     await queueDelete('workout_sets', s.id);
                 }
+            });
 
-                // 6. Routine Day Deduplication
+            // 6. Routine Day Deduplication
+            await safeStep('routineDays', async () => {
                 const dupeDays = await this.getAll<{ id: string }>(`
                     SELECT id FROM routine_days 
                     WHERE rowid NOT IN (
@@ -1251,8 +1315,10 @@ export class DatabaseService {
                     await this.run('DELETE FROM routine_days WHERE id = ?', [d.id]);
                     await queueDelete('routine_days', d.id);
                 }
+            });
 
-                // 7. PR Deduplication
+            // 7. PR Deduplication
+            await safeStep('prs', async () => {
                 const dupePRs = await this.getAll<{ id: string }>(`
                     SELECT id FROM user_exercise_prs
                     WHERE rowid NOT IN (
@@ -1263,15 +1329,19 @@ export class DatabaseService {
                     await this.run('DELETE FROM user_exercise_prs WHERE id = ?', [pr.id]);
                     await queueDelete('user_exercise_prs', pr.id);
                 }
+            });
 
-                // 8. Body Metrics / Measurements Deduplication (Keep newest entry per day)
+            // 8. Body Metrics / Measurements Deduplication
+            await safeStep('metrics', async () => {
                 const dupeMetrics = await this.getAll<{ id: string }>(`SELECT id FROM body_metrics WHERE rowid NOT IN (SELECT MAX(rowid) FROM body_metrics GROUP BY date)`);
                 for (const m of dupeMetrics) { await this.run('DELETE FROM body_metrics WHERE id = ?', [m.id]); await queueDelete('body_metrics', m.id); }
 
                 const dupeMeasures = await this.getAll<{ id: string }>(`SELECT id FROM measurements WHERE rowid NOT IN (SELECT MAX(rowid) FROM measurements GROUP BY date, type)`);
                 for (const m of dupeMeasures) { await this.run('DELETE FROM measurements WHERE id = ?', [m.id]); await queueDelete('measurements', m.id); }
+            });
 
-                // 9. Legacy Fixes & Names
+            // 9. Legacy Fixes & Names
+            await safeStep('legacyFixes', async () => {
                 await this.run("UPDATE measurements SET unit = 'kg' WHERE type = 'weight' AND (unit IS NULL OR unit = 'cm')");
                 await this.run("UPDATE measurements SET unit = '%' WHERE type = 'body_fat' AND (unit IS NULL OR unit = 'cm')");
                 await this.run(`
@@ -1279,8 +1349,10 @@ export class DatabaseService {
                     SET exercise_name = (SELECT name FROM exercises WHERE exercises.id = user_exercise_prs.exercise_id)
                     WHERE exercise_name IS NULL OR exercise_name = ''
                 `);
+            });
 
-                // 10. Social System Deduplication (Feed, Kudos, Reactions)
+            // 10. Social System Deduplication
+            await safeStep('social', async () => {
                 const dupeReactions = await this.getAll<{ id: string }>(`SELECT id FROM changelog_reactions WHERE rowid NOT IN (SELECT MIN(rowid) FROM changelog_reactions GROUP BY user_id, changelog_id, type)`);
                 for (const r of dupeReactions) { await this.run('DELETE FROM changelog_reactions WHERE id = ?', [r.id]); await queueDelete('changelog_reactions', r.id); }
 
@@ -1292,49 +1364,83 @@ export class DatabaseService {
 
                 const dupeFeed = await this.getAll<{ id: string }>(`SELECT id FROM activity_feed WHERE rowid NOT IN (SELECT MIN(rowid) FROM activity_feed GROUP BY user_id, action_type, reference_id, created_at)`);
                 for (const f of dupeFeed) { await this.run('DELETE FROM activity_feed WHERE id = ?', [f.id]); await queueDelete('activity_feed', f.id); }
+            });
 
-                // 11. Cross-Table Integrity Cleanup (Orphans)
-                // Remove kudos whose feed item is gone
+            // 11. Cross-Table Integrity Cleanup (Orphans)
+            await safeStep('orphans', async () => {
                 const orphanKudos = await this.getAll<{ id: string }>(`SELECT id FROM kudos WHERE feed_id NOT IN (SELECT id FROM activity_feed)`);
                 for (const k of orphanKudos) { await this.run('DELETE FROM kudos WHERE id = ?', [k.id]); await queueDelete('kudos', k.id); }
 
-                // Remove reactions whose changelog is gone
                 const orphanReactions = await this.getAll<{ id: string }>(`SELECT id FROM changelog_reactions WHERE changelog_id NOT IN (SELECT id FROM changelogs)`);
                 for (const r of orphanReactions) { await this.run('DELETE FROM changelog_reactions WHERE id = ?', [r.id]); await queueDelete('changelog_reactions', r.id); }
+            });
 
-                // 12. Junction Table Cleanup (Final physical safety, no sync needed as it's a junction)
-                await this.executeRaw(`DELETE FROM exercise_badges WHERE rowid NOT IN (SELECT MIN(rowid) FROM exercise_badges GROUP BY exercise_id, badge_id)`);
-                await this.executeRaw(`DELETE FROM routine_exercises WHERE rowid NOT IN (SELECT MIN(rowid) FROM routine_exercises GROUP BY routine_day_id, exercise_id, order_index)`);
+            // 12. Junction Table Cleanup
+            await safeStep('junctions', async () => {
+                await this.run(`DELETE FROM exercise_badges WHERE rowid NOT IN (SELECT MIN(rowid) FROM exercise_badges GROUP BY exercise_id, badge_id)`);
+                await this.run(`DELETE FROM routine_exercises WHERE rowid NOT IN (SELECT MIN(rowid) FROM routine_exercises GROUP BY routine_day_id, exercise_id, order_index)`);
+            });
 
-                // 13. Systemic Backfill of user_id for all syncable tables (Zero Trust)
+            // 13. Systemic Backfill of user_id for all syncable tables (Zero Trust)
+            await safeStep('backfillUserId', async () => {
                 const userId = useAuthStore.getState().user?.id;
-                if (userId) {
-                    const syncableTables = [
-                        'exercises', 'categories', 'workouts', 'workout_sets',
-                        'routines', 'routine_days', 'routine_exercises',
-                        'measurements', 'goals', 'plate_inventory', 'settings',
-                        'body_metrics', 'badges', 'exercise_badges',
-                        'user_exercise_prs', 'score_events', 'activity_feed',
-                        'notification_reactions', 'changelog_reactions', 'kudos'
-                    ];
+                if (!userId) return;
+                const syncableTables = [
+                    'exercises', 'categories', 'workouts', 'workout_sets',
+                    'routines', 'routine_days', 'routine_exercises',
+                    'measurements', 'goals', 'plate_inventory', 'settings',
+                    'body_metrics', 'badges', 'exercise_badges',
+                    'user_exercise_prs', 'score_events', 'activity_feed',
+                    'notification_reactions', 'changelog_reactions', 'kudos'
+                ];
 
-                    for (const table of syncableTables) {
-                        try {
-                            const info = await this.getAll<{ name: string }>(`PRAGMA table_info('${table}')`);
-                            const cols = info.map(c => c.name);
-                            if (cols.includes('user_id')) {
-                                await this.run(`UPDATE ${table} SET user_id = ? WHERE user_id IS NULL OR user_id = ''`, [userId]);
-                            } else if (table === 'kudos' && cols.includes('giver_id')) {
-                                await this.run(`UPDATE kudos SET giver_id = ? WHERE giver_id IS NULL OR giver_id = ''`, [userId]);
-                            }
-                        } catch (e) {
-                            // Silent catch for individual tables
+                for (const table of syncableTables) {
+                    try {
+                        const info = await this.getAll<{ name: string }>(`PRAGMA table_info('${table}')`);
+                        const cols = info.map(c => c.name);
+                        if (cols.includes('user_id')) {
+                            await this.run(`UPDATE ${table} SET user_id = ? WHERE user_id IS NULL OR user_id = ''`, [userId]);
+                        } else if (table === 'kudos' && cols.includes('giver_id')) {
+                            await this.run(`UPDATE kudos SET giver_id = ? WHERE giver_id IS NULL OR giver_id = ''`, [userId]);
                         }
+                    } catch (e) {
+                        // Silent catch for individual tables
+                    }
+                }
+            });
+
+            // 14. Workout Deduplication (Merge multiple workouts for same day)
+            await safeStep('workoutDedup', async () => {
+                const dupeWorkouts = await this.getAll<{ date_str: string }>(`
+                    SELECT date(date / 1000, 'unixepoch', 'localtime') as date_str FROM workouts 
+                    WHERE is_template = 0 AND deleted_at IS NULL
+                    GROUP BY date_str 
+                    HAVING COUNT(*) > 1
+                `);
+
+                for (const w of dupeWorkouts) {
+                    // Get all workouts for this date, with set counts to pick the one with most data as master
+                    const instances = await this.getAll<{ id: string, origin_id: string, set_count: number }>(
+                        `SELECT w.id, w.origin_id, 
+                            (SELECT COUNT(*) FROM workout_sets s WHERE s.workout_id = w.id) as set_count
+                         FROM workouts w 
+                         WHERE date(w.date / 1000, 'unixepoch', 'localtime') = ? AND w.is_template = 0 AND w.deleted_at IS NULL
+                         ORDER BY set_count DESC, origin_id DESC, id ASC`,
+                        [w.date_str]
+                    );
+                    if (instances.length <= 1) continue;
+
+                    const master = instances[0];
+                    const duplicates = instances.slice(1);
+                    for (const dupe of duplicates) {
+                        await this.run('UPDATE workout_sets SET workout_id = ? WHERE workout_id = ?', [master.id, dupe.id]);
+                        await this.run('DELETE FROM workouts WHERE id = ?', [dupe.id]);
+                        await queueDelete('workouts', dupe.id);
                     }
                 }
             });
         } finally {
-            await this.executeRaw('PRAGMA foreign_keys = ON;');
+            try { await this.executeRaw('PRAGMA foreign_keys = ON;'); } catch (e) { /* safety */ }
         }
     }
 
@@ -1454,10 +1560,18 @@ export class DatabaseService {
     // --- WORKOUTS ---
 
     public async getWorkoutByDate(dateStart: number, dateEnd: number): Promise<Workout | null> {
-        return await this.getFirst<Workout>(
-            'SELECT * FROM workouts WHERE date >= ? AND date < ? ORDER BY start_time DESC, date DESC LIMIT 1',
-            [dateStart, dateEnd]
-        );
+        // Prioritize workouts that have sets and are not deleted.
+        // This handles cases where a sync might create a duplicate workout record for the same day.
+        const sql = `
+            SELECT w.*, 
+                   (SELECT COUNT(*) FROM workout_sets ws WHERE ws.workout_id = w.id AND ws.deleted_at IS NULL) as set_count
+            FROM workouts w
+            WHERE date >= ? AND date < ? 
+              AND deleted_at IS NULL
+            ORDER BY set_count DESC, start_time DESC, date DESC 
+            LIMIT 1
+        `;
+        return await this.getFirst<Workout>(sql, [dateStart, dateEnd]);
     }
 
     public async getWorkoutById(id: string): Promise<Workout | null> {
@@ -1719,14 +1833,32 @@ export class DatabaseService {
     public async withTransaction(callback: () => Promise<void>): Promise<void> {
         await this.ensureInitialized();
         return await this.executeWithRetry(async () => {
-            return await this.db!.withTransactionAsync(callback);
+            try {
+                return await this.db!.withTransactionAsync(callback);
+            } catch (e: any) {
+                const msg = e?.message || '';
+                if (msg.includes('no transaction is active') || msg.includes('cannot rollback')) {
+                    logger.warn('[Database] Transaction auto-rolled back by driver or already closed.');
+                    return;
+                }
+                throw e;
+            }
         });
     }
 
     public async withTransactionAsync(callback: (db: SQLite.SQLiteDatabase) => Promise<void>): Promise<void> {
         await this.ensureInitialized();
         return await this.executeWithRetry(async () => {
-            return await this.db!.withTransactionAsync(() => callback(this.db!));
+            try {
+                return await this.db!.withTransactionAsync(() => callback(this.db!));
+            } catch (e: any) {
+                const msg = e?.message || '';
+                if (msg.includes('no transaction is active') || msg.includes('cannot rollback')) {
+                    logger.warn('[Database] Async transaction auto-rolled back by driver or already closed.');
+                    return;
+                }
+                throw e;
+            }
         });
     }
 

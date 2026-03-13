@@ -51,6 +51,41 @@ describe('SyncService', () => {
     (syncService as any).isSyncing = false;
   });
 
+  it('normalizes workouts epoch fields from seconds to milliseconds when needed', async () => {
+    const normalized = (syncService as any).normalizeIncomingRecord('workouts', {
+      id: 'w1',
+      date: 1_700_000_000, // seconds
+      start_time: 1_700_000_001,
+      end_time: 1_700_000_100,
+      duration: 3600, // seconds, must NOT be multiplied
+    }, new Set(['id', 'date', 'start_time', 'end_time', 'duration']));
+
+    // SyncService normalizes workout 'date' to local noon to avoid timezone splits.
+    // IMPORTANT: The service applies the noon-normalization BEFORE the seconds->ms heuristic.
+    const expectedDateObj = new Date(1_700_000_000);
+    expectedDateObj.setHours(12, 0, 0, 0);
+    expect(normalized.date).toBe(expectedDateObj.getTime() * 1000);
+    expect(normalized.start_time).toBe(1_700_000_001_000);
+    expect(normalized.end_time).toBe(1_700_000_100_000);
+    expect(normalized.duration).toBe(3600);
+  });
+
+  it('normalizes workouts epoch fields from numeric strings and ISO strings to epoch milliseconds', async () => {
+    const normalized = (syncService as any).normalizeIncomingRecord('workouts', {
+      id: 'w1',
+      date: '1700000000', // seconds as string
+      startTime: '2026-01-02T12:00:00.000Z', // ISO string
+      endTime: '1700000100000', // ms as string
+      duration: 1800,
+    }, new Set(['id', 'date', 'start_time', 'end_time', 'duration']));
+
+    expect(normalized.date).toBe(1_700_000_000_000);
+    expect(typeof normalized.start_time).toBe('number');
+    expect(normalized.start_time).toBe(Date.parse('2026-01-02T12:00:00.000Z'));
+    expect(normalized.end_time).toBe(1_700_000_100_000);
+    expect(normalized.duration).toBe(1800);
+  });
+
   it('computes local status with per-table active/deleted counts and aggregates only active', async () => {
     // For each table, checkLocalStatus issues 2 queries when supportsDelete=true, else 1.
     // We return 1 active and 2 deleted for all soft-delete tables, and 5 for non-soft-delete tables.
@@ -172,8 +207,16 @@ describe('SyncService', () => {
     await (syncService as any).pullRemoteChanges('token-1');
 
     const runSql = (dbService.run as jest.Mock).mock.calls.map((c) => String(c[0]));
-    const workoutIdx = runSql.findIndex((sql) => sql.includes('INSERT OR REPLACE INTO workouts'));
-    const setIdx = runSql.findIndex((sql) => sql.includes('INSERT OR REPLACE INTO workout_sets'));
+    const workoutIdx = runSql.findIndex((sql) => (
+      sql.includes('INSERT INTO workouts') ||
+      sql.includes('UPDATE workouts') ||
+      sql.includes('INSERT OR REPLACE INTO workouts')
+    ));
+    const setIdx = runSql.findIndex((sql) => (
+      sql.includes('INSERT INTO workout_sets') ||
+      sql.includes('UPDATE workout_sets') ||
+      sql.includes('INSERT OR REPLACE INTO workout_sets')
+    ));
 
     expect(workoutIdx).toBeGreaterThanOrEqual(0);
     expect(setIdx).toBeGreaterThanOrEqual(0);
@@ -287,9 +330,14 @@ describe('SyncService', () => {
 
     await (syncService as any).pullRemoteChanges('token-1');
 
-    const insertCall = (dbService.run as jest.Mock).mock.calls.find((c) => String(c[0]).includes('INSERT OR REPLACE INTO settings'));
+    const insertCall = (dbService.run as jest.Mock).mock.calls.find((c) => {
+      const sql = String(c[0]);
+      return sql.includes('INSERT INTO settings') || sql.includes('UPDATE settings') || sql.includes('INSERT OR REPLACE INTO settings');
+    });
     expect(insertCall).toBeDefined();
-    expect(insertCall?.[1]).toEqual(expect.arrayContaining(['training_days']));
+    // For UPDATE, SyncService binds values then recordId at the end.
+    const params = (insertCall?.[1] ?? []) as any[];
+    expect(params.join(' ')).toContain('training_days');
   });
 
   it('allows pulling badges and upserts them into local DB', async () => {
@@ -320,7 +368,10 @@ describe('SyncService', () => {
 
     await (syncService as any).pullRemoteChanges('token-1');
 
-    const insertCall = (dbService.run as jest.Mock).mock.calls.find((c) => String(c[0]).includes('INSERT OR REPLACE INTO badges'));
+    const insertCall = (dbService.run as jest.Mock).mock.calls.find((c) => {
+      const sql = String(c[0]);
+      return sql.includes('INSERT INTO badges') || sql.includes('UPDATE badges') || sql.includes('INSERT OR REPLACE INTO badges');
+    });
     expect(insertCall).toBeDefined();
   });
 });

@@ -71,4 +71,19 @@ describe('workoutStore', () => {
     useWorkoutStore.getState().tickTimer();
     expect(useWorkoutStore.getState().workoutTimer).toBe(2);
   });
+
+  it('should not transfer workout timer ownership when loading another workout by id (cross-day safety)', async () => {
+    const { dbService } = require('../../services/DatabaseService');
+    const { configService } = require('../../services/ConfigService');
+
+    (dbService.getWorkoutById as jest.Mock).mockResolvedValue({ id: 'w2', status: 'in_progress', is_template: 0, duration: 12 } as any);
+
+    await useWorkoutStore.getState().loadWorkoutById('w2');
+
+    expect(useWorkoutStore.getState().activeWorkout?.id).toBe('w2');
+    // runningWorkoutTimerWorkoutId mocked to 'w1', so w2 must NOT run
+    expect(useWorkoutStore.getState().isTimerRunning).toBe(false);
+    // Loading should never reassign ownership
+    expect(configService.set).not.toHaveBeenCalledWith('runningWorkoutTimerWorkoutId', 'w2');
+  });
 });

@@ -15,7 +15,7 @@ interface AnalysisTrendsProps {
     handleRangeChange: (d: 7 | 30 | 90 | 365) => void;
 }
 
-export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, handleRangeChange }: AnalysisTrendsProps) {
+export const AnalysisTrends = React.memo(({ volumeSeries, topExercisesByVolume, rangeDays, handleRangeChange }: AnalysisTrendsProps) => {
     const colors = useColors();
     const styles = useMemo(() => StyleSheet.create({
         container: {
@@ -402,6 +402,6 @@ export function AnalysisTrends({ volumeSeries, topExercisesByVolume, rangeDays, 
             </View>
         </View>
     );
-}
+});
 
 

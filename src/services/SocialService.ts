@@ -35,6 +35,7 @@ export interface SocialProfile {
     activeEvent?: GlobalEvent | null;
     weatherBonus?: WeatherInfo | null;
     scoreConfig?: ScoreConfig | null;
+    trainingDays?: number[];
 }
 
 export interface GlobalEvent {
@@ -115,6 +116,35 @@ export interface SocialComparisonEntry {
 }
 
 export class SocialService {
+    private static cache = new Map<string, { value: any; timestamp: number }>();
+    private static CACHE_TTL = 60000; // 60 seconds
+    private static isSubscribed = false;
+
+    private static init() {
+        if (this.isSubscribed) return;
+        dataEventService.subscribe('SOCIAL_UPDATED', () => this.clearCache());
+        this.isSubscribed = true;
+    }
+
+    public static clearCache() {
+        this.cache.clear();
+    }
+
+    private static getCached<T>(key: string): T | null {
+        const entry = this.cache.get(key);
+        if (!entry) return null;
+        if (Date.now() - entry.timestamp > this.CACHE_TTL) {
+            this.cache.delete(key);
+            return null;
+        }
+        return entry.value as T;
+    }
+
+    private static setCache(key: string, value: any) {
+        this.init();
+        this.cache.set(key, { value, timestamp: Date.now() });
+    }
+
     static async getToken(): Promise<string | null> {
         return await SecureStore.getItemAsync('irontrain_auth_token');
     }
@@ -167,8 +197,13 @@ export class SocialService {
     // -- PROFILE --
 
     static async getProfile(): Promise<SocialProfile> {
+        const cacheKey = 'social_profile';
+        const cached = this.getCached<SocialProfile>(cacheKey);
+        if (cached) return cached;
+
         const headers = await this.getHeaders();
         const data = await this.request<{ profile: SocialProfile }>(`${API_URL}/api/social/profile`, { headers });
+        this.setCache(cacheKey, data.profile);
         return data.profile;
     }
 
@@ -178,6 +213,20 @@ export class SocialService {
             method: 'PUT',
             headers,
             body: JSON.stringify({ displayName, username, isPublic }),
+        });
+
+        // Emit event for real-time UI updates
+        dataEventService.emit('SOCIAL_UPDATED');
+
+        return data.success;
+    }
+
+    static async updateTrainingDays(trainingDays: number[]) {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ success: boolean }>(`${API_URL}/api/social/profile/training-days`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({ trainingDays }),
         });
 
         // Emit event for real-time UI updates
@@ -198,8 +247,13 @@ export class SocialService {
     // -- FRIENDS --
 
     static async getFriends(): Promise<SocialFriend[]> {
+        const cacheKey = 'social_friends';
+        const cached = this.getCached<SocialFriend[]>(cacheKey);
+        if (cached) return cached;
+
         const headers = await this.getHeaders();
         const data = await this.request<{ friends: SocialFriend[] }>(`${API_URL}/api/social/friends`, { headers });
+        this.setCache(cacheKey, data.friends);
         return data.friends;
     }
 
@@ -237,8 +291,13 @@ export class SocialService {
     // -- INBOX --
 
     static async getInbox(): Promise<SocialInboxItem[]> {
+        const cacheKey = 'social_inbox';
+        const cached = this.getCached<SocialInboxItem[]>(cacheKey);
+        if (cached) return cached;
+
         const headers = await this.getHeaders();
         const data = await this.request<{ items: SocialInboxItem[] }>(`${API_URL}/api/social/inbox`, { headers });
+        this.setCache(cacheKey, data.items);
         return data.items;
     }
 
@@ -352,14 +411,24 @@ export class SocialService {
     // -- ANALYTICS --
 
     static async getAnalytics(): Promise<SocialLeaderboardEntry[]> {
+        const cacheKey = 'social_leaderboard';
+        const cached = this.getCached<SocialLeaderboardEntry[]>(cacheKey);
+        if (cached) return cached;
+
         const headers = await this.getHeaders();
         const data = await this.request<{ leaderboard: SocialLeaderboardEntry[] }>(`${API_URL}/api/social/analytics`, { headers });
+        this.setCache(cacheKey, data.leaderboard);
         return data.leaderboard;
     }
 
     static async compareFriend(friendId: string): Promise<SocialComparisonEntry[]> {
+        const cacheKey = `social_compare_${friendId}`;
+        const cached = this.getCached<SocialComparisonEntry[]>(cacheKey);
+        if (cached) return cached;
+
         const headers = await this.getHeaders();
         const data = await this.request<{ comparison: SocialComparisonEntry[] }>(`${API_URL}/api/social/compare?friendId=${encodeURIComponent(friendId)}`, { headers });
+        this.setCache(cacheKey, data.comparison);
         return data.comparison;
     }
 }

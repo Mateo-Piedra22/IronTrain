@@ -120,10 +120,48 @@ export interface OneRMProgressRow {
     badges: { name: string; color: string; icon?: string }[];
 }
 
+
+import { dataEventService } from './DataEventService';
+
 export class AnalysisService {
+    private static cache = new Map<string, { value: any; timestamp: number }>();
+    private static CACHE_TTL = 30000; // 30 seconds
+    private static isSubscribed = false;
+
+    private static init() {
+        if (this.isSubscribed) return;
+        dataEventService.subscribe('DATA_UPDATED', () => this.clearCache());
+        dataEventService.subscribe('SYNC_COMPLETED', () => this.clearCache());
+        this.isSubscribed = true;
+    }
+
+    public static clearCache() {
+        this.cache.clear();
+    }
+
+    private static getCached<T>(key: string): T | null {
+        const entry = this.cache.get(key);
+        if (!entry) return null;
+        if (Date.now() - entry.timestamp > this.CACHE_TTL) {
+            this.cache.delete(key);
+            return null;
+        }
+        return entry.value as T;
+    }
+
+    private static setCache(key: string, value: any) {
+        this.init();
+        this.cache.set(key, { value, timestamp: Date.now() });
+    }
+
+
     // 1RM Calculation (Epley Formula)
     static async getTop1RMs(days?: number, limit: number = 5): Promise<OneRepMax[]> {
+        const cacheKey = `top1rms_${days}_${limit}`;
+        const cached = this.getCached<OneRepMax[]>(cacheKey);
+        if (cached) return cached;
         try {
+
             const cutoff = days ? Date.now() - (days * 86400 * 1000) : null;
 
             const results = await dbService.getAll<any>(`
@@ -175,8 +213,11 @@ export class AnalysisService {
                 }
             });
 
-            return Object.values(maxes).sort((a, b) => b.estimated1RM - a.estimated1RM).slice(0, limit);
+            const result = Object.values(maxes).sort((a, b) => b.estimated1RM - a.estimated1RM).slice(0, limit);
+            this.setCache(cacheKey, result);
+            return result;
         } catch (error) {
+
             logger.captureException(error, { scope: 'AnalysisService.getTop1RMs', message: 'Error calculating 1RMs' });
             return [];
         }
@@ -184,6 +225,10 @@ export class AnalysisService {
 
     // Consistency Heatmap Data (Timestamps of completed workouts)
     static async getConsistency(days: number = 60): Promise<number[]> {
+        const cacheKey = `consistency_${days}`;
+        const cached = this.getCached<number[]>(cacheKey);
+        if (cached) return cached;
+
         // Last N days
         const now = Date.now();
         const cutoffMs = now - (days * 86400 * 1000);
@@ -194,11 +239,18 @@ export class AnalysisService {
             AND date > ?
         `, [cutoffMs]);
 
-        return results.map(r => r.date);
+        const result = results.map(r => r.date);
+        this.setCache(cacheKey, result);
+        return result;
     }
+
 
     // Volume Last 7 Workouts
     static async getWeeklyVolume(): Promise<VolumeData[]> {
+        const cacheKey = 'weekly_volume';
+        const cached = this.getCached<VolumeData[]>(cacheKey);
+        if (cached) return cached;
+
         const results = await dbService.getAll<any>(`
             SELECT w.date, SUM(s.weight * s.reps) as volume
             FROM workouts w
@@ -215,13 +267,20 @@ export class AnalysisService {
             LIMIT 7
         `);
 
-        return results.map(r => ({
+        const result = results.map(r => ({
             date: new Date(r.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
             volume: r.volume || 0
         }));
+        this.setCache(cacheKey, result);
+        return result;
     }
 
+
     static async getWorkoutSummary(days: number): Promise<WorkoutSummary> {
+        const cacheKey = `workout_summary_${days}`;
+        const cached = this.getCached<WorkoutSummary>(cacheKey);
+        if (cached) return cached;
+
         const now = Date.now();
         const cutoffMs = now - (days * 86400 * 1000);
 
@@ -262,7 +321,7 @@ export class AnalysisService {
             [cutoffMs]
         );
 
-        return {
+        const result = {
             days,
             workoutCount: workoutCountRow?.count ?? 0,
             totalVolume: Math.round(volumeRow?.total ?? 0),
@@ -270,9 +329,15 @@ export class AnalysisService {
             totalSets: (volumeRow as any)?.total_sets ?? 0,
             totalReps: (volumeRow as any)?.total_reps ?? 0
         };
+        this.setCache(cacheKey, result);
+        return result;
     }
 
+
     static async getCardioSummary(days: number): Promise<CardioSummary> {
+        const cacheKey = `cardio_summary_${days}`;
+        const cached = this.getCached<CardioSummary>(cacheKey);
+        if (cached) return cached;
         const now = Date.now();
         const cutoffMs = now - (days * 86400 * 1000);
 
@@ -312,7 +377,7 @@ export class AnalysisService {
             [cutoffMs]
         );
 
-        return {
+        const result = {
             days,
             sessions: row?.sessions ?? 0,
             totalDistanceMeters: row?.totalDistanceMeters ?? 0,
@@ -320,9 +385,15 @@ export class AnalysisService {
             avgSpeedKmh: row?.avgSpeedKmh ?? null,
             bestSpeedKmh: row?.bestSpeedKmh ?? null,
         };
+        this.setCache(cacheKey, result);
+        return result;
     }
 
+
     static async getRepsOnlySummary(days: number): Promise<RepsOnlySummary> {
+        const cacheKey = `reps_only_summary_${days}`;
+        const cached = this.getCached<RepsOnlySummary>(cacheKey);
+        if (cached) return cached;
         const now = Date.now();
         const cutoffMs = now - (days * 86400 * 1000);
 
@@ -348,15 +419,21 @@ export class AnalysisService {
             [cutoffMs]
         );
 
-        return {
+        const result = {
             days,
             sessions: row?.sessions ?? 0,
             totalReps: row?.totalReps ?? 0,
             bestReps: row?.bestReps ?? null,
         };
+        this.setCache(cacheKey, result);
+        return result;
     }
 
+
     static async getWeightOnlySummary(days: number): Promise<WeightOnlySummary> {
+        const cacheKey = `weight_only_summary_${days}`;
+        const cached = this.getCached<WeightOnlySummary>(cacheKey);
+        if (cached) return cached;
         const now = Date.now();
         const cutoffMs = now - (days * 86400 * 1000);
 
@@ -380,12 +457,15 @@ export class AnalysisService {
             [cutoffMs]
         );
 
-        return {
+        const result = {
             days,
             sessions: row?.sessions ?? 0,
             bestWeightKg: row?.bestWeightKg ?? null,
         };
+        this.setCache(cacheKey, result);
+        return result;
     }
+
 
     static async getWorkoutSummaryBetween(startMs: number, endMs: number): Promise<Omit<WorkoutSummary, 'days'> & { startMs: number; endMs: number }> {
         const workoutCountRow = await dbService.getFirst<{ count: number }>(
@@ -437,6 +517,10 @@ export class AnalysisService {
     }
 
     static async getWorkoutComparison(days: number): Promise<WorkoutComparison> {
+        const cacheKey = `workout_comparison_${days}`;
+        const cached = this.getCached<WorkoutComparison>(cacheKey);
+        if (cached) return cached;
+
         const now = Date.now();
         const currentStart = now - (days * 86400 * 1000);
         const previousStart = now - (days * 2 * 86400 * 1000);
@@ -470,10 +554,16 @@ export class AnalysisService {
             ? Math.round(((current.workoutCount - previous.workoutCount) / previous.workoutCount) * 100)
             : null;
 
-        return { days, current, previous, volumeChangePct, workoutChangePct };
+        const result = { days, current, previous, volumeChangePct, workoutChangePct };
+        this.setCache(cacheKey, result);
+        return result;
     }
 
+
     static async getVolumeSeries(days: number, bucket: 'day' | 'week' | 'month'): Promise<VolumeSeriesPoint[]> {
+        const cacheKey = `volume_series_${days}_${bucket}`;
+        const cached = this.getCached<VolumeSeriesPoint[]>(cacheKey);
+        if (cached) return cached;
         const now = Date.now();
         const cutoffMs = now - (days * 86400 * 1000);
 
@@ -539,10 +629,16 @@ export class AnalysisService {
             })
             .sort((a, b) => a.dateMs - b.dateMs);
 
-        return points;
+        const result = points;
+        this.setCache(cacheKey, result);
+        return result;
     }
 
+
     static async getCategoryVolume(days: number, limit: number = 6): Promise<CategoryVolumeRow[]> {
+        const cacheKey = `category_volume_${days}_${limit}`;
+        const cached = this.getCached<CategoryVolumeRow[]>(cacheKey);
+        if (cached) return cached;
         const now = Date.now();
         const cutoffMs = now - (days * 86400 * 1000);
 
@@ -571,15 +667,21 @@ export class AnalysisService {
             [cutoffMs, limit]
         );
 
-        return rows.map((r) => ({
+        const result = rows.map((r) => ({
             ...r,
             volume: Math.round((r as any).volume ?? 0),
             setCount: (r as any).total_sets ?? 0,
             maxWeight: (r as any).max_weight ?? 0,
         }));
+        this.setCache(cacheKey, result);
+        return result;
     }
 
+
     static async getTopExercisesByVolume(days: number, limit: number = 8): Promise<ExerciseVolumeRow[]> {
+        const cacheKey = `top_exercises_volume_${days}_${limit}`;
+        const cached = this.getCached<ExerciseVolumeRow[]>(cacheKey);
+        if (cached) return cached;
         const now = Date.now();
         const cutoffMs = now - (days * 86400 * 1000);
 
@@ -612,7 +714,7 @@ export class AnalysisService {
             [cutoffMs, limit]
         );
 
-        return rows.map((r: any) => {
+        const result = rows.map((r: any) => {
             const badges = r.badges_csv ? r.badges_csv.split(',').map((s: string) => {
                 const [name, color, icon] = s.split('|');
                 return { name, color, icon: icon || undefined };
@@ -625,9 +727,15 @@ export class AnalysisService {
                 badges
             };
         });
+        this.setCache(cacheKey, result);
+        return result;
     }
 
+
     static async getTop1RMProgress(days: number, limit: number = 6): Promise<OneRMProgressRow[]> {
+        const cacheKey = `top_1rm_progress_${days}_${limit}`;
+        const cached = this.getCached<OneRMProgressRow[]>(cacheKey);
+        if (cached) return cached;
         const now = Date.now();
         const cutoffMs = now - (days * 86400 * 1000);
         const midMs = cutoffMs + Math.floor((now - cutoffMs) / 2);
@@ -693,10 +801,17 @@ export class AnalysisService {
             });
         });
 
-        return result.sort((a, b) => b.delta - a.delta).slice(0, limit);
+        const finalResult = result.sort((a, b) => b.delta - a.delta).slice(0, limit);
+        this.setCache(cacheKey, finalResult);
+        return finalResult;
     }
 
+
     static async getWorkoutStreakLastYear(): Promise<WorkoutStreak> {
+        const cacheKey = 'workout_streak_year';
+        const cached = this.getCached<WorkoutStreak>(cacheKey);
+        if (cached) return cached;
+
         const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
         const rows = await dbService.getAll<{ date: number }>(
             'SELECT date FROM workouts WHERE status = ? AND date > ? ORDER BY date ASC',
@@ -740,8 +855,11 @@ export class AnalysisService {
             iteratorMs += 86400000;
         }
 
-        return { current: currentRun, best };
+        const result = { current: currentRun, best };
+        this.setCache(cacheKey, result);
+        return result;
     }
+
 
     static async getExercisePR(exerciseId: string): Promise<(ExercisePR & { badges: { name: string; color: string; icon?: string }[] }) | null> {
         const row = await dbService.getFirst<{ weight: number; reps: number; date: number; badges_csv: string | null }>(
@@ -780,6 +898,10 @@ export class AnalysisService {
     }
 
     static async getPowerliftingPRs(): Promise<PowerliftingPRs> {
+        const cacheKey = 'powerlifting_prs';
+        const cached = this.getCached<PowerliftingPRs>(cacheKey);
+        if (cached) return cached;
+
         const exercises = await dbService.getAll<{ id: string; name: string }>('SELECT id, name FROM exercises ORDER BY name ASC');
         const normalized = exercises.map((e) => ({ ...e, norm: e.name.toLowerCase() }));
 
@@ -804,12 +926,15 @@ export class AnalysisService {
 
         const totalKg = (squat?.weight ?? 0) + (bench?.weight ?? 0) + (deadlift?.weight ?? 0);
 
-        return {
+        const result = {
             squat, bench, deadlift, totalKg,
             squatName: squatMatch?.name ?? null,
             benchName: benchMatch?.name ?? null,
             deadliftName: deadliftMatch?.name ?? null,
         };
+        this.setCache(cacheKey, result);
+        return result;
     }
+
 
 }

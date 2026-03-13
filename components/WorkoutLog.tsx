@@ -5,7 +5,7 @@ import { notify } from '@/src/utils/notify';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BookOpen, Copy, Dumbbell, GripVertical, Trash2 } from 'lucide-react-native';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -35,7 +35,87 @@ interface GroupedExercise {
 }
 
 
-export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopyPress, onLoadRoutinePress }: WorkoutLogProps) {
+
+const GroupedExerciseItem = React.memo(({
+    group,
+    drag,
+    isActive,
+    onExercisePress,
+    handleDeleteExercise,
+    colors,
+    ss
+}: {
+    group: GroupedExercise;
+    drag: () => void;
+    isActive: boolean;
+    onExercisePress: (id: string, name: string) => void;
+    handleDeleteExercise: (id: string, name: string) => void;
+    colors: any;
+    ss: any;
+}) => {
+    const renderRightActions = useCallback((_progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+        const scale = dragX.interpolate({ inputRange: [-100, -50, 0], outputRange: [1, 0.5, 0], extrapolate: 'clamp' });
+        return (
+            <View style={ss.swipeRight}>
+                <Animated.View style={{ transform: [{ scale }], width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', paddingLeft: 20 }}>
+                    <TouchableOpacity
+                        onPress={() => handleDeleteExercise(group.exercise_id, group.exercise_name)}
+                        style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
+                        accessibilityRole="button" accessibilityLabel={`Eliminar ${group.exercise_name}`}
+                    >
+                        <Trash2 size={22} color={colors.white} />
+                        <Text style={ss.swipeLabel}>ELIMINAR</Text>
+                    </TouchableOpacity>
+                </Animated.View>
+            </View>
+        );
+    }, [group.exercise_id, group.exercise_name, handleDeleteExercise, colors, ss]);
+
+    const renderLeftActions = useCallback((_progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+        const scale = dragX.interpolate({ inputRange: [0, 50, 100], outputRange: [0, 0.8, 1], extrapolate: 'clamp' });
+        return (
+            <View style={ss.swipeLeft}>
+                <Animated.View style={{ transform: [{ scale }], width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', paddingRight: 20 }}>
+                    <TouchableOpacity
+                        onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); drag(); }}
+                        delayLongPress={180} disabled={isActive}
+                        style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
+                        accessibilityRole="button" accessibilityLabel={`Mantener para reordenar ${group.exercise_name}`}
+                    >
+                        <GripVertical size={20} color={colors.onPrimary} />
+                        <Text style={[ss.swipeLabel, { color: colors.onPrimary }]}>ORDENAR</Text>
+                    </TouchableOpacity>
+                </Animated.View>
+            </View>
+        );
+    }, [drag, isActive, group.exercise_name, colors, ss]);
+
+    return (
+        <ScaleDecorator>
+            <View style={ss.reorderItem}>
+                <Swipeable
+                    renderRightActions={renderRightActions}
+                    renderLeftActions={renderLeftActions}
+                    overshootRight={false} overshootLeft={false}
+                    containerStyle={{ overflow: 'visible' }}
+                    rightThreshold={40} leftThreshold={40}
+                >
+                    <ExerciseSummary
+                        exerciseName={group.exercise_name}
+                        exerciseType={group.exercise_type}
+                        sets={group.sets}
+                        badges={group.badges}
+                        categoryColor={group.category_color}
+                        onPress={() => onExercisePress(group.exercise_id, group.exercise_name)}
+                        disabled={isActive}
+                    />
+                </Swipeable>
+            </View>
+        </ScaleDecorator>
+    );
+});
+
+export const WorkoutLog = React.memo(({ sets, onExercisePress, onRefresh, workoutId, onCopyPress, onLoadRoutinePress }: WorkoutLogProps) => {
     const colors = useColors();
     const ss = useMemo(() => StyleSheet.create({
         container: { flex: 1, paddingHorizontal: 16, paddingTop: 8, position: 'relative' },
@@ -94,7 +174,7 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
 
     useEffect(() => { setLocalGroups(grouped); }, [grouped]);
 
-    const handleReorder = async (data: GroupedExercise[]) => {
+    const handleReorder = useCallback(async (data: GroupedExercise[]) => {
         const snapshot = localGroups;
         setLocalGroups(data);
         const newOrderIds = data.map((g) => g.exercise_id);
@@ -104,9 +184,9 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
             setLocalGroups(snapshot);
             notify.error('Error de red', e?.message || 'No se pudo reordenar. Intenta de nuevo.');
         }
-    };
+    }, [localGroups, workoutId]);
 
-    const handleDeleteExercise = (exerciseId: string, exerciseName: string) => {
+    const handleDeleteExercise = useCallback((exerciseId: string, exerciseName: string) => {
         confirm.destructive(
             'Eliminar ejercicio',
             `¿Quitar ${exerciseName} y todas sus series?`,
@@ -123,7 +203,21 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
             },
             'Eliminar'
         );
-    };
+    }, [workoutId, onRefresh]);
+
+    const renderItem = useCallback(({ item: group, drag, isActive }: RenderItemParams<GroupedExercise>) => {
+        return (
+            <GroupedExerciseItem
+                group={group}
+                drag={drag}
+                isActive={isActive}
+                onExercisePress={onExercisePress}
+                handleDeleteExercise={handleDeleteExercise}
+                colors={colors}
+                ss={ss}
+            />
+        );
+    }, [onExercisePress, handleDeleteExercise, colors, ss]);
 
     if (localGroups.length === 0) {
         return (
@@ -164,70 +258,6 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
             </View>
         );
     }
-
-    const renderItem = ({ item: group, drag, isActive }: RenderItemParams<GroupedExercise>) => {
-        const renderRightActions = (_progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
-            const scale = dragX.interpolate({ inputRange: [-100, -50, 0], outputRange: [1, 0.5, 0], extrapolate: 'clamp' });
-            return (
-                <View style={ss.swipeRight}>
-                    <Animated.View style={{ transform: [{ scale }], width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', paddingLeft: 20 }}>
-                        <TouchableOpacity
-                            onPress={() => handleDeleteExercise(group.exercise_id, group.exercise_name)}
-                            style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
-                            accessibilityRole="button" accessibilityLabel={`Eliminar ${group.exercise_name}`}
-                        >
-                            <Trash2 size={22} color={colors.white} />
-                            <Text style={ss.swipeLabel}>ELIMINAR</Text>
-                        </TouchableOpacity>
-                    </Animated.View>
-                </View>
-            );
-        };
-
-        const renderLeftActions = (_progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
-            const scale = dragX.interpolate({ inputRange: [0, 50, 100], outputRange: [0, 0.8, 1], extrapolate: 'clamp' });
-            return (
-                <View style={ss.swipeLeft}>
-                    <Animated.View style={{ transform: [{ scale }], width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', paddingRight: 20 }}>
-                        <TouchableOpacity
-                            onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); drag(); }}
-                            delayLongPress={180} disabled={isActive}
-                            style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
-                            accessibilityRole="button" accessibilityLabel={`Mantener para reordenar ${group.exercise_name}`}
-                        >
-                            <GripVertical size={20} color={colors.onPrimary} />
-                            <Text style={[ss.swipeLabel, { color: colors.onPrimary }]}>ORDENAR</Text>
-                        </TouchableOpacity>
-                    </Animated.View>
-                </View>
-            );
-        };
-
-        return (
-            <ScaleDecorator>
-                <View style={ss.reorderItem}>
-                    <Swipeable
-                        renderRightActions={renderRightActions}
-                        renderLeftActions={renderLeftActions}
-                        overshootRight={false} overshootLeft={false}
-                        containerStyle={{ overflow: 'visible' }}
-                        rightThreshold={40} leftThreshold={40}
-                    >
-                        <ExerciseSummary
-                            exerciseName={group.exercise_name}
-                            exerciseType={group.exercise_type}
-                            sets={group.sets}
-                            badges={group.badges}
-                            categoryColor={group.category_color}
-                            onPress={() => onExercisePress(group.exercise_id, group.exercise_name)}
-                            disabled={isActive}
-                        />
-
-                    </Swipeable>
-                </View>
-            </ScaleDecorator>
-        );
-    };
 
     return (
         <View style={ss.container}>
@@ -277,6 +307,7 @@ export function WorkoutLog({ sets, onExercisePress, onRefresh, workoutId, onCopy
             <LinearGradient colors={[withAlpha(colors.background, '00'), colors.background]} style={ss.bottomGradient} pointerEvents="none" />
         </View>
     );
-}
+});
+
 
 

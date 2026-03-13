@@ -27,7 +27,7 @@ interface AnalysisOverviewProps {
     displayWeight: (kg: number) => number;
 }
 
-export function AnalysisOverview({
+export const AnalysisOverview = React.memo(({
     rangeDays,
     setRangeDays,
     summary7,
@@ -43,7 +43,7 @@ export function AnalysisOverview({
     weightOnlySummary,
     unit,
     displayWeight
-}: AnalysisOverviewProps) {
+}: AnalysisOverviewProps) => {
     const colors = useColors();
 
     const styles = useMemo(() => StyleSheet.create({
@@ -710,7 +710,7 @@ export function AnalysisOverview({
             <BodySnapshotWidget unit={unit} displayWeight={displayWeight} />
         </View>
     );
-}
+});
 
 
 

@@ -15,6 +15,12 @@ class WorkoutService {
     private calendarEventsCache: { ts: number; data: Record<string, { status: string; colors: string[] }> } | null = null;
     private exerciseHistoryCache = new Map<string, { ts: number; data: { date: number; sets: WorkoutSet[] }[] }>();
 
+    constructor() {
+        dataEventService.subscribe('DATA_UPDATED', () => {
+            this.invalidateCaches();
+        });
+    }
+
     private invalidateCaches() {
         this.calendarEventsCache = null;
         this.exerciseHistoryCache.clear();
@@ -377,15 +383,20 @@ class WorkoutService {
     }
 
     public async getActiveWorkout(date: Date): Promise<Workout> {
+        // Normalize search range
         const start = getUnixTime(startOfDay(date)) * 1000;
         const end = getUnixTime(endOfDay(date)) * 1000;
 
         let workout = await dbService.getWorkoutByDate(start, end);
 
         if (!workout) {
-            // Create new workout
-            const workoutDate = getUnixTime(date) * 1000;
-            const id = await dbService.createWorkout(workoutDate);
+            // Create new workout - ALWAYS normalize to Local Noon (12:00)
+            // This prevents timezone-related daily splits and matches SyncService logic.
+            const dateObj = new Date(date);
+            dateObj.setHours(12, 0, 0, 0);
+            const normalizedDate = dateObj.getTime();
+
+            const id = await dbService.createWorkout(normalizedDate);
             workout = await dbService.getWorkoutById(id);
         }
 

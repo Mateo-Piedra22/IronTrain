@@ -36,6 +36,7 @@ jest.mock('../../store/authStore', () => {
     return {
         useAuthStore: {
             getState: () => ({ token: 't' }),
+            subscribe: jest.fn(() => () => undefined),
         }
     };
 });

@@ -15,7 +15,7 @@ interface AnalysisRecordsProps {
     rangeDays: 7 | 30 | 90 | 365;
 }
 
-export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: AnalysisRecordsProps) {
+export const AnalysisRecords = React.memo(({ oneRepMaxes, top1RMProgress, rangeDays }: AnalysisRecordsProps) => {
     const colors = useColors();
     const styles = useMemo(() => StyleSheet.create({
         container: {
@@ -270,6 +270,6 @@ export function AnalysisRecords({ oneRepMaxes, top1RMProgress, rangeDays }: Anal
             </View>
         </View>
     );
-}
+});
 
 

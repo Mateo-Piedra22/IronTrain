@@ -34,7 +34,7 @@ function formatWeight(value: number, unit: 'kg' | 'lbs'): string {
     return `${v.toFixed(decimals)} ${u}`;
 }
 
-export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [], categoryColor, onPress, disabled }: ExerciseSummaryProps) {
+export const ExerciseSummary = React.memo(({ exerciseName, exerciseType, sets, badges = [], categoryColor, onPress, disabled }: ExerciseSummaryProps) => {
     const colors = useColors();
     const activeCategoryColor = categoryColor || colors.primary.dark;
 
@@ -107,7 +107,7 @@ export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [],
     const unit = configService.get('weightUnit');
     const displayWeight = (kgValue: number) => unit === 'kg' ? kgValue : UnitService.kgToLbs(kgValue);
     const totalSets = sets.length;
-    const completedSets = sets.filter((s) => s.completed === 1);
+    const completedSets = sets.filter((s) => !!s.completed);
     const doneSets = completedSets.length;
     const relevant = doneSets > 0 ? completedSets : sets;
 
@@ -205,4 +205,5 @@ export function ExerciseSummary({ exerciseName, exerciseType, sets, badges = [],
             <ChevronRight size={18} color={colors.textMuted} style={ss.chevron} />
         </TouchableOpacity>
     );
-}
+});
+

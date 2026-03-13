@@ -169,7 +169,7 @@ export function ExerciseGrouper({
                             <View key={set.id}>
                                 <View style={[
                                     ss.setRow,
-                                    set.completed ? ss.setRowCompleted : null,
+                                    !!set.completed ? ss.setRowCompleted : null,
                                     (!isNormal && cfg) ? { backgroundColor: withAlpha(cfg.bg, '40') } : null
                                 ]}>
                                     <Text style={[ss.indexCell, !isNormal && { color: cfg.text, fontWeight: '900', fontSize: 8 }]}>
@@ -264,9 +264,9 @@ export function ExerciseGrouper({
                                         </Pressable>
                                         <Pressable onPress={() => handleToggleComplete(set)} hitSlop={6}>
                                             <Ionicons
-                                                name={set.completed ? "checkmark-circle" : "ellipse-outline"}
+                                                name={!!set.completed ? "checkmark-circle" : "ellipse-outline"}
                                                 size={20}
-                                                color={set.completed ? colors.green : colors.textMuted}
+                                                color={!!set.completed ? colors.green : colors.textMuted}
                                             />
                                         </Pressable>
                                         <Pressable onPress={() => confirm.destructive('Eliminar', '¿Eliminar serie?', () => onDeleteSet(set.id), 'Eliminar')} hitSlop={6}>

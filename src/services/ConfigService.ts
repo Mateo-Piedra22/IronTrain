@@ -39,6 +39,8 @@ export interface AppConfig {
     showGhostValues: boolean;
     autoFinishWorkout: boolean;
     runningWorkoutTimerWorkoutId: string | null;
+    runningWorkoutTimerStartTimestamp: number | null;
+    runningWorkoutTimerBaseSeconds: number;
     ignoredDuplicateKeys: string[];
 
     hapticFeedbackEnabled: boolean;
@@ -78,6 +80,8 @@ const DEFAULT_CONFIG: AppConfig = {
     autoFinishWorkout: false,
 
     runningWorkoutTimerWorkoutId: null,
+    runningWorkoutTimerStartTimestamp: null,
+    runningWorkoutTimerBaseSeconds: 0,
     ignoredDuplicateKeys: [],
 
     hapticFeedbackEnabled: true,
@@ -148,6 +152,13 @@ class ConfigService {
                     else if (s.key === 'runningWorkoutTimerWorkoutId') {
                         const v = String(s.value ?? '').trim();
                         loadedConfig[s.key] = v && v !== 'null' && v !== 'undefined' ? v : null;
+                    }
+                    else if (s.key === 'runningWorkoutTimerStartTimestamp') {
+                        const v = parseFloat(s.value);
+                        loadedConfig[s.key] = isNaN(v) ? null : v;
+                    }
+                    else if (s.key === 'runningWorkoutTimerBaseSeconds') {
+                        loadedConfig[s.key] = parseFloat(s.value) || 0;
                     }
                     else if (s.key === 'ignoredDuplicateKeys') {
                         try {
@@ -272,8 +283,20 @@ class ConfigService {
             [key, dbValue, now]
         );
 
-        // Queue for sync so it reaches the cloud
-        await dbService.queueSyncMutation('settings', key, 'INSERT', { key, value: dbValue, updated_at: now });
+        // Queue for sync so it reaches the cloud, BUT skip technical/local-only settings
+        const localOnlyKeys = new Set([
+            'last_sync_at',
+            'isAppFirstLaunch',
+            'sync_error_log',
+            'onboarding_completed',
+            'runningWorkoutTimerWorkoutId',      // Local state only
+            'runningWorkoutTimerStartTimestamp', // Local state only
+            'runningWorkoutTimerBaseSeconds'      // Local state only
+        ]);
+
+        if (!localOnlyKeys.has(key)) {
+            await dbService.queueSyncMutation('settings', key, 'INSERT', { key, value: dbValue, updated_at: now });
+        }
 
         // Emit event for real-time UI updates
         try {

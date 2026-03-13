@@ -44,6 +44,8 @@ export class SyncSchedulerService {
 
     private unsubscribeNetInfo: (() => void) | null = null;
     private unsubscribeQueue: (() => void) | null = null;
+    private unsubscribeAuth: (() => void) | null = null;
+    private lastToken: string | null = null;
 
     private readonly options: SyncSchedulerOptions;
 
@@ -58,6 +60,17 @@ export class SyncSchedulerService {
         this.unsubscribeQueue = dataEventService.subscribe('SYNC_QUEUE_ENQUEUED', () => {
             this.requestSync('queue');
         });
+
+        this.unsubscribeAuth = useAuthStore.subscribe((state) => {
+            const token = state.token;
+            const transitionedToAuth = token && !this.lastToken;
+            this.lastToken = token;
+
+            if (transitionedToAuth) {
+                this.requestSync('manual');
+            }
+        });
+        this.lastToken = useAuthStore.getState().token;
 
         this.unsubscribeNetInfo = NetInfo.addEventListener((state) => {
             if (state.isConnected && state.isInternetReachable) {
@@ -77,6 +90,11 @@ export class SyncSchedulerService {
             if (this.currentAppState !== 'active') return;
             this.requestSync('periodic');
         }, this.options.periodicMs);
+
+        // Proactive check on init: if logged in, attempt a sync
+        if (useAuthStore.getState().token) {
+            this.requestSync('resume');
+        }
     }
 
     public dispose(): void {
@@ -89,8 +107,10 @@ export class SyncSchedulerService {
 
         if (this.unsubscribeNetInfo) this.unsubscribeNetInfo();
         if (this.unsubscribeQueue) this.unsubscribeQueue();
+        if (this.unsubscribeAuth) this.unsubscribeAuth();
         this.unsubscribeNetInfo = null;
         this.unsubscribeQueue = null;
+        this.unsubscribeAuth = null;
 
         if (this.appStateSubscription) this.appStateSubscription.remove();
         this.appStateSubscription = null;
@@ -172,10 +192,29 @@ export class SyncSchedulerService {
                 }
             }
 
-            await syncService.syncBidirectional();
+            // Check if this is a fresh login/sync by looking at the last pull timestamp
+            const lastSyncRow = await dbService.getFirst<{ value: string }>('SELECT value FROM settings WHERE key = ?', ['last_pull_sync']);
+            const isFirstSync = !lastSyncRow || lastSyncRow.value === '0' || lastSyncRow.value === '';
+
+            // Perform bidirectional sync with verification if triggered manually, on resume, or if it's the first sync
+            // The user requested that everything stays "matched correctly", so we enforce verification on manual and first syncs.
+            await syncService.syncBidirectional({
+                forcePull: isFirstSync,
+                verify: reason === 'manual' || reason === 'resume' || isFirstSync
+            });
+
             this.lastSuccessAt = Date.now();
             this.backoffMs = 0;
             dataEventService.emit('SYNC_COMPLETED');
+
+            // After a successful sync, if we just logged in or resumed, we double check if there's anything else pending
+            // to fulfill the "automatic re-check" requirement.
+            if (reason === 'manual' || reason === 'resume') {
+                const hasMore = await this.hasOutstandingQueue();
+                if (hasMore) {
+                    this.requestSync('queue');
+                }
+            }
         } catch (e: any) {
             const code = e?.code as string | undefined;
             if (code === 'ALREADY_SYNCING' || code === 'OFFLINE' || code === 'UNAUTHENTICATED') {

@@ -12,17 +12,74 @@ import { confirm } from '@/src/store/confirmStore';
 import { Routine } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
+import { FlashList } from '@shopify/flash-list';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import { AlertTriangle, BookOpen, Pencil, Plus, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useContext, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IronTrainLogo } from '../../components/IronTrainLogo';
 import { useColors } from '../../src/hooks/useColors';
 import { ThemeFx, withAlpha } from '../../src/theme';
 
 type SegmentMode = 'exercises' | 'categories' | 'routines';
+
+// Optimized Card Component
+const RoutineCard = React.memo(({ item, colors, ss, onPress, onEdit, onDelete }: {
+    item: Routine;
+    colors: any;
+    ss: any;
+    onPress: (id: string) => void;
+    onEdit: (item: Routine) => void;
+    onDelete: (item: Routine) => void;
+}) => (
+    <TouchableOpacity
+        onPress={() => onPress(item.id)}
+        style={ss.exerciseCard}
+        accessibilityRole="button"
+        accessibilityLabel={`Abrir rutina ${item.name}`}
+    >
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
+            <View style={ss.iconBox}>
+                <BookOpen size={16} color={colors.primary.DEFAULT} />
+            </View>
+            <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={ss.cardName} numberOfLines={1}>{item.name}</Text>
+                    {item.is_moderated === 1 && (
+                        <View style={{ backgroundColor: colors.yellow + '20', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, borderWidth: 1.5, borderColor: colors.yellow + '40' }}>
+                            <Text style={{ color: colors.yellow, fontSize: 8, fontWeight: '900' }}>OCULTA</Text>
+                        </View>
+                    )}
+                </View>
+                {item.description ? (
+                    <Text style={ss.cardMeta} numberOfLines={1}>{item.description}</Text>
+                ) : (
+                    <Text style={ss.cardMeta}>RUTINA</Text>
+                )}
+            </View>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity
+                onPress={() => onEdit(item)}
+                style={ss.editBtn}
+                accessibilityRole="button"
+                accessibilityLabel={`Editar rutina ${item.name}`}
+            >
+                <Pencil size={14} color={colors.textMuted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+                onPress={() => onDelete(item)}
+                style={ss.deleteBtn}
+                accessibilityRole="button"
+                accessibilityLabel={`Eliminar rutina ${item.name}`}
+            >
+                <Trash2 size={14} color={colors.red} />
+            </TouchableOpacity>
+        </View>
+    </TouchableOpacity>
+));
 
 export default function LibraryScreen() {
     const colors = useColors();
@@ -238,7 +295,7 @@ export default function LibraryScreen() {
         }
     });
 
-    const handleDeleteRoutine = (routine: Routine) => {
+    const handleDeleteRoutine = useCallback((routine: Routine) => {
         confirm.destructive(
             '🗑 Eliminar Rutina',
             `¿Eliminar "${routine.name}" y todos sus días?`,
@@ -253,61 +310,33 @@ export default function LibraryScreen() {
             },
             'Sí, Eliminar'
         );
-    };
+    }, [loadRoutines]);
 
-    const openRoutineDetail = (id: string) => {
+    const openRoutineDetail = useCallback((id: string) => {
         setDetailRoutineId(id);
         setDetailVisible(true);
-    };
+    }, []);
 
-    // Card — exactly like ExerciseList and CategoryManager
-    const renderRoutineItem = ({ item }: { item: Routine }) => (
-        <TouchableOpacity
-            onPress={() => openRoutineDetail(item.id)}
-            style={ss.exerciseCard}
-            accessibilityRole="button"
-            accessibilityLabel={`Abrir rutina ${item.name}`}
-        >
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
-                <View style={ss.iconBox}>
-                    <BookOpen size={16} color={colors.primary.DEFAULT} />
-                </View>
-                <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={ss.cardName} numberOfLines={1}>{item.name}</Text>
-                        {item.is_moderated === 1 && (
-                            <View style={{ backgroundColor: colors.yellow + '20', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, borderWidth: 1.5, borderColor: colors.yellow + '40' }}>
-                                <Text style={{ color: colors.yellow, fontSize: 8, fontWeight: '900' }}>OCULTA</Text>
-                            </View>
-                        )}
-                    </View>
-                    {item.description ? (
-                        <Text style={ss.cardMeta} numberOfLines={1}>{item.description}</Text>
-                    ) : (
-                        <Text style={ss.cardMeta}>RUTINA</Text>
-                    )}
-                </View>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <TouchableOpacity
-                    onPress={() => { setEditingRoutine(item); setCreateModalVisible(true); }}
-                    style={ss.editBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Editar rutina ${item.name}`}
-                >
-                    <Pencil size={14} color={colors.textMuted} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                    onPress={() => handleDeleteRoutine(item)}
-                    style={ss.deleteBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Eliminar rutina ${item.name}`}
-                >
-                    <Trash2 size={14} color={colors.red} />
-                </TouchableOpacity>
-            </View>
-        </TouchableOpacity>
-    );
+    const handleEditRoutine = useCallback((item: Routine) => {
+        setEditingRoutine(item);
+        setCreateModalVisible(true);
+    }, []);
+
+    const renderRoutineItem = useCallback(({ item }: { item: Routine }) => (
+        <RoutineCard
+            item={item}
+            colors={colors}
+            ss={ss}
+            onPress={openRoutineDetail}
+            onEdit={handleEditRoutine}
+            onDelete={handleDeleteRoutine}
+        />
+    ), [colors, ss, openRoutineDetail, handleEditRoutine, handleDeleteRoutine]);
+
+    const handleCreateRoutine = useCallback(() => {
+        setEditingRoutine(null);
+        setCreateModalVisible(true);
+    }, []);
 
     return (
         <SafeAreaWrapper style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
@@ -413,7 +442,7 @@ export default function LibraryScreen() {
                             <ActivityIndicator color={colors.primary.DEFAULT} />
                         </View>
                     ) : (
-                        <FlatList
+                        <FlashList
                             data={routines}
                             keyExtractor={(item) => item.id}
                             renderItem={renderRoutineItem}
@@ -432,7 +461,7 @@ export default function LibraryScreen() {
 
                     {/* FAB — same as ExerciseList */}
                     <TouchableOpacity
-                        onPress={() => { setEditingRoutine(null); setCreateModalVisible(true); }}
+                        onPress={handleCreateRoutine}
                         style={[ss.fab, { bottom: bottomOffset }]}
                         accessibilityRole="button"
                         accessibilityLabel="Crear rutina"

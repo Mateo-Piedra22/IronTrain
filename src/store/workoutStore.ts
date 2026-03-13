@@ -127,15 +127,15 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
             return;
         }
         const savedDuration = workout.duration ?? 0;
+        const ownerId = configService.get('runningWorkoutTimerWorkoutId');
+        const isOwner = !!ownerId && ownerId === workout.id;
+        const canRun = workout.status !== 'completed' && workout.is_template !== 1;
         set({
             activeWorkout: workout,
             workoutTimer: savedDuration,
-            isTimerRunning: workout.status !== 'completed' && workout.is_template !== 1,
+            isTimerRunning: canRun && isOwner,
             lastTickAtMs: Date.now()
         });
-        if (workout.status !== 'completed' && workout.is_template !== 1) {
-            await configService.set('runningWorkoutTimerWorkoutId', workout.id);
-        }
         await Promise.all([get().loadExercises(), get().loadSetsForWorkout(workout.id)]);
     },
 

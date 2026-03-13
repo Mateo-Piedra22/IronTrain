@@ -287,12 +287,38 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
     // ─── Phase ───────────────────────────────────────────────────────────────
     const derivePhase = useCallback((): WorkoutPhase => {
         if (workout.status === 'completed') return 'completed';
+        // Check if THIS workout's timer is actively running via configService
+        const runningId = configService.get('runningWorkoutTimerWorkoutId');
+        if (runningId && runningId === workout.id) return 'active';
         return 'idle';
-    }, [workout.status]);
+    }, [workout.id, workout.status]);
+
+    // ─── Initial State Recovery ─────────────────────────────────────────────
+    const getInitialSeconds = useCallback(() => {
+        let seconds = workout.duration || 0;
+        const runningId = configService.get('runningWorkoutTimerWorkoutId');
+        if (runningId === workout.id) {
+            const startTs = configService.get('runningWorkoutTimerStartTimestamp');
+            const baseSec = configService.get('runningWorkoutTimerBaseSeconds');
+            if (startTs) {
+                const liveSeconds = baseSec + Math.floor((Date.now() - startTs) / 1000);
+                seconds = Math.max(seconds, liveSeconds);
+            } else if (baseSec !== undefined) {
+                seconds = Math.max(seconds, baseSec);
+            }
+        }
+        return seconds;
+    }, [workout.id, workout.duration]);
 
     const [phase, setPhase] = useState<WorkoutPhase>(derivePhase);
-    const [timerSeconds, setTimerSeconds] = useState(workout.duration || 0);
-    const [isPaused, setIsPaused] = useState(false);
+    const [timerSeconds, setTimerSeconds] = useState(getInitialSeconds);
+    const [isPaused, setIsPaused] = useState(() => {
+        const runningId = configService.get('runningWorkoutTimerWorkoutId');
+        if (runningId === workout.id) {
+            return !configService.get('runningWorkoutTimerStartTimestamp');
+        }
+        return false;
+    });
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState('');
     const [showStatePicker, setShowStatePicker] = useState(false);
@@ -301,14 +327,20 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
     const notifCounterRef = useRef<number>(0);
     const dotPulse = useRef(new Animated.Value(1)).current;
 
-    // Sync on external workout changes
+    // Sync on external workout changes or navigation
     useEffect(() => {
         const p = derivePhase();
         setPhase(p);
-        if (p === 'completed') {
-            setTimerSeconds(workout.duration || 0);
+        const initialSeconds = getInitialSeconds();
+        setTimerSeconds(initialSeconds);
+
+        const runningId = configService.get('runningWorkoutTimerWorkoutId');
+        if (runningId === workout.id) {
+            setIsPaused(!configService.get('runningWorkoutTimerStartTimestamp'));
         }
-    }, [workout.status, workout.duration, derivePhase]);
+
+        setIsEditing(false);
+    }, [workout.id, workout.status, workout.duration, derivePhase, getInitialSeconds]);
 
     const isTimerOwner = useCallback(() => {
         const ownerId = configService.get('runningWorkoutTimerWorkoutId');
@@ -331,6 +363,9 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
     }, [phase, isPaused, dotPulse, isTimerOwner]);
 
     // ─── Timer tick ──────────────────────────────────────────────────────────
+    const timerSecondsRef = useRef(timerSeconds);
+    timerSecondsRef.current = timerSeconds;
+
     useEffect(() => {
         if (phase === 'active' && !isPaused && isTimerOwner()) {
             lastTickRef.current = Date.now();
@@ -345,6 +380,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
                     if (next % 10 < delta) {
                         workoutService.update(workout.id, { duration: next });
                     }
+                    timerSecondsRef.current = next;
                     return next;
                 });
 
@@ -353,7 +389,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
                     const cs = sets.filter(s => s.completed === 1).length;
                     const ue = new Set(sets.map(s => s.exercise_id)).size;
                     systemNotificationService.showPersistentWorkout({
-                        elapsedSeconds: timerSeconds,
+                        elapsedSeconds: timerSecondsRef.current,
                         completedSets: cs,
                         totalExercises: ue,
                         isPaused: false,
@@ -367,7 +403,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
         }
         if (intervalRef.current) clearInterval(intervalRef.current);
         return undefined;
-    }, [phase, isPaused, workout.id, sets, timerSeconds, isTimerOwner]);
+    }, [phase, isPaused, workout.id, sets, isTimerOwner]);
 
     // ─── Stats ───────────────────────────────────────────────────────────────
     const completedSets = sets.filter(s => s.completed === 1).length;
@@ -379,23 +415,28 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
 
     const handleStart = async () => {
         try {
+            const now = Date.now();
             await configService.set('runningWorkoutTimerWorkoutId', workout.id);
+            await configService.set('runningWorkoutTimerStartTimestamp', now);
+            await configService.set('runningWorkoutTimerBaseSeconds', workout.duration || 0);
+
             setPhase('active');
             setIsPaused(false);
             setTimerSeconds(prev => prev || 0);
-            lastTickRef.current = Date.now();
+            const currentSeconds = timerSeconds || workout.duration || 0;
+            lastTickRef.current = now;
             notifCounterRef.current = 0;
 
             await workoutService.resumeWorkout(workout.id);
             feedbackService.buttonPress();
 
             systemNotificationService.showPersistentWorkout({
-                elapsedSeconds: timerSeconds,
+                elapsedSeconds: currentSeconds,
                 completedSets,
                 totalExercises: uniqueExercises,
                 isPaused: false,
             });
-            systemNotificationService.scheduleInactivityReminder(timerSeconds);
+            systemNotificationService.scheduleInactivityReminder(currentSeconds);
             onStatusChange();
         } catch (e: any) {
             notify.error('Error', e?.message ?? 'No se pudo iniciar.');
@@ -414,6 +455,8 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
                 const owner = isTimerOwner();
                 if (owner) {
                     await configService.set('runningWorkoutTimerWorkoutId', null);
+                    await configService.set('runningWorkoutTimerStartTimestamp', null);
+                    await configService.set('runningWorkoutTimerBaseSeconds', 0);
                 }
                 feedbackService.dayCompleted();
 
@@ -448,15 +491,21 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
 
     const handleResume = async () => {
         try {
+            const now = Date.now();
             await workoutService.resumeWorkout(workout.id);
             await configService.set('runningWorkoutTimerWorkoutId', workout.id);
+            await configService.set('runningWorkoutTimerStartTimestamp', now);
+            await configService.set('runningWorkoutTimerBaseSeconds', workout.duration || 0);
+
             setPhase('active');
             setIsPaused(false);
-            lastTickRef.current = Date.now();
+            const currentSeconds = workout.duration || 0;
+            setTimerSeconds(currentSeconds);
+            lastTickRef.current = now;
             feedbackService.buttonPress();
 
             systemNotificationService.showPersistentWorkout({
-                elapsedSeconds: timerSeconds,
+                elapsedSeconds: currentSeconds,
                 completedSets,
                 totalExercises: uniqueExercises,
                 isPaused: false,
@@ -471,8 +520,11 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
 
     const handleTogglePause = async () => {
         if (isPaused) {
+            const now = Date.now();
             setIsPaused(false);
-            lastTickRef.current = Date.now();
+            lastTickRef.current = now;
+            await configService.set('runningWorkoutTimerStartTimestamp', now);
+            await configService.set('runningWorkoutTimerBaseSeconds', timerSeconds);
             feedbackService.buttonPress();
             systemNotificationService.showPersistentWorkout({
                 elapsedSeconds: timerSeconds, completedSets, totalExercises: uniqueExercises, isPaused: false,
@@ -481,6 +533,8 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
         } else {
             setIsPaused(true);
             if (intervalRef.current) clearInterval(intervalRef.current);
+            await configService.set('runningWorkoutTimerStartTimestamp', null);
+            await configService.set('runningWorkoutTimerBaseSeconds', timerSeconds);
             feedbackService.buttonPress();
             await workoutService.update(workout.id, { duration: timerSeconds });
             systemNotificationService.showPersistentWorkout({
@@ -509,7 +563,30 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
         totalSec = Math.max(0, Math.min(totalSec, 86400));
         setTimerSeconds(totalSec);
         setIsEditing(false);
+        const now = Date.now();
+        // Reset tick reference so the interval doesn't compute a huge delta
+        lastTickRef.current = now;
+
+        // Persist manual change globally if this is the active timer
+        if (isTimerOwner()) {
+            await configService.set('runningWorkoutTimerBaseSeconds', totalSec);
+            if (phase === 'active' && !isPaused) {
+                await configService.set('runningWorkoutTimerStartTimestamp', now);
+            }
+        }
+
         await workoutService.update(workout.id, { duration: totalSec });
+
+        // Refresh notification with new timestamp base if we are active
+        if (phase === 'active' && isTimerOwner()) {
+            systemNotificationService.showPersistentWorkout({
+                elapsedSeconds: totalSec,
+                completedSets,
+                totalExercises: uniqueExercises,
+                isPaused,
+            });
+        }
+
         feedbackService.buttonPress();
     };
 
@@ -530,6 +607,8 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange }: WorkoutStatu
                         const owner = isTimerOwner();
                         if (owner) {
                             await configService.set('runningWorkoutTimerWorkoutId', null);
+                            await configService.set('runningWorkoutTimerStartTimestamp', null);
+                            await configService.set('runningWorkoutTimerBaseSeconds', 0);
                             systemNotificationService.dismissPersistentWorkout();
                             systemNotificationService.cancelInactivityReminder();
                         }

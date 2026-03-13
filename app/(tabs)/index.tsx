@@ -54,7 +54,7 @@ export default function DailyLogScreen() {
   const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
   const bottomOffset = (tabBarHeight ? tabBarHeight : insets.bottom) + 12;
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const activeWorkout = await workoutService.getActiveWorkout(selectedDate);
@@ -74,10 +74,10 @@ export default function DailyLogScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate]);
 
   // Lightweight refresh — updates workout + calendar without showing loading spinner
-  const refreshWorkoutOnly = async () => {
+  const refreshWorkoutOnly = useCallback(async () => {
     try {
       const activeWorkout = await workoutService.getActiveWorkout(selectedDate);
       setWorkout(activeWorkout);
@@ -86,7 +86,7 @@ export default function DailyLogScreen() {
     } catch (e) {
       logger.captureException(e, { scope: 'HomeTab.refreshWorkoutOnly', message: 'Failed to refresh workout' });
     }
-  };
+  }, [selectedDate]);
 
   // Reload when date changes or screen comes into focus
   useFocusEffect(
@@ -101,16 +101,14 @@ export default function DailyLogScreen() {
       };
 
       checkChangelogBadge();
-    }, [selectedDate]) // Re-fetch on focus just in case
+    }, [loadData]) // Re-fetch on focus just in case
   );
 
-  useDataReload(() => {
-    loadData();
-  });
+  useDataReload(loadData);
 
   const [isPickerVisible, setIsPickerVisible] = useState(false);
 
-  const handleAddSet = async (exerciseId: string) => {
+  const handleAddSet = useCallback(async (exerciseId: string) => {
     if (!workout) return;
     try {
       await workoutService.addSet(workout.id, exerciseId, 'normal');
@@ -120,9 +118,9 @@ export default function DailyLogScreen() {
     } catch (e: any) {
       notify.error('Fallo de conexión', e?.message || 'No se pudo agregar el ejercicio.');
     }
-  };
+  }, [workout, loadData]);
 
-  const handleLoadRoutineDay = async (day: RoutineDayWithExercises) => {
+  const handleLoadRoutineDay = useCallback(async (day: RoutineDayWithExercises) => {
     if (!workout) return;
     try {
       for (const ex of day.exercises) {
@@ -135,9 +133,9 @@ export default function DailyLogScreen() {
     } catch (e: any) {
       notify.error('Fallo de carga', e?.message || 'No se pudo cargar la rutina.');
     }
-  };
+  }, [workout, loadData]);
 
-  const handleCopySet = async (originalSetId: string) => {
+  const handleCopySet = useCallback(async (originalSetId: string) => {
     if (!workout) return;
     const originalSet = sets.find(s => s.id === originalSetId);
     if (!originalSet) return;
@@ -156,9 +154,9 @@ export default function DailyLogScreen() {
     } catch (e: any) {
       notify.error('Error al clonar', e?.message || 'Fallo general de base de datos.');
     }
-  };
+  }, [workout, sets, loadData]);
 
-  const handleUpdateSet = async (setId: string, updates: Partial<WorkoutSet>) => {
+  const handleUpdateSet = useCallback(async (setId: string, updates: Partial<WorkoutSet>) => {
     const prevSet = sets.find(s => s.id === setId);
     const prevSetsSnapshot = sets;
     const shouldAutoRest =
@@ -178,9 +176,9 @@ export default function DailyLogScreen() {
       setSets(prevSetsSnapshot);
       notify.error('Datos revertidos', e?.message || 'Fallo de integridad al actualizar.');
     }
-  };
+  }, [sets]);
 
-  const handleDeleteSet = async (setId: string) => {
+  const handleDeleteSet = useCallback(async (setId: string) => {
     try {
       await workoutService.deleteSet(setId);
       loadData();
@@ -188,9 +186,9 @@ export default function DailyLogScreen() {
     } catch (e: any) {
       notify.error('Operación fallida', e?.message || 'No se pudo borrar la serie.');
     }
-  };
+  }, [loadData]);
 
-  const handleLinkExercise = async (exerciseId: string) => {
+  const handleLinkExercise = useCallback(async (exerciseId: string) => {
     if (!workout) return;
 
     // derived ordered list of exercise IDs
@@ -228,9 +226,9 @@ export default function DailyLogScreen() {
     } catch (e: any) {
       notify.error('Error en Superset', e?.message || 'No fue posible unirlos.');
     }
-  };
+  }, [workout, sets, loadData]);
 
-  const handleUnlinkExercise = async (exerciseId: string) => {
+  const handleUnlinkExercise = useCallback(async (exerciseId: string) => {
     if (!workout) return;
     try {
       await workoutService.removeFromSuperset(workout.id, exerciseId);
@@ -239,9 +237,9 @@ export default function DailyLogScreen() {
     } catch (e: any) {
       notify.error('No se pudo desvincular', e?.message || 'Error general de red.');
     }
-  };
+  }, [workout, loadData]);
 
-  const handleViewHistory = async (exerciseId: string) => {
+  const handleViewHistory = useCallback(async (exerciseId: string) => {
     const exSet = sets.find(s => s.exercise_id === exerciseId);
     const name = exSet?.exercise_name || 'Ejercicio';
     setHistoryExerciseName(name);
@@ -251,7 +249,7 @@ export default function DailyLogScreen() {
     const history = await workoutService.getExerciseHistory(exerciseId);
     setHistoryData(history);
     setHistoryVisible(true);
-  };
+  }, [sets]);
 
   const handleAddButton = () => {
     setIsPickerVisible(true);

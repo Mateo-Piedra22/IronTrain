@@ -142,9 +142,39 @@ export class SyncService {
         const obj = raw as Record<string, unknown>;
         const out: Record<string, unknown> = {};
 
+        const normalizeEpochMs = (v: unknown): unknown => {
+            // Accept numbers, numeric strings, and ISO date strings.
+            let n: number | null = null;
+
+            if (typeof v === 'number') {
+                if (!Number.isFinite(v)) return v;
+                n = v;
+            } else if (typeof v === 'string') {
+                const trimmed = v.trim();
+                if (trimmed.length === 0) return v;
+
+                // Numeric string (seconds or ms)
+                if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) {
+                    const parsed = Number(trimmed);
+                    if (Number.isFinite(parsed)) n = parsed;
+                } else {
+                    // ISO string
+                    const ms = Date.parse(trimmed);
+                    if (!Number.isNaN(ms)) n = ms;
+                }
+            }
+
+            if (n === null) return v;
+
+            // Heuristic: seconds since epoch are usually 10 digits (~1e9-1e10), ms are 13 digits (~1e12-1e13)
+            if (n > 0 && n < 100_000_000_000) {
+                return Math.floor(n * 1000);
+            }
+            return Math.floor(n);
+        };
+
         for (const [key, value] of Object.entries(obj)) {
             if (key === 'updatedAt' || key === 'updated_at') {
-
                 if (typeof value === 'number') {
                     out.updated_at = value;
                 } else if (typeof value === 'string') {
@@ -167,12 +197,62 @@ export class SyncService {
             }
 
             const normalizedKey = key.includes('_') ? key : this.toSnakeKey(key);
-            out[normalizedKey] = value;
+
+            // SQLite doesn't have a boolean type, so we convert true/false to 1/0
+            let finalValue: any = value;
+            if (typeof value === 'boolean') {
+                finalValue = value ? 1 : 0;
+            } else if (value === 'true' || value === 'false') {
+                finalValue = value === 'true' ? 1 : 0;
+            }
+
+            // --- Field Aliasing ---
+            // Handle common cloud vs local field name mismatches
+            let targetKey = normalizedKey;
+            if (table === 'workout_sets') {
+                if (normalizedKey === 'is_completed') targetKey = 'completed';
+                if (normalizedKey === 'set_type') targetKey = 'type';
+                if (normalizedKey === 'sort_order') targetKey = 'order_index';
+            } else if (table === 'workouts') {
+                if (normalizedKey === 'is_completed' && finalValue === 1) {
+                    out['status'] = 'completed';
+                    continue;
+                }
+            } else if (table === 'exercises') {
+                if (normalizedKey === 'exercise_type') targetKey = 'type';
+            }
+
+            // Normalization: Ensure workout dates land on Local Noon to prevent timezone splits
+            // CRITICAL: ONLY for the 'date' field used for day grouping, NOT for 'start_time' or 'end_time'
+            if (table === 'workouts' && targetKey === 'date' && typeof finalValue === 'number') {
+                const dateObj = new Date(finalValue);
+                dateObj.setHours(12, 0, 0, 0);
+                finalValue = dateObj.getTime();
+            }
+
+            // --- Type Casts ---
+            // Local SQLite uses 1/0 for booleans. JSON uses true/false.
+            // Ensure column name matches the expected type.
+            const isBoolField = targetKey === 'completed' || targetKey === 'is_template' || targetKey === 'is_system' || targetKey === 'active';
+            if (isBoolField && finalValue !== null && finalValue !== undefined) {
+                if (typeof finalValue === 'string') {
+                    finalValue = (finalValue.toLowerCase() === 'true' || finalValue === '1') ? 1 : 0;
+                } else {
+                    finalValue = finalValue ? 1 : 0;
+                }
+            }
+
+            if (validColumns && !validColumns.has(targetKey)) continue;
+
+            if (table === 'workouts' && (targetKey === 'date' || targetKey === 'start_time' || targetKey === 'end_time')) {
+                out[targetKey] = normalizeEpochMs(finalValue);
+            } else {
+                out[targetKey] = finalValue;
+            }
         }
 
         // --- ID Standardization for Protected Records ---
         const recordName = typeof out.name === 'string' ? out.name : '';
-
         if (table === 'categories' && (recordName === 'Sin categoría' || recordName === 'Uncategorized')) {
             out.id = 'uncategorized';
             out.is_system = 1;
@@ -192,15 +272,16 @@ export class SyncService {
 
         // --- Schema-Aware Robustness Fix: Only keep columns that exist in local SQLite ---
         if (validColumns) {
-            for (const key of Object.keys(out)) {
+            Object.keys(out).forEach(key => {
                 if (!validColumns.has(key)) {
                     delete out[key];
                 }
-            }
+            });
         }
 
         return out;
     }
+
 
     private async requestWithRetry(input: RequestInfo, init: RequestInit): Promise<Response> {
         let lastError: unknown = null;
@@ -284,8 +365,10 @@ export class SyncService {
 
     /**
      * Executes a full bidirectional sync: Push local changes, then Pull remote changes.
+     * @param options.forcePull If true, pulls all remote data regardless of last sync timestamp
+     * @param options.verify If true, performs an additional push check if pull triggered consistency repairs
      */
-    public async syncBidirectional(options?: { forcePull?: boolean }): Promise<void> {
+    public async syncBidirectional(options?: { forcePull?: boolean; verify?: boolean }): Promise<void> {
         if (this.isSyncing) {
             throw this.syncPreconditionError('ALREADY_SYNCING', 'Sync en progreso');
         }
@@ -302,19 +385,47 @@ export class SyncService {
                 throw this.syncPreconditionError('OFFLINE', 'Sin conexión a internet');
             }
 
-            // Reintentar los fallidos que aún no superaron el límite
+            // Retry failed records that haven't hit the limit
             await dbService.run(`UPDATE sync_queue SET status = 'pending' WHERE status = 'failed' AND retry_count < ?`, [MAX_RETRIES]);
 
             // Fetch current local table schemas to ensure sync robustness
             const tableSchemas = await this.fetchAllTableSchemas();
 
+            // 1. Initial Push: Send any pending local changes
             await this.pushLocalChanges(token);
+
+            // 2. Pull: Get remote changes and run consistency fixes (repairs)
             await this.pullRemoteChanges(token, options?.forcePull, tableSchemas);
+
+            // 3. Verification: If 'verify' is true, check if pull/repairs added new mutations to the queue
+            if (options?.verify) {
+                const hasMore = await this.hasPendingChanges();
+                if (hasMore) {
+                    logger.info('[Sync] Post-pull verify: Found new changes (likely from duplicate cleanup). Pushing again...');
+                    await this.pushLocalChanges(token);
+                }
+            }
         } catch (error) {
             logger.captureException(error, { scope: 'SyncService.syncBidirectional' });
             throw error;
         } finally {
             this.isSyncing = false;
+        }
+    }
+
+    /**
+     * Checks if there are any pending or failed (retryable) changes in the sync queue.
+     */
+    public async hasPendingChanges(): Promise<boolean> {
+        try {
+            const row = await dbService.getFirst<{ count: number }>(
+                "SELECT COUNT(*) as count FROM sync_queue WHERE status IN ('pending', 'failed') AND retry_count < ?",
+                [MAX_RETRIES]
+            );
+            return Number(row?.count ?? 0) > 0;
+        } catch (e) {
+            logger.captureException(e, { scope: 'SyncService.hasPendingChanges' });
+            return false;
         }
     }
 
@@ -525,15 +636,43 @@ export class SyncService {
                                     continue;
                                 }
 
-                                const keys = Object.keys(normalized);
-                                const values = Object.values(normalized);
-                                const placeholders = keys.map(() => '?').join(', ');
-
+                                // UPSERT Logic: Use merge to avoid wiping out local data not present in remote payload
+                                // This solves the bug where 'completed' or 'duration' are lost during pull if payload is partial.
                                 try {
-                                    await dbService.run(
-                                        `INSERT OR REPLACE INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`,
-                                        values as any
-                                    );
+                                    // 1. Fetch existing record
+                                    const existing = await dbService.getFirst<Record<string, any>>(`SELECT * FROM ${table} WHERE id = ?`, [recordId]);
+
+                                    if (existing) {
+                                        // 2. Filter keys that are actually in our schema for this table
+                                        const schemaKeys = tableSchemas?.get(table);
+                                        const merged = { ...existing };
+
+                                        // 3. Apply updates from remote change
+                                        Object.keys(normalized).forEach(k => {
+                                            if (schemaKeys && !schemaKeys.has(k)) return;
+                                            merged[k] = normalized[k];
+                                        });
+
+                                        // 4. Update existing record
+                                        const updateKeys = Object.keys(merged).filter(k => k !== 'id');
+                                        const updatePlaceholders = updateKeys.map(k => `${k} = ?`).join(', ');
+                                        const updateValues = updateKeys.map(k => merged[k]);
+
+                                        await dbService.run(
+                                            `UPDATE ${table} SET ${updatePlaceholders} WHERE id = ?`,
+                                            [...updateValues, recordId]
+                                        );
+                                    } else {
+                                        // 5. New record: Direct insert
+                                        const keys = Object.keys(normalized);
+                                        const placeholders = keys.map(() => '?').join(', ');
+                                        const values = keys.map((k) => normalized[k]);
+
+                                        await dbService.run(
+                                            `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`,
+                                            values as any
+                                        );
+                                    }
                                 } catch (e: any) {
                                     const msg = e?.message || '';
                                     if (msg.includes('FOREIGN KEY constraint failed')) {
@@ -782,6 +921,25 @@ export class SyncService {
                             OR exercise_id NOT IN (SELECT id FROM exercises)`
                     );
 
+                    // Defensive fix: ensure critical epoch fields remain numeric in SQLite.
+                    // If the snapshot came with numeric strings, SQLite may persist them as TEXT,
+                    // breaking range queries like `WHERE date >= ? AND date < ?`.
+                    await dbService.run(
+                        `UPDATE workouts
+                         SET date = CAST(date AS INTEGER)
+                         WHERE date IS NOT NULL AND typeof(date) != 'integer'`
+                    );
+                    await dbService.run(
+                        `UPDATE workouts
+                         SET start_time = CAST(start_time AS INTEGER)
+                         WHERE start_time IS NOT NULL AND typeof(start_time) != 'integer'`
+                    );
+                    await dbService.run(
+                        `UPDATE workouts
+                         SET end_time = CAST(end_time AS INTEGER)
+                         WHERE end_time IS NOT NULL AND typeof(end_time) != 'integer'`
+                    );
+
                     // Append full sync event to avoid pushing this as mutations
                     await dbService.run('DELETE FROM sync_queue');
                 });
@@ -794,6 +952,45 @@ export class SyncService {
                 const first = fkIssues[0];
                 throw new Error(`Snapshot restore integrity check failed (foreign_key_check). First issue: table=${first.table} rowid=${first.rowid} parent=${first.parent} fkid=${first.fkid}`);
             }
+
+            // Deterministic hydration sanity check.
+            // If workouts exist but `date` ends up stored as TEXT/REAL or in seconds, the UI will show empty
+            // due to range queries (date >= startMs AND date < endMs).
+            const workoutCountRow = await dbService.getFirst<{ count: number }>('SELECT COUNT(*) as count FROM workouts');
+            const workoutCount = Number(workoutCountRow?.count || 0);
+            if (workoutCount > 0) {
+                const typeStats = await dbService.getFirst<{ integer_count: number; non_integer_count: number }>(
+                    `SELECT
+                        SUM(CASE WHEN typeof(date) = 'integer' THEN 1 ELSE 0 END) as integer_count,
+                        SUM(CASE WHEN date IS NOT NULL AND typeof(date) != 'integer' THEN 1 ELSE 0 END) as non_integer_count
+                     FROM workouts`
+                );
+
+                const rangeStats = await dbService.getFirst<{ min_date: number | null; max_date: number | null }>(
+                    'SELECT MIN(CAST(date AS INTEGER)) as min_date, MAX(CAST(date AS INTEGER)) as max_date FROM workouts'
+                );
+
+                const integerCount = Number(typeStats?.integer_count || 0);
+                const nonIntegerCount = Number(typeStats?.non_integer_count || 0);
+                const maxDate = rangeStats?.max_date === null || rangeStats?.max_date === undefined ? null : Number(rangeStats.max_date);
+
+                // If any non-integer remain after our casts, or maxDate looks like seconds, treat as fatal.
+                if (nonIntegerCount > 0 || integerCount === 0 || (maxDate !== null && maxDate > 0 && maxDate < 100_000_000_000)) {
+                    const sample = await dbService.getAll<{ id: string; date: any; date_type: string }>(
+                        "SELECT id, date, typeof(date) as date_type FROM workouts ORDER BY CAST(date AS INTEGER) DESC LIMIT 5"
+                    );
+                    logger.error('Snapshot restore hydration sanity check failed', {
+                        workoutCount,
+                        integerCount,
+                        nonIntegerCount,
+                        minDate: rangeStats?.min_date ?? null,
+                        maxDate,
+                        sample,
+                    });
+                    throw new Error('Snapshot restore completed but hydration validation failed (workouts.date type/unit mismatch). Please retry sync; if persists, export logs.');
+                }
+            }
+
             // Trigger reload for settings and other critical data
             await configService.reload();
             dataEventService.emit('SETTINGS_UPDATED');

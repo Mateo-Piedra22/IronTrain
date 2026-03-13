@@ -432,8 +432,6 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
                     data={dates}
                     extraData={[selectedDate, markedDates]}
                     renderItem={renderStripItem}
-                    // @ts-ignore
-                    estimatedItemSize={FULL_ITEM_SIZE}
                     initialScrollIndex={getIndexForDate(selectedDate)}
                     horizontal
                     showsHorizontalScrollIndicator={false}
