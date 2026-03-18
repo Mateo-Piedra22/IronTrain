@@ -1,7 +1,7 @@
 import { WorkoutSet } from '@/src/types/db';
-import { LucideCheck } from 'lucide-react-native';
+import { LucideCheck, LucideMenu } from 'lucide-react-native';
 import React, { memo, useMemo } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useColors } from '../src/hooks/useColors';
 import { configService } from '../src/services/ConfigService';
 import { UnitService } from '../src/services/UnitService';
@@ -13,15 +13,18 @@ interface SetRowInputProps {
     onUpdate: (id: string, updates: Partial<WorkoutSet>) => void;
     onToggleComplete: (id: string) => void;
     disabled?: boolean;
+    drag?: () => void;
+    isActive?: boolean;
 }
 
-export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disabled }: SetRowInputProps) => {
+export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disabled, drag, isActive }: SetRowInputProps) => {
     const colors = useColors();
     const ss = useMemo(() => StyleSheet.create({
         row: { flexDirection: 'row', alignItems: 'center', padding: 8, gap: 8, borderRadius: 12, borderWidth: 1 },
         rowDefault: { backgroundColor: colors.surface, borderColor: colors.border },
         rowCompleted: { backgroundColor: colors.surfaceLighter, borderColor: colors.primary.DEFAULT },
-        indexCol: { width: 24, alignItems: 'center' },
+        dragBtn: { width: 24, alignItems: 'flex-start', justifyContent: 'center' },
+        indexCol: { width: 20, alignItems: 'center' },
         indexText: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
         inputCol: { flex: 1, backgroundColor: colors.surfaceLighter, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center' },
         input: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.text, textAlign: 'center', padding: 4 },
@@ -37,7 +40,14 @@ export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disab
     const isCompleted = !!set.completed;
 
     return (
-        <View style={[ss.row, isCompleted ? ss.rowCompleted : ss.rowDefault]}>
+        <View style={[ss.row, isCompleted ? ss.rowCompleted : ss.rowDefault, isActive && { opacity: 0.8, borderColor: colors.primary.DEFAULT, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84 }]}>
+            {/* Drag Handle */}
+            {drag && !disabled && (
+                <TouchableOpacity onLongPress={drag} style={ss.dragBtn} delayLongPress={100}>
+                    <LucideMenu size={20} color={colors.textMuted} />
+                </TouchableOpacity>
+            )}
+
             {/* Index */}
             <View style={ss.indexCol}>
                 <Text style={[ss.indexText, isCompleted && { color: colors.green }]}>{index + 1}</Text>
@@ -118,7 +128,8 @@ export const SetRowInput = memo(({ index, set, onUpdate, onToggleComplete, disab
         prev.set.rpe === next.set.rpe &&
         prev.set.completed === next.set.completed &&
         prev.index === next.index &&
-        prev.disabled === next.disabled
+        prev.disabled === next.disabled &&
+        prev.isActive === next.isActive
     );
 });
 

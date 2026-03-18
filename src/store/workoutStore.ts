@@ -30,6 +30,7 @@ interface ActiveWorkoutState {
     updateSet: (setId: string, updates: Partial<WorkoutSet>) => Promise<void>;
     removeSet: (setId: string) => Promise<void>;
     toggleSetComplete: (setId: string) => Promise<void>;
+    reorderSets: (workoutId: string, orderedSetIds: string[]) => Promise<void>;
 
     loadSetsForWorkout: (workoutId: string) => Promise<void>;
     loadWorkoutById: (workoutId: string) => Promise<void>;
@@ -249,7 +250,36 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
     toggleSetComplete: async (setId) => {
         const s = get().activeSets.find(s => s.id === setId);
         if (s) {
-            await get().updateSet(setId, { completed: s.completed ? 0 : 1 });
+            get().updateSet(setId, { completed: s.completed ? 0 : 1 });
+        }
+    },
+
+    reorderSets: async (workoutId, orderedSetIds) => {
+        const { activeWorkout } = get();
+        if (!activeWorkout || activeWorkout.status === 'completed') return;
+
+        // Optimistic update
+        set(state => {
+            const newSets = [...state.activeSets];
+            // Sort newSets based on orderedSetIds
+            newSets.sort((a, b) => {
+                const idxA = orderedSetIds.indexOf(a.id);
+                const idxB = orderedSetIds.indexOf(b.id);
+                if (idxA === -1 && idxB === -1) return 0;
+                if (idxA === -1) return 1;
+                if (idxB === -1) return -1;
+                return idxA - idxB;
+            });
+            // Also assign local order_index sequentially for immediate UI reflection
+            newSets.forEach((s, idx) => s.order_index = idx);
+            return { activeSets: newSets };
+        });
+
+        try {
+            await workoutService.reorderSets(workoutId, orderedSetIds);
+        } catch (e) {
+            logger.captureException(e, { scope: 'workoutStore.reorderSets' });
+            await get().loadSetsForWorkout(workoutId); // revert
         }
     }
 }));

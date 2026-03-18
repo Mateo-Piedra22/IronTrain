@@ -157,6 +157,7 @@ export default function RootLayout() {
       feedbackService.dispose().catch((e) => {
         logger.captureException(e, { scope: 'RootLayout.cleanup', message: 'feedbackService.dispose failed' });
       });
+      syncScheduler.dispose();
     };
   }, []);
 
@@ -171,6 +172,7 @@ export default function RootLayout() {
         if (!res) {
           await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', '0']);
         }
+
         syncScheduler.init();
         await syncScheduler.syncNow();
         await configService.reload();
@@ -187,14 +189,6 @@ export default function RootLayout() {
     };
     runInitialSync();
   }, [dbInitialized, authToken]);
-
-  useEffect(() => {
-    if (!dbInitialized) return;
-    syncScheduler.init();
-    return () => {
-      syncScheduler.dispose();
-    };
-  }, [dbInitialized]);
 
   useEffect(() => {
     async function hideSplash() {

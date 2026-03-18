@@ -1,9 +1,13 @@
+import { ExerciseList } from '@/components/ExerciseList';
 import { BadgePill } from '@/components/ui/BadgePill';
 import { AnalysisService, PowerliftingPRs } from '@/src/services/AnalysisService';
+import { configService } from '@/src/services/ConfigService';
 import { ThemeFx, withAlpha } from '@/src/theme';
-import { AlertCircle, Crown, Info, Trophy } from 'lucide-react-native';
+import { AlertCircle, Crown, Info, Plus, Settings2, Trophy, X } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors } from '../src/hooks/useColors';
 
 export function PRCenter() {
@@ -11,10 +15,15 @@ export function PRCenter() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showInfo, setShowInfo] = useState(false);
+    const [isConfiguring, setIsConfiguring] = useState(false);
+    const [selectingSlot, setSelectingSlot] = useState<number | null>(null);
+
     const [data, setData] = useState<PowerliftingPRs>({
         squat: null, bench: null, deadlift: null, totalKg: 0,
         squatName: null, benchName: null, deadliftName: null,
     });
+
+    const manualIds = (configService.get('trophyExerciseIds') || [null, null, null]) as (string | null)[];
 
     useEffect(() => {
         loadPRs();
@@ -24,7 +33,8 @@ export function PRCenter() {
         setIsLoading(true);
         setError(null);
         try {
-            const prs = await AnalysisService.getPowerliftingPRs();
+            const currentManualIds = configService.get('trophyExerciseIds');
+            const prs = await AnalysisService.getPowerliftingPRs(currentManualIds);
             setData(prs);
         } catch (e: any) {
             setError(e?.message ?? 'No se pudieron cargar los PRs');
@@ -33,15 +43,36 @@ export function PRCenter() {
         }
     };
 
+    const handleSelectExercise = async (id: string) => {
+        if (selectingSlot === null) return;
+
+        const newIds = [...manualIds];
+        // Ensure we have 3 slots
+        while (newIds.length < 3) newIds.push(null);
+        newIds[selectingSlot] = id;
+
+        await configService.set('trophyExerciseIds', newIds);
+        setSelectingSlot(null);
+        loadPRs();
+    };
+
+    const handleClearSlot = async (index: number) => {
+        const newIds = [...manualIds];
+        while (newIds.length < 3) newIds.push(null);
+        newIds[index] = null;
+        await configService.set('trophyExerciseIds', newIds);
+        loadPRs();
+    };
+
     const liftData = useMemo(() => [
-        { label: 'SQUAT', value: data.squat?.weight ?? 0, color: colors.red, name: data.squatName },
-        { label: 'BENCH', value: data.bench?.weight ?? 0, color: colors.blue, name: data.benchName },
-        { label: 'DEADLIFT', value: data.deadlift?.weight ?? 0, color: colors.yellow, name: data.deadliftName },
-    ], [data, colors]);
+        { label: manualIds[0] ? (data.squatName?.toUpperCase() || 'SLOT 1') : 'SQUAT', value: data.squat?.weight ?? 0, color: colors.red, name: manualIds[0] ? null : data.squatName },
+        { label: manualIds[1] ? (data.benchName?.toUpperCase() || 'SLOT 2') : 'BENCH', value: data.bench?.weight ?? 0, color: colors.blue, name: manualIds[1] ? null : data.benchName },
+        { label: manualIds[2] ? (data.deadliftName?.toUpperCase() || 'SLOT 3') : 'DEADLIFT', value: data.deadlift?.weight ?? 0, color: colors.yellow, name: manualIds[2] ? null : data.deadliftName },
+    ], [data, colors, manualIds]);
 
     const maxLift = Math.max(...liftData.map(l => l.value), 1);
-    const allDetected = liftData.every(l => l.name != null);
-    const noneDetected = liftData.every(l => l.name == null);
+    const someDetected = liftData.some(l => l.value > 0 || l.name != null);
+    const noneDetected = !someDetected;
 
     const styles = useMemo(() => StyleSheet.create({
         container: {
@@ -93,7 +124,7 @@ export function PRCenter() {
             letterSpacing: 0.8,
             marginTop: 2,
         },
-        infoButton: {
+        iconButton: {
             width: 32,
             height: 32,
             borderRadius: 16,
@@ -113,7 +144,8 @@ export function PRCenter() {
             borderRadius: 12,
             borderWidth: 1.5,
             borderColor: withAlpha(colors.yellow, '30'),
-            ...ThemeFx.shadowSm,
+            // Fix: In light theme, the shadow creates a weird inner effect
+            ...(colors.isDark ? ThemeFx.shadowSm : {}),
         },
         totalValue: {
             fontSize: 18,
@@ -306,6 +338,70 @@ export function PRCenter() {
             fontWeight: '800',
             color: colors.textMuted,
         },
+        configSlot: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: colors.surface,
+            padding: 12,
+            borderRadius: 12,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            marginBottom: 8,
+        },
+        configLabel: {
+            fontSize: 12,
+            fontWeight: '900',
+            color: colors.textMuted,
+        },
+        configValue: {
+            fontSize: 13,
+            fontWeight: '700',
+            color: colors.text,
+            flex: 1,
+            marginHorizontal: 10,
+        },
+        // Modal Sheet Styles
+        modalSheet: {
+            flex: 1,
+            backgroundColor: colors.background,
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            overflow: 'hidden',
+        },
+        modalHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingHorizontal: 20,
+            paddingVertical: 16,
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.border,
+        },
+        modalHeaderContent: {
+            flex: 1,
+        },
+        modalTitle: {
+            fontSize: 18,
+            fontWeight: '900',
+            color: colors.text,
+        },
+        modalSub: {
+            fontSize: 12,
+            fontWeight: '600',
+            color: colors.textMuted,
+            marginTop: 2,
+        },
+        closeBtn: {
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            backgroundColor: colors.surfaceLighter,
+            justifyContent: 'center',
+            alignItems: 'center',
+            borderWidth: 1.5,
+            borderColor: colors.border,
+        },
     }), [colors]);
 
     return (
@@ -318,13 +414,19 @@ export function PRCenter() {
                     </View>
                     <View>
                         <Text style={styles.title}>Sala de Trofeos</Text>
-                        <Text style={styles.subtitle}>Powerlifting Total</Text>
+                        <Text style={styles.subtitle}>{isConfiguring ? 'Configurar Trofeos' : 'Powerlifting Total'}</Text>
                     </View>
                 </View>
                 <View style={styles.headerRight}>
                     <TouchableOpacity
+                        onPress={() => setIsConfiguring(!isConfiguring)}
+                        style={[styles.iconButton, isConfiguring && { borderColor: colors.yellow }]}
+                    >
+                        <Settings2 size={16} color={isConfiguring ? colors.yellow : colors.textMuted} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
                         onPress={() => setShowInfo(!showInfo)}
-                        style={styles.infoButton}
+                        style={styles.iconButton}
                         accessibilityRole="button"
                         accessibilityLabel="Info sobre sala de trofeos"
                     >
@@ -338,6 +440,36 @@ export function PRCenter() {
                 </View>
             </View>
 
+            {/* Config Mode */}
+            {isConfiguring && (
+                <View style={{ marginBottom: 16 }}>
+                    <Text style={[styles.infoPanelText, { marginBottom: 8 }]}>
+                        Selecciona hasta 3 ejercicios para mostrar. Si dejas alguno vacío, se usará la detección automática.
+                    </Text>
+                    {[0, 1, 2].map((i) => {
+                        const exName = manualIds[i] ? data[(['squatName', 'benchName', 'deadliftName'] as const)[i]] : null;
+                        return (
+                            <View key={i} style={styles.configSlot}>
+                                <Text style={styles.configLabel}>Trof. {i + 1}</Text>
+                                <Text style={styles.configValue} numberOfLines={1}>
+                                    {exName || 'Automático'}
+                                </Text>
+                                <View style={{ flexDirection: 'row', gap: 6 }}>
+                                    {manualIds[i] && (
+                                        <TouchableOpacity onPress={() => handleClearSlot(i)} style={styles.iconButton}>
+                                            <X size={14} color={colors.red} />
+                                        </TouchableOpacity>
+                                    )}
+                                    <TouchableOpacity onPress={() => setSelectingSlot(i)} style={styles.iconButton}>
+                                        <Plus size={14} color={colors.primary.DEFAULT} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        );
+                    })}
+                </View>
+            )}
+
             {/* Info Panel */}
             {showInfo && (
                 <View style={styles.infoPanel}>
@@ -346,8 +478,8 @@ export function PRCenter() {
                         <Text style={styles.infoPanelTitle}>¿Cómo funciona?</Text>
                     </View>
                     <Text style={styles.infoPanelText}>
-                        Esta sección detecta automáticamente tus ejercicios de Squat, Bench Press y Deadlift por nombre
-                        y muestra tu mayor peso registrado en cada uno.
+                        Detecta automáticamente tus ejercicios de Squat, Bench Press y Deadlift, mostrará tu mayor récord histórico.
+                        Puedes cambiar estos ejercicios desde el icono de configuración.
                     </Text>
                     <View style={styles.detectionList}>
                         {liftData.map((l) => (
@@ -363,11 +495,6 @@ export function PRCenter() {
                             </View>
                         ))}
                     </View>
-                    {!allDetected && (
-                        <Text style={styles.infoPanelHint}>
-                            💡 Tip: Para que funcione, tus ejercicios deben contener nombres como "Sentadilla", "Press Banca" o "Peso Muerto".
-                        </Text>
-                    )}
                 </View>
             )}
 
@@ -385,7 +512,7 @@ export function PRCenter() {
                     <Trophy size={32} color={colors.textMuted} />
                     <Text style={styles.emptyTitle}>Sin ejercicios detectados</Text>
                     <Text style={styles.emptyMessage}>
-                        Agrega ejercicios con nombres como "Sentadilla", "Press Banca" o "Peso Muerto" para ver tu total.
+                        Agrega ejercicios descriptivos o selecciónalos manualmente desde configuración.
                     </Text>
                 </View>
             ) : (
@@ -425,6 +552,34 @@ export function PRCenter() {
                         );
                     })}
                 </View>
+            )}
+
+            {/* Exercise Picker Modal */}
+            {selectingSlot !== null && (
+                <Modal visible transparent animationType="slide" onRequestClose={() => setSelectingSlot(null)}>
+                    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={{ flex: 1, backgroundColor: ThemeFx.backdropStrong }}>
+                        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+                            <GestureHandlerRootView style={{ flex: 1 }}>
+                                <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+                                    <View style={styles.modalSheet}>
+                                        <View style={styles.modalHeader}>
+                                            <View style={styles.modalHeaderContent}>
+                                                <Text style={styles.modalTitle}>Trof. {selectingSlot + 1}: Seleccionar</Text>
+                                                <Text style={styles.modalSub}>Elegí el ejercicio que querés trackear en este espacio.</Text>
+                                            </View>
+                                            <TouchableOpacity onPress={() => setSelectingSlot(null)} style={styles.closeBtn}>
+                                                <X size={18} color={colors.text} />
+                                            </TouchableOpacity>
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <ExerciseList onSelect={handleSelectExercise} inModal />
+                                        </View>
+                                    </View>
+                                </View>
+                            </GestureHandlerRootView>
+                        </KeyboardAvoidingView>
+                    </SafeAreaView>
+                </Modal>
             )}
         </View>
     );

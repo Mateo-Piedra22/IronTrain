@@ -721,6 +721,72 @@ export const createSocialStyles = (colors: any) => StyleSheet.create({
         marginTop: 40,
         fontWeight: '600',
     },
+    // Filters
+    inboxSecondaryHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 4,
+        marginBottom: 16,
+        marginTop: 8,
+    },
+    inboxStatusTitle: {
+        fontSize: 16,
+        fontWeight: '900',
+        color: colors.text,
+        letterSpacing: -0.3,
+    },
+    archiveToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        borderRadius: 10,
+        backgroundColor: colors.surfaceLighter,
+    },
+    archiveToggleActive: {
+        backgroundColor: colors.primary.DEFAULT,
+    },
+    archiveToggleText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: colors.textMuted,
+    },
+    archiveToggleTextActive: {
+        color: colors.onPrimary,
+    },
+    filterChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: colors.surface,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: colors.border,
+        ...ThemeFx.shadowSm,
+    },
+    filterChipActive: {
+        backgroundColor: colors.primary.DEFAULT,
+        borderColor: colors.primary.DEFAULT,
+    },
+    filterChipText: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: colors.textMuted,
+    },
+    filterChipTextActive: {
+        color: colors.onPrimary,
+    },
+    filterSeparator: {
+        width: 1,
+        height: 20,
+        backgroundColor: colors.border,
+        marginHorizontal: 4,
+        alignSelf: 'center',
+    },
     // Modals
     modalOverlay: {
         flex: 1,

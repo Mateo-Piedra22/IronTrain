@@ -2,17 +2,16 @@ import { useColors } from '@/src/hooks/useColors';
 import { useDataReload } from '@/src/hooks/useDataReload';
 import { useTheme } from '@/src/hooks/useTheme';
 import { configService } from '@/src/services/ConfigService';
-import { locationPermissionsService } from '@/src/services/LocationPermissionsService';
 import { routineService } from '@/src/services/RoutineService';
-import { SocialFriend, SocialInboxItem, SocialLeaderboardEntry, SocialProfile, SocialSearchUser, SocialService } from '@/src/services/SocialService';
+import { SocialFriend, SocialSearchUser, SocialService } from '@/src/services/SocialService';
 import { useAuthStore } from '@/src/store/authStore';
 import { confirm } from '@/src/store/confirmStore';
 import { useNotificationStore } from '@/src/store/notificationStore';
 import { useSettingsStore } from '@/src/store/useSettingsStore';
+import { useSocialStore } from '@/src/store/useSocialStore';
 import { logger } from '@/src/utils/logger';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
-import * as Location from 'expo-location';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import { Globe, Inbox as InboxIcon, Search, Settings, Trophy, Users } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -20,7 +19,7 @@ import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, 
 
 import { IronTrainLogo } from '@/components/IronTrainLogo';
 import { FriendsTab } from '@/components/social/FriendsTab';
-import { InboxTab } from '@/components/social/InboxTab';
+import InboxTab from '@/components/social/InboxTab';
 import { LeaderboardTab } from '@/components/social/LeaderboardTab';
 import { ProfileCard } from '@/components/social/ProfileCard';
 import { SearchTab } from '@/components/social/SearchTab';
@@ -45,16 +44,20 @@ export default function SocialTab() {
 
     // -- STATE --
     const [activeTab, setActiveTab] = useState<'leaderboard' | 'friends' | 'inbox' | 'search'>('leaderboard');
-    const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
-    // Data
-    const [profile, setProfile] = useState<SocialProfile | null>(null);
-    const [leaderboard, setLeaderboard] = useState<SocialLeaderboardEntry[]>([]);
-    const [friends, setFriends] = useState<SocialFriend[]>([]);
-    const [inbox, setInbox] = useState<SocialInboxItem[]>([]);
+    // Global Data
+    const {
+        profile, setProfile, leaderboard, friends, inbox, setInbox,
+        loading, refreshingLocation, locationPermissionDenied, lastKnownLocation,
+        loadData, refreshLocation
+    } = useSocialStore();
 
-    const pendingInboxCount = inbox.filter(i => i.status === 'pending').length;
+    const incomingFriendRequests = friends.filter(f => f.status === 'pending' && !f.isSender).length;
+    const pendingRoutinesCount = inbox.filter(i => i.feedType === 'direct_share' && i.status === 'pending').length;
+    const unseenActivitiesCount = inbox.filter(i => !i.seenAt && i.feedType === 'activity_log').length;
+    const totalUnseenCount = incomingFriendRequests + pendingRoutinesCount + unseenActivitiesCount;
+    const unseenFeedCount = pendingRoutinesCount + unseenActivitiesCount;
 
     // UI State
     const [isProfileExpanded, setIsProfileExpanded] = useState(false);
@@ -69,11 +72,11 @@ export default function SocialTab() {
     const [isScoreModalVisible, setIsScoreModalVisible] = useState(false);
     const [isEventModalVisible, setIsEventModalVisible] = useState(false);
     const [isWeatherModalVisible, setIsWeatherModalVisible] = useState(false);
-    const [refreshingLocation, setRefreshingLocation] = useState(false);
-    const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
 
     // Leaderboard state
     const [rankingSegment, setRankingSegment] = useState<'weekly' | 'monthly' | 'lifetime'>('weekly');
+    const [hideOwnActivity, setHideOwnActivity] = useState(false);
+    const [typeFilter, setTypeFilter] = useState<'all' | 'pr' | 'workout' | 'routine'>('all');
     const [expandedFriendId, setExpandedFriendId] = useState<string | null>(null);
     const [comparisons, setComparisons] = useState<Record<string, any>>({});
     const [loadingCompare, setLoadingCompare] = useState(false);
@@ -90,92 +93,33 @@ export default function SocialTab() {
         setTrainingDays(Array.isArray(rawDays) ? rawDays : [1, 2, 3, 4, 5, 6]);
     }, []);
 
-    const refreshLocation = useCallback(async (silent = false) => {
-        try {
-            setRefreshingLocation(true);
-            const location = await locationPermissionsService.getCurrentLocation(silent);
-
-            if (location) {
-                setLocationPermissionDenied(false);
-                setProfile(prev => prev ? ({
-                    ...prev,
-                    weatherBonus: {
-                        ...(prev.weatherBonus || {
-                            condition: 'Sincronizando...',
-                            temperature: 20,
-                            multiplier: 1.0,
-                            isActive: false,
-                        }),
-                        location: location.city || 'Tu ubicación',
-                    },
-                }) : null);
-
-                try {
-                    const updatedBonus = await SocialService.updateWeatherBonus(location.lat, location.lon, location.city);
-                    if (updatedBonus) {
-                        setProfile(prev => prev ? ({ ...prev, weatherBonus: updatedBonus }) : null);
-                        if (!silent) addToast({ type: 'success', title: 'Ubicación actualizada', message: `Se detectó: ${location.city || 'Tu ubicación'}` });
-                    }
-                } catch (err) {
-                    if (!silent) addToast({ type: 'error', title: 'Servicio de clima', message: 'No pudimos verificar bonificaciones climáticas, pero detectamos tu ubicación.' });
-                }
-            } else {
-                const status = await Location.getForegroundPermissionsAsync();
-                setLocationPermissionDenied(status.status === 'denied');
-                if (!silent && status.status === 'denied') {
-                    addToast({ type: 'info', title: 'Ubicación desactivada', message: 'Habilitá ubicación en uso para bonos climáticos.' });
-                }
-            }
-        } catch (err) {
-            logger.captureException(err, { scope: 'SocialTab.refreshLocation' });
-        } finally {
-            setRefreshingLocation(false);
-        }
-    }, [addToast]);
-
-    const loadData = useCallback(async (silent = false) => {
+    const fetchInitialData = useCallback(async (force = false, silent = false) => {
         if (!user) return;
-        if (!silent) setLoading(true);
-        try {
-            const [p, l, f, i] = await Promise.all([
-                SocialService.getProfile(),
-                SocialService.getAnalytics(),
-                SocialService.getFriends(),
-                SocialService.getInbox()
-            ]);
-            setProfile(p);
-            setLeaderboard(l);
-            setFriends(f);
-            setInbox(i);
-
-            if (p) {
-                setDisplayName(p.displayName || '');
-                setUsername(p.username || '');
-                setIsPublic(p.isPublic === 1);
-            }
-        } catch (err) {
-            logger.captureException(err, { scope: 'SocialTab.loadData' });
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
+        await loadData(force, silent);
+        const p = useSocialStore.getState().profile;
+        if (p) {
+            setDisplayName(p.displayName || '');
+            setUsername(p.username || '');
+            setIsPublic(p.isPublic === 1);
         }
-    }, [user]);
+        setRefreshing(false);
+    }, [user, loadData]);
 
-    useDataReload(loadData, ['DATA_UPDATED', 'SYNC_COMPLETED', 'SOCIAL_UPDATED']);
+    useDataReload(() => fetchInitialData(true, true), ['DATA_UPDATED', 'SYNC_COMPLETED', 'SOCIAL_UPDATED']);
 
     useEffect(() => {
-        if (user) loadData();
-    }, [user, loadData]);
+        if (user) fetchInitialData();
+    }, [user, fetchInitialData]);
 
     useEffect(() => {
         try {
             navigation.setOptions({
-                tabBarBadge: pendingInboxCount > 0 ? pendingInboxCount : undefined,
+                tabBarBadge: totalUnseenCount > 0 ? totalUnseenCount : undefined,
             } as any);
         } catch {
             // no-op
         }
-    }, [navigation, pendingInboxCount]);
+    }, [navigation, totalUnseenCount]);
 
     useDataReload(loadTrainingDays, ['SETTINGS_UPDATED']);
 
@@ -184,12 +128,22 @@ export default function SocialTab() {
             if (!user) return;
             loadTrainingDays();
             refreshLocation(true);
+
+            // Per user request: Re-check location in background every X time (3 minutes) while on Social tab
+            const locInterval = setInterval(() => {
+                refreshLocation(true);
+            }, 3 * 60 * 1000);
+
+            return () => clearInterval(locInterval);
         }, [user, loadTrainingDays, refreshLocation])
     );
 
     const handleRefresh = () => {
         setRefreshing(true);
-        loadData(true);
+        // Refresh data from API
+        fetchInitialData(true);
+        // Also quietly refresh GPS location in background since user explicitly pulled to refresh
+        refreshLocation(true);
     };
 
     const handleOpenPublicRoutines = useCallback(async () => {
@@ -224,7 +178,7 @@ export default function SocialTab() {
                 isPublic ? 1 : 0
             );
             setIsProfileModalVisible(false);
-            loadData(true);
+            fetchInitialData(true);
             addToast({ type: 'success', title: 'Perfil actualizado' });
         } catch (err: any) {
             addToast({ type: 'error', title: 'Error', message: err.message });
@@ -301,7 +255,7 @@ export default function SocialTab() {
     const handleAcceptFriend = async (requestId: string) => {
         try {
             await SocialService.respondFriendRequest(requestId, 'accept');
-            loadData(true);
+            fetchInitialData(true);
             addToast({ type: 'success', title: 'Amigo agregado' });
         } catch (err) {
             addToast({ type: 'error', title: 'Error al aceptar' });
@@ -311,7 +265,7 @@ export default function SocialTab() {
     const handleRejectFriend = async (requestId: string) => {
         try {
             await SocialService.respondFriendRequest(requestId, 'reject');
-            loadData(true);
+            fetchInitialData(true);
         } catch (err) {
             addToast({ type: 'error', title: 'Error al rechazar' });
         }
@@ -325,7 +279,7 @@ export default function SocialTab() {
             try {
                 await SocialService.respondFriendRequest(selectedFriend.id, action);
                 setSelectedFriend(null);
-                loadData(true);
+                fetchInitialData(true, true);
                 if (action === 'accept') addToast({ type: 'success', title: 'Amigo agregado' });
                 if (action === 'remove') addToast({ type: 'success', title: 'Amigo eliminado' });
                 if (action === 'block') addToast({ type: 'success', title: 'Usuario bloqueado' });
@@ -371,7 +325,7 @@ export default function SocialTab() {
                 try {
                     await SocialService.respondFriendRequest(friendId, 'remove');
                     setSelectedFriend(null);
-                    loadData(true);
+                    fetchInitialData(true, true);
                     addToast({ type: 'success', title: 'Amigo eliminado' });
                 } catch (err) {
                     addToast({ type: 'error', title: 'Error al eliminar' });
@@ -388,7 +342,7 @@ export default function SocialTab() {
                 addToast({ type: 'success', title: 'Rutina importada', message: 'Ya podés verla en tu biblioteca.' });
             }
             await SocialService.respondInbox(inboxId, action);
-            loadData(true);
+            fetchInitialData(true, true);
         } catch (err) {
             addToast({ type: 'error', title: 'Error en la acción' });
         }
@@ -396,14 +350,16 @@ export default function SocialTab() {
 
     const handleToggleKudo = async (feedId: string) => {
         try {
-            await SocialService.toggleKudo(feedId);
+            const result = await SocialService.toggleKudo(feedId);
+            if (result === 'error') return;
+
             setInbox(current => current.map(item => {
                 if (item.id === feedId) {
-                    const hasKudoed = !(item as any).hasKudoed; // Adjust according to real type
+                    const hasKudoed = result === 'added';
                     return {
                         ...item,
                         hasKudoed,
-                        kudosCount: ((item as any).kudosCount || 0) + (hasKudoed ? 1 : -1)
+                        kudosCount: Math.max(0, ((item as any).kudosCount || 0) + (hasKudoed ? 1 : -1))
                     } as any;
                 }
                 return item;
@@ -491,6 +447,7 @@ export default function SocialTab() {
                     onRefreshLocation={refreshLocation}
                     refreshingLocation={refreshingLocation}
                     locationPermissionDenied={locationPermissionDenied}
+                    lastKnownLocation={lastKnownLocation}
                     colors={colors}
                     styles={styles}
                 />
@@ -510,7 +467,14 @@ export default function SocialTab() {
                             onPress={() => setActiveTab('friends')}
                         >
                             <Users size={18} color={activeTab === 'friends' ? colors.onPrimary : colors.textMuted} />
-                            <Text style={[styles.tabText, activeTab === 'friends' && styles.tabTextActive]}>Amigos</Text>
+                            <Text style={[styles.tabText, activeTab === 'friends' && styles.tabTextActive]}>
+                                Amigos{incomingFriendRequests > 0 ? ` (${incomingFriendRequests})` : ''}
+                            </Text>
+                            {incomingFriendRequests > 0 && (
+                                <View style={[styles.inboxBadge, { backgroundColor: colors.red }]}>
+                                    <Text style={styles.inboxBadgeText}>{incomingFriendRequests}</Text>
+                                </View>
+                            )}
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -519,11 +483,11 @@ export default function SocialTab() {
                         >
                             <InboxIcon size={18} color={activeTab === 'inbox' ? colors.onPrimary : colors.textMuted} />
                             <Text style={[styles.tabText, activeTab === 'inbox' && styles.tabTextActive]}>
-                                Feed{pendingInboxCount > 0 ? ` (${pendingInboxCount})` : ''}
+                                Feed{unseenFeedCount > 0 ? ` (${unseenFeedCount})` : ''}
                             </Text>
-                            {(pendingInboxCount > 0) && (
+                            {unseenFeedCount > 0 && (
                                 <View style={styles.inboxBadge}>
-                                    <Text style={styles.inboxBadgeText}>{pendingInboxCount}</Text>
+                                    <Text style={styles.inboxBadgeText}>{unseenFeedCount}</Text>
                                 </View>
                             )}
                         </TouchableOpacity>
@@ -575,6 +539,10 @@ export default function SocialTab() {
                                 inbox={inbox}
                                 showSeen={showSeen}
                                 setShowSeen={setShowSeen}
+                                hideOwnActivity={hideOwnActivity}
+                                setHideOwnActivity={setHideOwnActivity}
+                                typeFilter={typeFilter}
+                                setTypeFilter={setTypeFilter}
                                 handleInboxResponse={handleInboxResponse}
                                 handleMarkAsSeen={handleMarkAsSeen}
                                 handleToggleKudo={handleToggleKudo}

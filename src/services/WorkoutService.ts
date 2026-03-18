@@ -75,11 +75,21 @@ class WorkoutService {
         const events: Record<string, { status: string; colors: string[] }> = {};
         for (const r of rows) {
             const dateStr = format(new Date(r.date), 'yyyy-MM-dd');
-            const colors = (r.colors || '')
+            const newColors = (r.colors || '')
                 .split(',')
                 .map(s => s.trim())
                 .filter(Boolean);
-            events[dateStr] = { status: r.status, colors };
+
+            if (!events[dateStr]) {
+                events[dateStr] = { status: r.status, colors: newColors };
+            } else {
+                const mergedColors = Array.from(new Set([...events[dateStr].colors, ...newColors]));
+                const newStatus = (r.status === 'completed' || events[dateStr].status === 'completed')
+                    ? 'completed'
+                    : (events[dateStr].status === 'in_progress' || r.status === 'in_progress' ? 'in_progress' : r.status);
+
+                events[dateStr] = { status: newStatus, colors: mergedColors };
+            }
         }
 
         this.calendarEventsCache = { ts: now, data: events };
@@ -464,11 +474,43 @@ class WorkoutService {
         const exerciseType: ExerciseType = (exercise?.type as ExerciseType) ?? 'weight_reps';
 
         // 1. Determine Order Index
-        // We need to fetch current sets to determine the next order index securely
         const currentSets = await dbService.getSetsForWorkout(workoutId);
-        const nextIndex = currentSets.length;
+        let orderIndex = currentSets.length;
 
-        const orderIndex = typeof overrides?.order_index === 'number' ? overrides.order_index : nextIndex;
+        if (typeof overrides?.order_index === 'number') {
+            orderIndex = overrides.order_index;
+        } else {
+            // Auto-group chronologically within the exercise
+            const exerciseSets = currentSets.filter(s => s.exercise_id === exerciseId);
+            if (exerciseSets.length > 0) {
+                if (type === 'warmup') {
+                    // Place warmup AFTER the last warmup, or BEFORE the first normal set
+                    const firstNormal = exerciseSets.find(s => s.type !== 'warmup');
+                    if (firstNormal) {
+                        orderIndex = firstNormal.order_index;
+                    } else {
+                        // All are warmups, insert at the end of this exercise
+                        orderIndex = exerciseSets[exerciseSets.length - 1].order_index + 1;
+                    }
+                } else {
+                    // For normal/drop/failure/etc., insert at the end of this exercise's sets
+                    orderIndex = exerciseSets[exerciseSets.length - 1].order_index + 1;
+                }
+            } else {
+                // First set of this exercise, put it at the end of the workout
+                orderIndex = currentSets.length;
+            }
+        }
+
+        // Shift existing sets if we are inserting in the middle to make room
+        if (orderIndex <= currentSets.length - 1) {
+            for (const s of currentSets) {
+                if (s.order_index >= orderIndex) {
+                    await dbService.updateSet(s.id, { order_index: s.order_index + 1 });
+                }
+            }
+        }
+
         const superset_id = (overrides as any)?.superset_id;
 
         const allowWeight = exerciseType === 'weight_reps' || exerciseType === 'weight_only';
@@ -558,6 +600,17 @@ class WorkoutService {
 
     public async deleteSet(id: string) {
         await dbService.deleteSet(id);
+        this.invalidateCaches();
+    }
+
+    public async reorderSets(workoutId: string, orderedSetIds: string[]) {
+        let currentOrderIndex = 0;
+        await dbService.withTransaction(async () => {
+            for (const setId of orderedSetIds) {
+                await dbService.updateSet(setId, { order_index: currentOrderIndex });
+                currentOrderIndex++;
+            }
+        });
         this.invalidateCaches();
     }
 

@@ -4,11 +4,11 @@ import { configService } from '@/src/services/ConfigService';
 import { useWorkoutStore } from '@/src/store/workoutStore';
 import { withAlpha } from '@/src/theme';
 import { WorkoutSet } from '@/src/types/db';
-import { FlashList } from '@shopify/flash-list';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { LucideClock, LucideMoreVertical } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { NestableDraggableFlatList, NestableScrollContainer, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { useColors } from '../../src/hooks/useColors';
 import { confirm } from '../../src/store/confirmStore';
 
@@ -273,13 +273,9 @@ export default function ActiveWorkoutScreen() {
                     </View>
                 )}
 
-                <FlashList
-                    data={exerciseIds}
-                    // @ts-ignore
-                    estimatedItemSize={200}
-                    contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-                    renderItem={({ item: exId }) => (
-                        <View style={{ marginBottom: 24 }}>
+                <NestableScrollContainer contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+                    {exerciseIds.map((exId) => (
+                        <View key={exId} style={{ marginBottom: 24 }}>
                             <View style={ss.exerciseHeader}>
                                 <Text style={ss.exerciseName}>{exerciseNames[exId] || 'Loading Exercise...'}</Text>
                                 <Pressable onPress={() => { }}><LucideMoreVertical size={20} color={colors.textMuted} /></Pressable>
@@ -287,16 +283,44 @@ export default function ActiveWorkoutScreen() {
 
                             {/* Sets Header */}
                             <View style={ss.setsHeaderRow}>
-                                <View style={{ width: 32 }} />
+                                <View style={{ width: 52 }} />
                                 <View style={{ flex: 1 }}><Text style={ss.colLabel}>{unit.toUpperCase()}</Text></View>
                                 <View style={{ flex: 1 }}><Text style={ss.colLabel}>REPS</Text></View>
                                 <View style={{ flex: 1 }}><Text style={ss.colLabel}>RPE</Text></View>
-                                <View style={{ width: 48 }} />
+                                <View style={{ width: 44 }} />
                             </View>
 
-                            {groupedSets[exId].map((set, idx) => (
-                                <SetRowInput key={set.id} index={idx} set={set} onUpdate={handleUpdateSet} onToggleComplete={handleToggleComplete} disabled={!isEditable} />
-                            ))}
+                            <NestableDraggableFlatList
+                                data={groupedSets[exId]}
+                                keyExtractor={(item: any) => item.id}
+                                onDragEnd={({ data }: { data: any[] }) => {
+                                    const newOrderIds: string[] = [];
+                                    for (const currentExId of exerciseIds) {
+                                        if (currentExId === exId) {
+                                            newOrderIds.push(...data.map(s => s.id));
+                                        } else {
+                                            newOrderIds.push(...groupedSets[currentExId].map(s => s.id));
+                                        }
+                                    }
+                                    if (activeWorkout) {
+                                        useWorkoutStore.getState().reorderSets(activeWorkout.id, newOrderIds);
+                                    }
+                                }}
+                                renderItem={({ item, drag, isActive, getIndex }: any) => (
+                                    <ScaleDecorator>
+                                        <SetRowInput
+                                            key={item.id}
+                                            index={getIndex() ?? 0}
+                                            set={item}
+                                            onUpdate={handleUpdateSet}
+                                            onToggleComplete={handleToggleComplete}
+                                            disabled={!isEditable}
+                                            drag={drag}
+                                            isActive={isActive}
+                                        />
+                                    </ScaleDecorator>
+                                )}
+                            />
 
                             {isEditable && (
                                 <Pressable onPress={() => addSet(exId)} style={ss.addSetBtn} accessibilityRole="button" accessibilityLabel="Agregar serie">
@@ -304,19 +328,18 @@ export default function ActiveWorkoutScreen() {
                                 </Pressable>
                             )}
                         </View>
+                    ))}
+
+                    {isEditable ? (
+                        <Pressable onPress={() => router.push('/(tabs)/exercises')} style={ss.addExerciseBtn} accessibilityRole="button" accessibilityLabel="Agregar ejercicio">
+                            <Text style={ss.addExerciseText}>+ Agregar ejercicio</Text>
+                        </Pressable>
+                    ) : (
+                        <Pressable onPress={() => router.replace('/(tabs)')} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
+                            <Text style={ss.backBtnText}>Volver</Text>
+                        </Pressable>
                     )}
-                    ListFooterComponent={
-                        isEditable ? (
-                            <Pressable onPress={() => router.push('/(tabs)/exercises')} style={ss.addExerciseBtn} accessibilityRole="button" accessibilityLabel="Agregar ejercicio">
-                                <Text style={ss.addExerciseText}>+ Agregar ejercicio</Text>
-                            </Pressable>
-                        ) : (
-                            <Pressable onPress={() => router.replace('/(tabs)')} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
-                                <Text style={ss.backBtnText}>Volver</Text>
-                            </Pressable>
-                        )
-                    }
-                />
+                </NestableScrollContainer>
             </KeyboardAvoidingView>
         </SafeAreaWrapper>
     );

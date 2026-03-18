@@ -2,17 +2,18 @@ import { SocialInboxItem, SocialProfile } from '@/src/services/SocialService';
 import { withAlpha } from '@/src/theme';
 import { getInboxKey } from '@/src/utils/dedupe';
 import { FlashList } from '@shopify/flash-list';
-import { CheckCircle, Dumbbell, Eye, EyeOff, Flame, Globe, Trophy, XCircle } from 'lucide-react-native';
+import { CheckCircle, Dumbbell, Eye, EyeOff, Filter, Flame, Globe, Trophy, User, XCircle } from 'lucide-react-native';
 import React, { useCallback, useMemo } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 interface InboxTabProps {
     inbox: SocialInboxItem[];
     showSeen: boolean;
     setShowSeen: (show: boolean) => void;
-    handleInboxResponse: (inboxId: string, action: 'accept' | 'reject', payload?: unknown) => void;
-    handleMarkAsSeen: (id: string, feedType: 'direct_share' | 'activity_log') => void;
-    handleToggleKudo: (feedId: string) => void;
+    hideOwnActivity: boolean;
+    setHideOwnActivity: (hide: boolean) => void;
+    typeFilter: 'all' | 'pr' | 'workout' | 'routine';
+    setTypeFilter: (type: 'all' | 'pr' | 'workout' | 'routine') => void;
     profile: SocialProfile | null;
     colors: any;
     styles: any;
@@ -143,10 +144,14 @@ const ActivityItem = React.memo(({ item, onToggleKudo, onMarkAsSeen, profileId, 
     );
 });
 
-export const InboxTab = React.memo(({
+const InboxTab = React.memo(({
     inbox,
     showSeen,
     setShowSeen,
+    hideOwnActivity,
+    setHideOwnActivity,
+    typeFilter,
+    setTypeFilter,
     handleInboxResponse,
     handleMarkAsSeen,
     handleToggleKudo,
@@ -156,11 +161,34 @@ export const InboxTab = React.memo(({
     renderHeader,
     refreshing,
     onRefresh
-}: InboxTabProps & { renderHeader?: any, refreshing?: boolean, onRefresh?: () => void }) => {
+}: InboxTabProps & {
+    handleInboxResponse: any,
+    handleMarkAsSeen: any,
+    handleToggleKudo: any,
+    renderHeader?: any,
+    refreshing?: boolean,
+    onRefresh?: () => void
+}) => {
 
     const filteredInbox = useMemo(() => {
-        return inbox.filter(item => showSeen ? !!item.seenAt : !item.seenAt);
-    }, [inbox, showSeen]);
+        return inbox.filter(item => {
+            // 1. Seen/Unseen filtering
+            const matchesSeen = showSeen ? !!item.seenAt : !item.seenAt;
+            if (!matchesSeen) return false;
+
+            // 2. Own activity filtering
+            if (hideOwnActivity && item.senderId === profile?.id) return false;
+
+            // 3. Type filtering
+            if (typeFilter !== 'all') {
+                if (typeFilter === 'pr' && item.actionType !== 'pr_broken') return false;
+                if (typeFilter === 'workout' && item.actionType !== 'workout_completed') return false;
+                if (typeFilter === 'routine' && item.feedType !== 'direct_share' && item.actionType !== 'routine_shared') return false;
+            }
+
+            return true;
+        });
+    }, [inbox, showSeen, hideOwnActivity, typeFilter, profile?.id]);
 
     const renderItem = useCallback(({ item }: { item: SocialInboxItem }) => {
         if (item.feedType === 'direct_share' || !item.feedType) {
@@ -197,12 +225,52 @@ export const InboxTab = React.memo(({
                 renderItem={renderItem}
                 keyExtractor={(item) => getInboxKey(item)}
                 ListHeaderComponent={() => (
-                    <View>
+                    <View style={{ paddingTop: 8 }}>
                         {renderHeader && renderHeader()}
-                        <View style={styles.inboxSecondaryHeader}>
-                            <Text style={styles.inboxStatusTitle}>
-                                {showSeen ? 'Historial de Notificaciones' : 'Notificaciones Recientes'}
-                            </Text>
+
+                        {/* 1. Global Filters Bar (Always at top) */}
+                        <View style={{ marginBottom: 12 }}>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 4, gap: 10 }}>
+                                <TouchableOpacity
+                                    style={[styles.filterChip, hideOwnActivity && styles.filterChipActive]}
+                                    onPress={() => setHideOwnActivity(!hideOwnActivity)}
+                                >
+                                    <User size={14} color={hideOwnActivity ? colors.onPrimary : colors.textMuted} />
+                                    <Text style={[styles.filterChipText, hideOwnActivity && styles.filterChipTextActive]}>
+                                        Ocultar mías
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <View style={styles.filterSeparator} />
+
+                                {(['all', 'workout', 'pr', 'routine'] as const).map((type) => (
+                                    <TouchableOpacity
+                                        key={type}
+                                        style={[styles.filterChip, typeFilter === type && styles.filterChipActive]}
+                                        onPress={() => setTypeFilter(type)}
+                                    >
+                                        {type === 'all' && <Filter size={14} color={typeFilter === type ? colors.onPrimary : colors.textMuted} />}
+                                        {type === 'workout' && <Dumbbell size={14} color={typeFilter === type ? colors.onPrimary : colors.textMuted} />}
+                                        {type === 'pr' && <Trophy size={14} color={typeFilter === type ? colors.onPrimary : colors.textMuted} />}
+                                        {type === 'routine' && <Globe size={14} color={typeFilter === type ? colors.onPrimary : colors.textMuted} />}
+                                        <Text style={[styles.filterChipText, typeFilter === type && styles.filterChipTextActive]}>
+                                            {type === 'all' ? 'Todos' : type === 'workout' ? 'Entrenos' : type === 'pr' ? 'Récords' : 'Rutinas'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+
+                        {/* 2. Secondary Header with Toggle (Section Title) */}
+                        <View style={[styles.inboxSecondaryHeader, { marginBottom: 16, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 }]}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.inboxStatusTitle}>
+                                    {showSeen ? 'Historial de Notificaciones' : 'Notificaciones Recientes'}
+                                </Text>
+                                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2, fontWeight: '600' }}>
+                                    {showSeen ? 'Actividad guardada' : 'Nuevas interacciones'}
+                                </Text>
+                            </View>
                             <TouchableOpacity
                                 style={[styles.archiveToggle, showSeen && styles.archiveToggleActive]}
                                 onPress={() => setShowSeen(!showSeen)}
@@ -227,3 +295,6 @@ export const InboxTab = React.memo(({
         </View>
     );
 });
+
+export default InboxTab;
+

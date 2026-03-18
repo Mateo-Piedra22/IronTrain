@@ -208,9 +208,8 @@ export default function ExerciseDetailScreen() {
             notify.info('Entrenamiento cerrado', 'No se puede agregar a un entrenamiento finalizado.');
             return;
         }
-        const nextIndex = sets.length;
         try {
-            const newSetId = await workoutService.addSet(workoutId, exerciseId, 'normal', { order_index: nextIndex });
+            const newSetId = await workoutService.addSet(workoutId, exerciseId, 'normal');
             if (newSetId) {
                 loadTrackData();
                 notify.success('Serie creada', 'Nueva serie en blanco lista.');
@@ -261,8 +260,7 @@ export default function ExerciseDetailScreen() {
                     distance: (s as any).distance,
                     time: (s as any).time,
                     rpe: s.rpe,
-                    notes: s.notes,
-                    order_index: sets.length + 1
+                    notes: s.notes
                 });
             }
             loadTrackData();

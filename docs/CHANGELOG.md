@@ -1,10 +1,34 @@
 # Changelog
 
-## 2.1.1 (Unreleased)
+## 2.1.2 (Unreleased)
 - **Sistema de temas**: Posibilidad completa de elegir entre tema claro y oscuro.
 - **Soporte para diferentes idiomas**: Posibilidad de elegir entre inglés y español.
 - **Conexión con múltiples dispositivos**: Posibilidad de conectar con múltiples dispositivos (relojes/bands compatibles).
 - **Vinculación con servicios de salud**: Posibilidad de vincular con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos.
+
+## 2.1.1 (2026-03-18)
+###  Social y Comunidad
+- **Filtros de Feed**: Ahora son siempre visibles y mantienen su estado al cambiar entre las pestañas de la sección social, mejorando la navegación.
+- **Bandeja de Entrada**: Se corrigieron errores donde el conteo de notificaciones era incorrecto o estas desaparecían inesperadamente.
+- **Persistencia de Ubicación**: El indicador de ubicación ahora persiste correctamente y refleja el estado real del usuario tras recargar la aplicación.
+- **Refinamientos de UI**: Mejoras en `social.styles.ts` para el manejo de sombras y coherencia de bordes, optimizado tanto para el Modo Claro como para el Oscuro.
+
+###  Centro de PRs (Sala de Trofeos)
+- **Selección Manual de Slots**: Se añadió un nuevo modal que permite seleccionar manualmente qué ejercicios específicos deseas seguir en la Sala de Trofeos.
+- **Gestión de Espacios**: Los usuarios pueden ahora limpiar los espacios manuales para volver a la detección automática de los "Big 3" (Sentadilla, Banca, Peso Muerto).
+- **Correcciones Visuales**: Se solucionó un error visual de "sombra interna" detectado en el badge de KG totales cuando se utiliza el tema claro.
+
+###  Análisis y Puntuación
+- **Sistema IronScore**: 
+    - Implementación de un proceso de cálculo retroactivo para otorgar puntos por entrenamientos completados en el pasado que no fueron procesados.
+    - Refinamiento de la lógica de detección de ejercicios principales para otorgar puntuaciones de recompensa más altas.
+- **Gestión de Datos Atípicos**: Se corrigieron valores inconsistentes en `AnalysisService` donde duraciones extremadamente largas (por olvido de cronómetro) alteraban las estadísticas promedio.
+- **Utilidades de Tiempo**: Incorporación de `formatDuration` y un sistema de parseo flexible para manejar limpiamente distintos formatos de entrada de tiempo.
+
+###  Entrenamiento y Almacenamiento
+- **Robustez de Sincronización**: Se mejoró la lógica en `SyncService` para asegurar que las acciones sociales y los registros de entrenamiento se sincronicen sin pérdida de datos.
+- **Tienda de Entrenamiento (Store)**: Optimización en la actualización de estados para el seguimiento de Récords Personales (PR) durante las sesiones activas.
+- **Entrada de Series**: Refinamiento en `SetRowInput` para ofrecer una mejor respuesta visual al completar series de alta intensidad.
 
 ## 2.1.0 (2026-03-09)
 

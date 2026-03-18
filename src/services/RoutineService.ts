@@ -547,10 +547,10 @@ class RoutineService {
     }
 
     public async exportRoutine(routineId: string): Promise<any> {
-        const routine = await dbService.getFirst('SELECT * FROM routines WHERE id = ?', [routineId]);
+        const routine = await dbService.getFirst('SELECT * FROM routines WHERE id = ? AND deleted_at IS NULL', [routineId]);
         if (!routine) throw new Error('Routine not found');
 
-        const routine_days = await dbService.getAll('SELECT * FROM routine_days WHERE routine_id = ?', [routineId]);
+        const routine_days = await dbService.getAll('SELECT * FROM routine_days WHERE routine_id = ? AND deleted_at IS NULL', [routineId]);
         let routine_exercises: any[] = [];
         let exercises: any[] = [];
         let categories: any[] = [];
@@ -569,7 +569,7 @@ class RoutineService {
                 const exIds = routine_exercises.map((re: any) => re.exercise_id);
                 const exPlaceholders = exIds.map(() => '?').join(',');
                 exercises = await dbService.getAll(
-                    `SELECT * FROM exercises WHERE id IN (${exPlaceholders})`,
+                    `SELECT * FROM exercises WHERE id IN (${exPlaceholders}) AND deleted_at IS NULL`,
                     exIds
                 );
 
@@ -595,7 +595,7 @@ class RoutineService {
             if (categoryIds.length > 0) {
                 const categoryPlaceholders = categoryIds.map(() => '?').join(',');
                 categories = await dbService.getAll(
-                    `SELECT * FROM categories WHERE id IN (${categoryPlaceholders})`,
+                    `SELECT * FROM categories WHERE id IN (${categoryPlaceholders}) AND deleted_at IS NULL`,
                     categoryIds
                 );
             }

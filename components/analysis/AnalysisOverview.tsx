@@ -8,6 +8,7 @@ import { Activity, BarChart3, Clock, Flame, TrendingDown, TrendingUp, Trophy, Za
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '../../src/hooks/useColors';
+import { formatDuration } from '../../src/utils/time';
 
 interface AnalysisOverviewProps {
     rangeDays: 7 | 30 | 90 | 365;
@@ -546,7 +547,7 @@ export const AnalysisOverview = React.memo(({
                         <View>
                             <Text style={styles.secondaryLabel}>Duración Media</Text>
                             <Text style={styles.secondaryValue}>
-                                {summaryRange?.avgDurationMin ? Math.round(summaryRange.avgDurationMin) : '—'} min
+                                {formatDuration(summaryRange?.avgDurationMin ?? null)}
                             </Text>
                         </View>
                     </View>

@@ -398,9 +398,7 @@ export class SocialService {
                 headers,
                 body: JSON.stringify({ feedId: feedId.trim() }),
             });
-            try {
-                dataEventService.emit('SOCIAL_UPDATED');
-            } catch { }
+            // Handled optimistically by the caller; no need for full reload
             return data.action === 'removed' ? 'removed' : 'added';
         } catch (e) {
             logger.captureException(e, { scope: 'SocialService.toggleKudo' });

@@ -63,6 +63,7 @@ export interface AppConfig {
     exerciseCardioPrimaryPRById: Record<string, 'distance' | 'time' | 'pace' | 'speed'>;
     lastViewedChangelogVersion: string;
     training_days: number[];
+    trophyExerciseIds: (string | null)[];
 
     cachedSocialScoreConfig: ScoreConfig | null;
     cachedSocialActiveEvent: GlobalEvent | null;
@@ -108,6 +109,7 @@ const DEFAULT_CONFIG: AppConfig = {
     exerciseCardioPrimaryPRById: {},
     lastViewedChangelogVersion: '0.0.0',
     training_days: [1, 2, 3, 4, 5, 6], // default Mon-Sat
+    trophyExerciseIds: [null, null, null] as (string | null)[],
 
     cachedSocialScoreConfig: null,
     cachedSocialActiveEvent: null,
@@ -180,6 +182,7 @@ class ConfigService {
                         s.key === 'exerciseCardioMetricById' ||
                         s.key === 'exerciseCardioPrimaryPRById' ||
                         s.key === 'training_days' ||
+                        s.key === 'trophyExerciseIds' ||
                         s.key === 'cachedSocialScoreConfig' ||
                         s.key === 'cachedSocialActiveEvent' ||
                         s.key === 'cachedSocialWeatherBonus'

@@ -310,8 +310,23 @@ export class AnalysisService {
             `
                 SELECT AVG(
                     COALESCE(
-                        CASE WHEN duration > 0 THEN duration / 60.0 ELSE NULL END,
-                        CASE WHEN end_time > start_time THEN (end_time - start_time) / 60000.0 ELSE NULL END
+                        CASE 
+                            WHEN duration > 0 THEN 
+                                CASE 
+                                    WHEN duration > 43200000 THEN NULL 
+                                    WHEN duration > 43200 THEN duration / 60000.0 
+                                    ELSE duration / 60.0 
+                                END
+                            ELSE NULL 
+                        END,
+                        CASE 
+                            WHEN end_time > start_time THEN 
+                                CASE 
+                                    WHEN (end_time - start_time) > 43200000 THEN NULL 
+                                    ELSE (end_time - start_time) / 60000.0 
+                                END
+                            ELSE NULL 
+                        END
                     )
                 ) as avgMin
                 FROM workouts
@@ -493,8 +508,23 @@ export class AnalysisService {
             `
                 SELECT AVG(
                     COALESCE(
-                        CASE WHEN duration > 0 THEN duration / 60.0 ELSE NULL END,
-                        CASE WHEN end_time > start_time THEN (end_time - start_time) / 60000.0 ELSE NULL END
+                        CASE 
+                            WHEN duration > 0 THEN 
+                                CASE 
+                                    WHEN duration > 43200000 THEN NULL 
+                                    WHEN duration > 43200 THEN duration / 60000.0 
+                                    ELSE duration / 60.0 
+                                END
+                            ELSE NULL 
+                        END,
+                        CASE 
+                            WHEN end_time > start_time THEN 
+                                CASE 
+                                    WHEN (end_time - start_time) > 43200000 THEN NULL 
+                                    ELSE (end_time - start_time) / 60000.0 
+                                END
+                            ELSE NULL 
+                        END
                     )
                 ) as avgMin
                 FROM workouts
@@ -897,28 +927,60 @@ export class AnalysisService {
         };
     }
 
-    static async getPowerliftingPRs(): Promise<PowerliftingPRs> {
-        const cacheKey = 'powerlifting_prs';
+    static async getPowerliftingPRs(manualExerciseIds?: (string | null)[]): Promise<PowerliftingPRs> {
+        const cacheKey = manualExerciseIds && manualExerciseIds.length > 0
+            ? `powerlifting_prs_${manualExerciseIds.map(id => id || 'null').join('_')}`
+            : 'powerlifting_prs_auto';
+
         const cached = this.getCached<PowerliftingPRs>(cacheKey);
         if (cached) return cached;
 
-        const exercises = await dbService.getAll<{ id: string; name: string }>('SELECT id, name FROM exercises ORDER BY name ASC');
-        const normalized = exercises.map((e) => ({ ...e, norm: e.name.toLowerCase() }));
+        let squatMatch: { id: string; name: string } | null = null;
+        let benchMatch: { id: string; name: string } | null = null;
+        let deadliftMatch: { id: string; name: string } | null = null;
 
-        const findBy = (include: string[], exclude: string[] = []): { id: string; name: string } | null => {
-            const found = normalized.find((e) => include.some((k) => e.norm.includes(k)) && !exclude.some((k) => e.norm.includes(k)));
-            return found ? { id: found.id, name: found.name } : null;
-        };
+        // Load exercises for manual IDs
+        const manualIdsToFetch = manualExerciseIds?.filter((id): id is string => Boolean(id)) || [];
+        const manualExercises = manualIdsToFetch.length > 0
+            ? await dbService.getAll<{ id: string; name: string }>(`SELECT id, name FROM exercises WHERE id IN (${manualIdsToFetch.map(id => `'${id}'`).join(',')})`)
+            : [];
 
-        const squatMatch =
-            findBy(['squat', 'sentadilla'], ['split', 'bulgar', 'hack']) ??
-            findBy(['front squat', 'sentadilla frontal'], []);
-        const benchMatch =
-            findBy(['bench press', 'press banca', 'banca'], ['dumb', 'mancuern', 'incline', 'inclinado']) ??
-            findBy(['press'], ['military', 'overhead', 'hombro']);
-        const deadliftMatch =
-            findBy(['deadlift', 'peso muerto'], ['romanian', 'rumano', 'rdl']) ??
-            findBy(['peso muerto convencional'], []);
+        // Assign manual matches if present
+        if (manualExerciseIds) {
+            squatMatch = manualExerciseIds[0] ? (manualExercises.find(e => e.id === manualExerciseIds[0]) || null) : null;
+            benchMatch = manualExerciseIds[1] ? (manualExercises.find(e => e.id === manualExerciseIds[1]) || null) : null;
+            deadliftMatch = manualExerciseIds[2] ? (manualExercises.find(e => e.id === manualExerciseIds[2]) || null) : null;
+        }
+
+        // Auto-detection for ONLY missing slots (Hybrid mode)
+        const exercises = (!squatMatch || !benchMatch || !deadliftMatch)
+            ? await dbService.getAll<{ id: string; name: string }>('SELECT id, name FROM exercises ORDER BY name ASC')
+            : [];
+
+        if (exercises.length > 0) {
+            const normalized = exercises.map((e) => ({ ...e, norm: e.name.toLowerCase() }));
+
+            const findBy = (include: string[], exclude: string[] = []): { id: string; name: string } | null => {
+                const found = normalized.find((e) => include.some((k) => e.norm.includes(k)) && !exclude.some((k) => e.norm.includes(k)));
+                return found ? { id: found.id, name: found.name } : null;
+            };
+
+            if (!squatMatch) {
+                squatMatch =
+                    findBy(['squat', 'sentadilla'], ['split', 'bulgar', 'hack']) ??
+                    findBy(['front squat', 'sentadilla frontal'], []);
+            }
+            if (!benchMatch) {
+                benchMatch =
+                    findBy(['bench press', 'press banca', 'banca'], ['dumb', 'mancuern', 'incline', 'inclinado']) ??
+                    findBy(['press'], ['military', 'overhead', 'hombro']);
+            }
+            if (!deadliftMatch) {
+                deadliftMatch =
+                    findBy(['deadlift', 'peso muerto'], ['romanian', 'rumano', 'rdl']) ??
+                    findBy(['peso muerto convencional'], []);
+            }
+        }
 
         const squat = squatMatch ? await AnalysisService.getExercisePR(squatMatch.id) : null;
         const bench = benchMatch ? await AnalysisService.getExercisePR(benchMatch.id) : null;
@@ -932,6 +994,7 @@ export class AnalysisService {
             benchName: benchMatch?.name ?? null,
             deadliftName: deadliftMatch?.name ?? null,
         };
+
         this.setCache(cacheKey, result);
         return result;
     }

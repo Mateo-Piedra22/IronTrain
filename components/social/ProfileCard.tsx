@@ -16,8 +16,9 @@ interface ProfileCardProps {
     onShowEventModal: () => void;
     onShowWeatherModal: () => void;
     onRefreshLocation: (silent?: boolean) => void;
-    refreshingLocation: boolean;
     locationPermissionDenied: boolean;
+    lastKnownLocation: string | null;
+    refreshingLocation: boolean;
     colors: any;
     styles: any;
 }
@@ -37,6 +38,7 @@ export const ProfileCard = React.memo(({
     onRefreshLocation,
     refreshingLocation,
     locationPermissionDenied,
+    lastKnownLocation,
     colors,
     styles
 }: ProfileCardProps) => {
@@ -86,7 +88,7 @@ export const ProfileCard = React.memo(({
                                 {refreshingLocation ? 'Localizando...' :
                                     profile.weatherBonus?.isActive ? 'Voluntad de Hierro' :
                                         locationPermissionDenied ? 'Ubicación desactivada' :
-                                            (profile.weatherBonus?.location || 'Activar ubicación')}
+                                            (profile.weatherBonus?.location || lastKnownLocation || 'Activar ubicación')}
                             </Text>
                         </TouchableOpacity>
                     </View>

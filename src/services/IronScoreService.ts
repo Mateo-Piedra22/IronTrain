@@ -70,6 +70,31 @@ function startOfWeekMs(ts: number): number {
 }
 
 export class IronScoreService {
+    static async calculateMissingScoresRetroactively(): Promise<void> {
+        const userId = useAuthStore.getState().user?.id;
+        if (!userId) return;
+
+        try {
+            const missing = await dbService.getAll<{ id: string; date: number }>(
+                `SELECT w.id, w.date
+                 FROM workouts w
+                 LEFT JOIN score_events se ON w.id = se.workout_id AND se.event_type = 'workout_completed' AND se.deleted_at IS NULL
+                 WHERE w.status = 'completed' AND w.deleted_at IS NULL AND se.id IS NULL
+                 ORDER BY w.date ASC`
+            );
+
+            if (!missing || missing.length === 0) return;
+
+            logger.info(`Found ${missing.length} completed workouts missing score events. Calculating retrospectively...`, { scope: 'IronScoreService' });
+
+            for (const w of missing) {
+                await this.awardForFinishedWorkout(w.id, w.date || Date.now());
+            }
+        } catch (err) {
+            logger.captureException(err, { scope: 'IronScoreService.calculateMissingScoresRetroactively' });
+        }
+    }
+
     static async awardForFinishedWorkout(workoutId: string, finishedAtMs: number): Promise<IronScoreAwardResult> {
         const userId = useAuthStore.getState().user?.id;
         if (!userId) return { insertedEvents: 0, pointsAwarded: 0 };

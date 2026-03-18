@@ -20,8 +20,8 @@ type SyncSchedulerOptions = {
 };
 
 const DEFAULT_OPTIONS: SyncSchedulerOptions = {
-    debounceMs: 1500,
-    minIntervalMs: 20_000,
+    debounceMs: 5000,
+    minIntervalMs: 10_000,
     resumeDelayMs: 2000,
     periodicMs: 5 * 60_000,
     periodicMaxStaleMs: 30 * 60_000,
@@ -150,7 +150,9 @@ export class SyncSchedulerService {
 
         const now = Date.now();
         const sinceAttempt = now - this.lastAttemptAt;
-        if (sinceAttempt < this.options.minIntervalMs && reason !== 'manual') return false;
+
+        const bypassMinInterval = ['manual', 'net_reconnect', 'queue'].includes(reason);
+        if (sinceAttempt < this.options.minIntervalMs && !bypassMinInterval) return false;
 
         if (this.backoffTimer) return false;
 
@@ -206,6 +208,10 @@ export class SyncSchedulerService {
             this.lastSuccessAt = Date.now();
             this.backoffMs = 0;
             dataEventService.emit('SYNC_COMPLETED');
+
+            // Calculate any missing retroactively after we got the latest data
+            const { IronScoreService } = await import('./IronScoreService');
+            await IronScoreService.calculateMissingScoresRetroactively();
 
             // After a successful sync, if we just logged in or resumed, we double check if there's anything else pending
             // to fulfill the "automatic re-check" requirement.

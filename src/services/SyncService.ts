@@ -863,17 +863,19 @@ export class SyncService {
             // IMPORTANT:
             // Keep PRAGMA foreign_keys=OFF for the entire restore transaction.
             // If we re-enable inside the transaction, SQLite may still validate at COMMIT and fail.
+            // Actually, in SQLite, PRAGMA foreign_keys = OFF is a noop inside a transaction.
+            // It MUST be executed OUTSIDE the transaction.
             await dbService.executeRaw('PRAGMA foreign_keys = OFF;');
 
             try {
-                await dbService.withTransaction(async () => {
+                await dbService.withTransactionAsync(async (db) => {
                     const allowed = new Set(TABLES);
                     const tablesInSnapshot = snapshot && typeof snapshot === 'object' ? Object.keys(snapshot) : [];
                     const presentInOrder = TABLES.filter((t) => allowed.has(t) && tablesInSnapshot.includes(t));
                     const deleteOrder = [...presentInOrder].reverse();
 
                     for (const table of deleteOrder) {
-                        await dbService.run(`DELETE FROM ${table}`);
+                        await db.runAsync(`DELETE FROM ${table}`);
                     }
 
                     // Fetch table schemas to be schema-aware during restoration
@@ -891,66 +893,59 @@ export class SyncService {
                             if (keys.length === 0) continue;
                             const values = Object.values(normalized);
                             const placeholders = keys.map(() => '?').join(', ');
-                            await dbService.run(
+                            await db.runAsync(
                                 `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`,
                                 values as any
                             );
                         }
                     }
 
-                    await dbService.run(
-                        `DELETE FROM exercises
-                         WHERE category_id IS NOT NULL
-                           AND category_id NOT IN (SELECT id FROM categories)`
-                    );
-
-                    await dbService.run(
-                        `DELETE FROM routine_days
-                         WHERE routine_id NOT IN (SELECT id FROM routines)`
-                    );
-
-                    await dbService.run(
-                        `DELETE FROM routine_exercises
-                         WHERE routine_day_id NOT IN (SELECT id FROM routine_days)
-                            OR exercise_id NOT IN (SELECT id FROM exercises)`
-                    );
-
-                    await dbService.run(
-                        `DELETE FROM workout_sets
-                         WHERE workout_id NOT IN (SELECT id FROM workouts)
-                            OR exercise_id NOT IN (SELECT id FROM exercises)`
-                    );
-
                     // Defensive fix: ensure critical epoch fields remain numeric in SQLite.
                     // If the snapshot came with numeric strings, SQLite may persist them as TEXT,
-                    // breaking range queries like `WHERE date >= ? AND date < ?`.
-                    await dbService.run(
+                    // breaking range queries like \`WHERE date >= ? AND date < ?\`.
+                    await db.runAsync(
                         `UPDATE workouts
                          SET date = CAST(date AS INTEGER)
                          WHERE date IS NOT NULL AND typeof(date) != 'integer'`
                     );
-                    await dbService.run(
+                    await db.runAsync(
                         `UPDATE workouts
                          SET start_time = CAST(start_time AS INTEGER)
                          WHERE start_time IS NOT NULL AND typeof(start_time) != 'integer'`
                     );
-                    await dbService.run(
+                    await db.runAsync(
                         `UPDATE workouts
                          SET end_time = CAST(end_time AS INTEGER)
                          WHERE end_time IS NOT NULL AND typeof(end_time) != 'integer'`
                     );
 
+                    // --------------------------------------------------------------------------------
+                    // DYNAMIC ORPHAN CLEANUP
+                    // Since PRAGMA foreign_keys = OFF is active, ON DELETE CASCADE didn't fire during
+                    // table replacement. We dynamically find and delete any orphaned records 
+                    // until the database is structurally sound.
+                    // --------------------------------------------------------------------------------
+                    let fkPass = 0;
+                    while (true) {
+                        const fkIssues = await db.getAllAsync<{ table: string; rowid: number; parent: string; fkid: number }>('PRAGMA foreign_key_check;');
+                        if (fkIssues.length === 0) break;
+
+                        for (const issue of fkIssues) {
+                            logger.warn(`[Sync] Cleaning up orphaned row during restore: table=${issue.table}, rowid=${issue.rowid}, missing parent=${issue.parent}`);
+                            await db.runAsync(`DELETE FROM ${issue.table} WHERE rowid = ?`, [issue.rowid]);
+                        }
+
+                        fkPass++;
+                        if (fkPass > 10) {
+                            throw new Error('Too many passes attempting to resolve snapshot foreign key violations. Snapshot data might be fundamentally corrupted.');
+                        }
+                    }
+
                     // Append full sync event to avoid pushing this as mutations
-                    await dbService.run('DELETE FROM sync_queue');
+                    await db.runAsync('DELETE FROM sync_queue');
                 });
             } finally {
                 await dbService.executeRaw('PRAGMA foreign_keys = ON;');
-            }
-
-            const fkIssues = await dbService.getAll<{ table: string; rowid: number; parent: string; fkid: number }>('PRAGMA foreign_key_check;');
-            if (fkIssues.length > 0) {
-                const first = fkIssues[0];
-                throw new Error(`Snapshot restore integrity check failed (foreign_key_check). First issue: table=${first.table} rowid=${first.rowid} parent=${first.parent} fkid=${first.fkid}`);
             }
 
             // Deterministic hydration sanity check.

@@ -59,3 +59,15 @@ export function parseFlexibleTimeToSeconds(text: string): ParseTimeResult {
     if (n < 0) return { ok: false, error: 'negative' };
     return { ok: true, seconds: Math.floor(n) };
 }
+export function formatDuration(minutes: number | null): string {
+    if (minutes === null || minutes === undefined || isNaN(minutes)) return '—';
+    const totalMinutes = Math.round(minutes);
+    if (totalMinutes === 0) return '0 min';
+
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+
+    if (h > 0 && m > 0) return `${h}h ${m}m`;
+    if (h > 0) return `${h}h`;
+    return `${m}m`;
+}
