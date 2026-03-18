@@ -232,6 +232,81 @@ export async function handleGlobalEventAction(formData: FormData) {
     if (redirectPath) redirect(redirectPath);
 }
 
+export async function handleChangelogPublishAction(formData: FormData) {
+    let redirectPath = '';
+    try {
+        const adminId = await getAuthenticatedAdmin();
+        if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
+
+        const id = String(formData.get('id') || '').trim();
+        if (!id) throw new Error('MISSING_CHANGELOG_ID');
+
+        const [changelog] = await db.select().from(schema.changelogs).where(eq(schema.changelogs.id, id)).limit(1);
+        if (!changelog) throw new Error('CHANGELOG_NOT_FOUND');
+
+        await db.update(schema.changelogs)
+            .set({ isUnreleased: 0, updatedAt: new Date() })
+            .where(eq(schema.changelogs.id, id));
+
+        await sendSegmentedPush('all', 'Nueva Versión Disponible', `Actualización v${changelog.version} lista. Entra para ver qué hay de nuevo.`, {
+            type: 'system',
+            actionUrl: 'irontrain://changelog'
+        });
+
+        revalidatePath('/admin');
+        redirectPath = '/admin?tab=content&section=changelog&success=published';
+    } catch (error: any) {
+        console.error('Changelog Publish Action Error:', error);
+        revalidatePath('/admin');
+        redirectPath = '/admin?tab=content&section=changelog&error=publish_failed';
+    }
+    if (redirectPath) redirect(redirectPath);
+}
+
+export async function handleGlobalEventDeriveAnnouncementAction(formData: FormData) {
+    let redirectPath = '';
+    try {
+        const adminId = await getAuthenticatedAdmin();
+        if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
+
+        const id = String(formData.get('id') || '').trim();
+        if (!id) throw new Error('MISSING_EVENT_ID');
+
+        const [event] = await db.select().from(schema.globalEvents).where(eq(schema.globalEvents.id, id)).limit(1);
+        if (!event) throw new Error('EVENT_NOT_FOUND');
+
+        const notifId = `broadcast_${randomUUID()}`;
+        await db.insert(schema.adminNotifications).values({
+            id: notifId,
+            title: '¡Evento Global Activo!',
+            message: `${event.name} · multiplicador x${Number(event.multiplier).toFixed(2)} en todo tu puntaje.`,
+            type: 'toast',
+            priority: 'high',
+            displayMode: 'once',
+            targetPlatform: 'all',
+            targetSegment: 'all',
+            metadata: { actionUrl: 'irontrain://social' },
+            isActive: 1,
+            updatedAt: new Date(),
+        });
+
+        await sendSegmentedPush(
+            'all',
+            '¡Evento Global Activo!',
+            `${event.name} · multiplicador x${Number(event.multiplier).toFixed(2)} en todo tu puntaje.`,
+            { type: 'system', actionUrl: 'irontrain://social' }
+        );
+
+        revalidatePath('/admin');
+        redirectPath = `/admin?tab=content&section=broadcast&editNotifId=${notifId}&success=derived`;
+    } catch (error: any) {
+        console.error('Global Event Derive Action Error:', error);
+        revalidatePath('/admin');
+        redirectPath = '/admin?tab=content&section=events&error=derive_failed';
+    }
+    if (redirectPath) redirect(redirectPath);
+}
+
 export async function handleChangelogSyncAction() {
     let redirectPath = '';
     try {
