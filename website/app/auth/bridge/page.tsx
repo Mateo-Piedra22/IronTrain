@@ -61,7 +61,10 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
     const profileResult = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, session.id));
     const profile = profileResult[0];
 
+    console.log(`[Bridge] User:${session.id} Email:${session.email} HasProfile:${!!profile} HasUsername:${!!profile?.username}`);
+
     // ONBOARDING STEP: Set Identity if no profile or no username exists
+    // We only show this if the user is NOT an admin or if they explicitly lack a username
     if (!profile || !profile.username) {
         async function setUsernameAction(formData: FormData) {
             'use server';
@@ -72,6 +75,8 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
             if (!rawUser) return redirect('/auth/bridge?error=Usuario_Requerido');
 
             const username = rawUser.trim().toLowerCase();
+
+            console.log(`[Bridge] Attempting to set username:${username} for User:${sessionId}`);
 
             // Rules
             if (username.length < 3 || username.length > 20) return redirect('/auth/bridge?error=Debe_tener_entre_3_y_20_caracteres');
@@ -101,10 +106,12 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
             } else {
                 await db.update(schema.userProfiles).set({
                     username,
-                    displayName: displayName?.trim() || profile.displayName || 'Atleta Iron',
+                    displayName: displayName?.trim() || profile.displayName || session.name || 'Atleta Iron',
                     updatedAt: new Date()
                 }).where(eq(schema.userProfiles.id, sessionId));
             }
+
+            console.log(`[Bridge] Identity set successfully for User:${sessionId}`);
 
             // Re-run bridge logic
             redirect('/auth/bridge');

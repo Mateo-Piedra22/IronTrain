@@ -20,16 +20,11 @@ export async function GET(req: NextRequest) {
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         let profiles = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, userId));
-
-        if (profiles.length === 0) {
-            await db.insert(schema.userProfiles).values({
-                id: userId,
-                displayName: 'Atleta',
-            });
-            profiles = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, userId));
-        }
-
         const profile = profiles[0];
+
+        if (!profile) {
+            return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+        }
 
         // Fetch dynamic score configuration
         const [scoreConfig] = await db.select().from(schema.socialScoringConfig).where(eq(schema.socialScoringConfig.id, 'default'));
