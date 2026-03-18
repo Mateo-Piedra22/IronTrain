@@ -1,6 +1,7 @@
 'use client';
 
 import { Database, Filter, RefreshCw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
 type WorkoutRow = {
@@ -42,11 +43,12 @@ function fmtDateTime(ms: number | null): string {
 
 export default function SyncWorkoutsPanel({ workouts, pagination }: SyncWorkoutsPanelProps) {
     const { currentPage, totalPages, totalItems } = pagination;
+    const router = useRouter();
 
     const handlePageChange = (newPage: number) => {
         const url = new URL(window.location.href);
         url.searchParams.set('workoutsPage', newPage.toString());
-        window.location.href = url.toString();
+        router.push(url.pathname + url.search, { scroll: false });
     };
 
     const [statusFilter, setStatusFilter] = useState<'all' | 'in_progress' | 'completed'>('all');

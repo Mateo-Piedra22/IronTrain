@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useTransition } from 'react';
 import {
     handleChangelogAction,
     handleChangelogPublishAction,
@@ -18,6 +19,7 @@ import {
     handleGlobalEventDeriveAnnouncementAction,
     handleNotificationAction
 } from '../actions';
+import ConfirmModal from './ConfirmModal';
 
 type GlobalEventRow = {
     id: string;
@@ -58,10 +60,32 @@ export default function ContentManagementPanel({
     const router = useRouter();
     const activeSection = (searchParams.get('section') as 'broadcast' | 'changelog' | 'events') || 'broadcast';
 
+    const [isPending, startTransition] = useTransition();
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => { }
+    });
+
     const setActiveSection = (section: string) => {
         const params = new URLSearchParams(searchParams.toString());
         params.set('section', section);
         router.push(`?${params.toString()}`, { scroll: false });
+    };
+
+    const handleConfirm = (title: string, message: string, action: () => void) => {
+        setConfirmConfig({
+            isOpen: true,
+            title,
+            message,
+            onConfirm: action
+        });
     };
 
     return (
@@ -83,9 +107,29 @@ export default function ContentManagementPanel({
                     </div>
                 </div>
 
-                <form action={handleChangelogSyncAction}>
-                    <button type="submit" className="h-9 px-4 bg-[#1a1a2e] text-[#f5f1e8] font-black uppercase text-[10px] tracking-wide hover:bg-orange-500 transition-colors flex items-center justify-center gap-2 shadow-[3px_3px_0px_0px_rgba(249,115,22,0.3)]">
-                        <Zap className="w-3.5 h-3.5" /> FORZAR_DB_REBUILD
+                <form
+                    action={handleChangelogSyncAction}
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        handleConfirm(
+                            'RECONSTRUIR BASE DE DATOS',
+                            'Esta acción reconstruirá el caché de changelogs. ¿Continuar?',
+                            () => {
+                                startTransition(async () => {
+                                    const formData = new FormData(e.currentTarget as HTMLFormElement);
+                                    await handleChangelogSyncAction();
+                                });
+                            }
+                        );
+                    }}
+                >
+                    <button
+                        type="submit"
+                        disabled={isPending}
+                        className="h-9 px-4 bg-[#1a1a2e] text-[#f5f1e8] font-black uppercase text-[10px] tracking-wide hover:bg-orange-500 transition-colors flex items-center justify-center gap-2 shadow-[3px_3px_0px_0px_rgba(249,115,22,0.3)] disabled:opacity-50"
+                    >
+                        <Zap className={`w-3.5 h-3.5 ${isPending ? 'animate-spin' : ''}`} />
+                        {isPending ? 'PROCESANDO...' : 'FORZAR_DB_REBUILD'}
                     </button>
                 </form>
             </div>
@@ -262,11 +306,27 @@ export default function ContentManagementPanel({
                                                 >
                                                     EDIT
                                                 </Link>
-                                                <form action={handleNotificationAction}>
+                                                <form
+                                                    action={handleNotificationAction}
+                                                    onSubmit={(event) => {
+                                                        event.preventDefault();
+                                                        handleConfirm(
+                                                            'ELIMINAR NOTIFICACIÓN',
+                                                            '¿Estás seguro de que quieres eliminar esta notificación permanentemente?',
+                                                            () => {
+                                                                startTransition(async () => {
+                                                                    const formData = new FormData(event.currentTarget as HTMLFormElement);
+                                                                    formData.set('intent', 'delete');
+                                                                    await handleNotificationAction(formData);
+                                                                });
+                                                            }
+                                                        );
+                                                    }}
+                                                >
                                                     <input type="hidden" name="id" value={n.id} />
                                                     <input type="hidden" name="origin_tab" value={searchParams.get('tab') || 'content'} />
                                                     <input type="hidden" name="origin_section" value="broadcast" />
-                                                    <button type="submit" name="intent" value="delete" className="text-red-500">
+                                                    <button type="submit" name="intent" value="delete" className="text-red-500 hover:scale-110 transition-transform disabled:opacity-50" disabled={isPending}>
                                                         <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
                                                 </form>
@@ -346,11 +406,27 @@ export default function ContentManagementPanel({
                                             >
                                                 EDIT
                                             </Link>
-                                            <form action={handleChangelogAction}>
+                                            <form
+                                                action={handleChangelogAction}
+                                                onSubmit={(event) => {
+                                                    event.preventDefault();
+                                                    handleConfirm(
+                                                        'ELIMINAR VERSIÓN',
+                                                        `¿Eliminar permanentemente la versión ${c.version}?`,
+                                                        () => {
+                                                            startTransition(async () => {
+                                                                const formData = new FormData(event.currentTarget as HTMLFormElement);
+                                                                formData.set('intent', 'delete');
+                                                                await handleChangelogAction(formData);
+                                                            });
+                                                        }
+                                                    );
+                                                }}
+                                            >
                                                 <input type="hidden" name="id" value={c.id} />
                                                 <input type="hidden" name="origin_tab" value={searchParams.get('tab') || 'content'} />
                                                 <input type="hidden" name="origin_section" value="changelog" />
-                                                <button type="submit" name="intent" value="delete" className="text-red-500">
+                                                <button type="submit" name="intent" value="delete" className="text-red-500 hover:scale-110 transition-transform disabled:opacity-50" disabled={isPending}>
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
                                             </form>
@@ -456,11 +532,27 @@ export default function ContentManagementPanel({
                                             >
                                                 EDIT
                                             </Link>
-                                            <form action={handleGlobalEventAction}>
+                                            <form
+                                                action={handleGlobalEventAction}
+                                                onSubmit={(event) => {
+                                                    event.preventDefault();
+                                                    handleConfirm(
+                                                        'ELIMINAR EVENTO',
+                                                        `¿Eliminar el evento "${e.name}"?`,
+                                                        () => {
+                                                            startTransition(async () => {
+                                                                const formData = new FormData(event.currentTarget as HTMLFormElement);
+                                                                formData.set('intent', 'delete');
+                                                                await handleGlobalEventAction(formData);
+                                                            });
+                                                        }
+                                                    );
+                                                }}
+                                            >
                                                 <input type="hidden" name="id" value={e.id} />
                                                 <input type="hidden" name="origin_tab" value={searchParams.get('tab') || 'content'} />
                                                 <input type="hidden" name="origin_section" value="events" />
-                                                <button type="submit" name="intent" value="delete" className="text-red-500">
+                                                <button type="submit" name="intent" value="delete" className="text-red-500 hover:scale-110 transition-transform disabled:opacity-50" disabled={isPending}>
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
                                             </form>
@@ -472,6 +564,14 @@ export default function ContentManagementPanel({
                     </div>
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmConfig.onConfirm}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+            />
         </div>
     );
 }

@@ -33,7 +33,8 @@ export default function AdminTabs({
     const activeTab = (searchParams.get('tab') as 'status' | 'social' | 'content' | 'moderation' | 'marketplace' | 'sync') || 'status';
 
     const setActiveTab = (tab: string) => {
-        const params = new URLSearchParams(searchParams.toString());
+        // Clear all sub-parameters when switching main tabs to prevent "jumping" or inconsistent states
+        const params = new URLSearchParams();
         params.set('tab', tab);
         router.push(`?${params.toString()}`, { scroll: false });
     };

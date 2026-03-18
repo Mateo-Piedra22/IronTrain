@@ -11,9 +11,11 @@ import {
     WifiOff,
     Zap
 } from 'lucide-react';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useTransition } from 'react';
 import { SyncHealthPanel } from '../../../src/components/admin/SyncHealthPanel';
 import { handleUpdateSystemStatus } from '../actions';
+import ConfirmModal from './ConfirmModal';
 
 interface SystemStatusPanelProps {
     metrics: {
@@ -35,6 +37,26 @@ export default function SystemStatusPanel({ metrics, syncHealth, systemStatus }:
     const [maintenance, setMaintenance] = useState(systemStatus.maintenanceMode === 1);
     const [offlineOnly, setOfflineOnly] = useState(systemStatus.offlineOnlyMode === 1);
     const [message, setMessage] = useState(systemStatus.message || '');
+    const [isPending, startTransition] = useTransition();
+    const searchParams = useSearchParams();
+
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant: 'danger' | 'warning' | 'info';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => { },
+        variant: 'danger'
+    });
+
+    const handleConfirm = (title: string, message: string, onConfirm: () => void, variant: 'danger' | 'warning' | 'info' = 'danger') => {
+        setConfirmConfig({ isOpen: true, title, message, onConfirm, variant });
+    };
 
     return (
         <div className="space-y-12 animate-in fade-in duration-500">
@@ -45,7 +67,34 @@ export default function SystemStatusPanel({ metrics, syncHealth, systemStatus }:
                     <h2 className="text-sm font-black uppercase tracking-[0.2em]">GLOBAL_APP_CONTROL</h2>
                 </div>
 
-                <form action={handleUpdateSystemStatus} className="p-8 space-y-8">
+                <form 
+                    action={handleUpdateSystemStatus} 
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        const isMaintenanceChanging = maintenance !== (systemStatus.maintenanceMode === 1);
+                        const isOfflineOnlyChanging = offlineOnly !== (systemStatus.offlineOnlyMode === 1);
+
+                        if (isMaintenanceChanging || isOfflineOnlyChanging) {
+                            handleConfirm(
+                                'CAMBIO DE ESTADO GLOBAL',
+                                `Estás a punto de cambiar modos críticos del sistema (${isMaintenanceChanging ? 'MAINTENANCE' : ''} ${isOfflineOnlyChanging ? 'OFFLINE_ONLY' : ''}). ¿Confirmar cambios?`,
+                                () => {
+                                    startTransition(async () => {
+                                        const formData = new FormData(e.currentTarget as HTMLFormElement);
+                                        await handleUpdateSystemStatus(formData);
+                                    });
+                                },
+                                'warning'
+                            );
+                        } else {
+                            startTransition(async () => {
+                                const formData = new FormData(e.currentTarget as HTMLFormElement);
+                                await handleUpdateSystemStatus(formData);
+                            });
+                        }
+                    }}
+                    className="p-8 space-y-8"
+                >
                     <input type="hidden" name="origin_tab" value="system" />
                     <input type="hidden" name="origin_section" value="status" />
                     <input type="hidden" name="maintenanceMode" value={maintenance ? '1' : '0'} />
@@ -110,10 +159,11 @@ export default function SystemStatusPanel({ metrics, syncHealth, systemStatus }:
                     <div className="flex justify-end">
                         <button
                             type="submit"
-                            className="bg-[#1a1a2e] text-[#f5f1e8] px-8 py-3 font-black uppercase tracking-widest text-xs flex items-center gap-3 hover:translate-x-1 hover:-translate-y-1 transition-transform active:translate-x-0 active:translate-y-0 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)]"
+                            disabled={isPending}
+                            className="bg-[#1a1a2e] text-[#f5f1e8] px-8 py-3 font-black uppercase tracking-widest text-xs flex items-center gap-3 hover:translate-x-1 hover:-translate-y-1 transition-transform active:translate-x-0 active:translate-y-0 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)] disabled:opacity-50"
                         >
                             <Save className="w-4 h-4" />
-                            APPLY_GLOBAL_CHANGES
+                            {isPending ? 'APPLYING...' : 'APPLY_GLOBAL_CHANGES'}
                         </button>
                     </div>
                 </form>
@@ -175,6 +225,15 @@ export default function SystemStatusPanel({ metrics, syncHealth, systemStatus }:
             <div className="border border-[#1a1a2e]/10 p-4 text-center bg-[#1a1a2e]/5">
                 <div className="text-[9px] font-black uppercase opacity-40 tracking-[0.5em]">SYSTEM_STABLE_NO_ERRORS_DETECTED_V2</div>
             </div>
+
+            <ConfirmModal
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmConfig.onConfirm}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                variant={confirmConfig.variant}
+            />
         </div>
     );
 }

@@ -8,7 +8,10 @@ import {
     Trophy,
     Zap
 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useTransition } from 'react';
 import { handleGlobalEventAction, handleScoringConfigAction } from '../actions';
+import ConfirmModal from './ConfirmModal';
 
 interface IronSocialPanelProps {
     scoreConfig: any;
@@ -32,11 +35,32 @@ export default function IronSocialPanel({
     pagination
 }: IronSocialPanelProps) {
     const { currentPage, totalPages, totalItems } = pagination;
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const [isPending, startTransition] = useTransition();
+
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant: 'danger' | 'warning' | 'info';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => { },
+        variant: 'danger'
+    });
+
+    const handleConfirm = (title: string, message: string, onConfirm: () => void, variant: 'danger' | 'warning' | 'info' = 'danger') => {
+        setConfirmConfig({ isOpen: true, title, message, onConfirm, variant });
+    };
 
     const handlePageChange = (newPage: number) => {
         const url = new URL(window.location.href);
         url.searchParams.set('leaderboardPage', newPage.toString());
-        window.location.href = url.toString();
+        router.push(url.pathname + url.search, { scroll: false });
     };
     return (
         <div className="space-y-12">
@@ -82,8 +106,12 @@ export default function IronSocialPanel({
                             <input type="checkbox" name="weatherBonusEnabled" value="true" id="weather_on" defaultChecked={scoreConfig.weatherBonusEnabled === 1} className="w-4 h-4 accent-[#1a1a2e]" />
                             <label htmlFor="weather_on" className="text-[10px] font-black uppercase tracking-wider">Enable_Voluntad_De_Hierro</label>
                         </div>
-                        <button type="submit" className="w-full bg-[#1a1a2e] text-[#f5f1e8] py-3 font-black uppercase text-[10px] tracking-widest hover:bg-orange-500 transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)]">
-                            SYNC_SCORING_V2
+                        <button 
+                            type="submit" 
+                            disabled={isPending}
+                            className="w-full bg-[#1a1a2e] text-[#f5f1e8] py-3 font-black uppercase text-[10px] tracking-widest hover:bg-orange-500 transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)] disabled:opacity-50"
+                        >
+                            {isPending ? 'SYNCING...' : 'SYNC_SCORING_V2'}
                         </button>
                     </form>
                 </div>
@@ -129,8 +157,12 @@ export default function IronSocialPanel({
                             <input type="checkbox" name="sendPush" value="true" id="push_event" className="w-4 h-4 accent-[#1a1a2e]" />
                             <label htmlFor="push_event" className="text-[10px] font-black uppercase tracking-wider">Broadcast_Push_To_All</label>
                         </div>
-                        <button type="submit" className="w-full bg-orange-500 text-[#1a1a2e] py-3 font-black uppercase text-[10px] tracking-widest hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
-                            LAUNCH_EVENT
+                        <button 
+                            type="submit" 
+                            disabled={isPending}
+                            className="w-full bg-orange-500 text-[#1a1a2e] py-3 font-black uppercase text-[10px] tracking-widest hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] disabled:opacity-50"
+                        >
+                            {isPending ? 'LAUNCHING...' : 'LAUNCH_EVENT'}
                         </button>
                     </form>
 
@@ -142,9 +174,26 @@ export default function IronSocialPanel({
                                         <div className="text-xs font-black uppercase">{event.name}</div>
                                         <div className="text-[10px] font-mono opacity-80">MULT: x{Number(event.multiplier).toFixed(2)}</div>
                                     </div>
-                                    <form action={handleGlobalEventAction}>
+                                    <form 
+                                        action={handleGlobalEventAction}
+                                        onSubmit={(e) => {
+                                            e.preventDefault();
+                                            handleConfirm(
+                                                'ELIMINAR EVENTO',
+                                                `¿Estás seguro de que quieres eliminar el evento "${event.name}"?`,
+                                                () => {
+                                                    startTransition(async () => {
+                                                        const formData = new FormData(e.currentTarget as HTMLFormElement);
+                                                        formData.set('intent', 'delete');
+                                                        await handleGlobalEventAction(formData);
+                                                    });
+                                                }
+                                            );
+                                        }}
+                                    >
                                         <input type="hidden" name="id" value={event.id} />
-                                        <button type="submit" name="intent" value="delete" className="text-red-400 hover:text-red-600">
+                                        <input type="hidden" name="origin_tab" value={searchParams.get('tab') || 'social'} />
+                                        <button type="submit" name="intent" value="delete" className="text-red-400 hover:text-red-600 disabled:opacity-50" disabled={isPending}>
                                             <Trash2 className="w-4 h-4" />
                                         </button>
                                     </form>
@@ -264,6 +313,15 @@ export default function IronSocialPanel({
                     })}
                 </div>
             </div>
+
+            <ConfirmModal
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmConfig.onConfirm}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                variant={confirmConfig.variant}
+            />
         </div>
     );
 }

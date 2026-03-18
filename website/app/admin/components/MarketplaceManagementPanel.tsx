@@ -10,8 +10,9 @@ import {
     Trash2
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { handleMarketplaceEntityAction } from '../actions';
+import ConfirmModal from './ConfirmModal';
 
 interface MarketplaceManagementPanelProps {
     officialExercises: any[];
@@ -31,8 +32,27 @@ export default function MarketplaceManagementPanel({
     const searchParams = useSearchParams();
     const router = useRouter();
     const activeSection = (searchParams.get('section') as 'exercises' | 'categories' | 'badges') || 'exercises';
+    const [isPending, startTransition] = useTransition();
 
     const [searchQuery, setSearchQuery] = useState('');
+
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        variant: 'danger' | 'warning' | 'info';
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => { },
+        variant: 'danger'
+    });
+
+    const handleConfirm = (title: string, message: string, onConfirm: () => void, variant: 'danger' | 'warning' | 'info' = 'danger') => {
+        setConfirmConfig({ isOpen: true, title, message, onConfirm, variant });
+    };
 
     const setActiveSection = (section: string) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -186,8 +206,14 @@ export default function MarketplaceManagementPanel({
                             </>
                         )}
 
-                        <button type="submit" name="intent" value="save" className="w-full bg-[#1a1a2e] text-[#f5f1e8] py-4 font-black uppercase text-xs tracking-[0.2em] hover:bg-red-600 transition-all shadow-[6px_6px_0px_0px_rgba(26,26,46,0.2)] active:translate-y-1 active:shadow-none flex items-center justify-center gap-2 mt-4">
-                            {editingItem ? 'COMMIT_CHANGES' : 'PUBLISH_OFFICIAL'}
+                        <button 
+                            type="submit" 
+                            name="intent" 
+                            value="save" 
+                            disabled={isPending}
+                            className="w-full bg-[#1a1a2e] text-[#f5f1e8] py-4 font-black uppercase text-xs tracking-[0.2em] hover:bg-red-600 transition-all shadow-[6px_6px_0px_0px_rgba(26,26,46,0.2)] active:translate-y-1 active:shadow-none flex items-center justify-center gap-2 mt-4 disabled:opacity-50"
+                        >
+                            {isPending ? 'PROCESS...' : (editingItem ? 'COMMIT_CHANGES' : 'PUBLISH_OFFICIAL')}
                             <Check className="w-4 h-4" />
                         </button>
                     </form>
@@ -223,12 +249,28 @@ export default function MarketplaceManagementPanel({
                                             >
                                                 EDIT
                                             </button>
-                                            <form action={handleMarketplaceEntityAction}>
+                                            <form 
+                                                action={handleMarketplaceEntityAction}
+                                                onSubmit={(e) => {
+                                                    e.preventDefault();
+                                                    handleConfirm(
+                                                        'ELIMINAR ENTIDAD',
+                                                        `¿Estás seguro de que quieres eliminar "${item.name}"?`,
+                                                        () => {
+                                                            startTransition(async () => {
+                                                                const formData = new FormData(e.currentTarget as HTMLFormElement);
+                                                                formData.set('intent', 'delete');
+                                                                await handleMarketplaceEntityAction(formData);
+                                                            });
+                                                        }
+                                                    );
+                                                }}
+                                            >
                                                 <input type="hidden" name="table" value={activeSection} />
                                                 <input type="hidden" name="id" value={item.id} />
                                                 <input type="hidden" name="origin_tab" value="marketplace" />
                                                 <input type="hidden" name="origin_section" value={activeSection} />
-                                                <button type="submit" name="intent" value="delete" className="text-red-500/40 hover:text-red-600 transition-colors">
+                                                <button type="submit" name="intent" value="delete" className="text-red-500/40 hover:text-red-600 transition-colors disabled:opacity-50" disabled={isPending}>
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
                                             </form>
@@ -285,6 +327,15 @@ export default function MarketplaceManagementPanel({
                     </div>
                 </div>
             </div>
+
+            <ConfirmModal
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmConfig.onConfirm}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                variant={confirmConfig.variant}
+            />
         </div>
     );
 }

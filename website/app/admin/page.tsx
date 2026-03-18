@@ -43,6 +43,7 @@ const ISO_EPOCH_FALLBACK = new Date(0).toISOString();
 interface AdminPageProps {
     params: Promise<any>;
     searchParams: Promise<{
+        tab?: string;
         editNotifId?: string;
         editChangelogId?: string;
         editEventId?: string;
@@ -78,7 +79,10 @@ export default async function AdminPage({
         );
     }
 
+    // 0. Resolve parameters
     const params = await searchParams;
+    const activeTab = (params.tab as 'status' | 'social' | 'content' | 'moderation' | 'marketplace' | 'sync') || 'status';
+
     const {
         editNotifId,
         editChangelogId,
@@ -101,107 +105,45 @@ export default async function AdminPage({
     const leaderboardPageSize = 30;
     const leaderboardOffset = (leaderboardPage - 1) * leaderboardPageSize;
 
-    // Preliminary fetch for counts to avoid blocking if possible (though we still Promise.all)
+    // 1. Core Data (Always needed or lightweight)
     const [
         totalWorkoutsResult,
-        totalProfilesResult
+        totalProfilesResult,
+        systemStatusData,
+        installsCount,
+        feedbackCountResult
     ] = await Promise.all([
         db.select({ count: sql<number>`count(*)` }).from(schema.workouts),
         db.select({ count: sql<number>`count(*)` }).from(schema.userProfiles),
+        db.select().from(schema.systemStatus).where(eq(schema.systemStatus.id, 'global')).limit(1),
+        db.select({ count: sql<number>`count(*)` }).from(schema.appInstalls),
+        db.select({ count: sql<number>`count(*)` }).from(schema.feedback).where(eq(schema.feedback.status, 'open')),
     ]);
 
     const totalWorkouts = Number(totalWorkoutsResult[0]?.count || 0);
     const totalProfiles = Number(totalProfilesResult[0]?.count || 0);
+    const pendingFeedbackCount = Number(feedbackCountResult[0]?.count || 0);
 
-    // Main parallel fetch
-    const [
-        routinesData,
-        installsCount,
-        feedbackData,
-        changelogsRaw,
-        adminNotificationsData,
-        notificationLogsResult,
-        changelogReactionsResult,
-        scoringConfigData,
-        globalEventsData,
-        leaderboardData,
-        syncHealth,
-        officialExercisesRaw,
-        officialCategoriesRaw,
-        officialBadgesRaw,
-        systemStatusData,
-        workoutsForSyncPanel
-    ] = await Promise.all([
-        db.select({
-            id: schema.routines.id,
-            name: schema.routines.name,
-            userId: schema.routines.userId,
-            isPublic: schema.routines.isPublic,
-            isModerated: schema.routines.isModerated,
-            moderationMessage: schema.routines.moderationMessage,
-            updatedAt: schema.routines.updatedAt,
-            username: schema.userProfiles.username,
-        })
-            .from(schema.routines)
-            .leftJoin(schema.userProfiles, eq(schema.routines.userId, schema.userProfiles.id))
-            .where(isNull(schema.routines.deletedAt))
-            .orderBy(desc(schema.routines.updatedAt))
-            .limit(100), // Limit routines too for safety
-        db.select({ count: sql<number>`count(*)` }).from(schema.appInstalls),
-        db.select({
-            id: schema.feedback.id,
-            userId: schema.feedback.userId,
-            type: schema.feedback.type,
-            message: schema.feedback.message,
-            status: schema.feedback.status,
-            metadata: schema.feedback.metadata,
-            createdAt: schema.feedback.createdAt,
-            updatedAt: schema.feedback.updatedAt,
-            senderDisplayName: schema.userProfiles.displayName,
-            senderUsername: schema.userProfiles.username,
-        })
-            .from(schema.feedback)
-            .leftJoin(schema.userProfiles, eq(schema.feedback.userId, schema.userProfiles.id))
-            .orderBy(desc(schema.feedback.createdAt))
-            .limit(100),
-        db.select().from(schema.changelogs).orderBy(desc(schema.changelogs.version)),
-        db.select().from(schema.adminNotifications).orderBy(desc(schema.adminNotifications.createdAt)),
-        db.select({
-            notificationId: schema.notificationLogs.notificationId,
-            action: schema.notificationLogs.action,
-            count: sql<number>`count(*)`
-        }).from(schema.notificationLogs).groupBy(schema.notificationLogs.notificationId, schema.notificationLogs.action),
-        db.select({
-            changelogId: schema.changelogReactions.changelogId,
-            count: sql<number>`count(*)`
-        }).from(schema.changelogReactions)
-            .where(isNull(schema.changelogReactions.deletedAt))
-            .groupBy(schema.changelogReactions.changelogId),
-        db.select().from(schema.socialScoringConfig).where(eq(schema.socialScoringConfig.id, 'default')),
-        db.select().from(schema.globalEvents).orderBy(desc(schema.globalEvents.startDate)),
-        db.select({
-            id: schema.userProfiles.id,
-            username: schema.userProfiles.username,
-            displayName: schema.userProfiles.displayName,
-            scoreLifetime: schema.userProfiles.scoreLifetime,
-            streakWeeks: schema.userProfiles.streakWeeks,
-            streakMultiplier: schema.userProfiles.streakMultiplier,
-            currentStreak: schema.userProfiles.currentStreak,
-            highestStreak: schema.userProfiles.highestStreak,
-            updatedAt: schema.userProfiles.updatedAt,
-        }).from(schema.userProfiles)
-            .orderBy(desc(schema.userProfiles.scoreLifetime))
-            .limit(leaderboardPageSize)
-            .offset(leaderboardOffset),
-        getSyncHealthReport(),
-        db.query.exercises.findMany({
-            where: eq(schema.exercises.isSystem, 1),
-            with: { badges: true }
-        }),
-        db.select().from(schema.categories).where(eq(schema.categories.isSystem, 1)),
-        db.select().from(schema.badges).where(eq(schema.badges.isSystem, 1)),
-        db.select().from(schema.systemStatus).where(eq(schema.systemStatus.id, 'global')).limit(1),
-        db.select({
+    // 2. Conditional Panel Data
+    let routinesData: any[] = [];
+    let feedbackData: any[] = [];
+    let changelogsRaw: any[] = [];
+    let adminNotificationsData: any[] = [];
+    let notificationLogsResult: any[] = [];
+    let changelogReactionsResult: any[] = [];
+    let scoringConfigData: any[] = [];
+    let globalEventsData: any[] = [];
+    let leaderboardData: any[] = [];
+    let syncHealth = null;
+    let officialExercisesRaw: any[] = [];
+    let officialCategoriesRaw: any[] = [];
+    let officialBadgesRaw: any[] = [];
+    let workoutsForSyncPanel: any[] = [];
+
+    if (activeTab === 'status') {
+        syncHealth = await getSyncHealthReport();
+    } else if (activeTab === 'sync') {
+        workoutsForSyncPanel = await db.select({
             id: schema.workouts.id,
             userId: schema.workouts.userId,
             username: schema.userProfiles.username,
@@ -219,8 +161,100 @@ export default async function AdminPage({
             .groupBy(schema.workouts.id, schema.userProfiles.username)
             .orderBy(desc(schema.workouts.updatedAt))
             .limit(workoutsPageSize)
-            .offset(workoutsOffset),
-    ]);
+            .offset(workoutsOffset);
+    } else if (activeTab === 'social') {
+        const [scoring, events, leaderboard] = await Promise.all([
+            db.select().from(schema.socialScoringConfig).where(eq(schema.socialScoringConfig.id, 'default')),
+            db.select().from(schema.globalEvents).orderBy(desc(schema.globalEvents.startDate)),
+            db.select({
+                id: schema.userProfiles.id,
+                username: schema.userProfiles.username,
+                displayName: schema.userProfiles.displayName,
+                scoreLifetime: schema.userProfiles.scoreLifetime,
+                streakWeeks: schema.userProfiles.streakWeeks,
+                streakMultiplier: schema.userProfiles.streakMultiplier,
+                currentStreak: schema.userProfiles.currentStreak,
+                highestStreak: schema.userProfiles.highestStreak,
+                updatedAt: schema.userProfiles.updatedAt,
+            }).from(schema.userProfiles)
+                .orderBy(desc(schema.userProfiles.scoreLifetime))
+                .limit(leaderboardPageSize)
+                .offset(leaderboardOffset),
+        ]);
+        scoringConfigData = scoring;
+        globalEventsData = events;
+        leaderboardData = leaderboard;
+    } else if (activeTab === 'content') {
+        const [logs, notifs, nLogs, cReactions, events] = await Promise.all([
+            db.select().from(schema.changelogs).orderBy(desc(schema.changelogs.version)),
+            db.select().from(schema.adminNotifications).orderBy(desc(schema.adminNotifications.createdAt)),
+            db.select({
+                notificationId: schema.notificationLogs.notificationId,
+                action: schema.notificationLogs.action,
+                count: sql<number>`count(*)`
+            }).from(schema.notificationLogs).groupBy(schema.notificationLogs.notificationId, schema.notificationLogs.action),
+            db.select({
+                changelogId: schema.changelogReactions.changelogId,
+                count: sql<number>`count(*)`
+            }).from(schema.changelogReactions)
+                .where(isNull(schema.changelogReactions.deletedAt))
+                .groupBy(schema.changelogReactions.changelogId),
+            db.select().from(schema.globalEvents).orderBy(desc(schema.globalEvents.startDate)),
+        ]);
+        changelogsRaw = logs;
+        adminNotificationsData = notifs;
+        notificationLogsResult = nLogs;
+        changelogReactionsResult = cReactions;
+        globalEventsData = events;
+    } else if (activeTab === 'moderation') {
+        const [routines, feedback] = await Promise.all([
+            db.select({
+                id: schema.routines.id,
+                name: schema.routines.name,
+                userId: schema.routines.userId,
+                isPublic: schema.routines.isPublic,
+                isModerated: schema.routines.isModerated,
+                moderationMessage: schema.routines.moderationMessage,
+                updatedAt: schema.routines.updatedAt,
+                username: schema.userProfiles.username,
+            })
+                .from(schema.routines)
+                .leftJoin(schema.userProfiles, eq(schema.routines.userId, schema.userProfiles.id))
+                .where(isNull(schema.routines.deletedAt))
+                .orderBy(desc(schema.routines.updatedAt))
+                .limit(100),
+            db.select({
+                id: schema.feedback.id,
+                userId: schema.feedback.userId,
+                type: schema.feedback.type,
+                message: schema.feedback.message,
+                status: schema.feedback.status,
+                metadata: schema.feedback.metadata,
+                createdAt: schema.feedback.createdAt,
+                updatedAt: schema.feedback.updatedAt,
+                senderDisplayName: schema.userProfiles.displayName,
+                senderUsername: schema.userProfiles.username,
+            })
+                .from(schema.feedback)
+                .leftJoin(schema.userProfiles, eq(schema.feedback.userId, schema.userProfiles.id))
+                .orderBy(desc(schema.feedback.createdAt))
+                .limit(100),
+        ]);
+        routinesData = routines;
+        feedbackData = feedback;
+    } else if (activeTab === 'marketplace') {
+        const [exercises, categories, badges] = await Promise.all([
+            db.query.exercises.findMany({
+                where: eq(schema.exercises.isSystem, 1),
+                with: { badges: true }
+            }),
+            db.select().from(schema.categories).where(eq(schema.categories.isSystem, 1)),
+            db.select().from(schema.badges).where(eq(schema.badges.isSystem, 1)),
+        ]);
+        officialExercisesRaw = exercises;
+        officialCategoriesRaw = categories;
+        officialBadgesRaw = badges;
+    }
 
     // Secondary Fetch: Targeted Analytics for current leaderboard page
     const visibleUserIds = leaderboardData.map(u => u.id);
@@ -298,14 +332,14 @@ export default async function AdminPage({
     const metrics = {
         installs: Number(installsCount[0]?.count || 0),
         users: totalProfiles,
-        activeEvents: globalEventsData.filter((e) => {
+        activeEvents: globalEventsData.length > 0 ? globalEventsData.filter((e) => {
             if (e.isActive !== 1) return false;
             const start = toDateSafe((e as any)?.startDate);
             const end = toDateSafe((e as any)?.endDate);
             if (!start || !end) return false;
             return start <= now && end >= now;
-        }).length,
-        pendingFeedback: feedbackRows.filter(f => f.status === 'open').length,
+        }).length : 0,
+        pendingFeedback: pendingFeedbackCount,
     };
 
     const lastChangelogSync = changelogsRaw.reduce<Date | null>((latest, row) => {
