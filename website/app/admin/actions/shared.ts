@@ -1,3 +1,4 @@
+'use server';
 import { auth } from '../../../src/lib/auth/server';
 
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
