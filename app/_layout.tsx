@@ -5,6 +5,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { AlertTriangle, Download } from 'lucide-react-native';
+import { PostHogProvider } from 'posthog-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -27,6 +28,7 @@ import { updateService } from '../src/services/UpdateService';
 import { useAuthStore } from '../src/store/authStore';
 import { useConfirmStore } from '../src/store/confirmStore';
 import { useUpdateStore } from '../src/store/updateStore';
+import { posthog } from '../src/utils/analytics';
 import { logger } from '../src/utils/logger';
 import { notify } from '../src/utils/notify';
 
@@ -49,9 +51,6 @@ function GlobalConfirmModal() {
   );
 }
 
-/**
- * Main application content that has access to the ThemeContext
- */
 function MainAppContent({ dbInitialized, fontsLoaded, fontError, installedVersion, latestVersion, downloadUrl, notesUrl }: any) {
   const { activeTheme, currentNavTheme, statusBarStyle } = useTheme();
   const updateStatus = useUpdateStore((state) => state.status);
@@ -177,7 +176,6 @@ export default function RootLayout() {
         await syncScheduler.syncNow();
         await configService.reload();
 
-        // Register for push notifications
         const { PushRegistrationService } = await import('../src/services/PushRegistrationService');
         PushRegistrationService.registerForPushNotifications().catch(e => {
           logger.captureException(e, { scope: 'RootLayout.runInitialSync', message: 'Push registration failed' });
@@ -221,18 +219,20 @@ export default function RootLayout() {
   }, [updateStatus, latestVersion, downloadUrl, notesUrl]);
 
   return (
-    <SafeAreaProvider>
-      <AppThemeProvider>
-        <MainAppContent
-          dbInitialized={dbInitialized}
-          fontsLoaded={fontsLoaded}
-          fontError={fontError}
-          installedVersion={installedVersion}
-          latestVersion={latestVersion}
-          downloadUrl={downloadUrl}
-          notesUrl={notesUrl}
-        />
-      </AppThemeProvider>
-    </SafeAreaProvider>
+    <PostHogProvider client={posthog}>
+      <SafeAreaProvider>
+        <AppThemeProvider>
+          <MainAppContent
+            dbInitialized={dbInitialized}
+            fontsLoaded={fontsLoaded}
+            fontError={fontError}
+            installedVersion={installedVersion}
+            latestVersion={latestVersion}
+            downloadUrl={downloadUrl}
+            notesUrl={notesUrl}
+          />
+        </AppThemeProvider>
+      </SafeAreaProvider>
+    </PostHogProvider>
   );
 }

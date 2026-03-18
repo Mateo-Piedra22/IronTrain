@@ -4,6 +4,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { jwtDecode } from 'jwt-decode';
 import { create } from 'zustand';
 import { Config } from '../constants/Config';
+import * as analytics from '../utils/analytics';
 
 const TOKEN_KEY = 'irontrain_auth_token';
 const WEBSITE_URL = Config.API_URL;
@@ -68,6 +69,11 @@ export const useAuthStore = create<AuthState>((set) => ({
                     return;
                 }
                 set({ token, user: userData, isLoading: false });
+
+                // Identify user in PostHog
+                analytics.identify(userData.id, {
+                    email: userData.email
+                });
             } else {
                 set({ token: null, user: null, isLoading: false });
             }
@@ -103,6 +109,10 @@ export const useAuthStore = create<AuthState>((set) => ({
                     }
 
                     await SecureStore.setItemAsync(TOKEN_KEY, token);
+
+                    // Alias the anonymous ID with the user ID on first login
+                    analytics.alias(userData.id);
+
                     await useAuthStore.getState().initialize();
                 }
             } else if (result.type === 'cancel' || result.type === 'dismiss') {
@@ -120,6 +130,10 @@ export const useAuthStore = create<AuthState>((set) => ({
         try {
             set({ isLoading: true });
             await SecureStore.deleteItemAsync(TOKEN_KEY);
+
+            // Reset PostHog user state
+            analytics.reset();
+
             set({ token: null, user: null, isLoading: false });
         } catch (e: unknown) {
             set({ isLoading: false, error: getErrorMessage(e, 'Error desconocido') });

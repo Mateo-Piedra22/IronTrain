@@ -8,6 +8,7 @@ import { getAuthenticatedAdmin } from './actions';
 
 // New Components
 import AdminTabs from './components/AdminTabs';
+import AnalyticsPanel from './components/AnalyticsPanel';
 import CommunityModerationPanel from './components/CommunityModerationPanel';
 import ContentManagementPanel from './components/ContentManagementPanel';
 import IronSocialPanel from './components/IronSocialPanel';
@@ -81,7 +82,7 @@ export default async function AdminPage({
 
     // 0. Resolve parameters
     const params = await searchParams;
-    const activeTab = (params.tab as 'status' | 'social' | 'content' | 'moderation' | 'marketplace' | 'sync') || 'status';
+    const activeTab = (params.tab as 'status' | 'social' | 'content' | 'moderation' | 'marketplace' | 'sync' | 'analytics') || 'status';
 
     const {
         editNotifId,
@@ -534,6 +535,7 @@ export default async function AdminPage({
                             editingType={editType}
                         />
                     }
+                    analyticsPanel={<AnalyticsPanel />}
                 />
             </Suspense>
 

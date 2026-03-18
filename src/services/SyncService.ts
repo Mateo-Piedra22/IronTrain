@@ -4,6 +4,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { Config } from '../constants/Config';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+import * as analytics from '../utils/analytics';
 import { logger } from '../utils/logger';
 import { configService } from './ConfigService';
 import { dataEventService } from './DataEventService';
@@ -374,6 +375,9 @@ export class SyncService {
         }
         this.isSyncing = true;
 
+        let totalPushed = 0;
+        let totalPulled = 0;
+
         try {
             const token = useAuthStore.getState().token;
             if (!token) {
@@ -392,20 +396,32 @@ export class SyncService {
             const tableSchemas = await this.fetchAllTableSchemas();
 
             // 1. Initial Push: Send any pending local changes
-            await this.pushLocalChanges(token);
+            totalPushed += await this.pushLocalChanges(token);
 
             // 2. Pull: Get remote changes and run consistency fixes (repairs)
-            await this.pullRemoteChanges(token, options?.forcePull, tableSchemas);
+            totalPulled += await this.pullRemoteChanges(token, options?.forcePull, tableSchemas);
+
+            analytics.capture('sync_completed', {
+                success: true,
+                force_pull: !!options?.forcePull,
+                verify: !!options?.verify,
+                records_pushed: totalPushed,
+                records_pulled: totalPulled,
+            });
 
             // 3. Verification: If 'verify' is true, check if pull/repairs added new mutations to the queue
             if (options?.verify) {
                 const hasMore = await this.hasPendingChanges();
                 if (hasMore) {
                     logger.info('[Sync] Post-pull verify: Found new changes (likely from duplicate cleanup). Pushing again...');
-                    await this.pushLocalChanges(token);
+                    totalPushed += await this.pushLocalChanges(token);
                 }
             }
         } catch (error) {
+            analytics.capture('sync_completed', {
+                success: false,
+                error: error instanceof Error ? error.message : String(error),
+            });
             logger.captureException(error, { scope: 'SyncService.syncBidirectional' });
             throw error;
         } finally {
@@ -432,8 +448,8 @@ export class SyncService {
     /**
      * Pushes pending mutations from the local database out to the remote server.
      */
-    private async pushLocalChanges(token: string): Promise<void> {
-
+    private async pushLocalChanges(token: string): Promise<number> {
+        let totalCount = 0;
         let hasMore = true;
         while (hasMore) {
             const pendingOps = await dbService.getAll<SyncPayload>(
@@ -528,6 +544,7 @@ export class SyncService {
 
                 if (successIds.length > 0) {
                     await dbService.run(`UPDATE sync_queue SET status = 'synced', synced_at = ? WHERE id IN (${successIds.map(() => '?').join(',')})`, [Date.now(), ...successIds]);
+                    totalCount += successIds.length;
                 }
 
                 if (failedIds.length > 0) {
@@ -541,12 +558,14 @@ export class SyncService {
                 throw error; // Throw to abort sync chain if push fails fully
             }
         }
+        return totalCount;
     }
 
     /**
      * Pulls remote changes that happened after the last sync timestamp.
      */
-    private async pullRemoteChanges(token: string, forcePull = false, tableSchemas?: Map<string, Set<string>>): Promise<void> {
+    private async pullRemoteChanges(token: string, forcePull = false, tableSchemas?: Map<string, Set<string>>): Promise<number> {
+        let totalCount = 0;
         // Retrieve the last synced timestamp from local settings
         const lastSyncRecord = await dbService.getFirst<{ value: string }>('SELECT value FROM settings WHERE key = ?', ['last_pull_sync']);
         const lastSyncAt = (lastSyncRecord?.value && !forcePull) ? parseInt(lastSyncRecord.value, 10) : 0;
@@ -566,6 +585,7 @@ export class SyncService {
 
             const data = await response.json();
             const changes = Array.isArray(data?.changes) ? data.changes : [];
+            totalCount = changes.length;
             const serverTime = data?.serverTime;
 
             const byTable = new Map<string, any[]>();
@@ -797,11 +817,11 @@ export class SyncService {
             // After downloading changes, fix any potential duplicates from the cloud
             logger.info('[Sync] Performing post-pull consistency check...');
             await dbService.repairDataConsistency();
-
         } catch (error) {
             logger.captureException(error, { scope: 'SyncService.pullRemoteChanges' });
             throw error; // Throw so syncBidirectional fails loudly
         }
+        return totalCount;
     }
 
     /**

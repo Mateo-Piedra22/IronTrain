@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Config } from '../constants/Config';
 import { useAuthStore } from '../store/authStore';
+import * as analytics from '../utils/analytics';
 import { logger } from '../utils/logger';
 import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
@@ -271,6 +272,10 @@ export class SocialService {
         // Emit event for real-time UI updates
         dataEventService.emit('SOCIAL_UPDATED');
 
+        if (data.success) {
+            analytics.capture('friend_request_sent', { friend_id: friendId.trim() });
+        }
+
         return data.success;
     }
 
@@ -284,6 +289,10 @@ export class SocialService {
 
         // Emit event for real-time UI updates
         dataEventService.emit('SOCIAL_UPDATED');
+
+        if (data.success) {
+            analytics.capture('friend_request_responded', { request_id: requestId, action });
+        }
 
         return data.success;
     }
@@ -399,7 +408,11 @@ export class SocialService {
                 body: JSON.stringify({ feedId: feedId.trim() }),
             });
             // Handled optimistically by the caller; no need for full reload
-            return data.action === 'removed' ? 'removed' : 'added';
+            const result = data.action === 'removed' ? 'removed' : 'added';
+            if (result === 'added') {
+                analytics.capture('kudos_given', { feed_id: feedId.trim() });
+            }
+            return result;
         } catch (e) {
             logger.captureException(e, { scope: 'SocialService.toggleKudo' });
             return 'error';

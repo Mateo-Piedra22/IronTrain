@@ -1,6 +1,7 @@
 'use client';
 
 import {
+    BarChart2,
     Bell,
     Database,
     LayoutDashboard,
@@ -18,6 +19,7 @@ interface AdminTabsProps {
     moderationPanel: React.ReactNode;
     marketplacePanel: React.ReactNode;
     syncPanel: React.ReactNode;
+    analyticsPanel: React.ReactNode;
 }
 
 export default function AdminTabs({
@@ -26,11 +28,12 @@ export default function AdminTabs({
     contentPanel,
     moderationPanel,
     marketplacePanel,
-    syncPanel
+    syncPanel,
+    analyticsPanel
 }: AdminTabsProps) {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const activeTab = (searchParams.get('tab') as 'status' | 'social' | 'content' | 'moderation' | 'marketplace' | 'sync') || 'status';
+    const activeTab = (searchParams.get('tab') as 'status' | 'social' | 'content' | 'moderation' | 'marketplace' | 'sync' | 'analytics') || 'status';
 
     const setActiveTab = (tab: string) => {
         // Clear all sub-parameters when switching main tabs to prevent "jumping" or inconsistent states
@@ -41,6 +44,7 @@ export default function AdminTabs({
 
     const tabs = [
         { id: 'status', label: 'ESTADO_SISTEMA', icon: LayoutDashboard },
+        { id: 'analytics', label: 'METRICAS_AVANZADAS', icon: BarChart2 },
         { id: 'marketplace', label: 'MARKETPLACE_CATALOG', icon: ShoppingBag },
         { id: 'social', label: 'IRONSOCIAL_MGMT', icon: Share2 },
         { id: 'content', label: 'PUBLICADOR_UNIFICADO', icon: Bell },
@@ -74,6 +78,7 @@ export default function AdminTabs({
             {/* Tab Content */}
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                 {activeTab === 'status' && statusPanel}
+                {activeTab === 'analytics' && analyticsPanel}
                 {activeTab === 'social' && socialPanel}
                 {activeTab === 'content' && contentPanel}
                 {activeTab === 'moderation' && moderationPanel}

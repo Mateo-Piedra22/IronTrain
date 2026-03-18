@@ -4,6 +4,7 @@ import { configService } from '@/src/services/ConfigService';
 import { useWorkoutStore } from '@/src/store/workoutStore';
 import { withAlpha } from '@/src/theme';
 import { WorkoutSet } from '@/src/types/db';
+import * as analytics from '@/src/utils/analytics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { LucideClock, LucideMoreVertical } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -20,6 +21,12 @@ export default function ActiveWorkoutScreen() {
         activeWorkout, activeSets, isTimerRunning, workoutTimer, tickTimer,
         setWorkoutStatus, updateSet, addSet, toggleSetComplete, loadWorkoutById, exerciseNames,
     } = useWorkoutStore();
+
+    useEffect(() => {
+        if (id) {
+            analytics.capture('workout_started', { workout_id: id });
+        }
+    }, [id]);
 
     const [unit, setUnit] = useState(configService.get('weightUnit'));
 

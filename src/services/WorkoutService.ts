@@ -1,6 +1,7 @@
 import { endOfDay, format, getUnixTime, startOfDay } from 'date-fns';
 import { useAuthStore } from '../store/authStore';
 import { ExerciseType, SetType, Workout, WorkoutSet } from '../types/db';
+import * as analytics from '../utils/analytics';
 import { logger } from '../utils/logger';
 import { uuidV4 } from '../utils/uuid';
 import { dataEventService } from './DataEventService';
@@ -102,6 +103,11 @@ class WorkoutService {
     public async loadTemplate(templateId: string, targetDateStr: string): Promise<string> {
         const template = await dbService.getWorkoutById(templateId);
         if (!template) throw new Error('Template not found');
+
+        analytics.capture('template_loaded', {
+            template_id: templateId,
+            template_name: template.name,
+        });
 
         // Parse date strictly (YYYY-MM-DD)
         const parts = targetDateStr.split('-');
@@ -562,6 +568,13 @@ class WorkoutService {
         if (filteredOverrides.rpe !== undefined) payload.rpe = filteredOverrides.rpe;
         if ((filteredOverrides as any).completed !== undefined) payload.completed = (filteredOverrides as any).completed;
         const id = await dbService.addSet(payload);
+
+        analytics.capture('set_added', {
+            workout_id: workoutId,
+            exercise_id: exerciseId,
+            type: type,
+        });
+
         this.invalidateCaches();
         return id;
     }
@@ -595,6 +608,17 @@ class WorkoutService {
         if (filtered.time !== undefined && filtered.time !== null && filtered.time < 0) throw new Error('Time cannot be negative');
 
         await dbService.updateSet(id, filtered as any);
+
+        if (updates.completed === 1 && existing.completed === 0) {
+            analytics.capture('set_completed', {
+                set_id: id,
+                exercise_id: existing.exercise_id,
+                type: existing.type,
+                weight: filtered.weight ?? existing.weight,
+                reps: filtered.reps ?? existing.reps,
+            });
+        }
+
         this.invalidateCaches();
     }
 
@@ -640,6 +664,12 @@ class WorkoutService {
             );
             await dbService.queueSyncMutation('workouts', id, 'UPDATE', { status: 'completed', end_time: now, updated_at: now });
         }
+
+        analytics.capture('workout_completed', {
+            workout_id: id,
+            duration_seconds: workout?.start_time ? Math.round((now - workout.start_time) / 1000) : 0,
+            has_location: !!location,
+        });
 
         try {
             const { IronScoreService } = await import('./IronScoreService');
