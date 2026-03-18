@@ -137,9 +137,9 @@ export async function POST(req: NextRequest) {
                         if (filteredData.items) {
                             try {
                                 const parsed = typeof filteredData.items === 'string' ? JSON.parse(filteredData.items) : filteredData.items;
-                                filteredData.items = JSON.stringify(parsed);
+                                filteredData.items = parsed;
                             } catch {
-                                filteredData.items = '[]';
+                                filteredData.items = [];
                             }
                         }
                         // Changelogs don't have a userId, they are system-wide

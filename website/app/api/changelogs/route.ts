@@ -33,9 +33,9 @@ export async function GET(request: NextRequest) {
             id: c.id,
             version: c.version,
             date: toIsoSafe((c as any)?.date),
-            items: JSON.parse(c.items || '[]'),
+            items: (c.items as string[]) || [],
             unreleased: c.isUnreleased === 1,
-            metadata: c.metadata ? JSON.parse(c.metadata) : null,
+            metadata: (c.metadata as any) || null,
             reactionCount: c.reactionCount
         }))
             .filter((r) => includeUnreleased || r.unreleased !== true)
