@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { bigint, integer, pgTable, real, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, integer, jsonb, pgTable, real, text, timestamp } from 'drizzle-orm/pg-core';
 
 const commonFields = {
     userId: text('user_id').notNull(),
@@ -210,7 +210,7 @@ export const sharesInbox = pgTable('shares_inbox', {
     id: text('id').primaryKey(),
     senderId: text('sender_id').notNull(),
     receiverId: text('receiver_id').notNull(),
-    payload: text('payload').notNull(), // JSON string representing the Routine/Exercise
+    payload: jsonb('payload').notNull(), // JSON Represents the Routine/Exercise
     type: text('type').notNull(), // 'routine'
     status: text('status').notNull().default('pending'), // 'pending', 'accepted', 'rejected'
     seenAt: timestamp('seen_at'),
@@ -223,7 +223,7 @@ export const activityFeed = pgTable('activity_feed', {
     userId: text('user_id').notNull(),
     actionType: text('action_type').notNull(), // 'workout_completed', 'pr_broken', 'routine_shared'
     referenceId: text('reference_id'), // ID of the workout, routine, etc.
-    metadata: text('metadata'), // JSON string with specific info (e.g. weight, exercise name)
+    metadata: jsonb('metadata'), // JSON with specific info (e.g. weight, exercise name)
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
@@ -253,7 +253,7 @@ export const appInstalls = pgTable('app_installs', {
     id: text('id').primaryKey(), // uniquely generated uuid per device installation
     platform: text('platform').notNull(), // 'android', 'ios', 'web'
     version: text('version'), // e.g. '1.0.0'
-    metadata: text('metadata'), // Extra JSON data (device model, os version)
+    metadata: jsonb('metadata'), // Extra JSON data (device model, os version)
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -263,7 +263,7 @@ export const feedback = pgTable('feedback', {
     type: text('type').notNull(), // 'bug', 'feature_request', 'review', 'other'
     message: text('message').notNull(),
     status: text('status').default('open').notNull(), // 'open', 'in_progress', 'resolved', 'closed'
-    metadata: text('metadata'), // JSON string with app version, OS, etc. for repro
+    metadata: jsonb('metadata'), // JSON with app version, OS, etc. for repro
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -273,9 +273,9 @@ export const changelogs = pgTable('changelogs', {
     id: text('id').primaryKey(), // Usually UUID
     version: text('version').notNull().unique(), // e.g. '1.2.0'
     date: timestamp('date').defaultNow().notNull(),
-    items: text('items').notNull(), // JSON string: string[]
+    items: jsonb('items').notNull(), // JSON: string[]
     isUnreleased: integer('is_unreleased').default(0),
-    metadata: text('metadata'), // JSON string: icon, bannerImage, etc.
+    metadata: jsonb('metadata'), // JSON: icon, bannerImage, etc.
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     reactionCount: integer('reaction_count').default(0).notNull(),
@@ -294,7 +294,7 @@ export const adminNotifications = pgTable('admin_notifications', {
     targetSegment: text('target_segment'), // 'all', 'premium', 'new_users', etc.
     isActive: integer('is_active').default(1),
     scheduledAt: timestamp('scheduled_at').defaultNow().notNull(),
-    metadata: text('metadata'), // JSON string: icons, action buttons, styles
+    metadata: jsonb('metadata'), // JSON: icons, action buttons, styles
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     expiresAt: timestamp('expires_at'),
@@ -306,7 +306,7 @@ export const notificationLogs = pgTable('notification_logs', {
     notificationId: text('notification_id').notNull(),
     userId: text('user_id').notNull(),
     action: text('action').notNull(), // 'seen', 'closed', 'clicked'
-    metadata: text('metadata'), // e.g. platform, app version when action was taken
+    metadata: jsonb('metadata'), // e.g. platform, app version when action was taken
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -384,7 +384,7 @@ export const scoreEvents = pgTable('score_events', {
     streakMultiplier: real('streak_multiplier').default(1).notNull(),
     globalMultiplier: real('global_multiplier').default(1).notNull(),
     pointsAwarded: integer('points_awarded').notNull(),
-    metadata: text('metadata'),
+    metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),

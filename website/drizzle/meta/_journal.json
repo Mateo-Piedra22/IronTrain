@@ -29,6 +29,13 @@
       "when": 1773232062654,
       "tag": "0003_keen_gambit",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1773806824335,
+      "tag": "0004_jsonb_migration_v2",
+      "breakpoints": true
     }
   ]
 }
