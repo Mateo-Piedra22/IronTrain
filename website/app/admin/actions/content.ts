@@ -22,7 +22,7 @@ export async function handleChangelogAction(formData: FormData) {
         if (intent === 'delete') {
             await db.delete(schema.changelogReactions).where(eq(schema.changelogReactions.changelogId, id));
             await db.delete(schema.changelogs).where(eq(schema.changelogs.id, id));
-            redirectPath = getRedirectPath(formData, 'changelog');
+            redirectPath = await getRedirectPath(formData, 'changelog');
         } else if (intent === 'save') {
             const rawItems = String(formData.get('items') || '').trim();
             const items = rawItems.split('\n').map(i => i.trim()).filter(i => i.length > 0);
@@ -66,7 +66,7 @@ export async function handleChangelogAction(formData: FormData) {
                     actionUrl: 'irontrain://changelog'
                 });
             }
-            redirectPath = getRedirectPath(formData, 'changelog');
+            redirectPath = await getRedirectPath(formData, 'changelog');
         }
         revalidatePath('/admin');
     } catch (error: any) {
@@ -90,7 +90,7 @@ export async function handleNotificationAction(formData: FormData) {
             await db.delete(schema.notificationLogs).where(eq(schema.notificationLogs.notificationId, id));
             await db.delete(schema.notificationReactions).where(eq(schema.notificationReactions.notificationId, id));
             await db.delete(schema.adminNotifications).where(eq(schema.adminNotifications.id, id));
-            redirectPath = getRedirectPath(formData, 'broadcast');
+            redirectPath = await getRedirectPath(formData, 'broadcast');
         } else if (intent === 'save') {
             const actionUrl = formData.get('actionUrl') as string;
             const validated = notificationSchema.parse({
@@ -147,7 +147,7 @@ export async function handleNotificationAction(formData: FormData) {
                     actionUrl: actionUrl || ''
                 });
             }
-            redirectPath = getRedirectPath(formData, 'broadcast');
+            redirectPath = await getRedirectPath(formData, 'broadcast');
         }
         revalidatePath('/admin');
     } catch (error: any) {
@@ -171,7 +171,7 @@ export async function handleGlobalEventAction(formData: FormData) {
             await db.delete(schema.globalEvents).where(eq(schema.globalEvents.id, id));
             revalidatePath('/admin');
             revalidatePath('/feed');
-            redirectPath = getRedirectPath(formData, 'events');
+            redirectPath = await getRedirectPath(formData, 'events');
         } else if (intent === 'save') {
             const validated = globalEventSchema.parse({
                 id,
@@ -222,7 +222,7 @@ export async function handleGlobalEventAction(formData: FormData) {
 
             revalidatePath('/admin');
             revalidatePath('/feed');
-            redirectPath = getRedirectPath(formData, 'events');
+            redirectPath = await getRedirectPath(formData, 'events');
         }
     } catch (error: any) {
         console.error('Global Event Action Error:', error);

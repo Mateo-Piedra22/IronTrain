@@ -38,7 +38,7 @@ export async function handleMarketplaceEntityAction(formData: FormData) {
                     await db.delete(schema.badges).where(eq(schema.badges.id, id));
                 }
             }
-            redirectPath = getRedirectPath(formData, 'marketplace');
+            redirectPath = await getRedirectPath(formData, 'marketplace');
         } else if (intent === 'save') {
             if (table === 'categories') {
                 const name = String(formData.get('name') || '').trim();
@@ -120,7 +120,7 @@ export async function handleMarketplaceEntityAction(formData: FormData) {
                     }
                 });
             }
-            redirectPath = getRedirectPath(formData, 'marketplace');
+            redirectPath = await getRedirectPath(formData, 'marketplace');
         }
         revalidatePath('/admin');
         revalidatePath('/feed');

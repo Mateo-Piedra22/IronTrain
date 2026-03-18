@@ -15,7 +15,7 @@ export async function getAuthenticatedAdmin(): Promise<string | null> {
     }
 }
 
-export function getRedirectPath(formData: FormData, defaultSection?: string) {
+export async function getRedirectPath(formData: FormData, defaultSection?: string) {
     const tab = (formData.get('origin_tab') as string) || 'content';
     const section = (formData.get('origin_section') as string) || defaultSection || '';
     let path = `/admin?tab=${tab}`;

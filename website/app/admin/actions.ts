@@ -21,5 +21,5 @@ export {
     handleUpdateSystemStatus
 } from './actions/system';
 
-export { getAuthenticatedAdmin, getRedirectPath } from './actions/shared';
+export { getAuthenticatedAdmin } from './actions/shared';
 

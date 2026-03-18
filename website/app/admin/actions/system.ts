@@ -38,7 +38,7 @@ export async function handleUpdateSystemStatus(formData: FormData) {
 
         revalidatePath('/admin');
         revalidatePath('/');
-        redirectPath = getRedirectPath(formData, 'system');
+        redirectPath = await getRedirectPath(formData, 'system');
     } catch (error: any) {
         console.error('System Status Action Error:', error);
         revalidatePath('/admin');
@@ -97,7 +97,7 @@ export async function handleScoringConfigAction(formData: FormData) {
 
         revalidatePath('/admin');
         revalidatePath('/feed');
-        redirectPath = getRedirectPath(formData, 'social');
+        redirectPath = await getRedirectPath(formData, 'social');
     } catch (error: any) {
         console.error('Scoring Config Action Error:', error);
         revalidatePath('/admin');

@@ -19,7 +19,7 @@ export async function markFeedbackStatus(formData: FormData) {
 
         await db.update(schema.feedback).set({ status, updatedAt: new Date() }).where(eq(schema.feedback.id, id));
         revalidatePath('/admin');
-        redirectPath = getRedirectPath(formData, 'feedback');
+        redirectPath = await getRedirectPath(formData, 'feedback');
     } catch (error: any) {
         console.error('Feedback Action Error:', error);
         revalidatePath('/admin');
@@ -65,7 +65,7 @@ export async function handleRoutineAction(formData: FormData) {
 
         revalidatePath('/admin');
         revalidatePath('/feed');
-        redirectPath = getRedirectPath(formData, 'social');
+        redirectPath = await getRedirectPath(formData, 'social');
     } catch (error: any) {
         console.error('Routine Moderation Action Error:', error);
         revalidatePath('/admin');
