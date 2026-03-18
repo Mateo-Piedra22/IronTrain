@@ -16,6 +16,11 @@ interface IronSocialPanelProps {
     leaderboard: any[];
     breakdownByUser: Record<string, any[]>;
     recentEventsByUser: Record<string, any[]>;
+    pagination: {
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+    };
 }
 
 export default function IronSocialPanel({
@@ -23,8 +28,16 @@ export default function IronSocialPanel({
     globalEvents,
     leaderboard,
     breakdownByUser,
-    recentEventsByUser
+    recentEventsByUser,
+    pagination
 }: IronSocialPanelProps) {
+    const { currentPage, totalPages, totalItems } = pagination;
+
+    const handlePageChange = (newPage: number) => {
+        const url = new URL(window.location.href);
+        url.searchParams.set('leaderboardPage', newPage.toString());
+        window.location.href = url.toString();
+    };
     return (
         <div className="space-y-12">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -145,11 +158,29 @@ export default function IronSocialPanel({
                 </div>
             </div>
 
-            {/* IronSocial Leaderboard Refactor */}
             <div className="border border-[#1a1a2e] p-6 bg-white overflow-hidden">
-                <div className="flex items-center gap-3 mb-8 border-b border-[#1a1a2e]/10 pb-4">
-                    <Trophy className="w-5 h-5" />
-                    <h2 className="text-lg font-black uppercase tracking-tight">GLOBAL_COMMAND_LEADERBOARD</h2>
+                <div className="flex items-center justify-between mb-8 border-b border-[#1a1a2e]/10 pb-4">
+                    <div className="flex items-center gap-3">
+                        <Trophy className="w-5 h-5" />
+                        <h2 className="text-lg font-black uppercase tracking-tight">GLOBAL_COMMAND_LEADERBOARD ({totalItems})</h2>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage <= 1}
+                            className="px-3 py-1 bg-white text-[#1a1a2e] border-2 border-[#1a1a2e] font-black text-[9px] uppercase hover:translate-x-[2px] hover:translate-y-[2px] disabled:opacity-30 disabled:hover:translate-x-0"
+                        >
+                            PREV
+                        </button>
+                        <span className="font-black text-[9px] opacity-60">PAGE_{currentPage}_OF_{totalPages}</span>
+                        <button
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage >= totalPages}
+                            className="px-3 py-1 bg-white text-[#1a1a2e] border-2 border-[#1a1a2e] font-black text-[9px] uppercase hover:translate-x-[2px] hover:translate-y-[2px] disabled:opacity-30 disabled:hover:translate-x-0"
+                        >
+                            NEXT
+                        </button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

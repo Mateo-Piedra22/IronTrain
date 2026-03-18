@@ -1,5 +1,6 @@
 import { desc, eq, isNull, sql } from 'drizzle-orm';
 import { Shield } from 'lucide-react';
+import { Suspense } from 'react';
 import { db } from '../../src/db';
 import * as schema from '../../src/db/schema';
 import { getSyncHealthReport } from '../../src/lib/sync-health';
@@ -51,6 +52,8 @@ interface AdminPageProps {
         changelogSyncedAt?: string;
         editId?: string;
         editType?: 'exercises' | 'categories' | 'badges';
+        workoutsPage?: string;
+        leaderboardPage?: string;
     }>;
 }
 
@@ -85,13 +88,34 @@ export default async function AdminPage({
         changelogSource,
         changelogSyncedAt,
         editId,
-        editType
+        editType,
+        workoutsPage: wPageStr,
+        leaderboardPage: lPageStr
     } = params;
 
-    // Parallel Data Fetching
+    const workoutsPage = Math.max(1, Number(wPageStr) || 1);
+    const workoutsPageSize = 50;
+    const workoutsOffset = (workoutsPage - 1) * workoutsPageSize;
+
+    const leaderboardPage = Math.max(1, Number(lPageStr) || 1);
+    const leaderboardPageSize = 30;
+    const leaderboardOffset = (leaderboardPage - 1) * leaderboardPageSize;
+
+    // Preliminary fetch for counts to avoid blocking if possible (though we still Promise.all)
+    const [
+        totalWorkoutsResult,
+        totalProfilesResult
+    ] = await Promise.all([
+        db.select({ count: sql<number>`count(*)` }).from(schema.workouts),
+        db.select({ count: sql<number>`count(*)` }).from(schema.userProfiles),
+    ]);
+
+    const totalWorkouts = Number(totalWorkoutsResult[0]?.count || 0);
+    const totalProfiles = Number(totalProfilesResult[0]?.count || 0);
+
+    // Main parallel fetch
     const [
         routinesData,
-        profilesCount,
         installsCount,
         feedbackData,
         changelogsRaw,
@@ -101,8 +125,6 @@ export default async function AdminPage({
         scoringConfigData,
         globalEventsData,
         leaderboardData,
-        scoreBreakdownRows,
-        recentScoreEvents,
         syncHealth,
         officialExercisesRaw,
         officialCategoriesRaw,
@@ -123,8 +145,8 @@ export default async function AdminPage({
             .from(schema.routines)
             .leftJoin(schema.userProfiles, eq(schema.routines.userId, schema.userProfiles.id))
             .where(isNull(schema.routines.deletedAt))
-            .orderBy(desc(schema.routines.updatedAt)),
-        db.select({ count: sql<number>`count(*)` }).from(schema.userProfiles),
+            .orderBy(desc(schema.routines.updatedAt))
+            .limit(100), // Limit routines too for safety
         db.select({ count: sql<number>`count(*)` }).from(schema.appInstalls),
         db.select({
             id: schema.feedback.id,
@@ -140,7 +162,8 @@ export default async function AdminPage({
         })
             .from(schema.feedback)
             .leftJoin(schema.userProfiles, eq(schema.feedback.userId, schema.userProfiles.id))
-            .orderBy(desc(schema.feedback.createdAt)),
+            .orderBy(desc(schema.feedback.createdAt))
+            .limit(100),
         db.select().from(schema.changelogs).orderBy(desc(schema.changelogs.version)),
         db.select().from(schema.adminNotifications).orderBy(desc(schema.adminNotifications.createdAt)),
         db.select({
@@ -166,20 +189,10 @@ export default async function AdminPage({
             currentStreak: schema.userProfiles.currentStreak,
             highestStreak: schema.userProfiles.highestStreak,
             updatedAt: schema.userProfiles.updatedAt,
-        }).from(schema.userProfiles).orderBy(desc(schema.userProfiles.scoreLifetime)).limit(60),
-        db.select({
-            userId: schema.scoreEvents.userId,
-            eventType: schema.scoreEvents.eventType,
-            count: sql<number>`count(*)`,
-            points: sql<number>`sum(${schema.scoreEvents.pointsAwarded})`,
-        }).from(schema.scoreEvents).groupBy(schema.scoreEvents.userId, schema.scoreEvents.eventType),
-        db.select({
-            userId: schema.scoreEvents.userId,
-            eventType: schema.scoreEvents.eventType,
-            pointsAwarded: schema.scoreEvents.pointsAwarded,
-            metadata: schema.scoreEvents.metadata,
-            createdAt: schema.scoreEvents.createdAt,
-        }).from(schema.scoreEvents).orderBy(desc(schema.scoreEvents.createdAt)).limit(300),
+        }).from(schema.userProfiles)
+            .orderBy(desc(schema.userProfiles.scoreLifetime))
+            .limit(leaderboardPageSize)
+            .offset(leaderboardOffset),
         getSyncHealthReport(),
         db.query.exercises.findMany({
             where: eq(schema.exercises.isSystem, 1),
@@ -205,18 +218,44 @@ export default async function AdminPage({
             .leftJoin(schema.userProfiles, eq(schema.userProfiles.id, schema.workouts.userId))
             .groupBy(schema.workouts.id, schema.userProfiles.username)
             .orderBy(desc(schema.workouts.updatedAt))
-            .limit(800),
+            .limit(workoutsPageSize)
+            .offset(workoutsOffset),
     ]);
+
+    // Secondary Fetch: Targeted Analytics for current leaderboard page
+    const visibleUserIds = leaderboardData.map(u => u.id);
+    const [scoreBreakdownRows, recentScoreEvents] = visibleUserIds.length > 0 ? await Promise.all([
+        db.select({
+            userId: schema.scoreEvents.userId,
+            eventType: schema.scoreEvents.eventType,
+            count: sql<number>`count(*)`,
+            points: sql<number>`sum(${schema.scoreEvents.pointsAwarded})`,
+        })
+            .from(schema.scoreEvents)
+            .where(sql`${schema.scoreEvents.userId} IN ${visibleUserIds}`) // Using generic SQL for inArray compatibility if needed
+            .groupBy(schema.scoreEvents.userId, schema.scoreEvents.eventType),
+        db.select({
+            userId: schema.scoreEvents.userId,
+            eventType: schema.scoreEvents.eventType,
+            pointsAwarded: schema.scoreEvents.pointsAwarded,
+            metadata: schema.scoreEvents.metadata,
+            createdAt: schema.scoreEvents.createdAt,
+        })
+            .from(schema.scoreEvents)
+            .where(sql`${schema.scoreEvents.userId} IN ${visibleUserIds}`)
+            .orderBy(desc(schema.scoreEvents.createdAt))
+            .limit(500), // Limit total recent events for the page
+    ]) : [[], []];
 
     // Data Transformation
     const changelogs = (changelogsRaw || []).map(c => ({
         ...c,
-        items: JSON.parse(c.items || '[]') as string[],
+        items: (c.items || []) as string[],
         kudos: (changelogReactionsResult as any[] || []).find((r: any) => r.changelogId === c.id)?.count || 0
     }));
 
     const feedbackRows = feedbackData.map((f) => {
-        const metadata = f.metadata ? JSON.parse(f.metadata) : null;
+        const metadata = f.metadata as any;
         const senderName = f.senderDisplayName || (f.senderUsername ? `@${f.senderUsername}` : (f.userId || 'Anónimo'));
         return { ...f, metadata, senderName };
     });
@@ -258,7 +297,7 @@ export default async function AdminPage({
     const now = new Date();
     const metrics = {
         installs: Number(installsCount[0]?.count || 0),
-        users: Number(profilesCount[0]?.count || 0),
+        users: totalProfiles,
         activeEvents: globalEventsData.filter((e) => {
             if (e.isActive !== 1) return false;
             const start = toDateSafe((e as any)?.startDate);
@@ -385,60 +424,84 @@ export default async function AdminPage({
                 </div>
             </header>
 
-            <AdminTabs
-                statusPanel={
-                    <SystemStatusPanel
-                        metrics={metrics}
-                        syncHealth={syncHealth}
-                        systemStatus={systemStatus}
-                    />
-                }
-                syncPanel={
-                    <SyncWorkoutsPanel workouts={sanitizedWorkoutsForSync} />
-                }
-                socialPanel={
-                    <IronSocialPanel
-                        scoreConfig={scoreConfig}
-                        globalEvents={sanitizedGlobalEvents}
-                        leaderboard={sanitizedLeaderboard}
-                        breakdownByUser={sanitizedBreakdown}
-                        recentEventsByUser={sanitizedRecent}
-                    />
-                }
-                contentPanel={
-                    <ContentManagementPanel
-                        changelogs={sanitizedChangelogs}
-                        notifications={sanitizedNotifications}
-                        globalEvents={sanitizedGlobalEvents}
-                        editingChangelog={editChangelogId ? (sanitizedChangelogs.find(c => c.id === editChangelogId) ?? null) : null}
-                        editingNotification={editNotifId ? (sanitizedNotifications.find(n => n.id === editNotifId) ?? null) : null}
-                        editingGlobalEvent={editEventId ? (sanitizedGlobalEvents.find(e => e.id === editEventId) ?? null) : null}
-                        syncStatus={{
-                            lastSyncAt: toIsoSafe(lastChangelogSync),
-                            totalInDb: sanitizedChangelogs.length,
-                            syncStatus: changelogSyncStatus || null,
-                            upsertedCount: changelogUpserted || null,
-                            sourceCount: changelogSource || null,
-                            syncedAt: changelogSyncedAt || null
-                        }}
-                    />
-                }
-                moderationPanel={
-                    <CommunityModerationPanel
-                        routines={sanitizedRoutines}
-                        feedback={sanitizedFeedback}
-                    />
-                }
-                marketplacePanel={
-                    <MarketplaceManagementPanel
-                        officialExercises={sanitizedOfficialExercises}
-                        officialCategories={sanitizedOfficialCategories}
-                        officialBadges={sanitizedOfficialBadges}
-                        editingId={editId}
-                        editingType={editType}
-                    />
-                }
-            />
+            <Suspense fallback={
+                <div className="p-8 border-4 border-[#1a1a2e] bg-white animate-pulse">
+                    <div className="flex gap-4 mb-8">
+                        {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-10 w-32 bg-[#1a1a2e]/10 border-2 border-[#1a1a2e]/20" />)}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="h-64 bg-[#1a1a2e]/5 border-2 border-[#1a1a2e]/10" />
+                        <div className="h-64 bg-[#1a1a2e]/5 border-2 border-[#1a1a2e]/10" />
+                    </div>
+                </div>
+            }>
+                <AdminTabs
+                    statusPanel={
+                        <SystemStatusPanel
+                            metrics={metrics}
+                            syncHealth={syncHealth}
+                            systemStatus={systemStatus}
+                        />
+                    }
+                    syncPanel={
+                        <SyncWorkoutsPanel
+                            workouts={sanitizedWorkoutsForSync}
+                            pagination={{
+                                currentPage: workoutsPage,
+                                totalPages: Math.ceil(totalWorkouts / workoutsPageSize),
+                                totalItems: totalWorkouts
+                            }}
+                        />
+                    }
+                    socialPanel={
+                        <IronSocialPanel
+                            scoreConfig={scoreConfig}
+                            globalEvents={sanitizedGlobalEvents}
+                            leaderboard={sanitizedLeaderboard}
+                            breakdownByUser={sanitizedBreakdown}
+                            recentEventsByUser={sanitizedRecent}
+                            pagination={{
+                                currentPage: leaderboardPage,
+                                totalPages: Math.ceil(totalProfiles / leaderboardPageSize),
+                                totalItems: totalProfiles
+                            }}
+                        />
+                    }
+                    contentPanel={
+                        <ContentManagementPanel
+                            changelogs={sanitizedChangelogs}
+                            notifications={sanitizedNotifications}
+                            globalEvents={sanitizedGlobalEvents}
+                            editingChangelog={editChangelogId ? (sanitizedChangelogs.find(c => c.id === editChangelogId) ?? null) : null}
+                            editingNotification={editNotifId ? (sanitizedNotifications.find(n => n.id === editNotifId) ?? null) : null}
+                            editingGlobalEvent={editEventId ? (sanitizedGlobalEvents.find(e => e.id === editEventId) ?? null) : null}
+                            syncStatus={{
+                                lastSyncAt: toIsoSafe(lastChangelogSync),
+                                totalInDb: sanitizedChangelogs.length,
+                                syncStatus: changelogSyncStatus || null,
+                                upsertedCount: changelogUpserted || null,
+                                sourceCount: changelogSource || null,
+                                syncedAt: changelogSyncedAt || null
+                            }}
+                        />
+                    }
+                    moderationPanel={
+                        <CommunityModerationPanel
+                            routines={sanitizedRoutines}
+                            feedback={sanitizedFeedback}
+                        />
+                    }
+                    marketplacePanel={
+                        <MarketplaceManagementPanel
+                            officialExercises={sanitizedOfficialExercises}
+                            officialCategories={sanitizedOfficialCategories}
+                            officialBadges={sanitizedOfficialBadges}
+                            editingId={editId}
+                            editingType={editType}
+                        />
+                    }
+                />
+            </Suspense>
 
             <footer className="mt-24 text-center pb-12 border-t border-[#1a1a2e] pt-12">
                 <div className="text-[10px] opacity-40 font-bold tracking-[0.3em] uppercase mb-4">

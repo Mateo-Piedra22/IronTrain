@@ -45,7 +45,7 @@ export async function handleChangelogAction(formData: FormData) {
                 .values({
                     id,
                     version: validated.version,
-                    items: JSON.stringify(items),
+                    items: items,
                     isUnreleased,
                     date: new Date(),
                     updatedAt: new Date(),
@@ -54,7 +54,7 @@ export async function handleChangelogAction(formData: FormData) {
                     target: schema.changelogs.id,
                     set: {
                         version: validated.version,
-                        items: JSON.stringify(items),
+                        items: items,
                         isUnreleased,
                         updatedAt: new Date(),
                     }
@@ -106,7 +106,7 @@ export async function handleNotificationAction(formData: FormData) {
             const targetVersion = formData.get('targetVersion') as string;
             const targetPlatform = formData.get('targetPlatform') as string;
             const targetSegment = String(formData.get('targetSegment') || 'all');
-            const metadata = actionUrl ? JSON.stringify({ actionUrl }) : null;
+            const metadata = actionUrl ? { actionUrl } : null;
 
             await db.insert(schema.adminNotifications)
                 .values({

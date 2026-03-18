@@ -225,7 +225,7 @@ async function awardEvent(args: AwardArgs): Promise<number> {
         streakMultiplier: args.streakMultiplier,
         globalMultiplier: args.globalMultiplier,
         pointsAwarded,
-        metadata: args.metadata ? JSON.stringify(args.metadata) : null,
+        metadata: args.metadata ?? null,
     });
 
     await args.trx

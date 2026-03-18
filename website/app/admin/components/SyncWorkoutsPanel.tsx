@@ -16,6 +16,15 @@ type WorkoutRow = {
     setCount: number;
 };
 
+interface SyncWorkoutsPanelProps {
+    workouts: WorkoutRow[];
+    pagination: {
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+    };
+}
+
 function fmtDateTime(ms: number | null): string {
     if (!ms) return '-';
     try {
@@ -31,7 +40,15 @@ function fmtDateTime(ms: number | null): string {
     }
 }
 
-export default function SyncWorkoutsPanel({ workouts }: { workouts: WorkoutRow[] }) {
+export default function SyncWorkoutsPanel({ workouts, pagination }: SyncWorkoutsPanelProps) {
+    const { currentPage, totalPages, totalItems } = pagination;
+
+    const handlePageChange = (newPage: number) => {
+        const url = new URL(window.location.href);
+        url.searchParams.set('workoutsPage', newPage.toString());
+        window.location.href = url.toString();
+    };
+
     const [statusFilter, setStatusFilter] = useState<'all' | 'in_progress' | 'completed'>('all');
     const [showDeleted, setShowDeleted] = useState(false);
     const [onlyWithSets, setOnlyWithSets] = useState(false);
@@ -51,9 +68,26 @@ export default function SyncWorkoutsPanel({ workouts }: { workouts: WorkoutRow[]
                 <div className="p-4 bg-[#1a1a2e] text-[#f5f1e8] flex items-center gap-3 justify-between">
                     <div className="flex items-center gap-3">
                         <Database className="w-5 h-5" />
-                        <h2 className="text-sm font-black uppercase tracking-[0.2em]">SYNC_WORKOUTS_MONITOR</h2>
+                        <h2 className="text-sm font-black uppercase tracking-[0.2em]">SYNC_WORKOUTS_MONITOR ({totalItems})</h2>
                     </div>
-                    <div className="text-[10px] font-black opacity-60 tracking-[0.2em] uppercase flex items-center gap-2">
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage <= 1}
+                            className="px-3 py-1 bg-white text-[#1a1a2e] border-2 border-[#1a1a2e] font-black text-[9px] uppercase hover:translate-x-[2px] hover:translate-y-[2px] disabled:opacity-30 disabled:hover:translate-x-0"
+                        >
+                            PREV
+                        </button>
+                        <span className="font-black text-[9px] opacity-60">PAGE_{currentPage}_OF_{totalPages}</span>
+                        <button
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage >= totalPages}
+                            className="px-3 py-1 bg-white text-[#1a1a2e] border-2 border-[#1a1a2e] font-black text-[9px] uppercase hover:translate-x-[2px] hover:translate-y-[2px] disabled:opacity-30 disabled:hover:translate-x-0"
+                        >
+                            NEXT
+                        </button>
+                    </div>
+                    <div className="hidden md:flex text-[10px] font-black opacity-60 tracking-[0.2em] uppercase items-center gap-2">
                         <RefreshCw className="w-3 h-3" />
                         LIVE_DB_VIEW
                     </div>

@@ -12,7 +12,7 @@ type DerivedAnnouncement = {
     targetVersion: string | null;
     targetPlatform: 'android' | 'ios' | 'all' | null;
     targetSegment: string;
-    metadata: string | null;
+    metadata: Record<string, any> | null;
     isActive: 0 | 1;
 };
 
@@ -22,10 +22,10 @@ export function buildDerivedGlobalEventAnnouncement(event: GlobalEventRow): Deri
     const title = `Evento Global: ${event.name}`;
     const message = `${event.name} · multiplicador x${event.multiplier.toFixed(2)} en todo tu puntaje.`;
 
-    const metadata = JSON.stringify({
+    const metadata = {
         actionUrl: 'irontrain://social',
         derivedFrom: { kind: 'global_event', id: event.id },
-    });
+    };
 
     return {
         id,

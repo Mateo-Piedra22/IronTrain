@@ -32,13 +32,10 @@ function buildAnnouncementItem(row: typeof schema.adminNotifications.$inferSelec
 
     let actionUrl: string | null = null;
     try {
-        if (row.metadata) {
-            const parsed = JSON.parse(row.metadata) as unknown;
-            if (parsed && typeof parsed === 'object') {
-                const url = (parsed as Record<string, unknown>).actionUrl;
-                if (typeof url === 'string' && url.trim().length > 0) {
-                    actionUrl = url.trim().slice(0, 512);
-                }
+        if (row.metadata && typeof row.metadata === 'object') {
+            const url = (row.metadata as Record<string, unknown>).actionUrl;
+            if (typeof url === 'string' && url.trim().length > 0) {
+                actionUrl = url.trim().slice(0, 512);
             }
         }
     } catch {
@@ -73,7 +70,7 @@ function buildChangelogItem(row: typeof schema.changelogs.$inferSelect): Broadca
 
     let body = '';
     try {
-        const items = JSON.parse(row.items || '[]') as unknown;
+        const items = row.items;
         if (Array.isArray(items)) {
             body = items.map((i) => (typeof i === 'string' ? i : '')).filter(Boolean).slice(0, 12).join('\n');
         }
