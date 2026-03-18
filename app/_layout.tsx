@@ -12,6 +12,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GlobalNoticeHandler } from '../components/GlobalNoticeHandler';
+import MaintenanceMode from '../components/MaintenanceMode';
 import { TimerOverlay } from '../components/TimerOverlay';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { GlobalBanner } from '../components/ui/GlobalBanner';
@@ -222,15 +223,17 @@ export default function RootLayout() {
     <PostHogProvider client={posthog}>
       <SafeAreaProvider>
         <AppThemeProvider>
-          <MainAppContent
-            dbInitialized={dbInitialized}
-            fontsLoaded={fontsLoaded}
-            fontError={fontError}
-            installedVersion={installedVersion}
-            latestVersion={latestVersion}
-            downloadUrl={downloadUrl}
-            notesUrl={notesUrl}
-          />
+          <MaintenanceMode>
+            <MainAppContent
+              dbInitialized={dbInitialized}
+              fontsLoaded={fontsLoaded}
+              fontError={fontError}
+              installedVersion={installedVersion}
+              latestVersion={latestVersion}
+              downloadUrl={downloadUrl}
+              notesUrl={notesUrl}
+            />
+          </MaintenanceMode>
         </AppThemeProvider>
       </SafeAreaProvider>
     </PostHogProvider>

@@ -16,6 +16,8 @@ import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { verifyAuth } from '../../../src/lib/auth';
 import { MarketplaceResolver } from '../../../src/lib/marketplace';
+import { ExperimentWrapper, PremiumFeatureBadge } from '../../components/PostHogFeatures';
+
 
 // Force dynamic rendering since we want real-time social feed
 export const revalidate = 0;
@@ -127,6 +129,9 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                             <p className="text-xs font-black opacity-40 max-w-xl leading-relaxed uppercase tracking-widest italic">
                                 Explora el ecosistema IronTrain: rutinas de la comunidad y ejercicios oficiales del Marketplace.
                             </p>
+                            <div className="mt-4">
+                                <PremiumFeatureBadge />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -158,48 +163,49 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                     ) : (
                         <div className="grid gap-6">
                             {publicRoutinesData.map((routine: any) => (
-                                <Link
-                                    href={`/share/routine/${routine.id}`}
-                                    key={routine.id}
-                                    className="group block border-2 border-[#1a1a2e] p-6 hover:shadow-[12px_12px_0px_0px_rgba(26,26,46,1)] transition-all hover:-translate-y-1 bg-white"
-                                >
-                                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                                        <div className="flex-1 space-y-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="bg-[#1a1a2e] text-[#f5f1e8] px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter">P2P_ROUTINE</div>
-                                                <h2 className="text-2xl font-black uppercase tracking-tighter truncate group-hover:text-red-600">
-                                                    {routine.name}
-                                                </h2>
+                                <ExperimentWrapper key={routine.id}>
+                                    <Link
+                                        href={`/share/routine/${routine.id}`}
+                                        className="group block border-2 border-[#1a1a2e] p-6 hover:shadow-[12px_12px_0px_0px_rgba(26,26,46,1)] transition-all hover:-translate-y-1 bg-white"
+                                    >
+                                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                            <div className="flex-1 space-y-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="bg-[#1a1a2e] text-[#f5f1e8] px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter">P2P_ROUTINE</div>
+                                                    <h2 className="text-2xl font-black uppercase tracking-tighter truncate group-hover:text-red-600">
+                                                        {routine.name}
+                                                    </h2>
+                                                </div>
+
+                                                {routine.description && (
+                                                    <p className="text-xs font-bold opacity-60 line-clamp-2 md:line-clamp-3 leading-relaxed uppercase italic">
+                                                        {routine.description}
+                                                    </p>
+                                                )}
+
+                                                <div className="flex flex-wrap items-center gap-6 pt-4 text-[10px] font-black uppercase tracking-[0.2em]">
+                                                    <div className="flex items-center gap-2 opacity-100">
+                                                        <User className="w-3.5 h-3.5 text-red-600" />
+                                                        <span>@{routine.username || 'user'}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 opacity-30">
+                                                        <Clock className="w-3.5 h-3.5" />
+                                                        <span>{routine.updatedAt && new Date(routine.updatedAt).getTime() > 0
+                                                            ? new Date(routine.updatedAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                                                            : new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
 
-                                            {routine.description && (
-                                                <p className="text-xs font-bold opacity-60 line-clamp-2 md:line-clamp-3 leading-relaxed uppercase italic">
-                                                    {routine.description}
-                                                </p>
-                                            )}
-
-                                            <div className="flex flex-wrap items-center gap-6 pt-4 text-[10px] font-black uppercase tracking-[0.2em]">
-                                                <div className="flex items-center gap-2 opacity-100">
-                                                    <User className="w-3.5 h-3.5 text-red-600" />
-                                                    <span>@{routine.username || 'user'}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2 opacity-30">
-                                                    <Clock className="w-3.5 h-3.5" />
-                                                    <span>{routine.updatedAt && new Date(routine.updatedAt).getTime() > 0
-                                                        ? new Date(routine.updatedAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                                                        : new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                                                    </span>
+                                            <div className="flex flex-col items-end justify-center h-full sm:pl-6 sm:border-l-2 sm:border-[#1a1a2e]/10">
+                                                <div className="bg-[#1a1a2e] text-[#f5f1e8] h-12 w-12 flex items-center justify-center group-hover:bg-red-600 transition-colors shadow-[4px_4px_0px_0px_rgba(26,26,46,0.2)]">
+                                                    <ChevronRight className="w-6 h-6" />
                                                 </div>
                                             </div>
                                         </div>
-
-                                        <div className="flex flex-col items-end justify-center h-full sm:pl-6 sm:border-l-2 sm:border-[#1a1a2e]/10">
-                                            <div className="bg-[#1a1a2e] text-[#f5f1e8] h-12 w-12 flex items-center justify-center group-hover:bg-red-600 transition-colors shadow-[4px_4px_0px_0px_rgba(26,26,46,0.2)]">
-                                                <ChevronRight className="w-6 h-6" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </Link>
+                                    </Link>
+                                </ExperimentWrapper>
                             ))}
                         </div>
                     )

@@ -11,7 +11,7 @@ import {
     WifiOff,
     Zap
 } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { SyncHealthPanel } from '../../../src/components/admin/SyncHealthPanel';
 import { handleUpdateSystemStatus } from '../actions';
@@ -67,8 +67,8 @@ export default function SystemStatusPanel({ metrics, syncHealth, systemStatus }:
                     <h2 className="text-sm font-black uppercase tracking-[0.2em]">GLOBAL_APP_CONTROL</h2>
                 </div>
 
-                <form 
-                    action={handleUpdateSystemStatus} 
+                <form
+                    action={handleUpdateSystemStatus}
                     onSubmit={(e) => {
                         e.preventDefault();
                         const isMaintenanceChanging = maintenance !== (systemStatus.maintenanceMode === 1);
@@ -140,6 +140,29 @@ export default function SystemStatusPanel({ metrics, syncHealth, systemStatus }:
                                 </button>
                             </div>
                         </div>
+                    </div>
+
+                    {/* PostHog Feature Flags Notice */}
+                    <div className="mt-8 p-6 bg-[#1a1a2e] text-white border-2 border-[#1a1a2e] shadow-[8px_8px_0px_0px_rgba(0,0,0,0.1)]">
+                        <div className="flex items-center gap-4 mb-4">
+                            <Zap className="w-8 h-8 text-yellow-400" />
+                            <div>
+                                <h3 className="text-lg font-black uppercase tracking-tight">PostHog_Engine_Link</h3>
+                                <p className="text-[10px] font-bold opacity-60 uppercase">Control Avanzado y Experimentos</p>
+                            </div>
+                        </div>
+                        <p className="text-sm opacity-80 mb-6 leading-relaxed">
+                            Ahora puedes controlar el <span className="font-bold text-yellow-400">Modo Mantenimiento</span> y otros experimentos directamente desde el dashboard de PostHog sin desplegar código ni tocar la base de datos.
+                        </p>
+                        <a
+                            href="https://us.posthog.com/project/347728/feature_flags"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 bg-yellow-400 text-[#1a1a2e] px-4 py-2 text-xs font-black uppercase hover:bg-yellow-300 transition-colors"
+                        >
+                            Open_PostHog_Dashboard
+                            <Activity className="w-3 h-3" />
+                        </a>
                     </div>
 
                     <div className="space-y-2">

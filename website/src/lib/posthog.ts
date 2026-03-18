@@ -13,6 +13,7 @@ export const initPostHog = () => {
             capture_pageleave: true,
             persistence: 'localStorage',
             session_recording: {},
+            capture_exceptions: true,
         });
     }
 };

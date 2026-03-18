@@ -5,6 +5,13 @@ const PH_HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.co
 
 export const posthog = new PostHog(PH_KEY || '', {
     host: PH_HOST,
+    errorTracking: {
+        autocapture: {
+            uncaughtExceptions: true,
+            unhandledRejections: true,
+            console: ['error', 'warn'],
+        },
+    },
 });
 
 /**
@@ -33,4 +40,36 @@ export const alias = (userId: string) => {
  */
 export const reset = () => {
     posthog.reset();
+};
+
+/**
+ * FEATURE FLAGS & EXPERIMENTS
+ */
+
+/**
+ * Check if a feature flag is enabled for the current user.
+ */
+export const isFeatureFlagEnabled = (key: string): boolean => {
+    return !!posthog.isFeatureEnabled(key);
+};
+
+/**
+ * Get the value of a multivariant feature flag or experiment variant.
+ */
+export const getFeatureFlag = (key: string): string | boolean | undefined => {
+    return posthog.getFeatureFlag(key);
+};
+
+/**
+ * Get the JSON payload associated with a feature flag or variant.
+ */
+export const getFeatureFlagPayload = (key: string): any => {
+    return posthog.getFeatureFlagPayload(key);
+};
+
+/**
+ * Manually reload feature flags (useful after login).
+ */
+export const reloadFeatureFlags = async () => {
+    await posthog.reloadFeatureFlagsAsync();
 };

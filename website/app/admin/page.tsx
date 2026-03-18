@@ -13,6 +13,7 @@ import CommunityModerationPanel from './components/CommunityModerationPanel';
 import ContentManagementPanel from './components/ContentManagementPanel';
 import IronSocialPanel from './components/IronSocialPanel';
 import MarketplaceManagementPanel from './components/MarketplaceManagementPanel';
+import PostHogGuidePanel from './components/PostHogGuidePanel';
 import SyncWorkoutsPanel from './components/SyncWorkoutsPanel';
 import SystemStatusPanel from './components/SystemStatusPanel';
 
@@ -82,7 +83,7 @@ export default async function AdminPage({
 
     // 0. Resolve parameters
     const params = await searchParams;
-    const activeTab = (params.tab as 'status' | 'social' | 'content' | 'moderation' | 'marketplace' | 'sync' | 'analytics') || 'status';
+    const activeTab = (params.tab as 'status' | 'social' | 'content' | 'moderation' | 'marketplace' | 'sync' | 'analytics' | 'posthog') || 'status';
 
     const {
         editNotifId,
@@ -536,6 +537,7 @@ export default async function AdminPage({
                         />
                     }
                     analyticsPanel={<AnalyticsPanel />}
+                    posthogPanel={<PostHogGuidePanel />}
                 />
             </Suspense>
 

@@ -177,7 +177,13 @@ export default function ActiveWorkoutScreen() {
 
     const handleToggleComplete = useCallback((setId: string) => {
         toggleSetComplete(setId);
-    }, [toggleSetComplete]);
+        const set = activeSets.find(s => s.id === setId);
+        analytics.capture('set_toggled_complete', {
+            set_id: setId,
+            completed: !set?.completed,
+            exercise_id: set?.exercise_id
+        });
+    }, [toggleSetComplete, activeSets]);
 
     useFocusEffect(useCallback(() => { setUnit(configService.get('weightUnit')); }, []));
 
@@ -221,10 +227,20 @@ export default function ActiveWorkoutScreen() {
         confirm.ask(
             'Reabrir entrenamiento',
             '¿Volver a marcarlo como activo? (podrás editar y seguir registrando)',
-            async () => { await setWorkoutStatus('in_progress'); },
+            async () => {
+                analytics.capture('workout_finalized_click', { workout_id: id, status: 'in_progress' });
+                await setWorkoutStatus('in_progress');
+            },
             'Reabrir'
         );
     };
+
+    const handleReorderSets = useCallback((exId: string, newOrderIds: string[]) => {
+        if (activeWorkout) {
+            analytics.capture('exercise_sets_reordered', { exercise_id: exId, workout_id: activeWorkout.id });
+            useWorkoutStore.getState().reorderSets(activeWorkout.id, newOrderIds);
+        }
+    }, [activeWorkout]);
 
     const groupedSets = activeSets.reduce((acc, set) => {
         if (!acc[set.exercise_id]) acc[set.exercise_id] = [];
@@ -310,7 +326,7 @@ export default function ActiveWorkoutScreen() {
                                         }
                                     }
                                     if (activeWorkout) {
-                                        useWorkoutStore.getState().reorderSets(activeWorkout.id, newOrderIds);
+                                        handleReorderSets(exId, newOrderIds);
                                     }
                                 }}
                                 renderItem={({ item, drag, isActive, getIndex }: any) => (
