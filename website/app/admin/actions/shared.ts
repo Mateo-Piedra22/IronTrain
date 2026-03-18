@@ -36,6 +36,6 @@ export type ActionResponse = {
     data?: any;
 };
 
-export function createActionResponse(success: boolean, message?: string, error?: string): ActionResponse {
+export async function createActionResponse(success: boolean, message?: string, error?: string): Promise<ActionResponse> {
     return { success, message, error };
 }
