@@ -29,8 +29,7 @@ describe('SyncService', () => {
   const mockSchema = () => {
     (dbService.getAll as jest.Mock).mockImplementation(async (sql: string) => {
       if (sql.includes('PRAGMA table_info')) {
-        const tableName = sql.match(/'([^']+)'/)?.[1] || '';
-        const common = [
+        return [
           { name: 'id' }, { name: 'updated_at' }, { name: 'deleted_at' },
           { name: 'date' }, { name: 'start_time' }, { name: 'end_time' },
           { name: 'status' }, { name: 'name' }, { name: 'key' }, { name: 'value' },
@@ -39,8 +38,9 @@ describe('SyncService', () => {
           { name: 'category_id' }, { name: 'color' }, { name: 'group_name' },
           { name: 'is_system' }, { name: 'duration' }
         ];
-        return common;
       }
+      // For general SELECT * FROM table WHERE ... queries during sync, return empty by default
+      // so the service thinks the record is NEW.
       return [];
     });
   };
@@ -48,6 +48,7 @@ describe('SyncService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (useAuthStore.getState as jest.Mock).mockReturnValue({ token: 'token-1', user: { id: 'user-1' } });
+    (dbService.getFirst as jest.Mock).mockResolvedValue(null);
     global.fetch = jest.fn();
     mockSchema();
   });
@@ -182,7 +183,8 @@ describe('SyncService', () => {
 
     await (syncService as any).pullRemoteChanges('token-1');
 
-    const calls = (dbService.run as jest.Mock).mock.calls.map(call => String(call[0]));
+    const runCalls = (dbService.run as jest.Mock).mock.calls;
+    const calls = runCalls.map(call => String(call[0]));
     const invalidInsert = calls.find(sql => sql.includes('hack_table'));
     expect(invalidInsert).toBeUndefined();
   });
@@ -225,8 +227,7 @@ describe('SyncService', () => {
       }),
     });
 
-    (dbService.getAll as jest.Mock).mockResolvedValue([]);
-
+    // Removed override that broke schema mock
     await (syncService as any).pullRemoteChanges('token-1');
 
     const runSql = (dbService.run as jest.Mock).mock.calls.map((c) => String(c[0]));
@@ -282,13 +283,16 @@ describe('SyncService', () => {
       }),
     });
 
-    (dbService.getAll as jest.Mock).mockResolvedValue([]);
+    // mockSchema() handles this
 
     // First attempt to insert workout_sets fails due to FK; retry pass should succeed.
     (dbService.run as jest.Mock).mockImplementation(async (sql: string) => {
-      if (sql.includes('INSERT OR REPLACE INTO workout_sets')) {
-        const calls = (dbService.run as jest.Mock).mock.calls.filter((c) => String(c[0]).includes('INSERT OR REPLACE INTO workout_sets'));
-        if (calls.length === 0) {
+      if (sql.includes('INSERT INTO workout_sets') || sql.includes('UPDATE workout_sets')) {
+        const calls = (dbService.run as jest.Mock).mock.calls.filter((c) => {
+          const s = String(c[0]);
+          return s.includes('INSERT INTO workout_sets') || s.includes('UPDATE workout_sets');
+        });
+        if (calls.length === 1) { // Throw on first attempt, succeed on retry
           const err: any = new Error('FOREIGN KEY constraint failed');
           throw err;
         }
@@ -306,7 +310,7 @@ describe('SyncService', () => {
 
   it('normalizes scoped cloud settings keys to local keys during pull', async () => {
     (dbService.getFirst as jest.Mock).mockResolvedValue({ value: '0' });
-    (dbService.getAll as jest.Mock).mockResolvedValue([]);
+    // mockSchema() handles this
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -327,14 +331,16 @@ describe('SyncService', () => {
 
     await (syncService as any).pullRemoteChanges('token-1');
 
-    const insertCall = (dbService.run as jest.Mock).mock.calls.find((c) => String(c[0]).includes('INSERT OR REPLACE INTO settings'));
-    expect(insertCall).toBeDefined();
+    const insertCall = (dbService.run as jest.Mock).mock.calls.find((c) => {
+      const sql = String(c[0]);
+      return sql.includes('INSERT INTO settings') || sql.includes('UPDATE settings');
+    }); expect(insertCall).toBeDefined();
     expect(insertCall?.[1]).toEqual(expect.arrayContaining(['last_pull_sync_user-1']));
   });
 
   it('uses settings.key as PK during pull (does not require payload.id)', async () => {
     (dbService.getFirst as jest.Mock).mockResolvedValue({ value: '0' });
-    (dbService.getAll as jest.Mock).mockResolvedValue([]);
+    // mockSchema() handles this
 
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
@@ -358,7 +364,7 @@ describe('SyncService', () => {
 
     const insertCall = (dbService.run as jest.Mock).mock.calls.find((c) => {
       const sql = String(c[0]);
-      return sql.includes('INSERT INTO settings') || sql.includes('UPDATE settings') || sql.includes('INSERT OR REPLACE INTO settings');
+      return sql.includes('INSERT INTO settings') || sql.includes('UPDATE settings');
     });
     expect(insertCall).toBeDefined();
     // For UPDATE, SyncService binds values then recordId at the end.
@@ -369,7 +375,7 @@ describe('SyncService', () => {
 
   it('allows pulling badges and upserts them into local DB', async () => {
     (dbService.getFirst as jest.Mock).mockResolvedValue({ value: '0' });
-    (dbService.getAll as jest.Mock).mockResolvedValue([]);
+    // mockSchema() handles this
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({

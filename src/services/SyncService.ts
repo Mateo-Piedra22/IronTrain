@@ -243,7 +243,7 @@ export class SyncService {
                 }
             }
 
-            // Final filtering by schema if provided (fallback to allow all if schema is missing or failed to fetch)
+            // Final filtering by schema if provided (fallback to allow all if schema is missing or empty)
             if (validColumns && validColumns.size > 0 && !validColumns.has(targetKey)) continue;
 
             if (table === 'workouts' && (targetKey === 'date' || targetKey === 'start_time' || targetKey === 'end_time')) {
@@ -648,12 +648,23 @@ export class SyncService {
                             if (!operation || !payload) continue;
 
                             const normalized = this.normalizeIncomingRecord(table, payload, validColumns);
-                            if (!normalized) continue;
+                            if (!normalized) {
+                                logger.debug(`[Sync] Skipping ${table} record: normalization returned null`);
+                                continue;
+                            }
 
                             const recordId = table === 'settings'
-                                ? (normalized.key || payload.key)
-                                : (normalized.id || normalized.record_id || payload.recordId);
-                            if (typeof recordId !== 'string' || recordId.length === 0) continue;
+                                ? (normalized.key || (payload as any).key)
+                                : (normalized.id || normalized.record_id || (payload as any).recordId);
+
+                            if (typeof recordId !== 'string' || recordId.length === 0) {
+                                logger.debug(`[Sync] Skipping ${table} record: missing recordId`, {
+                                    tableName: table,
+                                    normalizedKeys: Object.keys(normalized),
+                                    payloadKeys: Object.keys(payload as any)
+                                });
+                                continue;
+                            }
 
                             const local = existingById.get(recordId);
                             const remoteUpdatedAt = typeof normalized.updated_at === 'number' ? normalized.updated_at : null;
