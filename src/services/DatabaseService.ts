@@ -1787,14 +1787,23 @@ export class DatabaseService {
                 const isLocked = (
                     msg.includes('database is locked')
                     || error?.code === 'SQLITE_BUSY'
-                    || (msg.includes('finalizeAsync') && (!isForeignKey && !isUnique))
-                    || (msg.includes('finalizeAsync') && isUnique) // Retry on finalize UNIQUE race
+                    // finalizeAsync rejection can happen if the bridge is flooded or a previous error wasn't cleared.
+                    // If it's a UNIQUE error or FK error, we don't retry by default unless explicitly safe.
+                    || (msg.includes('finalizeAsync') && !isForeignKey && !isUnique)
                 );
+
                 if (isLocked) {
                     logger.warn(`[Database] Busy/Locked/Race (attempt ${i + 1}/${retries}). Retrying...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                     continue;
                 }
+
+                // If it's a UNIQUE error, we log it with more context but DON'T retry usually
+                // because it's a logic error, NOT a transient database state.
+                if (isUnique) {
+                    logger.error(`[Database] UNIQUE constraint failed. msg=${msg}`);
+                }
+
                 throw error;
             }
         }

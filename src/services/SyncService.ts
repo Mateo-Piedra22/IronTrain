@@ -718,6 +718,9 @@ export class SyncService {
                                             `UPDATE ${table} SET ${updatePlaceholders} WHERE ${pkField} = ?`,
                                             [...updateValues, recordId]
                                         );
+
+                                        // Update local map to handle potential duplicates in the same batch
+                                        existingById.set(recordId, merged);
                                     } else {
                                         const keys = Object.keys(normalized);
                                         const placeholders = keys.map(() => '?').join(', ');
@@ -727,6 +730,9 @@ export class SyncService {
                                             `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`,
                                             values as any
                                         );
+
+                                        // Update local map to handle potential duplicates in the same batch
+                                        existingById.set(recordId, normalized);
                                     }
                                 } catch (e: any) {
                                     const msg = e?.message || '';
@@ -959,7 +965,7 @@ export class SyncService {
                             const values = Object.values(normalized);
                             const placeholders = keys.map(() => '?').join(', ');
                             await db.runAsync(
-                                `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`,
+                                `INSERT OR REPLACE INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`,
                                 values as any
                             );
                         }
