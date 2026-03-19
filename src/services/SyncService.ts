@@ -243,7 +243,8 @@ export class SyncService {
                 }
             }
 
-            if (validColumns && !validColumns.has(targetKey)) continue;
+            // Final filtering by schema if provided (fallback to allow all if schema is missing or failed to fetch)
+            if (validColumns && validColumns.size > 0 && !validColumns.has(targetKey)) continue;
 
             if (table === 'workouts' && (targetKey === 'date' || targetKey === 'start_time' || targetKey === 'end_time')) {
                 out[targetKey] = normalizeEpochMs(finalValue);

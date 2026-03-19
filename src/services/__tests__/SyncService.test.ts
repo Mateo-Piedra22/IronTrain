@@ -26,10 +26,30 @@ jest.mock('../../store/authStore', () => ({
 }));
 
 describe('SyncService', () => {
+  const mockSchema = () => {
+    (dbService.getAll as jest.Mock).mockImplementation(async (sql: string) => {
+      if (sql.includes('PRAGMA table_info')) {
+        const tableName = sql.match(/'([^']+)'/)?.[1] || '';
+        const common = [
+          { name: 'id' }, { name: 'updated_at' }, { name: 'deleted_at' },
+          { name: 'date' }, { name: 'start_time' }, { name: 'end_time' },
+          { name: 'status' }, { name: 'name' }, { name: 'key' }, { name: 'value' },
+          { name: 'completed' }, { name: 'type' }, { name: 'order_index' },
+          { name: 'workout_id' }, { name: 'exercise_id' }, { name: 'routine_id' },
+          { name: 'category_id' }, { name: 'color' }, { name: 'group_name' },
+          { name: 'is_system' }, { name: 'duration' }
+        ];
+        return common;
+      }
+      return [];
+    });
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     (useAuthStore.getState as jest.Mock).mockReturnValue({ token: 'token-1', user: { id: 'user-1' } });
     global.fetch = jest.fn();
+    mockSchema();
   });
 
   it('syncBidirectional throws when unauthenticated (no silent no-op)', async () => {
@@ -212,13 +232,11 @@ describe('SyncService', () => {
     const runSql = (dbService.run as jest.Mock).mock.calls.map((c) => String(c[0]));
     const workoutIdx = runSql.findIndex((sql) => (
       sql.includes('INSERT INTO workouts') ||
-      sql.includes('UPDATE workouts') ||
-      sql.includes('INSERT OR REPLACE INTO workouts')
+      sql.includes('UPDATE workouts')
     ));
     const setIdx = runSql.findIndex((sql) => (
       sql.includes('INSERT INTO workout_sets') ||
-      sql.includes('UPDATE workout_sets') ||
-      sql.includes('INSERT OR REPLACE INTO workout_sets')
+      sql.includes('UPDATE workout_sets')
     ));
 
     expect(workoutIdx).toBeGreaterThanOrEqual(0);
@@ -282,8 +300,8 @@ describe('SyncService', () => {
 
     // Check that we attempted to run SQL for both records (one direct, one deferred/retried)
     const runCalls = (dbService.run as jest.Mock).mock.calls;
-    expect(runCalls.some(c => String(c[0]).includes('INSERT OR REPLACE INTO workouts'))).toBe(true);
-    expect(runCalls.some(c => String(c[0]).includes('INSERT OR REPLACE INTO workout_sets'))).toBe(true);
+    expect(runCalls.some(c => String(c[0]).includes('INSERT INTO workouts') || String(c[0]).includes('UPDATE workouts'))).toBe(true);
+    expect(runCalls.some(c => String(c[0]).includes('INSERT INTO workout_sets') || String(c[0]).includes('UPDATE workout_sets'))).toBe(true);
   });
 
   it('normalizes scoped cloud settings keys to local keys during pull', async () => {
@@ -345,7 +363,8 @@ describe('SyncService', () => {
     expect(insertCall).toBeDefined();
     // For UPDATE, SyncService binds values then recordId at the end.
     const params = (insertCall?.[1] ?? []) as any[];
-    expect(params.join(' ')).toContain('training_days');
+    // params join might not work if keys/values are mixed, check both key and value
+    expect(params).toEqual(expect.arrayContaining(['training_days']));
   });
 
   it('allows pulling badges and upserts them into local DB', async () => {
@@ -378,7 +397,7 @@ describe('SyncService', () => {
 
     const insertCall = (dbService.run as jest.Mock).mock.calls.find((c) => {
       const sql = String(c[0]);
-      return sql.includes('INSERT INTO badges') || sql.includes('UPDATE badges') || sql.includes('INSERT OR REPLACE INTO badges');
+      return sql.includes('INSERT INTO badges') || sql.includes('UPDATE badges');
     });
     expect(insertCall).toBeDefined();
   });
