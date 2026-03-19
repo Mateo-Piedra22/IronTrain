@@ -268,6 +268,12 @@ export class SyncService {
                     out.key = pieces.slice(1).join(':');
                 }
             }
+
+            const userId = useAuthStore.getState().user?.id;
+            if (userId && out.key === 'last_pull_sync') {
+                out.key = `last_pull_sync_${userId}`;
+            }
+
             // settings has no deleted_at in local schema
             delete out.deleted_at;
         }
@@ -613,7 +619,25 @@ export class SyncService {
                             .map((c) => {
                                 const payload = c?.payload as any;
                                 if (!payload || typeof payload !== 'object') return null;
-                                if (pkField === 'key') return payload.key as unknown;
+                                if (pkField === 'key') {
+                                    const rawKey = payload.key as unknown;
+                                    if (typeof rawKey !== 'string' || rawKey.length === 0) return null;
+
+                                    if (rawKey.includes(':')) {
+                                        const pieces = rawKey.split(':');
+                                        const suffix = pieces.length > 1 ? pieces.slice(1).join(':') : rawKey;
+                                        if (suffix === 'last_pull_sync' && userId) {
+                                            return `last_pull_sync_${userId}`;
+                                        }
+                                        return suffix;
+                                    }
+
+                                    if (rawKey === 'last_pull_sync' && userId) {
+                                        return `last_pull_sync_${userId}`;
+                                    }
+
+                                    return rawKey;
+                                }
                                 return (payload.id ?? payload.recordId) as unknown;
                             })
                             .filter((v): v is string => typeof v === 'string' && v.length > 0);
