@@ -63,7 +63,8 @@
       "expo-secure-store",
       "expo-location",
       "expo-audio",
-      "expo-asset"
+      "expo-asset",
+      "./scripts/fix-async-storage.js"
     ],
     "experiments": {
       "typedRoutes": true
