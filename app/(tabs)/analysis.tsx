@@ -2,6 +2,7 @@ import { AnalysisOverview } from '@/components/analysis/AnalysisOverview';
 import { AnalysisRecords } from '@/components/analysis/AnalysisRecords';
 import { AnalysisTools } from '@/components/analysis/AnalysisTools';
 import { AnalysisTrends } from '@/components/analysis/AnalysisTrends';
+import { WorkoutHistoryModal } from '@/components/analysis/WorkoutHistoryModal';
 import { CalculatorsModal } from '@/components/CalculatorsModal';
 import { IronCard } from '@/components/IronCard';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
@@ -11,7 +12,7 @@ import { configService } from '@/src/services/ConfigService';
 import { UnitService } from '@/src/services/UnitService';
 import { workoutService } from '@/src/services/WorkoutService';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { IronTrainLogo } from '../../components/IronTrainLogo';
@@ -54,12 +55,14 @@ const INITIAL_RANGE_STATE: RangeAnalysisState = {
 
 export default function AnalysisScreen() {
     const colors = useColors();
+    const router = useRouter();
     const [unit, setUnit] = useState(configService.get('weightUnit'));
     const [calcVisible, setCalcVisible] = useState(false);
     const [calcTab, setCalcTab] = useState<'oneRm' | 'warmup' | 'power'>('oneRm');
     const [coreLoading, setCoreLoading] = useState(true);
     const [rangeLoading, setRangeLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [historyVisible, setHistoryVisible] = useState(false);
 
     const ss = useMemo(() => {
         const { StyleSheet } = require('react-native');
@@ -276,7 +279,7 @@ export default function AnalysisScreen() {
             </View>
 
             <View style={ss.content}>
-                <View style={{ height: 48, marginBottom: 16 }}>
+                <View style={{ marginTop: 2, marginBottom: 2 }}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={ss.tabsScroll} contentContainerStyle={{ paddingRight: 20, alignItems: 'center' }}>
                         <View style={ss.tabsContainer}>
                             {[
@@ -316,7 +319,7 @@ export default function AnalysisScreen() {
                         style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 16, zIndex: 10 }}
                         pointerEvents="none"
                     />
-                    <ScrollView contentContainerStyle={{ paddingBottom: 100, paddingTop: 16 }} showsVerticalScrollIndicator={false}>
+                    <ScrollView contentContainerStyle={{ paddingBottom: 10, paddingTop: 16 }} showsVerticalScrollIndicator={false}>
                         {isLoading && !rangeData.summary7 ? (
                             <View style={ss.loadingWrapper}>
                                 <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
@@ -349,6 +352,12 @@ export default function AnalysisScreen() {
                                         weightOnlySummary={rangeData.weightOnlySummary}
                                         unit={unit}
                                         displayWeight={displayWeight}
+                                        onOpenHistory={() => setHistoryVisible(true)}
+                                        onOpenCalc={(tab?: 'oneRm' | 'warmup' | 'power') => {
+                                            if (tab) setCalcTab(tab);
+                                            setCalcVisible(true);
+                                        }}
+                                        onNavigate={(path: string) => router.push(path as any)}
                                     />
                                 )}
 
@@ -370,10 +379,13 @@ export default function AnalysisScreen() {
                                 )}
 
                                 {tab === 'tools' && (
-                                    <AnalysisTools setCalcVisible={(v, t) => {
-                                        if (t) setCalcTab(t);
-                                        setCalcVisible(v);
-                                    }} />
+                                    <AnalysisTools
+                                        setCalcVisible={(v, t) => {
+                                            if (t) setCalcTab(t);
+                                            setCalcVisible(v);
+                                        }}
+                                        setHistoryVisible={setHistoryVisible}
+                                    />
                                 )}
                             </>
                         )}
@@ -381,6 +393,7 @@ export default function AnalysisScreen() {
                 </View>
             </View>
             <CalculatorsModal visible={calcVisible} onClose={() => setCalcVisible(false)} initialTab={calcTab} />
+            <WorkoutHistoryModal visible={historyVisible} onClose={() => setHistoryVisible(false)} />
         </SafeAreaWrapper >
     );
 }

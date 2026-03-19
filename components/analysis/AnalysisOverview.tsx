@@ -4,9 +4,9 @@ import { BodySnapshotWidget } from '@/components/analysis/BodySnapshotWidget';
 import { VolumeChart } from '@/components/analysis/VolumeChart';
 import { CardioSummary, CategoryVolumeRow, RepsOnlySummary, WeightOnlySummary, WorkoutComparison, WorkoutStreak, WorkoutSummary } from '@/src/services/AnalysisService';
 import { ThemeFx, withAlpha } from '@/src/theme';
-import { Activity, BarChart3, Clock, Flame, TrendingDown, TrendingUp, Trophy, Zap } from 'lucide-react-native';
+import { Activity, BarChart3, CircleDot, Clock, Flame, History as HistoryIcon, Ruler, TrendingDown, TrendingUp, Trophy, Zap } from 'lucide-react-native';
 import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '../../src/hooks/useColors';
 import { formatDuration } from '../../src/utils/time';
 
@@ -26,6 +26,9 @@ interface AnalysisOverviewProps {
     weightOnlySummary: WeightOnlySummary | null;
     unit: string;
     displayWeight: (kg: number) => number;
+    onOpenHistory?: () => void;
+    onOpenCalc?: (tab?: 'oneRm' | 'warmup' | 'power') => void;
+    onNavigate?: (path: string) => void;
 }
 
 export const AnalysisOverview = React.memo(({
@@ -43,7 +46,10 @@ export const AnalysisOverview = React.memo(({
     repsOnlySummary,
     weightOnlySummary,
     unit,
-    displayWeight
+    displayWeight,
+    onOpenHistory,
+    onOpenCalc,
+    onNavigate
 }: AnalysisOverviewProps) => {
     const colors = useColors();
 
@@ -51,10 +57,63 @@ export const AnalysisOverview = React.memo(({
         container: {
             paddingBottom: 32
         },
+        header: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            marginBottom: 16,
+        },
+        headerAccent: {
+            width: 4,
+            height: 20,
+            borderRadius: 2,
+            backgroundColor: colors.primary.DEFAULT,
+        },
+        headerTitle: {
+            fontSize: 18,
+            fontWeight: '900',
+            color: colors.text,
+            letterSpacing: -0.3,
+        },
+        quickActions: {
+            flexDirection: 'row',
+            marginBottom: 24,
+        },
+        quickActionsScroll: {
+            gap: 12,
+            paddingRight: 20
+        },
+        actionCard: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: colors.surface,
+            borderRadius: 14,
+            paddingVertical: 10,
+            paddingHorizontal: 16,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            gap: 8,
+            ...ThemeFx.shadowSm,
+        },
+        actionIcon: {
+            width: 24,
+            height: 24,
+            borderRadius: 6,
+            backgroundColor: withAlpha(colors.primary.DEFAULT, '12'),
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        actionLabel: {
+            fontSize: 10,
+            fontWeight: '900',
+            color: colors.text,
+            textAlign: 'center',
+            textTransform: 'uppercase',
+        },
         rangeRow: {
             flexDirection: 'row',
             gap: 10,
-            marginBottom: 24
+            marginBottom: 24,
         },
         rangeChip: {
             paddingHorizontal: 16,
@@ -429,6 +488,70 @@ export const AnalysisOverview = React.memo(({
 
     return (
         <View style={styles.container}>
+            {/* Quick Access */}
+            <View style={styles.header}>
+                <View style={styles.headerAccent} />
+                <Text style={styles.headerTitle}>Accesos Directos</Text>
+            </View>
+            <View style={styles.quickActions}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsScroll}>
+                    <Pressable
+                        style={styles.actionCard}
+                        onPress={onOpenHistory}
+                        android_ripple={{ color: colors.surfaceLighter }}
+                    >
+                        <View style={styles.actionIcon}>
+                            <HistoryIcon size={14} color={colors.primary.DEFAULT} />
+                        </View>
+                        <Text style={styles.actionLabel}>Historial</Text>
+                    </Pressable>
+
+                    <Pressable
+                        style={styles.actionCard}
+                        onPress={() => onOpenCalc?.('oneRm')}
+                        android_ripple={{ color: colors.surfaceLighter }}
+                    >
+                        <View style={styles.actionIcon}>
+                            <Zap size={14} color={colors.primary.DEFAULT} />
+                        </View>
+                        <Text style={styles.actionLabel}>1RM</Text>
+                    </Pressable>
+
+                    <Pressable
+                        style={styles.actionCard}
+                        onPress={() => onNavigate?.('/tools/plate-calculator')}
+                        android_ripple={{ color: colors.surfaceLighter }}
+                    >
+                        <View style={styles.actionIcon}>
+                            <CircleDot size={14} color={colors.primary.DEFAULT} />
+                        </View>
+                        <Text style={styles.actionLabel}>Discos</Text>
+                    </Pressable>
+
+                    <Pressable
+                        style={styles.actionCard}
+                        onPress={() => onOpenCalc?.('warmup')}
+                        android_ripple={{ color: colors.surfaceLighter }}
+                    >
+                        <View style={styles.actionIcon}>
+                            <Flame size={14} color={colors.primary.DEFAULT} />
+                        </View>
+                        <Text style={styles.actionLabel}>Calentar</Text>
+                    </Pressable>
+
+                    <Pressable
+                        style={styles.actionCard}
+                        onPress={() => onNavigate?.('/body')}
+                        android_ripple={{ color: colors.surfaceLighter }}
+                    >
+                        <View style={styles.actionIcon}>
+                            <Ruler size={14} color={colors.primary.DEFAULT} />
+                        </View>
+                        <Text style={styles.actionLabel}>Cuerpo</Text>
+                    </Pressable>
+                </ScrollView>
+            </View>
+
             {/* Range Selector */}
             <View style={styles.rangeRow}>
                 {[7, 30, 90, 365].map((d) => (

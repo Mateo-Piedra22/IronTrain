@@ -195,7 +195,9 @@ export class SyncSchedulerService {
             }
 
             // Check if this is a fresh login/sync by looking at the last pull timestamp
-            const lastSyncRow = await dbService.getFirst<{ value: string }>('SELECT value FROM settings WHERE key = ?', ['last_pull_sync']);
+            const userId = useAuthStore.getState().user?.id;
+            const syncKey = userId ? `last_pull_sync_${userId}` : 'last_pull_sync';
+            const lastSyncRow = await dbService.getFirst<{ value: string }>('SELECT value FROM settings WHERE key = ?', [syncKey]);
             const isFirstSync = !lastSyncRow || lastSyncRow.value === '0' || lastSyncRow.value === '';
 
             // Perform bidirectional sync with verification if triggered manually, on resume, or if it's the first sync

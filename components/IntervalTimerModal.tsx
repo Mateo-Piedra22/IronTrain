@@ -72,7 +72,7 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
         container: { flex: 1, backgroundColor: colors.surface },
         idleHeader: {
             flexDirection: 'row', alignItems: 'center', gap: 16,
-            paddingHorizontal: 20, paddingTop: 60, paddingBottom: 20,
+            paddingHorizontal: 20, paddingTop: 10, paddingBottom: 10,
             backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border
         },
         backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceLighter, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.border },
@@ -514,7 +514,13 @@ export function IntervalTimerModal({ visible, onClose }: IntervalTimerModalProps
     // ═══════════════════════════════════════════════════════════════════════════
     if (phase === 'idle') {
         return (
-            <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+            <Modal
+                visible={visible}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={handleClose}
+                onDismiss={handleClose}
+            >
                 <SafeAreaView style={ss.container} edges={['top', 'bottom', 'left', 'right']}>
                     {/* Modern Header */}
                     <View style={ss.idleHeader}>

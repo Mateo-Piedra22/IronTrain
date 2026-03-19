@@ -30,7 +30,7 @@ export function CategoryManager() {
     const ss = useMemo(() => StyleSheet.create({
         container: { flex: 1, backgroundColor: colors.background },
         loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-        listContent: { padding: 16, paddingBottom: 100 },
+        listContent: { paddingTop: 12, paddingHorizontal: 16, paddingBottom: 100 },
         categoryItem: {
             flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
             padding: 16, marginBottom: 12, backgroundColor: colors.surface,

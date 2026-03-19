@@ -383,6 +383,69 @@ export class SocialService {
         return true;
     }
 
+    /**
+     * Mark all provided inbox items as seen in batch.
+     */
+    static async markAllAsSeen(items: SocialInboxItem[]) {
+        if (!items || items.length === 0) return true;
+
+        const now = Date.now();
+        const userId = useAuthStore.getState().user?.id;
+
+        try {
+            await dbService.withTransaction(async () => {
+                for (const item of items) {
+                    const id = item.id;
+                    const feedType = item.feedType || (item.type === 'routine' ? 'direct_share' : 'activity_log');
+
+                    if (feedType === 'activity_log') {
+                        await dbService.run('UPDATE activity_feed SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
+                        await dbService.queueSyncMutation('activity_feed', id, 'UPDATE', { seen_at: now, updated_at: now });
+
+                        if (userId) {
+                            const seenId = `${userId}_${id}`;
+                            await dbService.run(
+                                'INSERT OR REPLACE INTO activity_seen (id, user_id, activity_id, seen_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+                                [seenId, userId, id, now, now]
+                            );
+                            await dbService.queueSyncMutation('activity_seen', seenId, 'INSERT', {
+                                user_id: userId,
+                                activity_id: id,
+                                seen_at: now,
+                                updated_at: now
+                            });
+                        }
+                    } else {
+                        await dbService.run('UPDATE shares_inbox SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
+                        await dbService.queueSyncMutation('shares_inbox', id, 'UPDATE', { seen_at: now, updated_at: now });
+                    }
+                }
+            });
+        } catch (e) {
+            logger.warn('[SocialService] Batch local markAllAsSeen failed', { error: e });
+        }
+
+        // Server request in batch
+        try {
+            const headers = await this.getHeaders();
+            const payload = items.map(item => ({
+                id: item.id,
+                feedType: item.feedType || (item.type === 'routine' ? 'direct_share' : 'activity_log')
+            }));
+
+            await this.request<{ success: boolean }>(`${API_URL}/api/social/inbox/batch-seen`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ items: payload }),
+            });
+        } catch (e) {
+            logger.info('[SocialService] Batch server markAllAsSeen pending (synced locally)', { error: e });
+        }
+
+        dataEventService.emit('SOCIAL_UPDATED');
+        return true;
+    }
+
     static async respondInbox(inboxId: string, action: 'accept' | 'reject') {
         const headers = await this.getHeaders();
         const data = await this.request<{ success: boolean }>(`${API_URL}/api/social/inbox/respond`, {

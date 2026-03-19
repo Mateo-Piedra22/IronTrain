@@ -21,7 +21,7 @@ import { notify } from '@/src/utils/notify';
 import { formatTimeSeconds } from '@/src/utils/time';
 import * as Haptics from 'expo-haptics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Dumbbell, Info, Pencil, Timer, Trophy, Zap } from 'lucide-react-native';
+import { Calculator, Dumbbell, Info, Pencil, Timer, Trophy, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Dimensions, Text, TouchableOpacity, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
@@ -150,6 +150,30 @@ export default function ExerciseDetailScreen() {
         }
     };
 
+    const handleWarmupAddSets = useCallback(async (warmupSets: Partial<WorkoutSet>[]) => {
+        if (!workoutId) return;
+        if (workoutLocked) {
+            notify.info('Desactivado', 'El entrenamiento cerró. No puedes enviar más series.');
+            return;
+        }
+        try {
+            for (const s of warmupSets) {
+                const w = (s.weight ?? 0);
+                const wKg = toKg(w);
+                await workoutService.addSet(workoutId, exerciseId, 'warmup', {
+                    weight: wKg,
+                    reps: s.reps,
+                    notes: s.notes,
+                    order_index: sets.length + 1
+                });
+            }
+            await loadTrackData();
+            notify.success('Cargado', 'Series de calentamiento incorporadas.');
+        } catch (e: any) {
+            notify.error('Error', e?.message || 'No se pudieron agregar las series.');
+        }
+    }, [workoutId, exerciseId, workoutLocked, sets.length]);
+
     const loadData = async () => {
         setLoading(true);
         await Promise.all([loadTrackData(), loadHistoryData()]);
@@ -271,29 +295,7 @@ export default function ExerciseDetailScreen() {
         }
     };
 
-    const handleAddWarmupSets = async (newSets: Partial<WorkoutSet>[]) => {
-        if (!workoutId) return;
-        if (workoutLocked) {
-            notify.info('Desactivado', 'El entrenamiento cerró. No puedes enviar más series.');
-            return;
-        }
-        try {
-            for (const s of newSets) {
-                const w = (s.weight ?? 0);
-                const wKg = toKg(w);
-                await workoutService.addSet(workoutId, exerciseId, 'warmup', {
-                    weight: wKg,
-                    reps: s.reps,
-                    notes: s.notes,
-                    order_index: sets.length + 1
-                });
-            }
-            loadTrackData();
-            notify.success('Rutina de warmup cargada', 'Listos para empezar duro.');
-        } catch (e: any) {
-            notify.error('Carga incompleta', e?.message || 'Error de base de datos calculando.');
-        }
-    };
+
 
     // --- GRAPHS DATA ---
     const rounding = unit === 'kg' ? configService.get('calculatorsRoundingKg') : configService.get('calculatorsRoundingLbs');
@@ -666,12 +668,7 @@ export default function ExerciseDetailScreen() {
                     </View>
                 )}
 
-                <WarmupCalculatorModal
-                    visible={warmupVisible}
-                    onClose={() => setWarmupVisible(false)}
-                    onAddSets={handleAddWarmupSets}
-                    defaultWeight={Math.max(...sets.map(s => displayWeight(s.weight || 0)), 0) || (unit === 'kg' ? 100 : 225)}
-                />
+
             </IronCard>
         )
     };
@@ -1425,6 +1422,33 @@ export default function ExerciseDetailScreen() {
                 <View style={{ gap: 16 }}>
                     <IronCard>
                         <Text style={{ color: colors.text, fontWeight: '900', fontSize: 16, marginBottom: 16, letterSpacing: -0.3 }}>Herramientas</Text>
+
+                        {(exType === 'weight_reps' || exType === 'weight_only') && (
+                            <TouchableOpacity
+                                onPress={() => setWarmupVisible(true)}
+                                style={{
+                                    backgroundColor: withAlpha(colors.yellow, '15'),
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 14,
+                                    borderRadius: 14,
+                                    marginBottom: 12,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    borderWidth: 1.5,
+                                    borderColor: withAlpha(colors.yellow, '30'),
+                                }}
+                                accessibilityRole="button"
+                                accessibilityLabel="Calculadora de calentamiento"
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                    <Zap size={18} color={colors.yellow} fill={colors.yellow} />
+                                    <Text style={{ color: colors.text, fontWeight: '800', fontSize: 14 }}>Calculadora de Calentamiento</Text>
+                                </View>
+                                <Info size={14} color={colors.textMuted} />
+                            </TouchableOpacity>
+                        )}
+
                         <TouchableOpacity
                             onPress={() => useTimerStore.getState().startTimer(configService.get('defaultRestTimer'))}
                             style={{
@@ -1472,15 +1496,27 @@ export default function ExerciseDetailScreen() {
 
                         <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 16 }} />
 
-                        <TouchableOpacity
-                            onPress={() => router.push('/tools/plate-calculator' as any)}
-                            style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border }}
-                            accessibilityRole="button"
-                            accessibilityLabel="Abrir calculadora de discos"
-                        >
-                            <Text style={{ color: colors.text, fontWeight: '800', fontSize: 14 }}>Calculadora de discos</Text>
-                            <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>Útil si no llegas exacto: muestra alternativas por arriba/abajo.</Text>
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <TouchableOpacity
+                                onPress={() => router.push('/tools/plate-calculator' as any)}
+                                style={{ flex: 1, backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                                accessibilityRole="button"
+                                accessibilityLabel="Abrir calculadora de discos"
+                            >
+                                <Dumbbell size={16} color={colors.textMuted} />
+                                <Text style={{ color: colors.text, fontWeight: '800', fontSize: 14 }}>Discos</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => setAnalysisTab('prs')}
+                                style={{ flex: 1, backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                                accessibilityRole="button"
+                                accessibilityLabel="Ver mejor 1RM"
+                            >
+                                <Calculator size={16} color={colors.textMuted} />
+                                <Text style={{ color: colors.text, fontWeight: '800', fontSize: 14 }}>Mi 1RM</Text>
+                            </TouchableOpacity>
+                        </View>
                     </IronCard>
                 </View>
             )}
@@ -1640,6 +1676,13 @@ export default function ExerciseDetailScreen() {
                     }
                 }}
                 initialData={currentExercise}
+            />
+
+            <WarmupCalculatorModal
+                visible={warmupVisible}
+                onClose={() => setWarmupVisible(false)}
+                onAddSets={handleWarmupAddSets}
+                defaultWeight={insights.heaviest?.weight || 0}
             />
         </SafeAreaWrapper>
     );

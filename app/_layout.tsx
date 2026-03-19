@@ -13,9 +13,11 @@ import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GlobalNoticeHandler } from '../components/GlobalNoticeHandler';
 import MaintenanceMode from '../components/MaintenanceMode';
+import { SyncConflictModal } from '../components/SyncConflictModal';
 import { TimerOverlay } from '../components/TimerOverlay';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { GlobalBanner } from '../components/ui/GlobalBanner';
+import { SyncingOverlay } from '../components/ui/SyncingOverlay';
 import { ToastContainer } from '../components/ui/ToastContainer';
 import '../global.css';
 import { ThemeProvider as AppThemeProvider } from '../src/contexts/ThemeContext';
@@ -25,6 +27,7 @@ import { dbService } from '../src/services/DatabaseService';
 import { feedbackService } from '../src/services/FeedbackService';
 import { MetricsAndFeedbackService } from '../src/services/MetricsAndFeedbackService';
 import { syncScheduler } from '../src/services/SyncSchedulerService';
+import { SyncDiagnostics, syncService } from '../src/services/SyncService';
 import { updateService } from '../src/services/UpdateService';
 import { useAuthStore } from '../src/store/authStore';
 import { useConfirmStore } from '../src/store/confirmStore';
@@ -55,6 +58,50 @@ function GlobalConfirmModal() {
 function MainAppContent({ dbInitialized, fontsLoaded, fontError, installedVersion, latestVersion, downloadUrl, notesUrl }: any) {
   const { activeTheme, currentNavTheme, statusBarStyle } = useTheme();
   const updateStatus = useUpdateStore((state) => state.status);
+  const { needsInitialSync, setNeedsInitialSync, token: authToken } = useAuthStore();
+  const [syncModalVisible, setSyncModalVisible] = useState(false);
+  const [syncDiagnostics, setSyncDiagnostics] = useState<SyncDiagnostics | null>(null);
+  const [isSyncingInitial, setIsSyncingInitial] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (needsInitialSync && dbInitialized && authToken) {
+      const checkConflicts = async () => {
+        setSyncError(null);
+        setIsSyncingInitial(true);
+        try {
+          const diag = await syncService.getDiagnostics();
+
+          if (diag.local.hasData && diag.remote.hasData) {
+            setSyncDiagnostics(diag);
+            setSyncModalVisible(true);
+            setIsSyncingInitial(false);
+          } else if (diag.remote.hasData && !diag.local.hasData) {
+            // New device / Reinstalled: Pull everything from cloud
+            await syncService.pullCloudSnapshot();
+            setNeedsInitialSync(false);
+            setIsSyncingInitial(false);
+            notify.success('Datos recuperados', 'Tu historial se ha sincronizado correctamente.');
+          } else if (diag.local.hasData && !diag.remote.hasData) {
+            // New account / First sync: Push everything to cloud
+            await syncService.pushLocalSnapshot();
+            setNeedsInitialSync(false);
+            setIsSyncingInitial(false);
+            notify.success('Copia guardada', 'Tus datos se han respaldado en la nube.');
+          } else {
+            // Both empty: Just clear the flag
+            setNeedsInitialSync(false);
+            setIsSyncingInitial(false);
+          }
+        } catch (e: any) {
+          logger.captureException(e, { scope: 'MainAppContent.checkConflicts' });
+          setSyncError(e?.message || 'Error en la sincronización inicial');
+          setIsSyncingInitial(false);
+        }
+      };
+      checkConflicts();
+    }
+  }, [needsInitialSync, dbInitialized, authToken]);
 
   if ((!fontsLoaded && !fontError) || !dbInitialized) {
     return null;
@@ -93,10 +140,31 @@ function MainAppContent({ dbInitialized, fontsLoaded, fontError, installedVersio
     <GestureHandlerRootView style={{ flex: 1 }}>
       <NavigationThemeProvider value={currentNavTheme}>
         <StatusBar style={statusBarStyle} backgroundColor={activeTheme.colors.background} />
+        <SyncingOverlay
+          visible={isSyncingInitial}
+          error={syncError}
+          onRetry={() => setNeedsInitialSync(true)}
+          onCancel={() => {
+            setNeedsInitialSync(false);
+            setSyncError(null);
+          }}
+        />
         <GlobalBanner />
         <GlobalNoticeHandler />
         <TimerOverlay />
         <GlobalConfirmModal />
+        <SyncConflictModal
+          visible={syncModalVisible}
+          diagnostics={syncDiagnostics}
+          onClose={() => {
+            setSyncModalVisible(false);
+            setNeedsInitialSync(false);
+          }}
+          onComplete={() => {
+            setSyncModalVisible(false);
+            setNeedsInitialSync(false);
+          }}
+        />
         <Stack
           screenOptions={{
             headerStyle: { backgroundColor: activeTheme.colors.background },
@@ -162,7 +230,8 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (!dbInitialized || !authToken) return;
+    const { needsInitialSync } = useAuthStore.getState();
+    if (!dbInitialized || !authToken || needsInitialSync) return;
     if (lastSyncedTokenRef.current === authToken) return;
     lastSyncedTokenRef.current = authToken;
 

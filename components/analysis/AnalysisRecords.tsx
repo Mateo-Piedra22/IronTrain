@@ -22,16 +22,16 @@ export const AnalysisRecords = React.memo(({ oneRepMaxes, top1RMProgress, rangeD
             paddingBottom: 32
         },
         sectionSpacing: {
-            marginTop: 24
+            marginTop: 8
         },
         sectionSpacingLarge: {
-            marginTop: 32
+            marginTop: 16
         },
         sectionHeader: {
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: 16,
+            marginBottom: 8,
             paddingHorizontal: 4,
         },
         sectionTitleContainer: {

@@ -377,11 +377,14 @@ export class IronScoreService {
         if (weeklyGoal > 0) {
             const prevWeekStart = weekStart - 7 * 24 * 60 * 60 * 1000;
             const prevWeekEnd = weekStart;
-            const row = await dbService.getFirst<{ count: number }>(
-                'SELECT COUNT(*) as count FROM workouts WHERE status = ? AND date >= ? AND date < ? AND deleted_at IS NULL',
+            const rows = await dbService.getAll<{ date: number }>(
+                'SELECT date FROM workouts WHERE status = ? AND date >= ? AND date < ? AND deleted_at IS NULL',
                 ['completed', prevWeekStart, prevWeekEnd]
             );
-            const completedPrevWeek = row?.count ?? 0;
+            const completedPrevWeek = new Set(rows.map(r => {
+                const d = new Date(r.date);
+                return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+            })).size;
             nextStreakWeeks = completedPrevWeek >= weeklyGoal ? (prevStreakWeeks + 1) : 0;
         }
 
@@ -500,11 +503,18 @@ export class IronScoreService {
         const weekStart = startOfWeekMs(finishedAtMs);
         const weekEnd = weekStart + 7 * 24 * 60 * 60 * 1000;
 
-        const row = await dbService.getFirst<{ count: number }>(
-            'SELECT COUNT(*) as count FROM workouts WHERE status = ? AND date >= ? AND date < ? AND deleted_at IS NULL',
+        const rows = await dbService.getAll<{ date: number }>(
+            'SELECT date FROM workouts WHERE status = ? AND date >= ? AND date < ? AND deleted_at IS NULL',
             ['completed', weekStart, weekEnd]
         );
-        const completedThisWeek = row?.count ?? 0;
+
+        // Map to midnight timestamps to count UNIQUE training days
+        const uniqueTrainedDays = new Set(rows.map(r => {
+            const d = new Date(r.date);
+            return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        })).size;
+
+        const completedThisWeek = uniqueTrainedDays;
 
         const trainingDays = configService.get('training_days') ?? [1, 2, 3, 4, 5, 6];
         const weeklyGoal = Array.isArray(trainingDays) ? trainingDays.length : 0;
@@ -532,5 +542,59 @@ export class IronScoreService {
             reference_id: workoutId,
             points_base: cfg.extraDayPoints,
         };
+    }
+
+    /**
+     * Reverts all points awarded for a specific workout.
+     * Used when a workout is deleted from history.
+     */
+    static async revertScoreForWorkout(workoutId: string): Promise<void> {
+        const userId = useAuthStore.getState().user?.id;
+        if (!userId) return;
+
+        try {
+            await dbService.withTransaction(async () => {
+                // 1. Get all events for this workout that haven't been deleted yet
+                const events = await dbService.getAll<{ id: string; points: number }>(
+                    'SELECT id, points FROM score_events WHERE workout_id = ? AND user_id = ? AND deleted_at IS NULL',
+                    [workoutId, userId]
+                );
+
+                if (events.length === 0) return;
+
+                const totalPointsToRevert = events.reduce((sum, e) => sum + (e.points || 0), 0);
+
+                // 2. Mark events as deleted (soft delete for sync)
+                const now = Date.now();
+                for (const event of events) {
+                    await dbService.run('UPDATE score_events SET deleted_at = ?, updated_at = ? WHERE id = ?', [now, now, event.id]);
+                    await dbService.queueSyncMutation('score_events', event.id, 'UPDATE', { deleted_at: now, updated_at: now });
+                }
+
+                // 3. Update user profile lifetime score
+                const profile = await dbService.getFirst<{ score_lifetime: number | null }>(
+                    'SELECT score_lifetime FROM user_profiles WHERE id = ? AND deleted_at IS NULL',
+                    [userId]
+                );
+
+                if (profile) {
+                    const currentScore = profile.score_lifetime ?? 0;
+                    const nextScore = Math.max(0, currentScore - totalPointsToRevert);
+
+                    await dbService.run(
+                        'UPDATE user_profiles SET score_lifetime = ?, updated_at = ? WHERE id = ?',
+                        [nextScore, now, userId]
+                    );
+                    await dbService.queueSyncMutation('user_profiles', userId, 'UPDATE', {
+                        score_lifetime: nextScore,
+                        updated_at: now
+                    });
+                }
+            });
+
+            logger.info(`Reverted ${workoutId} score events.`, { scope: 'IronScoreService' });
+        } catch (err) {
+            logger.captureException(err, { scope: 'IronScoreService.revertScoreForWorkout', workoutId });
+        }
     }
 }

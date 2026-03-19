@@ -2,7 +2,9 @@ import { withAlpha } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '../src/hooks/useColors';
 
@@ -13,42 +15,83 @@ export function RestTimer() {
     const intervalRef = useRef<any | null>(null);
     const insets = useSafeAreaInsets();
     const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
-    const bottomOffset = (tabBarHeight ? tabBarHeight : insets.bottom) + 12;
+
+    const initialBottom = (tabBarHeight ? tabBarHeight : insets.bottom) + 80;
+
+    // Draggability state
+    const translateX = useSharedValue(0);
+    const translateY = useSharedValue(0);
+    const context = useSharedValue({ x: 0, y: 0 });
+
+    const gesture = Gesture.Pan()
+        .onStart(() => {
+            context.value = { x: translateX.value, y: translateY.value };
+        })
+        .onUpdate((event) => {
+            translateX.value = event.translationX + context.value.x;
+            translateY.value = event.translationY + context.value.y;
+        })
+        .onEnd(() => {
+            // Optional: Add snap to edges if needed, but for now free dragging is requested
+        });
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [
+            { translateX: translateX.value },
+            { translateY: translateY.value },
+        ],
+    }));
 
     const ss = useMemo(() => StyleSheet.create({
         fabIdle: {
             position: 'absolute',
             backgroundColor: colors.surface,
-            borderRadius: 28,
-            width: 56,
-            height: 56,
+            borderRadius: 35,
+            width: 70,
+            height: 70,
             alignItems: 'center',
             justifyContent: 'center',
             shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.15,
-            shadowRadius: 8,
-            elevation: 6,
-            borderWidth: 1,
-            borderColor: withAlpha(colors.primary.DEFAULT, '30')
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.2,
+            shadowRadius: 10,
+            elevation: 8,
+            borderWidth: 1.5,
+            borderColor: withAlpha(colors.primary.DEFAULT, '40')
         },
         fabActive: {
             position: 'absolute',
             backgroundColor: colors.surface,
-            borderRadius: 28,
-            paddingHorizontal: 20,
-            height: 56,
+            borderRadius: 35,
+            paddingHorizontal: 24,
+            height: 70,
             flexDirection: 'row',
             alignItems: 'center',
             shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.15,
-            shadowRadius: 8,
-            elevation: 6,
-            borderWidth: 1,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.2,
+            shadowRadius: 10,
+            elevation: 8,
+            borderWidth: 2,
             borderColor: colors.primary.DEFAULT
         },
-        timerText: { color: colors.text, fontSize: 18, fontWeight: '900', marginRight: 14, fontVariant: ['tabular-nums'] },
+        timerText: {
+            color: colors.text,
+            fontSize: 22,
+            fontWeight: '900',
+            marginRight: 16,
+            fontVariant: ['tabular-nums']
+        },
+        pauseBtn: {
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            backgroundColor: withAlpha(colors.red, '15'),
+            justifyContent: 'center',
+            alignItems: 'center',
+            borderWidth: 1.5,
+            borderColor: withAlpha(colors.red, '30')
+        }
     }), [colors]);
 
     useEffect(() => {
@@ -61,7 +104,12 @@ export function RestTimer() {
     }, [isActive]);
 
     const toggleTimer = () => {
-        if (isActive) { setIsActive(false); setSeconds(0); }
+        if (isActive) {
+            setIsActive(false);
+            setSeconds(0);
+            // Reset position on close? Maybe not, usually users like it where they left it
+            // but if it's annoying, we can reset.
+        }
         else { setIsActive(true); }
     };
 
@@ -73,18 +121,28 @@ export function RestTimer() {
 
     if (!isActive) {
         return (
-            <Pressable onPress={toggleTimer} style={[ss.fabIdle, { left: 24, bottom: bottomOffset }]}>
-                <Ionicons name="timer-outline" size={22} color={colors.primary.dark} />
-            </Pressable>
+            <GestureDetector gesture={gesture}>
+                <Animated.View style={[ss.fabIdle, { left: 24, bottom: initialBottom }, animatedStyle]}>
+                    <Pressable onPress={toggleTimer} style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="timer-outline" size={28} color={colors.primary.dark} />
+                    </Pressable>
+                </Animated.View>
+            </GestureDetector>
         );
     }
 
     return (
-        <View style={[ss.fabActive, { left: 24, bottom: bottomOffset }]}>
-            <Text style={ss.timerText}>{formatTime(seconds)}</Text>
-            <Pressable onPress={() => { setIsActive(false); setSeconds(0); }} hitSlop={8}>
-                <Ionicons name="stop" size={18} color={colors.red} />
-            </Pressable>
-        </View>
+        <GestureDetector gesture={gesture}>
+            <Animated.View style={[ss.fabActive, { left: 24, bottom: initialBottom }, animatedStyle]}>
+                <Text style={ss.timerText}>{formatTime(seconds)}</Text>
+                <TouchableOpacity
+                    onPress={() => { setIsActive(false); setSeconds(0); }}
+                    hitSlop={12}
+                    style={ss.pauseBtn}
+                >
+                    <Ionicons name="stop" size={16} color={colors.red} />
+                </TouchableOpacity>
+            </Animated.View>
+        </GestureDetector>
     );
 }

@@ -399,7 +399,7 @@ export class SyncService {
             totalPushed += await this.pushLocalChanges(token);
 
             // 2. Pull: Get remote changes and run consistency fixes (repairs)
-            totalPulled += await this.pullRemoteChanges(token, options?.forcePull, tableSchemas);
+            totalPulled += await this.pullRemoteChanges(token, options?.forcePull);
 
             analytics.capture('sync_completed', {
                 success: true,
@@ -561,16 +561,21 @@ export class SyncService {
         return totalCount;
     }
 
+
     /**
      * Pulls remote changes that happened after the last sync timestamp.
      */
-    private async pullRemoteChanges(token: string, forcePull = false, tableSchemas?: Map<string, Set<string>>): Promise<number> {
+    private async pullRemoteChanges(token: string, forcePull: boolean = false): Promise<number> {
         let totalCount = 0;
+        const userId = useAuthStore.getState().user?.id;
+        const syncKey = userId ? `last_pull_sync_${userId}` : 'last_pull_sync';
+
         // Retrieve the last synced timestamp from local settings
-        const lastSyncRecord = await dbService.getFirst<{ value: string }>('SELECT value FROM settings WHERE key = ?', ['last_pull_sync']);
+        const lastSyncRecord = await dbService.getFirst<{ value: string }>('SELECT value FROM settings WHERE key = ?', [syncKey]);
         const lastSyncAt = (lastSyncRecord?.value && !forcePull) ? parseInt(lastSyncRecord.value, 10) : 0;
 
         try {
+            const tableSchemas = await this.fetchAllTableSchemas();
             const response = await this.requestWithRetry(`${API_BASE_URL}/pull?since=${lastSyncAt}`, {
                 method: 'GET',
                 headers: {
@@ -613,24 +618,26 @@ export class SyncService {
                             .filter((v): v is string => typeof v === 'string' && v.length > 0);
 
                         const hasSoftDelete = TABLES_WITH_SOFT_DELETE.has(table);
-                        const columns = [pkField, 'updated_at'];
-                        if (hasSoftDelete) columns.push('deleted_at');
+                        // Chunk IDs to avoid SQLite parameter limits (usually 999)
+                        const CHUNK_SIZE = 900;
+                        const existingRows: any[] = [];
 
-                        const existingRows = ids.length > 0
-                            ? await dbService.getAll<any>(
-                                `SELECT ${columns.join(', ')} FROM ${table} WHERE ${pkField} IN (${ids.map(() => '?').join(', ')})`,
-                                ids
-                            ).catch(e => {
-                                logger.captureException(e, { scope: 'SyncService.pullRemoteChanges.queryExisting', table, columns });
-                                throw e;
-                            })
-                            : [];
+                        if (ids.length > 0) {
+                            for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+                                const chunk = ids.slice(i, i + CHUNK_SIZE);
+                                const rows = await dbService.getAll<any>(
+                                    `SELECT * FROM ${table} WHERE ${pkField} IN (${chunk.map(() => '?').join(', ')})`,
+                                    chunk
+                                ).catch(e => {
+                                    logger.captureException(e, { scope: 'SyncService.pullRemoteChanges.queryExisting', table });
+                                    throw e;
+                                });
+                                existingRows.push(...rows);
+                            }
+                        }
 
                         const existingById = new Map(existingRows
-                            .map((r) => {
-                                const pk = (r as any)?.[pkField];
-                                return [pk, r] as const;
-                            })
+                            .map((r) => [(r as any)?.[pkField], r] as const)
                             .filter((pair) => typeof pair[0] === 'string' && pair[0].length > 0)
                         );
 
@@ -656,34 +663,26 @@ export class SyncService {
                                     continue;
                                 }
 
-                                // UPSERT Logic: Use merge to avoid wiping out local data not present in remote payload
-                                // This solves the bug where 'completed' or 'duration' are lost during pull if payload is partial.
                                 try {
-                                    // 1. Fetch existing record
-                                    const existing = await dbService.getFirst<Record<string, any>>(`SELECT * FROM ${table} WHERE id = ?`, [recordId]);
-
-                                    if (existing) {
-                                        // 2. Filter keys that are actually in our schema for this table
+                                    if (local) {
+                                        // Merge: Use existing record as base, overwrite with incoming columns
+                                        const merged = { ...local };
                                         const schemaKeys = tableSchemas?.get(table);
-                                        const merged = { ...existing };
 
-                                        // 3. Apply updates from remote change
                                         Object.keys(normalized).forEach(k => {
                                             if (schemaKeys && !schemaKeys.has(k)) return;
                                             merged[k] = normalized[k];
                                         });
 
-                                        // 4. Update existing record
-                                        const updateKeys = Object.keys(merged).filter(k => k !== 'id');
+                                        const updateKeys = Object.keys(merged).filter(k => k !== pkField);
                                         const updatePlaceholders = updateKeys.map(k => `${k} = ?`).join(', ');
                                         const updateValues = updateKeys.map(k => merged[k]);
 
                                         await dbService.run(
-                                            `UPDATE ${table} SET ${updatePlaceholders} WHERE id = ?`,
+                                            `UPDATE ${table} SET ${updatePlaceholders} WHERE ${pkField} = ?`,
                                             [...updateValues, recordId]
                                         );
                                     } else {
-                                        // 5. New record: Direct insert
                                         const keys = Object.keys(normalized);
                                         const placeholders = keys.map(() => '?').join(', ');
                                         const values = keys.map((k) => normalized[k]);
@@ -709,21 +708,17 @@ export class SyncService {
                                     continue;
                                 }
 
-                                if (TABLES_WITH_SOFT_DELETE.has(table)) {
+                                if (hasSoftDelete) {
                                     const deletedAt = typeof normalized.deleted_at === 'number'
                                         ? normalized.deleted_at
                                         : (remoteUpdatedAt !== null ? remoteUpdatedAt : Date.now());
                                     const updatedAt = remoteUpdatedAt !== null ? remoteUpdatedAt : deletedAt;
                                     await dbService.run(
-                                        `UPDATE ${table} SET deleted_at = ?, updated_at = ? WHERE id = ?`,
+                                        `UPDATE ${table} SET deleted_at = ?, updated_at = ? WHERE ${pkField} = ?`,
                                         [deletedAt, updatedAt, recordId]
                                     );
                                 } else {
-                                    if (table === 'settings') {
-                                        await dbService.run(`DELETE FROM ${table} WHERE key = ?`, [recordId]);
-                                    } else {
-                                        await dbService.run(`DELETE FROM ${table} WHERE id = ?`, [recordId]);
-                                    }
+                                    await dbService.run(`DELETE FROM ${table} WHERE ${pkField} = ?`, [recordId]);
                                 }
                             }
                         }
@@ -740,22 +735,19 @@ export class SyncService {
                         }
                     }
 
-                    // Retry deferred upserts that failed due to missing parent references.
-                    // This occurs when remote changes reference parents that are also part of the pull set.
                     if (deferredUpserts.length > 0) {
                         let pendingDeferred = [...deferredUpserts];
                         for (let pass = 0; pass < 3 && pendingDeferred.length > 0; pass++) {
                             const nextPending: Array<{ table: string; change: any }> = [];
                             for (const item of pendingDeferred) {
-                                const operation = typeof item?.change?.operation === 'string' ? item.change.operation : null;
                                 const payload = item?.change?.payload && typeof item.change.payload === 'object' ? item.change.payload : null;
-                                if (!operation || !payload) continue;
-                                const recordId = payload.id || payload.recordId;
+                                if (!payload) continue;
+                                const pkField = item.table === 'settings' ? 'key' : 'id';
+                                const recordId = item.table === 'settings' ? payload.key : (payload.id || payload.recordId);
                                 if (typeof recordId !== 'string' || recordId.length === 0) continue;
 
-                                // Re-apply LWW check against current local state
                                 const localRow = await dbService.getFirst<{ updated_at?: number | null }>(
-                                    `SELECT updated_at FROM ${item.table} WHERE id = ?`,
+                                    `SELECT updated_at FROM ${item.table} WHERE ${pkField} = ?`,
                                     [recordId]
                                 );
 
@@ -768,19 +760,38 @@ export class SyncService {
                                     continue;
                                 }
 
-                                const keys = Object.keys(normalized);
-                                const values = Object.values(normalized);
-                                const placeholders = keys.map(() => '?').join(', ');
-
                                 try {
-                                    await dbService.run(
-                                        `INSERT OR REPLACE INTO ${item.table} (${keys.join(', ')}) VALUES (${placeholders})`,
-                                        values as any
-                                    );
+                                    const existing = await dbService.getFirst<Record<string, any>>(`SELECT * FROM ${item.table} WHERE ${pkField} = ?`, [recordId]);
+
+                                    if (existing) {
+                                        const schemaKeys = tableSchemas?.get(item.table);
+                                        const merged = { ...existing };
+                                        Object.keys(normalized).forEach(k => {
+                                            if (schemaKeys && !schemaKeys.has(k)) return;
+                                            merged[k] = normalized[k];
+                                        });
+
+                                        const updateKeys = Object.keys(merged).filter(k => k !== pkField);
+                                        const updatePlaceholders = updateKeys.map(k => `${k} = ?`).join(', ');
+                                        const updateValues = updateKeys.map(k => merged[k]);
+
+                                        await dbService.run(
+                                            `UPDATE ${item.table} SET ${updatePlaceholders} WHERE ${pkField} = ?`,
+                                            [...updateValues, recordId]
+                                        );
+                                    } else {
+                                        const keys = Object.keys(normalized);
+                                        const placeholders = keys.map(() => '?').join(', ');
+                                        const values = keys.map((k) => normalized[k]);
+
+                                        await dbService.run(
+                                            `INSERT INTO ${item.table} (${keys.join(', ')}) VALUES (${placeholders})`,
+                                            values as any
+                                        );
+                                    }
                                 } catch (e: any) {
                                     const msg = e?.message || '';
-                                    const isFk = msg.includes('FOREIGN KEY constraint failed');
-                                    if (isFk) {
+                                    if (msg.includes('FOREIGN KEY constraint failed')) {
                                         nextPending.push(item);
                                         continue;
                                     }
@@ -801,9 +812,8 @@ export class SyncService {
                 });
             }
 
-            // Update local sync time with SERVER time to avoid clock drift issues
             const nextSyncTime = serverTime ? serverTime.toString() : Date.now().toString();
-            await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', nextSyncTime]);
+            await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [syncKey, nextSyncTime]);
 
             if (byTable.size > 0) {
                 if (byTable.has('settings')) {
@@ -813,13 +823,12 @@ export class SyncService {
                 dataEventService.emit('DATA_UPDATED');
             }
 
-            // --- Post-Sync Clean (Industrial Repair) ---
-            // After downloading changes, fix any potential duplicates from the cloud
             logger.info('[Sync] Performing post-pull consistency check...');
-            await dbService.repairDataConsistency();
+            await dbService.repairDataConsistency(userId);
+
         } catch (error) {
             logger.captureException(error, { scope: 'SyncService.pullRemoteChanges' });
-            throw error; // Throw so syncBidirectional fails loudly
+            throw error;
         }
         return totalCount;
     }
@@ -1026,7 +1035,32 @@ export class SyncService {
         });
 
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return await response.json();
+        const data = await response.json();
+
+        // Refine remote hasData/recordCount to match local logic (user data only)
+        const userDataTables = [
+            'workouts', 'workout_sets', 'routines', 'routine_days',
+            'routine_exercises', 'measurements', 'goals', 'body_metrics',
+            'plate_inventory', 'badges'
+        ];
+
+        let recordCount = 0;
+        if (data.counts) {
+            recordCount = Object.entries(data.counts).reduce((acc, [key, v]: [string, any]) => {
+                if (userDataTables.includes(key)) {
+                    return acc + (v.active || 0);
+                }
+                return acc;
+            }, 0);
+        } else {
+            recordCount = data.recordCount || 0;
+        }
+
+        return {
+            hasData: recordCount > 0,
+            recordCount,
+            counts: data.counts
+        };
     }
 
     public async checkLocalStatus(): Promise<SyncStatus> {
@@ -1074,7 +1108,19 @@ export class SyncService {
             counts[t.key] = { active, deleted, total: active + deleted };
         }
 
-        const recordCount = Object.values(counts).reduce((acc, v) => acc + v.active, 0);
+        const recordCount = Object.entries(counts).reduce((acc, [key, v]) => {
+            // Only count tables that represent actual user data
+            // Ignore system categories, settings, etc. for "hasData" detection
+            const userDataTables = [
+                'workouts', 'workout_sets', 'routines', 'routine_days',
+                'routine_exercises', 'measurements', 'goals', 'body_metrics',
+                'plate_inventory', 'badges'
+            ];
+            if (userDataTables.includes(key)) {
+                return acc + v.active;
+            }
+            return acc;
+        }, 0);
         return { hasData: recordCount > 0, recordCount, counts };
     }
 
@@ -1112,10 +1158,11 @@ export class SyncService {
         if (!token) throw new Error('Usuario no autenticado');
 
         const tables = [
-            'exercises', 'categories', 'workouts', 'workout_sets',
+            'categories', 'exercises', 'workouts', 'workout_sets',
             'routines', 'routine_days', 'routine_exercises',
             'measurements', 'goals', 'plate_inventory', 'settings',
-            'body_metrics', 'badges', 'exercise_badges'
+            'body_metrics', 'badges', 'exercise_badges', 'user_profiles',
+            'activity_feed', 'changelog_reactions', 'kudos'
         ];
 
         const snapshot: Record<string, any[]> = {};
@@ -1138,8 +1185,10 @@ export class SyncService {
             throw new Error(`Snapshot push failed! status: ${response.status}${suffix}`);
         }
 
+        const userId = useAuthStore.getState().user?.id;
+        const syncKey = userId ? `last_pull_sync_${userId}` : 'last_pull_sync';
         await dbService.run('DELETE FROM sync_queue');
-        await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', Date.now().toString()]);
+        await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [syncKey, Date.now().toString()]);
     }
 
     public async wipeAllUserData(): Promise<void> {
@@ -1189,7 +1238,9 @@ export class SyncService {
         await configService.reload();
         await useSettingsStore.getState().loadSettings();
 
-        await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['last_pull_sync', Date.now().toString()]);
+        const userId = useAuthStore.getState().user?.id;
+        const syncKey = userId ? `last_pull_sync_${userId}` : 'last_pull_sync';
+        await dbService.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [syncKey, Date.now().toString()]);
 
         // Notify app
         dataEventService.emit('DATA_UPDATED');

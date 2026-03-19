@@ -14,9 +14,16 @@ interface InboxTabProps {
     setHideOwnActivity: (hide: boolean) => void;
     typeFilter: 'all' | 'pr' | 'workout' | 'routine';
     setTypeFilter: (type: 'all' | 'pr' | 'workout' | 'routine') => void;
+    handleInboxResponse: any;
+    handleMarkAsSeen: any;
+    handleMarkAllAsSeen?: () => void;
+    handleToggleKudo: any;
     profile: SocialProfile | null;
     colors: any;
     styles: any;
+    renderHeader?: any;
+    refreshing?: boolean;
+    onRefresh?: () => void;
 }
 
 const getActivityDescription = (item: SocialInboxItem): string => {
@@ -154,6 +161,7 @@ const InboxTab = React.memo(({
     setTypeFilter,
     handleInboxResponse,
     handleMarkAsSeen,
+    handleMarkAllAsSeen,
     handleToggleKudo,
     profile,
     colors,
@@ -161,14 +169,7 @@ const InboxTab = React.memo(({
     renderHeader,
     refreshing,
     onRefresh
-}: InboxTabProps & {
-    handleInboxResponse: any,
-    handleMarkAsSeen: any,
-    handleToggleKudo: any,
-    renderHeader?: any,
-    refreshing?: boolean,
-    onRefresh?: () => void
-}) => {
+}: InboxTabProps) => {
 
     const filteredInbox = useMemo(() => {
         return inbox.filter(item => {
@@ -280,6 +281,16 @@ const InboxTab = React.memo(({
                                     {showSeen ? 'Ver pendientes' : 'Ver archivadas'}
                                 </Text>
                             </TouchableOpacity>
+
+                            {!showSeen && handleMarkAllAsSeen && (
+                                <TouchableOpacity
+                                    style={[styles.archiveToggle, { marginLeft: 10, borderColor: colors.border }]}
+                                    onPress={handleMarkAllAsSeen}
+                                >
+                                    <CheckCircle size={16} color={colors.textMuted} />
+                                    <Text style={[styles.archiveToggleText, { marginLeft: 6 }]}>Leído</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
                     </View>
                 )}

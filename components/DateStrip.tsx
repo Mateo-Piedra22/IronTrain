@@ -3,6 +3,7 @@ import { FlashList, ViewToken } from '@shopify/flash-list';
 import { addDays, differenceInDays, format, isSameDay, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import { Calendar as CalendarIcon, Check, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -30,8 +31,10 @@ const FULL_ITEM_SIZE = ITEM_WIDTH + ITEM_SPACING;
 // --- Interfaces ---
 
 interface DailyStatus {
-    status?: string; // 'completed' | 'in_progress' | undefined
+    status?: string; // 'completed' | 'in_progress' | 'idle'
     colors?: string[];
+    completedCount?: number;
+    totalCount?: number;
 }
 
 interface DateStripProps {
@@ -45,6 +48,7 @@ interface DateStripProps {
 
 export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, markedDates = {}, headerCenter, headerRight }: DateStripProps) {
     const colors = useColors();
+    const router = useRouter();
     const [isExpanded, setIsExpanded] = useState(false);
     const [visibleMonth, setVisibleMonth] = useState(selectedDate);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,6 +57,184 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
     // --- Memoized Data ---
 
     const anchorDate = useMemo(() => subDays(new Date(), VISIBLE_RANGE_DAYS), []);
+
+    // --- Styles ---
+    const styles = useMemo(() => StyleSheet.create({
+        wrapper: {
+            backgroundColor: colors.background,
+            zIndex: 10,
+            borderBottomWidth: 1.5,
+            borderBottomColor: colors.border,
+            ...ThemeFx.shadowSm,
+        },
+        header: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            height: 64,
+            backgroundColor: colors.background,
+        },
+        monthTitle: {
+            color: colors.text,
+            fontWeight: '900',
+            fontSize: 20,
+            textTransform: 'capitalize',
+            letterSpacing: -0.5,
+        },
+        expandButton: {
+            padding: 10,
+            backgroundColor: colors.surface,
+            borderRadius: 14,
+            borderWidth: 1.5,
+            borderColor: colors.border,
+            ...ThemeFx.shadowSm,
+        },
+        stripContainer: {
+            paddingTop: 1,
+            paddingBottom: 1,
+            height: 80,
+            backgroundColor: colors.background,
+        },
+        listContent: {
+            paddingHorizontal: 16,
+        },
+        // Strip Item Styles
+        stripItem: {
+            width: ITEM_WIDTH,
+            height: 72,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 8,
+            borderRadius: 16,
+            borderWidth: 1.5,
+            ...ThemeFx.shadowSm,
+        },
+        stripItemBorder: {
+            // dynamic override
+        },
+        stripItemSelected: {
+            backgroundColor: colors.primary.DEFAULT,
+            borderColor: colors.primary.DEFAULT,
+        },
+        stripItemSelectedCompleted: {
+            backgroundColor: colors.primary.DEFAULT,
+            borderColor: colors.green,
+        },
+        stripItemCompleted: {
+            backgroundColor: colors.surface,
+            borderColor: withAlpha(colors.green, '40'),
+        },
+        stripItemInProgress: {
+            backgroundColor: colors.surface,
+            borderColor: withAlpha(colors.yellow, '40'),
+        },
+        stripItemDefault: {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+        },
+        textWhite: { color: colors.onPrimary },
+        textMuted: { color: colors.textMuted },
+        textPrimary: { color: colors.primary.DEFAULT },
+
+        stripDayName: {
+            fontSize: 10,
+            fontWeight: '700',
+            textTransform: 'uppercase',
+            marginBottom: 4,
+            letterSpacing: 0.5,
+        },
+        stripDayNum: {
+            fontSize: 20,
+            fontWeight: '900',
+        },
+        completedBadge: {
+            position: 'absolute',
+            top: 1,
+            right: 1,
+            backgroundColor: colors.green,
+            borderRadius: 999,
+            padding: 2,
+            borderWidth: 1.5,
+            borderColor: colors.background,
+        },
+        dotsContainer: {
+            flexDirection: 'row',
+            gap: 2,
+            marginTop: 6,
+            height: 6,
+            justifyContent: 'center',
+        },
+        dot: {
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+        },
+        // Calendar Styles
+        calendarContainer: {
+            backgroundColor: colors.background,
+            paddingBottom: 8,
+        },
+        calendarDay: {
+            width: 44,
+            height: 44,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 14,
+            margin: 2,
+            borderWidth: 1.5,
+            borderColor: 'transparent',
+        },
+        bgPrimary: {
+            backgroundColor: colors.primary.DEFAULT,
+            borderColor: colors.primary.DEFAULT
+        },
+        bgPrimaryCompleted: {
+            backgroundColor: colors.primary.DEFAULT,
+            borderColor: colors.green
+        },
+        bgSurfaceCompleted: {
+            backgroundColor: colors.surface,
+            borderColor: withAlpha(colors.green, '40'),
+        },
+        bgSurfaceInProgress: {
+            backgroundColor: colors.surface,
+            borderColor: withAlpha(colors.blue, '40'),
+        },
+        calendarDayText: {
+            fontSize: 15,
+            fontWeight: '600',
+        },
+        textWhiteBold: { color: colors.onPrimary, fontWeight: '900' },
+        textPrimaryBold: { color: colors.primary.DEFAULT, fontWeight: '900' },
+        textMutedBold: { color: colors.textMuted, fontWeight: '700' },
+
+        calendarDotsContainer: {
+            flexDirection: 'row',
+            gap: 2,
+            marginTop: 4,
+            position: 'absolute',
+            bottom: 6,
+            justifyContent: 'center',
+            width: '100%',
+        },
+        calDot: {
+            width: 4,
+            height: 4,
+            borderRadius: 2,
+        },
+        calendarCompletedTick: {
+            position: 'absolute',
+            top: 2,
+            right: 2,
+        },
+        tickDot: {
+            width: 6,
+            height: 6,
+            backgroundColor: colors.green,
+            borderRadius: 3,
+        }
+    }), [colors]);
 
     const dates = useMemo(() => {
         return Array.from({ length: TOTAL_DAYS }, (_, i) => addDays(anchorDate, i));
@@ -128,13 +310,15 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
         const dateStr = format(item, 'yyyy-MM-dd');
         const marks = markedDates[dateStr];
         const isCompleted = marks?.status === 'completed';
+        const isPartiallyCompleted = marks?.totalCount && marks.totalCount > 1 && marks.completedCount !== undefined;
 
         // Styles
         const containerStyle = [
             styles.stripItem,
             styles.stripItemBorder,
             isSelected ? (isCompleted ? styles.stripItemSelectedCompleted : styles.stripItemSelected) :
-                isCompleted ? styles.stripItemCompleted : styles.stripItemDefault
+                isCompleted ? styles.stripItemCompleted :
+                    (marks?.status === 'in_progress' ? styles.stripItemInProgress : styles.stripItemDefault)
         ];
 
         const dayNameStyle = [styles.stripDayName, isSelected ? styles.textWhite : styles.textMuted];
@@ -142,11 +326,21 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
 
         return (
             <TouchableOpacity onPress={() => handleDateSelect(item)} style={containerStyle} activeOpacity={0.7}>
-                {isCompleted && (
+                {isCompleted ? (
                     <View style={styles.completedBadge}>
                         <Check size={8} color={colors.green} />
                     </View>
-                )}
+                ) : isPartiallyCompleted ? (
+                    <View style={[styles.completedBadge, { backgroundColor: colors.yellow }]}>
+                        <Text style={{ fontSize: 7, color: '#fff', fontWeight: '900' }}>
+                            {marks.completedCount}/{marks.totalCount}
+                        </Text>
+                    </View>
+                ) : marks?.status === 'in_progress' ? (
+                    <View style={[styles.completedBadge, { backgroundColor: colors.blue, padding: 3 }]}>
+                        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#fff' }} />
+                    </View>
+                ) : null}
                 <Text style={dayNameStyle}>{format(item, 'EEE', { locale: es })}</Text>
                 <Text style={dayNumStyle}>{format(item, 'd')}</Text>
             </TouchableOpacity>
@@ -163,11 +357,13 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
         const dateStr = date.dateString;
         const marks = markedDates[dateStr];
         const isCompleted = marks?.status === 'completed';
+        const isPartiallyCompleted = marks?.totalCount && marks.totalCount > 1 && marks.completedCount !== undefined;
 
         const containerStyle = [
             styles.calendarDay,
             isSelected ? (isCompleted ? styles.bgPrimaryCompleted : styles.bgPrimary) :
-                isCompleted ? styles.bgSurfaceCompleted : {}
+                isCompleted ? styles.bgSurfaceCompleted :
+                    (marks?.status === 'in_progress' ? styles.bgSurfaceInProgress : {})
         ];
 
         const textStyle = [
@@ -179,187 +375,33 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
             <TouchableOpacity onPress={() => handleDateSelect(dayDate)} style={containerStyle} activeOpacity={0.7}>
                 <Text style={textStyle}>{date.day}</Text>
                 <View style={styles.calendarDotsContainer}>
-                    {marks?.colors?.slice(0, 4).map((color, i) => (
+                    {marks?.colors?.slice(0, 4).map((color: string, i: number) => (
                         <View key={`${dateStr}-cal-dot-${i}`} style={[styles.calDot, { backgroundColor: color }]} />
                     ))}
                 </View>
-                {isCompleted && (
+                {isCompleted ? (
                     <View style={styles.calendarCompletedTick}>
                         <View style={styles.tickDot} />
                     </View>
-                )}
+                ) : isPartiallyCompleted ? (
+                    <View style={styles.calendarCompletedTick}>
+                        <View style={[styles.tickDot, { backgroundColor: colors.yellow, width: 8, height: 8, borderRadius: 4, alignItems: 'center', justifyContent: 'center' }]}>
+                            <Text style={{ fontSize: 6, color: '#fff', fontWeight: '900' }}>
+                                {marks.completedCount}
+                            </Text>
+                        </View>
+                    </View>
+                ) : marks?.status === 'in_progress' ? (
+                    <View style={styles.calendarCompletedTick}>
+                        <View style={[styles.tickDot, { backgroundColor: colors.blue }]} />
+                    </View>
+                ) : null}
             </TouchableOpacity>
         );
-    }, [selectedDate, markedDates, handleDateSelect]);
+    }, [selectedDate, markedDates, handleDateSelect, colors, styles]);
 
     // --- Styles ---
-    const styles = useMemo(() => StyleSheet.create({
-        wrapper: {
-            backgroundColor: colors.background,
-            zIndex: 10,
-            borderBottomWidth: 1.5,
-            borderBottomColor: colors.border,
-            ...ThemeFx.shadowSm,
-        },
-        header: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            paddingHorizontal: 16,
-            height: 64,
-            backgroundColor: colors.background,
-        },
-        monthTitle: {
-            color: colors.text,
-            fontWeight: '900',
-            fontSize: 20,
-            textTransform: 'capitalize',
-            letterSpacing: -0.5,
-        },
-        expandButton: {
-            padding: 10,
-            backgroundColor: colors.surface,
-            borderRadius: 14,
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            ...ThemeFx.shadowSm,
-        },
-        stripContainer: {
-            paddingVertical: 12,
-            height: 96,
-            backgroundColor: colors.background,
-        },
-        listContent: {
-            paddingHorizontal: 16,
-        },
-        // Strip Item Styles
-        stripItem: {
-            width: ITEM_WIDTH,
-            height: 72,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginRight: 8,
-            borderRadius: 16,
-            borderWidth: 1.5,
-            ...ThemeFx.shadowSm,
-        },
-        stripItemBorder: {
-            // dynamic override
-        },
-        stripItemSelected: {
-            backgroundColor: colors.primary.DEFAULT,
-            borderColor: colors.primary.DEFAULT,
-        },
-        stripItemSelectedCompleted: {
-            backgroundColor: colors.primary.DEFAULT,
-            borderColor: colors.green,
-        },
-        stripItemCompleted: {
-            backgroundColor: colors.surface,
-            borderColor: withAlpha(colors.green, '40'),
-        },
-        stripItemDefault: {
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-        },
-        textWhite: { color: colors.onPrimary },
-        textMuted: { color: colors.textMuted },
-        textPrimary: { color: colors.primary.DEFAULT },
 
-        stripDayName: {
-            fontSize: 10,
-            fontWeight: '700',
-            textTransform: 'uppercase',
-            marginBottom: 4,
-            letterSpacing: 0.5,
-        },
-        stripDayNum: {
-            fontSize: 20,
-            fontWeight: '900',
-        },
-        completedBadge: {
-            position: 'absolute',
-            top: -4,
-            right: -4,
-            backgroundColor: colors.green,
-            borderRadius: 999,
-            padding: 2,
-            borderWidth: 1.5,
-            borderColor: colors.background,
-        },
-        dotsContainer: {
-            flexDirection: 'row',
-            gap: 2,
-            marginTop: 6,
-            height: 6,
-            justifyContent: 'center',
-        },
-        dot: {
-            width: 6,
-            height: 6,
-            borderRadius: 3,
-        },
-        // Calendar Styles
-        calendarContainer: {
-            backgroundColor: colors.background,
-            paddingBottom: 8,
-        },
-        calendarDay: {
-            width: 44,
-            height: 44,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 14,
-            margin: 2,
-            borderWidth: 1.5,
-            borderColor: 'transparent',
-        },
-        bgPrimary: {
-            backgroundColor: colors.primary.DEFAULT,
-            borderColor: colors.primary.DEFAULT
-        },
-        bgPrimaryCompleted: {
-            backgroundColor: colors.primary.DEFAULT,
-            borderColor: colors.green
-        },
-        bgSurfaceCompleted: {
-            backgroundColor: colors.surface,
-            borderColor: withAlpha(colors.green, '40'),
-        },
-        calendarDayText: {
-            fontSize: 15,
-            fontWeight: '600',
-        },
-        textWhiteBold: { color: colors.onPrimary, fontWeight: '900' },
-        textPrimaryBold: { color: colors.primary.DEFAULT, fontWeight: '900' },
-        textMutedBold: { color: colors.textMuted, fontWeight: '700' },
-
-        calendarDotsContainer: {
-            flexDirection: 'row',
-            gap: 2,
-            marginTop: 4,
-            position: 'absolute',
-            bottom: 6,
-            justifyContent: 'center',
-            width: '100%',
-        },
-        calDot: {
-            width: 4,
-            height: 4,
-            borderRadius: 2,
-        },
-        calendarCompletedTick: {
-            position: 'absolute',
-            top: 2,
-            right: 2,
-        },
-        tickDot: {
-            width: 6,
-            height: 6,
-            backgroundColor: colors.green,
-            borderRadius: 3,
-        }
-    }), [colors]);
 
     // --- Main Render ---
 
@@ -379,6 +421,7 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
                             <CalendarIcon color={colors.textMuted} size={20} />
                         )}
                     </TouchableOpacity>
+
                 </View>
 
                 {headerCenter && (
@@ -395,11 +438,11 @@ export function DateStrip({ selectedDate, onSelectDate, onExpandedChange, marked
             <View style={[styles.calendarContainer, { paddingBottom: 16, display: isExpanded ? 'flex' : 'none' }]}>
                 <Calendar
                     initialDate={format(selectedDate, 'yyyy-MM-dd')}
-                    key="calendar-view"
+                    key={`calendar-${colors.background}-${colors.surface}`} // Force re-render on theme change
                     onMonthChange={(date: DateData) => {
                         setVisibleMonth(new Date(date.year, date.month - 1, date.day));
                     }}
-                    dayComponent={renderCalendarDay}
+                    dayComponent={(props: any) => renderCalendarDay(props)}
                     renderArrow={(direction: string) => (direction === 'left' ? <ChevronLeft color={colors.textMuted} size={24} /> : <ChevronRight color={colors.textMuted} size={24} />)}
                     enableSwipeMonths={true}
                     theme={{

@@ -380,6 +380,32 @@ export default function SocialTab() {
         }
     };
 
+    const handleMarkAllAsSeen = async () => {
+        const unseen = inbox.filter(i => !i.seenAt);
+        if (unseen.length === 0) return;
+
+        confirm.ask(
+            '¿Archivar todo?',
+            `Se marcarán como leídas las ${unseen.length} notificaciones pendientes.`,
+            async () => {
+                const now = new Date().toISOString();
+                // Optimistic UI Update: Mark everything seen immediately
+                setInbox(current => current.map(item => ({ ...item, seenAt: item.seenAt || now })));
+                addToast({ type: 'success', title: 'Buzón actualizado', message: 'Notificaciones archivadas.' });
+
+                try {
+                    await SocialService.markAllAsSeen(unseen);
+                } catch (err) {
+                    logger.captureException(err, { scope: 'SocialTab.markAllAsSeen' });
+                    // Revert? Or just show error. Since we are archiving, usually reverting is confusing.
+                    // But we can inform the user.
+                    addToast({ type: 'error', title: 'Error servidor', message: 'Algunas notificaciones podrían reaparecer.' });
+                }
+            },
+            'Archivar todo'
+        );
+    };
+
     if (!user) {
         return (
             <SafeAreaWrapper style={styles.container} centered contentStyle={{ alignItems: 'center', justifyContent: 'center' }}>
@@ -546,6 +572,7 @@ export default function SocialTab() {
                                 handleInboxResponse={handleInboxResponse}
                                 handleMarkAsSeen={handleMarkAsSeen}
                                 handleToggleKudo={handleToggleKudo}
+                                handleMarkAllAsSeen={handleMarkAllAsSeen}
                                 profile={profile}
                                 colors={colors}
                                 styles={styles}

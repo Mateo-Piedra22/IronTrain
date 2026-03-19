@@ -24,6 +24,8 @@ interface AuthState {
     initialize: () => Promise<void>;
     login: () => Promise<void>;
     logout: () => Promise<void>;
+    needsInitialSync: boolean;
+    setNeedsInitialSync: (val: boolean) => void;
 }
 
 WebBrowser.maybeCompleteAuthSession();
@@ -55,6 +57,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     user: null,
     isLoading: true,
     error: null,
+    needsInitialSync: false,
+    setNeedsInitialSync: (val: boolean) => set({ needsInitialSync: val }),
 
     initialize: async () => {
         try {
@@ -113,6 +117,7 @@ export const useAuthStore = create<AuthState>((set) => ({
                     // Alias the anonymous ID with the user ID on first login
                     analytics.alias(userData.id);
 
+                    set({ needsInitialSync: true });
                     await useAuthStore.getState().initialize();
                 }
             } else if (result.type === 'cancel' || result.type === 'dismiss') {

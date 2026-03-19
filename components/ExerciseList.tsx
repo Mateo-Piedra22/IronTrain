@@ -119,7 +119,7 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
 
     const st = useMemo(() => StyleSheet.create({
         container: { flex: 1, backgroundColor: inModal ? colors.surfaceLighter : colors.background },
-        header: { padding: 18, paddingBottom: 12 },
+        header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12 },
         searchBar: {
             flexDirection: 'row',
             alignItems: 'center',
@@ -151,7 +151,7 @@ export function ExerciseList({ onSelect, inModal }: ExerciseListProps) {
         categoryText: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
         categoryTextActive: { color: colors.onPrimary },
 
-        listContent: { padding: 16, paddingBottom: inModal ? 40 : 100 },
+        listContent: { paddingTop: 0, paddingHorizontal: 16, paddingBottom: inModal ? 40 : 100 },
         card: {
             flexDirection: 'row',
             alignItems: 'center',

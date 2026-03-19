@@ -239,7 +239,10 @@ export class AnalysisService {
             AND date > ?
         `, [cutoffMs]);
 
-        const result = results.map(r => r.date);
+        const result = Array.from(new Set(results.map(r => {
+            const d = new Date(r.date);
+            return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        })));
         this.setCache(cacheKey, result);
         return result;
     }
@@ -263,14 +266,22 @@ export class AnalysisService {
             AND s.weight < 1000
             AND s.reps < 500
             GROUP BY w.id
-            ORDER BY w.date ASC
-            LIMIT 7
+            ORDER BY w.date DESC
+            LIMIT 15
         `);
 
-        const result = results.map(r => ({
-            date: new Date(r.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
-            volume: r.volume || 0
-        }));
+        // Group by day in JS to handle multiple sessions per day correctly
+        const dailyTotals = new Map<string, number>();
+        results.forEach(r => {
+            const dateStr = new Date(r.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+            dailyTotals.set(dateStr, (dailyTotals.get(dateStr) || 0) + (r.volume || 0));
+        });
+
+        const result = Array.from(dailyTotals.entries())
+            .map(([date, volume]) => ({ date, volume }))
+            .reverse() // Back to ASC
+            .slice(-7);
+
         this.setCache(cacheKey, result);
         return result;
     }

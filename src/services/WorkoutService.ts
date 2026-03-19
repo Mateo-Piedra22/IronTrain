@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 import { uuidV4 } from '../utils/uuid';
 import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
+import { IronScoreService } from './IronScoreService';
 
 type CopyMode = 'replace' | 'append';
 type CopyNameMode = 'if_empty' | 'always' | 'never';
@@ -13,7 +14,7 @@ type CopyContentMode = 'full' | 'structure' | 'exercises_only';
 type FinishLocation = { lat: number; lon: number } | null;
 
 class WorkoutService {
-    private calendarEventsCache: { ts: number; data: Record<string, { status: string; colors: string[] }> } | null = null;
+    private calendarEventsCache: { ts: number; data: Record<string, { status: string; colors: string[]; completedCount: number; totalCount: number }> } | null = null;
     private exerciseHistoryCache = new Map<string, { ts: number; data: { date: number; sets: WorkoutSet[] }[] }>();
 
     constructor() {
@@ -54,7 +55,7 @@ class WorkoutService {
     /**
      * Get calendar events: dates with status and muscle colors.
      */
-    public async getCalendarEvents(): Promise<Record<string, { status: string, colors: string[] }>> {
+    public async getCalendarEvents(): Promise<Record<string, { status: string, colors: string[], completedCount: number, totalCount: number }>> {
         const now = Date.now();
         if (this.calendarEventsCache && now - this.calendarEventsCache.ts < 15_000) {
             return this.calendarEventsCache.data;
@@ -70,10 +71,11 @@ class WorkoutService {
             LEFT JOIN workout_sets s ON s.workout_id = w.id
             LEFT JOIN exercises e ON s.exercise_id = e.id
             LEFT JOIN categories c ON e.category_id = c.id
+            WHERE w.is_template = 0 AND w.deleted_at IS NULL
             GROUP BY w.id
         `);
 
-        const events: Record<string, { status: string; colors: string[] }> = {};
+        const events: Record<string, { status: string; colors: string[]; completedCount: number; totalCount: number }> = {};
         for (const r of rows) {
             const dateStr = format(new Date(r.date), 'yyyy-MM-dd');
             const newColors = (r.colors || '')
@@ -82,14 +84,34 @@ class WorkoutService {
                 .filter(Boolean);
 
             if (!events[dateStr]) {
-                events[dateStr] = { status: r.status, colors: newColors };
+                events[dateStr] = {
+                    status: r.status,
+                    colors: newColors,
+                    completedCount: r.status === 'completed' ? 1 : 0,
+                    totalCount: 1
+                };
             } else {
-                const mergedColors = Array.from(new Set([...events[dateStr].colors, ...newColors]));
-                const newStatus = (r.status === 'completed' || events[dateStr].status === 'completed')
-                    ? 'completed'
-                    : (events[dateStr].status === 'in_progress' || r.status === 'in_progress' ? 'in_progress' : r.status);
+                events[dateStr].colors = Array.from(new Set([...events[dateStr].colors, ...newColors]));
+                events[dateStr].totalCount += 1;
+                if (r.status === 'completed') {
+                    events[dateStr].completedCount += 1;
+                }
 
-                events[dateStr] = { status: newStatus, colors: mergedColors };
+                // Status Logic: 
+                // 1. If all are completed -> 'completed'
+                // 2. If any in_progress OR some completed/some idle -> 'in_progress' (serves as "active/partial")
+                // 3. Otherwise -> 'idle'
+                const allCompleted = events[dateStr].completedCount === events[dateStr].totalCount;
+                const anyInProgress = events[dateStr].status === 'in_progress' || r.status === 'in_progress';
+                const someDone = events[dateStr].completedCount > 0;
+
+                if (allCompleted) {
+                    events[dateStr].status = 'completed';
+                } else if (anyInProgress || someDone) {
+                    events[dateStr].status = 'in_progress';
+                } else {
+                    events[dateStr].status = 'idle';
+                }
             }
         }
 
@@ -160,7 +182,7 @@ class WorkoutService {
         return newId;
     }
 
-    public async getWorkoutWithSetsForDate(date: Date): Promise<Workout | null> {
+    public async getWorkoutsWithSetsForDate(date: Date): Promise<(Workout & { set_count: number })[]> {
         const start = getUnixTime(startOfDay(date)) * 1000;
         const end = getUnixTime(endOfDay(date)) * 1000;
 
@@ -172,10 +194,9 @@ class WorkoutService {
             GROUP BY w.id
             HAVING set_count > 0
             ORDER BY w.start_time DESC, w.date DESC
-            LIMIT 1
         `, [start, end]);
 
-        return rows?.[0] ?? null;
+        return rows || [];
     }
 
     public async copyWorkoutToWorkout(sourceWorkoutId: string, targetWorkoutId: string): Promise<void> {
@@ -184,6 +205,12 @@ class WorkoutService {
 
     public async getWorkout(id: string): Promise<Workout | null> {
         return await dbService.getWorkoutById(id);
+    }
+
+    public async updateWorkout(id: string, updates: Partial<Pick<Workout, 'name' | 'notes'>>): Promise<void> {
+        await dbService.updateWorkout(id, updates);
+        this.invalidateCaches();
+        dataEventService.emit('DATA_UPDATED');
     }
 
     public async copyWorkoutToWorkoutAdvanced(
@@ -398,26 +425,48 @@ class WorkoutService {
         return v;
     }
 
-    public async getActiveWorkout(date: Date): Promise<Workout> {
-        // Normalize search range
+    /**
+     * Get all workout sessions for a given date.
+     */
+    public async getWorkoutsForDate(date: Date): Promise<Workout[]> {
         const start = getUnixTime(startOfDay(date)) * 1000;
         const end = getUnixTime(endOfDay(date)) * 1000;
+        return await dbService.getWorkoutsByDate(start, end);
+    }
 
-        let workout = await dbService.getWorkoutByDate(start, end);
+    /**
+     * Get the most relevant workout for a specific date.
+     * Prioritizes in-progress sessions, then the most recent completed one.
+     * If no workout exists, it creates the first one.
+     */
+    public async getActiveWorkout(date: Date): Promise<Workout> {
+        const workouts = await this.getWorkoutsForDate(date);
 
-        if (!workout) {
-            // Create new workout - ALWAYS normalize to Local Noon (12:00)
-            // This prevents timezone-related daily splits and matches SyncService logic.
-            const dateObj = new Date(date);
-            dateObj.setHours(12, 0, 0, 0);
-            const normalizedDate = dateObj.getTime();
+        // 1. Pick the first IN_PROGRESS session (most recent first due to DB ordering)
+        const active = workouts.find(w => w.status === 'in_progress');
+        if (active) return active;
 
-            const id = await dbService.createWorkout(normalizedDate);
-            workout = await dbService.getWorkoutById(id);
-        }
+        // 2. If all are completed, return the last one (workouts[0] is most recent)
+        if (workouts.length > 0) return workouts[0];
 
+        // 3. If none exist, create the first one of the day
+        return await this.startNewSession(date);
+    }
+
+    /**
+     * Explicitly starts a new session for a given date.
+     */
+    public async startNewSession(date: Date): Promise<Workout> {
+        const dateObj = new Date(date);
+        // Force NOON (12:00) local time to ensure it lands on the correct calendar day
+        dateObj.setHours(12, 0, 0, 0);
+        const normalizedDate = dateObj.getTime();
+
+        const id = await dbService.createWorkout(normalizedDate);
+        const workout = await dbService.getWorkoutById(id);
         if (!workout) throw new Error('Failed to create/fetch workout');
 
+        this.invalidateCaches();
         return workout;
     }
 
@@ -643,6 +692,16 @@ class WorkoutService {
         if (workout?.status === 'completed') return; // Idempotent
 
         const now = Date.now();
+
+        // Automatic naming if empty
+        if (!workout?.name) {
+            const dateStr = format(new Date(workout?.date || now), 'dd/MM');
+            const dayName = format(new Date(workout?.date || now), 'eeee', { locale: require('date-fns/locale').es });
+            const autoName = `Entrenamiento ${dayName.charAt(0).toUpperCase() + dayName.slice(1)} ${dateStr}`;
+
+            await dbService.updateWorkout(id, { name: autoName });
+        }
+
         const location = await this.captureFinishLocation();
 
         if (location) {
@@ -699,6 +758,72 @@ class WorkoutService {
         dataEventService.emit('DATA_UPDATED');
 
         this.invalidateCaches();
+    }
+
+    /**
+     * Delete a workout session and all its related data (sets, feed, score).
+     */
+    public async deleteWorkout(id: string): Promise<void> {
+        const workout = await dbService.getWorkoutById(id);
+        if (!workout) return;
+
+        const timestamp = Date.now();
+
+        try {
+            await dbService.withTransaction(async () => {
+                // 1. Delete sets
+                const sets = await dbService.getSetsForWorkout(id);
+                for (const set of sets) {
+                    await dbService.run('DELETE FROM workout_sets WHERE id = ?', [set.id]);
+                    await dbService.queueSyncMutation('workout_sets', set.id, 'DELETE');
+                }
+
+                // 2. Cleanup activity feed
+                await this.cleanupActivityFeedForWorkout(id);
+
+                // 3. Revert IronScore
+                await IronScoreService.revertScoreForWorkout(id);
+
+                // 4. Delete workout
+                await dbService.run('DELETE FROM workouts WHERE id = ?', [id]);
+                await dbService.queueSyncMutation('workouts', id, 'DELETE');
+            });
+
+            this.invalidateCaches();
+            dataEventService.emit('DATA_UPDATED');
+
+            analytics.capture('workout_deleted', {
+                workout_id: id,
+                had_sets: (await dbService.getSetsForWorkout(id)).length > 0,
+            });
+        } catch (e) {
+            logger.error('Failed to delete workout', { error: e, workoutId: id });
+            throw e;
+        }
+    }
+
+    /**
+     * Get complete workout history with metadata.
+     */
+    public async getWorkoutHistory(): Promise<any[]> {
+        const sql = `
+            SELECT 
+                w.id,
+                w.name,
+                w.date,
+                w.start_time,
+                w.end_time,
+                w.status,
+                COUNT(DISTINCT s.id) as set_count,
+                COUNT(DISTINCT s.exercise_id) as exercise_count
+            FROM workouts w
+            LEFT JOIN workout_sets s ON s.workout_id = w.id AND s.deleted_at IS NULL
+            WHERE w.deleted_at IS NULL
+            GROUP BY w.id
+            ORDER BY w.date DESC, w.start_time DESC
+        `;
+        const rows = await dbService.getAll<any>(sql);
+        return rows || [];
     }
 
     // --- SUPERSETS ---

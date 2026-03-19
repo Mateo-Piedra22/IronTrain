@@ -168,18 +168,22 @@ class SystemNotificationServiceImpl {
         completedSets: number;
         totalExercises: number;
         isPaused: boolean;
+        workoutName?: string;
     }, force = false): Promise<void> {
         if (!force && !(await this.canNotifyType('workoutPersistent'))) return;
         await this.ensureChannels();
 
-        const { elapsedSeconds, completedSets, totalExercises, isPaused } = params;
+        const { elapsedSeconds, completedSets, totalExercises, isPaused, workoutName } = params;
         const timeStr = this.formatDuration(elapsedSeconds);
         const statusEmoji = isPaused ? '⏸️' : '💪';
+        const titlePrefix = workoutName && !workoutName.toLowerCase().includes('entrenamiento')
+            ? `${workoutName}: `
+            : '';
 
         const show = async (asForegroundService: boolean) => {
             await notifee.displayNotification({
                 id: NOTIFICATION_IDS.PERSISTENT_WORKOUT,
-                title: `${statusEmoji} Entrenamiento ${isPaused ? 'Pausado' : 'Activo'}`,
+                title: `${statusEmoji} ${titlePrefix}Entrenamiento ${isPaused ? 'Pausado' : 'Activo'}`,
                 body: `⏱ ${timeStr}  ·  ${completedSets} series  ·  ${totalExercises} ejercicios`,
                 android: {
                     channelId: CHANNELS.WORKOUT_ACTIVE,
@@ -269,17 +273,19 @@ class SystemNotificationServiceImpl {
         durationSeconds: number;
         completedSets: number;
         totalExercises: number;
+        workoutName?: string;
     }, force = false): Promise<void> {
         if (!force && !(await this.canNotifyType('workoutComplete'))) return;
         await this.ensureChannels();
 
-        const { durationSeconds, completedSets, totalExercises } = params;
+        const { durationSeconds, completedSets, totalExercises, workoutName } = params;
         const timeStr = this.formatDuration(durationSeconds);
+        const titleSuffix = workoutName ? ` (${workoutName})` : '';
 
         try {
             await notifee.displayNotification({
                 id: NOTIFICATION_IDS.CONGRATULATION,
-                title: '🎉 ¡Entrenamiento Completado!',
+                title: `🎉 ¡Entrenamiento Completado!${titleSuffix}`,
                 body: `Duración: ${timeStr}  ·  ${completedSets} series  ·  ${totalExercises} ejercicios`,
                 android: {
                     channelId: CHANNELS.WORKOUT_EVENTS,

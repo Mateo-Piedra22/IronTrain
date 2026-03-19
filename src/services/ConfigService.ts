@@ -309,6 +309,34 @@ class ConfigService {
         }
     }
 
+    /**
+     * Get a setting by key supporting any string (not just AppConfig keys).
+     */
+    public getGeneric<T = any>(key: string): T | null {
+        if (!this.cache) return null;
+        return (this.cache as any)[key] ?? null;
+    }
+
+    /**
+     * Set a setting by key supporting any string.
+     */
+    public async setGeneric(key: string, value: any): Promise<void> {
+        if (!this.cache) this.cache = { ...DEFAULT_CONFIG };
+        (this.cache as any)[key] = value;
+
+        let dbValue = String(value);
+        if (typeof value === 'boolean') dbValue = value ? 'true' : 'false';
+        else if (typeof value === 'object') dbValue = JSON.stringify(value);
+
+        const now = Date.now();
+        await dbService.run(
+            'INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?)',
+            [key, dbValue, now]
+        );
+
+        dataEventService.emit('SETTINGS_UPDATED', { key, value });
+    }
+
     public async reset(): Promise<void> {
         this.cache = { ...DEFAULT_CONFIG };
         await dbService.run('DELETE FROM settings');

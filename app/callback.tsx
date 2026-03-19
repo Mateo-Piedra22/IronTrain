@@ -106,6 +106,9 @@ export default function AuthCallback() {
 
                 // Save to SecureStore and update global store
                 await SecureStore.setItemAsync(TOKEN_KEY, rawToken);
+
+                // Set flag for initial sync modal
+                useAuthStore.getState().setNeedsInitialSync(true);
                 await useAuthStore.getState().initialize();
 
                 setStatus('success');

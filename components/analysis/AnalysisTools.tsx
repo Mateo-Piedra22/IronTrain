@@ -1,7 +1,7 @@
 import { backupService } from '@/src/services/BackupService';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { useRouter } from 'expo-router';
-import { Calculator, ChevronRight, CircleDot, Database, Ruler, Settings, Wrench } from 'lucide-react-native';
+import { Calculator, ChevronRight, CircleDot, Database, History, Ruler, Settings, Wrench } from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '../../src/hooks/useColors';
@@ -9,9 +9,11 @@ import { confirm, useConfirmStore } from '../../src/store/confirmStore';
 
 interface AnalysisToolsProps {
     setCalcVisible: (v: boolean, tab?: 'oneRm' | 'warmup' | 'power') => void;
+    setHistoryVisible: (v: boolean) => void;
 }
 
 const tools = [
+    { id: 'history', icon: History, label: 'Gestor de Historial', subtitle: 'Ver, editar y eliminar sesiones' },
     { id: 'oneRm', icon: Calculator, label: 'Calculadora 1RM', subtitle: 'Estima tu repetición máxima' },
     { id: 'plates', icon: CircleDot, label: 'Calculadora de Discos', subtitle: 'Planifica tu barra' },
     { id: 'body', icon: Ruler, label: 'Evolución Física', subtitle: 'Medidas y seguimiento corporal' },
@@ -19,7 +21,7 @@ const tools = [
     { id: 'backup', icon: Database, label: 'Datos (Backup)', subtitle: 'Exportar y restaurar' },
 ] as const;
 
-export function AnalysisTools({ setCalcVisible }: AnalysisToolsProps) {
+export function AnalysisTools({ setCalcVisible, setHistoryVisible }: AnalysisToolsProps) {
     const colors = useColors();
     const styles = useMemo(() => StyleSheet.create({
         container: {
@@ -122,6 +124,9 @@ export function AnalysisTools({ setCalcVisible }: AnalysisToolsProps) {
 
     const handlePress = (id: string) => {
         switch (id) {
+            case 'history':
+                setHistoryVisible(true);
+                break;
             case 'oneRm':
                 setCalcVisible(true, 'oneRm');
                 break;

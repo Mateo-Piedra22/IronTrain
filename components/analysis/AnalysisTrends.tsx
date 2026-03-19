@@ -24,7 +24,7 @@ export const AnalysisTrends = React.memo(({ volumeSeries, topExercisesByVolume, 
         rangeRow: {
             flexDirection: 'row',
             gap: 12,
-            marginBottom: 24
+            marginBottom: 16
         },
         rangeChip: {
             paddingHorizontal: 16,
@@ -56,7 +56,7 @@ export const AnalysisTrends = React.memo(({ volumeSeries, topExercisesByVolume, 
             borderWidth: 1.5,
             borderColor: colors.border,
             padding: 24,
-            marginBottom: 28,
+            marginBottom: 20,
             ...ThemeFx.shadowMd,
         },
         trendHeader: {

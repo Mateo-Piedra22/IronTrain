@@ -1,16 +1,34 @@
 {
-  "generatedAt": "2026-03-18T02:11:59.266Z",
+  "generatedAt": "2026-03-19T14:38:19.155Z",
   "source": "docs/CHANGELOG.md",
   "releases": [
     {
-      "version": "2.1.2",
+      "version": "2.5.0",
       "date": null,
       "unreleased": true,
       "items": [
-        "**Sistema de temas**: Posibilidad completa de elegir entre tema claro y oscuro.",
+        "**Sistema de SubTemas**: Posibilidad completa de diseñar, compartir y descargar subtemas para la aplicación.",
         "**Soporte para diferentes idiomas**: Posibilidad de elegir entre inglés y español.",
         "**Conexión con múltiples dispositivos**: Posibilidad de conectar con múltiples dispositivos (relojes/bands compatibles).",
         "**Vinculación con servicios de salud**: Posibilidad de vincular con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos."
+      ]
+    },
+    {
+      "version": "2.1.2",
+      "date": "2026-03-19",
+      "unreleased": false,
+      "items": [
+        "**Sincronización Inicial Robusta**: Rediseño del flujo de login para usar Snapshots completos (pullCloudSnapshot / pushLocalSnapshot) en dispositivos nuevos, garantizando una recuperación de datos atómica y fiable.",
+        "**Detección Inteligente de Datos**: Refinamiento en la lógica de diagnóstico para ignorar datos técnicos/boilerplate y centrarse exclusivamente en contenido real del usuario al detectar conflictos.",
+        "**Gestión de Sesión y Auth**: Resolución de race conditions durante el inicio de sesión, asegurando que el token de autenticación esté presente antes de iniciar cualquier proceso de sincronización.",
+        "**Consolidación de Snapshot**: Actualización del motor de respaldo para incluir las 18 tablas críticas del sistema, asegurando paridad total entre nube y dispositivo.",
+        "**Nombres Automáticos de Sesión**: Implementación de generación de nombres descriptivos (ej. \"Entrenamiento Lunes 19/03\") para sesiones finalizadas sin título.",
+        "**Edición de Historial**: Capacidad de edición inline para nombres y notas de entrenamientos pasados directamente desde el modal de historial.",
+        "**Validación de Importación**: Nuevo sistema de validación que impide la importación de rutinas compartidas que no contienen ejercicios.",
+        "**Nuevo SyncingOverlay**: Capa de interfaz tematizada que proporciona feedback visual en tiempo real y manejo de errores con reintento durante la sincronización inicial.",
+        "**Calendario (DateStrip)**: Corrección de indicadores visuales (dots y bordes) y sincronización de píldoras de estado para reflejar con precisión las sesiones diarias.",
+        "**Estilización Consistente**: Eliminación de colores estáticos en favor del sistema de temas global, asegurando una visualización perfecta en Modo Claro y Oscuro.",
+        "**Accesos Directos de Análisis**: Restauración del acceso directo a la calculadora de calentamiento (Warmup Calculator)."
       ]
     },
     {

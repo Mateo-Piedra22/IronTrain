@@ -53,6 +53,13 @@ export default function ShareRoutineScreen() {
 
     const handleImport = async () => {
         if (!payload) return;
+
+        const routineExes = payload.routine_exercises || [];
+        if (routineExes.length === 0) {
+            notify.error('Rutina Vacía', 'Esta rutina no contiene ejercicios y no se puede importar.');
+            return;
+        }
+
         setImporting(true);
         try {
             await routineService.importSharedRoutine(payload);
@@ -444,121 +451,121 @@ export default function ShareRoutineScreen() {
                         </View>
                     </View>
 
-                {/* Hero Info Section */}
-                <View style={styles.heroSection}>
-                    <View style={styles.titleRow}>
-                        <View style={styles.routineIconBox}>
-                            <Dumbbell color={colors.primary.DEFAULT} size={24} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.title}>{routine.name}</Text>
-                            <Text style={styles.subtitle}>IronTrain Share</Text>
-                        </View>
-                    </View>
-
-                    {routine.description && (
-                        <View style={styles.infoCard}>
-                            <Info size={16} color={colors.primary.DEFAULT} style={{ marginTop: 2 }} />
-                            <Text style={styles.infoCardText}>{routine.description}</Text>
-                        </View>
-                    )}
-
-                    <View style={styles.statsGrid}>
-                        <View style={styles.statItem}>
-                            <Calendar size={14} color={colors.primary.DEFAULT} />
-                            <Text style={styles.statValue}>{routine_days.length}</Text>
-                            <Text style={styles.statLabel}>Días</Text>
-                        </View>
-                        <View style={styles.statItem}>
-                            <Dumbbell size={14} color={colors.primary.DEFAULT} />
-                            <Text style={styles.statValue}>{exercises.length}</Text>
-                            <Text style={styles.statLabel}>Ejercicios</Text>
-                        </View>
-                    </View>
-                </View>
-
-                {/* Days Section */}
-                <Text style={styles.sectionLabel}>Plan de Entrenamiento</Text>
-
-                <View style={styles.dayList}>
-                    {routine_days.sort((a: any, b: any) => a.order_index - b.order_index).map((day: any) => {
-                        const dayExercises = routine_exercises.filter((re: any) => re.routine_day_id === day.id);
-                        return (
-                            <View key={day.id} style={styles.dayBlock}>
-                                <View style={styles.dayHeader}>
-                                    <View style={styles.dayIconBox}>
-                                        <Calendar color={colors.primary.DEFAULT} size={18} />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.dayTitle}>{day.name}</Text>
-                                        <Text style={styles.daySubLabel}>{dayExercises.length} EJERCICIOS</Text>
-                                    </View>
-                                </View>
-                                <View style={styles.dayInnerContent}>
-                                    {dayExercises.length === 0 ? (
-                                        <Text style={styles.emptyText}>Sin ejercicios definidos</Text>
-                                    ) : (
-                                        dayExercises.sort((a: any, b: any) => a.order_index - b.order_index).map((re: any, idx: number) => {
-                                            const ex = exercises.find((e: any) => e.id === re.exercise_id);
-                                            // Get relevant badges for this exercise
-                                            const relBadges = (exercise_badges || [])
-                                                .filter((eb: any) => eb.exercise_id === ex?.id)
-                                                .map((eb: any) => badges?.find((b: any) => b.id === eb.badge_id))
-                                                .filter(Boolean);
-
-                                            return (
-                                                <View key={re.id} style={styles.exCard}>
-                                                    <View style={styles.exInfo}>
-                                                        <Text style={styles.exNumber}>{idx + 1}</Text>
-                                                        <View style={{ flex: 1 }}>
-                                                            <Text style={styles.exName} numberOfLines={1}>{ex?.name || 'Ejercicio'}</Text>
-                                                            {relBadges.length > 0 && (
-                                                                <View style={styles.badgeRow}>
-                                                                    {relBadges.map((b: any) => (
-                                                                        <BadgePill key={b.id} name={b.name} color={b.color} icon={b.icon} size="sm" variant="minimal" />
-                                                                    ))}
-                                                                </View>
-                                                            )}
-                                                        </View>
-                                                    </View>
-                                                    {re.notes && (
-                                                        <View style={styles.exNotesHeader}>
-                                                            <Text style={styles.exNotesText} numberOfLines={1}>
-                                                                {re.notes}
-                                                            </Text>
-                                                        </View>
-                                                    )}
-                                                </View>
-                                            );
-                                        })
-                                    )}
-                                </View>
+                    {/* Hero Info Section */}
+                    <View style={styles.heroSection}>
+                        <View style={styles.titleRow}>
+                            <View style={styles.routineIconBox}>
+                                <Dumbbell color={colors.primary.DEFAULT} size={24} />
                             </View>
-                        );
-                    })}
-                </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.title}>{routine.name}</Text>
+                                <Text style={styles.subtitle}>IronTrain Share</Text>
+                            </View>
+                        </View>
 
-                {/* Import Section */}
-                <View style={styles.actionSection}>
-                    <View style={styles.helperCard}>
-                        <Info size={14} color={colors.primary.DEFAULT} />
-                        <Text style={styles.helperText}>
-                            La rutina y sus ejercicios personalizados se importarán a tu biblioteca local.
-                        </Text>
+                        {routine.description && (
+                            <View style={styles.infoCard}>
+                                <Info size={16} color={colors.primary.DEFAULT} style={{ marginTop: 2 }} />
+                                <Text style={styles.infoCardText}>{routine.description}</Text>
+                            </View>
+                        )}
+
+                        <View style={styles.statsGrid}>
+                            <View style={styles.statItem}>
+                                <Calendar size={14} color={colors.primary.DEFAULT} />
+                                <Text style={styles.statValue}>{routine_days.length}</Text>
+                                <Text style={styles.statLabel}>Días</Text>
+                            </View>
+                            <View style={styles.statItem}>
+                                <Dumbbell size={14} color={colors.primary.DEFAULT} />
+                                <Text style={styles.statValue}>{exercises.length}</Text>
+                                <Text style={styles.statLabel}>Ejercicios</Text>
+                            </View>
+                        </View>
                     </View>
 
-                    <IronButton
-                        label={importing ? "Importando..." : "Confirmar Importación"}
-                        onPress={handleImport}
-                        disabled={importing}
-                        loading={importing}
-                        style={{ height: 60 }}
-                    />
+                    {/* Days Section */}
+                    <Text style={styles.sectionLabel}>Plan de Entrenamiento</Text>
 
-                    <TouchableOpacity onPress={() => router.back()} style={styles.cancelBtn}>
-                        <Text style={styles.cancelBtnText}>Volver a la app</Text>
-                    </TouchableOpacity>
-                </View>
+                    <View style={styles.dayList}>
+                        {routine_days.sort((a: any, b: any) => a.order_index - b.order_index).map((day: any) => {
+                            const dayExercises = routine_exercises.filter((re: any) => re.routine_day_id === day.id);
+                            return (
+                                <View key={day.id} style={styles.dayBlock}>
+                                    <View style={styles.dayHeader}>
+                                        <View style={styles.dayIconBox}>
+                                            <Calendar color={colors.primary.DEFAULT} size={18} />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.dayTitle}>{day.name}</Text>
+                                            <Text style={styles.daySubLabel}>{dayExercises.length} EJERCICIOS</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.dayInnerContent}>
+                                        {dayExercises.length === 0 ? (
+                                            <Text style={styles.emptyText}>Sin ejercicios definidos</Text>
+                                        ) : (
+                                            dayExercises.sort((a: any, b: any) => a.order_index - b.order_index).map((re: any, idx: number) => {
+                                                const ex = exercises.find((e: any) => e.id === re.exercise_id);
+                                                // Get relevant badges for this exercise
+                                                const relBadges = (exercise_badges || [])
+                                                    .filter((eb: any) => eb.exercise_id === ex?.id)
+                                                    .map((eb: any) => badges?.find((b: any) => b.id === eb.badge_id))
+                                                    .filter(Boolean);
+
+                                                return (
+                                                    <View key={re.id} style={styles.exCard}>
+                                                        <View style={styles.exInfo}>
+                                                            <Text style={styles.exNumber}>{idx + 1}</Text>
+                                                            <View style={{ flex: 1 }}>
+                                                                <Text style={styles.exName} numberOfLines={1}>{ex?.name || 'Ejercicio'}</Text>
+                                                                {relBadges.length > 0 && (
+                                                                    <View style={styles.badgeRow}>
+                                                                        {relBadges.map((b: any) => (
+                                                                            <BadgePill key={b.id} name={b.name} color={b.color} icon={b.icon} size="sm" variant="minimal" />
+                                                                        ))}
+                                                                    </View>
+                                                                )}
+                                                            </View>
+                                                        </View>
+                                                        {re.notes && (
+                                                            <View style={styles.exNotesHeader}>
+                                                                <Text style={styles.exNotesText} numberOfLines={1}>
+                                                                    {re.notes}
+                                                                </Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                );
+                                            })
+                                        )}
+                                    </View>
+                                </View>
+                            );
+                        })}
+                    </View>
+
+                    {/* Import Section */}
+                    <View style={styles.actionSection}>
+                        <View style={styles.helperCard}>
+                            <Info size={14} color={colors.primary.DEFAULT} />
+                            <Text style={styles.helperText}>
+                                La rutina y sus ejercicios personalizados se importarán a tu biblioteca local.
+                            </Text>
+                        </View>
+
+                        <IronButton
+                            label={importing ? "Importando..." : "Confirmar Importación"}
+                            onPress={handleImport}
+                            disabled={importing}
+                            loading={importing}
+                            style={{ height: 60 }}
+                        />
+
+                        <TouchableOpacity onPress={() => router.back()} style={styles.cancelBtn}>
+                            <Text style={styles.cancelBtnText}>Volver a la app</Text>
+                        </TouchableOpacity>
+                    </View>
                 </ScrollView>
             </SafeAreaWrapper>
         </ModalScreenOverlayHost>

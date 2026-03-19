@@ -302,6 +302,10 @@ class RoutineService {
         const badges = toArray<SharedBadge>(payload?.badges);
         const exerciseBadges = toArray<SharedExerciseBadge>(payload?.exercise_badges);
 
+        if (routineExercises.length === 0) {
+            throw new Error('La rutina compartida no contiene ejercicios.');
+        }
+
         const routineName = getString(routine?.name) || 'Rutina importada';
         const routineDescription = getString(routine?.description);
 

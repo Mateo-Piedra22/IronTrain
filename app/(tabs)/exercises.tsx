@@ -123,7 +123,8 @@ export default function LibraryScreen() {
         },
         segmentContainer: {
             paddingHorizontal: 16,
-            marginVertical: 12,
+            marginTop: 8,
+            marginBottom: 0,
         },
         segmentTrack: {
             flexDirection: 'row',
@@ -446,7 +447,7 @@ export default function LibraryScreen() {
                             data={routines}
                             keyExtractor={(item) => item.id}
                             renderItem={renderRoutineItem}
-                            contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                            contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 16, paddingBottom: 100 }}
                             ListEmptyComponent={() => (
                                 <View style={ss.emptyState}>
                                     <View style={ss.emptyIconCircle}>

@@ -4,7 +4,7 @@ import { ExerciseType, Workout, WorkoutSet } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
 import { format, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Copy, Tag, X } from 'lucide-react-native';
+import { ChevronRight, Copy, Tag, X } from 'lucide-react-native';
 import React, { useCallback, useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
@@ -25,6 +25,7 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
     const colors = useColors();
     const [selectedDateStr, setSelectedDateStr] = useState('');
     const [sourceWorkout, setSourceWorkout] = useState<Workout | null>(null);
+    const [workoutsOnDate, setWorkoutsOnDate] = useState<(Workout & { set_count: number })[]>([]);
     const [sourceSets, setSourceSets] = useState<(WorkoutSet & { exercise_name: string; category_color: string; exercise_type: ExerciseType })[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -164,24 +165,37 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
 
     const handleDayPress = async (day: { dateString: string; year: number; month: number; day: number }) => {
         setSelectedDateStr(day.dateString);
+        setSourceWorkout(null);
+        setSourceSets([]);
         setLoading(true);
         try {
-            // Fetch workout for this date
             const d = new Date(day.year, day.month - 1, day.day, 12, 0, 0);
+            const workouts = await workoutService.getWorkoutsWithSetsForDate(d);
+            setWorkoutsOnDate(workouts);
 
-            const workout = await workoutService.getWorkoutWithSetsForDate(d);
-            setSourceWorkout(workout);
-
-            if (workout) {
-                const fetchedSets = await workoutService.getSets(workout.id);
+            if (workouts.length === 1) {
+                // Auto-select if only one
+                const w = workouts[0];
+                setSourceWorkout(w);
+                const fetchedSets = await workoutService.getSets(w.id);
                 setSourceSets(fetchedSets as any);
-            } else {
-                setSourceSets([]);
             }
         } catch (e) {
             notify.warning('Sin entrenamiento', 'No se encontró un entrenamiento para esa fecha.');
-            setSourceWorkout(null);
-            setSourceSets([]);
+            setWorkoutsOnDate([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSelectSourceWorkout = async (w: Workout) => {
+        setLoading(true);
+        try {
+            setSourceWorkout(w);
+            const fetchedSets = await workoutService.getSets(w.id);
+            setSourceSets(fetchedSets as any);
+        } catch (e) {
+            notify.error('Error', 'No se pudieron cargar los sets de esta sesión.');
         } finally {
             setLoading(false);
         }
@@ -403,10 +417,22 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
                             ) : sourceWorkout ? (
                                 <View style={ss.workoutCard}>
                                     <View style={ss.workoutHeader}>
-                                        <Text style={ss.workoutName}>{sourceWorkout.name || 'Entrenamiento'}</Text>
-                                        <Text style={ss.workoutDate}>
-                                            {format(new Date(selectedDateStr), 'EEEE, d MMMM yyyy', { locale: es })}
-                                        </Text>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={ss.workoutName}>{sourceWorkout.name || 'Entrenamiento'}</Text>
+                                                <Text style={ss.workoutDate}>
+                                                    {format(new Date(selectedDateStr), 'EEEE, d MMMM yyyy', { locale: es })}
+                                                </Text>
+                                            </View>
+                                            {workoutsOnDate.length > 1 && (
+                                                <TouchableOpacity
+                                                    onPress={() => setSourceWorkout(null)}
+                                                    style={{ backgroundColor: colors.surfaceLighter, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: colors.border }}
+                                                >
+                                                    <Text style={{ color: colors.primary.DEFAULT, fontSize: 10, fontWeight: '800' }}>CAMBIAR SESIÓN</Text>
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
                                     </View>
 
                                     {sourceSets.length > 0 ? (
@@ -436,6 +462,38 @@ export function CopyWorkoutModal({ visible, onClose, targetDate, targetWorkoutId
                                         <Copy color={colors.onPrimary} size={18} />
                                         <Text style={ss.copyButtonText}>Copiar rutina</Text>
                                     </TouchableOpacity>
+                                </View>
+                            ) : workoutsOnDate.length > 1 ? (
+                                <View style={{ gap: 12 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                        <View style={{ width: 4, height: 16, backgroundColor: colors.primary.DEFAULT, borderRadius: 2, marginRight: 8 }} />
+                                        <Text style={{ color: colors.text, fontWeight: '900', fontSize: 16 }}>Múltiples sesiones encontradas</Text>
+                                    </View>
+                                    {workoutsOnDate.map((w, i) => (
+                                        <TouchableOpacity
+                                            key={w.id}
+                                            onPress={() => handleSelectSourceWorkout(w)}
+                                            style={{
+                                                backgroundColor: colors.surface,
+                                                padding: 16,
+                                                borderRadius: 20,
+                                                borderWidth: 1.5,
+                                                borderColor: colors.border,
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                ...ThemeFx.shadowSm
+                                            }}
+                                        >
+                                            <View>
+                                                <Text style={{ color: colors.text, fontWeight: '800', fontSize: 15 }}>{w.name || `Sesión ${workoutsOnDate.length - i}`}</Text>
+                                                <Text style={{ color: colors.textMuted, fontSize: 12 }}>{w.set_count} ejercicios/sets registrados</Text>
+                                            </View>
+                                            <View style={{ backgroundColor: colors.surfaceLighter, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }}>
+                                                <ChevronRight size={18} color={colors.primary.DEFAULT} />
+                                            </View>
+                                        </TouchableOpacity>
+                                    ))}
                                 </View>
                             ) : selectedDateStr ? (
                                 <View style={ss.emptyStateContainer}>

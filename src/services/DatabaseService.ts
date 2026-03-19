@@ -1111,10 +1111,13 @@ export class DatabaseService {
      * Public method to deduplicate categories, exercises, and badges.
      * Can be called during migrations OR after a sync pull to ensure zero duplicates.
      */
-    public async repairDataConsistency(): Promise<void> {
+    public async repairDataConsistency(injectedUserId?: string): Promise<void> {
+        const userId = injectedUserId || useAuthStore.getState().user?.id;
+        // If no user is logged in, we skip most user-specific repairs to avoid cross-contamination.
+        // Some system-level repairs (like uncategorized) can still run.
+
         await this.executeRaw('PRAGMA foreign_keys = OFF;');
 
-        // Helper to queue deletions for merged records
         const queueDelete = async (table: string, id: string) => {
             try { await this.queueSyncMutation(table, id, 'DELETE'); } catch (e) { /* non-critical */ }
         };
@@ -1128,7 +1131,7 @@ export class DatabaseService {
         };
 
         try {
-            // 1. Uncategorized Consistency
+            // 1. Uncategorized Consistency (System level)
             await safeStep('uncategorized', async () => {
                 const uncategorizedRows = await this.getAll<{ id: string }>(
                     "SELECT id FROM categories WHERE name = ? OR id = ? OR id = ?",
@@ -1149,16 +1152,20 @@ export class DatabaseService {
                 }
             });
 
-            // 2. Generic Category Deduplication (Marketplace Aware)
+            if (!userId) {
+                return; // Everything below requires a user context to be safe
+            }
+
+            // 2. Generic Category Deduplication (User Aware)
             await safeStep('categories', async () => {
                 const duplicateCats = await this.getAll<{ name: string }>(
-                    "SELECT name FROM categories WHERE name != ? GROUP BY name HAVING COUNT(*) > 1",
-                    [UNCATEGORIZED_NAME]
+                    "SELECT name FROM categories WHERE name != ? AND user_id = ? GROUP BY LOWER(name) HAVING COUNT(*) > 1",
+                    [UNCATEGORIZED_NAME, userId]
                 );
                 for (const cat of duplicateCats) {
                     const instances = await this.getAll<{ id: string, origin_id: string, is_system: number }>(
-                        "SELECT id, origin_id, is_system FROM categories WHERE name = ? ORDER BY origin_id DESC, is_system DESC, id ASC",
-                        [cat.name]
+                        "SELECT id, origin_id, is_system FROM categories WHERE name = ? COLLATE NOCASE AND user_id = ? ORDER BY origin_id DESC, is_system DESC, id ASC",
+                        [cat.name, userId]
                     );
                     const master = instances[0];
                     const duplicates = instances.slice(1);
@@ -1170,13 +1177,16 @@ export class DatabaseService {
                 }
             });
 
-            // 3. Generic Badge Deduplication (Marketplace Aware)
+            // 3. Generic Badge Deduplication (User Aware)
             await safeStep('badges', async () => {
-                const duplicateBadges = await this.getAll<{ name: string }>("SELECT name FROM badges GROUP BY name HAVING COUNT(*) > 1");
+                const duplicateBadges = await this.getAll<{ name: string }>(
+                    "SELECT name FROM badges WHERE user_id = ? GROUP BY LOWER(name) HAVING COUNT(*) > 1",
+                    [userId]
+                );
                 for (const b of duplicateBadges) {
                     const instances = await this.getAll<{ id: string, origin_id: string }>(
-                        "SELECT id, origin_id FROM badges WHERE name = ? ORDER BY origin_id DESC, id ASC",
-                        [b.name]
+                        "SELECT id, origin_id FROM badges WHERE name = ? COLLATE NOCASE AND user_id = ? ORDER BY origin_id DESC, id ASC",
+                        [b.name, userId]
                     );
                     const masterId = instances[0].id;
                     const duplicates = instances.slice(1);
@@ -1188,10 +1198,11 @@ export class DatabaseService {
                 }
             });
 
-            // 4. Badge-Aware Exercise Deduplication (Marketplace Aware)
+            // 4. Exercise Deduplication (User Aware)
             await safeStep('exercises', async () => {
                 const allExs = await this.getAll<{ id: string, name: string, category_id: string, origin_id: string }>(
-                    "SELECT id, name, category_id, origin_id FROM exercises"
+                    "SELECT id, name, category_id, origin_id FROM exercises WHERE user_id = ?",
+                    [userId]
                 );
 
                 const exerciseMap = new Map<string, Array<{ id: string, origin_id: string }>>();
@@ -1237,65 +1248,21 @@ export class DatabaseService {
                 }
             });
 
-            // 4.5 Workout Deduplication (By Date)
-            await safeStep('workouts', async () => {
-                const allWorkouts = await this.getAll<{ id: string, date: number, status: string }>(
-                    "SELECT id, date, status FROM workouts WHERE deleted_at IS NULL"
-                );
-
-                const workoutMap = new Map<string, Array<{ id: string, date: number, status: string, set_count: number }>>();
-
-                for (const w of allWorkouts) {
-                    // Group by YYYY-MM-DD
-                    const d = new Date(w.date);
-                    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-                    const setRow = await this.getFirst<{ count: number }>("SELECT COUNT(*) as count FROM workout_sets WHERE workout_id = ? AND deleted_at IS NULL", [w.id]);
-                    const set_count = Number(setRow?.count ?? 0);
-
-                    if (!workoutMap.has(key)) workoutMap.set(key, []);
-                    workoutMap.get(key)!.push({ ...w, set_count });
-                }
-
-                for (const [, records] of workoutMap.entries()) {
-                    if (records.length > 1) {
-                        // Master is the one with most sets, then completed status, then newest
-                        const sorted = [...records].sort((a, b) => {
-                            if (b.set_count !== a.set_count) return b.set_count - a.set_count;
-                            if (a.status === 'completed' && b.status !== 'completed') return -1;
-                            if (b.status === 'completed' && a.status !== 'completed') return 1;
-                            return b.date - a.date;
-                        });
-
-                        const master = sorted[0];
-                        const duplicates = sorted.slice(1);
-
-                        for (const dupe of duplicates) {
-                            // Move sets to master
-                            await this.run('UPDATE workout_sets SET workout_id = ? WHERE workout_id = ?', [master.id, dupe.id]);
-                            // Delete duplicate workout
-                            await this.run('DELETE FROM workouts WHERE id = ?', [dupe.id]);
-                            await queueDelete('workouts', dupe.id);
-                        }
-                    }
-                }
-            });
-
-            // 5. Workout Sets Deduplication
+            // 5. Workout Sets Deduplication (User Aware)
             await safeStep('workoutSets', async () => {
                 const dupeSets = await this.getAll<{ id: string }>(`
                     SELECT id FROM workout_sets 
-                    WHERE id NOT IN (
+                    WHERE user_id = ? AND id NOT IN (
                         SELECT id FROM (
                             SELECT id, ROW_NUMBER() OVER (
                                 PARTITION BY workout_id, order_index, exercise_id 
                                 ORDER BY completed DESC, weight DESC, updated_at DESC
                             ) as rn
                             FROM workout_sets
-                            WHERE deleted_at IS NULL
+                            WHERE user_id = ? AND deleted_at IS NULL
                         ) WHERE rn = 1
                     ) AND deleted_at IS NULL
-                `);
+                `, [userId, userId]);
 
                 for (const s of dupeSets) {
                     await this.run('DELETE FROM workout_sets WHERE id = ?', [s.id]);
@@ -1303,88 +1270,100 @@ export class DatabaseService {
                 }
             });
 
-            // 6. Routine Day Deduplication
+            // 6. Routine Day Deduplication (User Aware)
             await safeStep('routineDays', async () => {
                 const dupeDays = await this.getAll<{ id: string }>(`
                     SELECT id FROM routine_days 
-                    WHERE rowid NOT IN (
-                        SELECT MIN(rowid) FROM routine_days GROUP BY routine_id, order_index
+                    WHERE user_id = ? AND rowid NOT IN (
+                        SELECT MIN(rowid) FROM routine_days WHERE user_id = ? GROUP BY routine_id, order_index
                     )
-                `);
+                `, [userId, userId]);
                 for (const d of dupeDays) {
                     await this.run('DELETE FROM routine_days WHERE id = ?', [d.id]);
                     await queueDelete('routine_days', d.id);
                 }
             });
 
-            // 7. PR Deduplication
+            // 7. PR Deduplication (User Aware)
             await safeStep('prs', async () => {
                 const dupePRs = await this.getAll<{ id: string }>(`
                     SELECT id FROM user_exercise_prs
-                    WHERE rowid NOT IN (
-                        SELECT MIN(rowid) FROM user_exercise_prs GROUP BY user_id, exercise_id, weight, reps, date
+                    WHERE user_id = ? AND rowid NOT IN (
+                        SELECT MIN(rowid) FROM user_exercise_prs WHERE user_id = ? GROUP BY user_id, exercise_id, weight, reps, date
                     )
-                `);
+                `, [userId, userId]);
                 for (const pr of dupePRs) {
                     await this.run('DELETE FROM user_exercise_prs WHERE id = ?', [pr.id]);
                     await queueDelete('user_exercise_prs', pr.id);
                 }
             });
 
-            // 8. Body Metrics / Measurements Deduplication
+            // 8. Body Metrics / Measurements Deduplication (User Aware)
             await safeStep('metrics', async () => {
-                const dupeMetrics = await this.getAll<{ id: string }>(`SELECT id FROM body_metrics WHERE rowid NOT IN (SELECT MAX(rowid) FROM body_metrics GROUP BY date)`);
+                const dupeMetrics = await this.getAll<{ id: string }>(`SELECT id FROM body_metrics WHERE user_id = ? AND rowid NOT IN (SELECT MAX(rowid) FROM body_metrics WHERE user_id = ? GROUP BY date)`, [userId, userId]);
                 for (const m of dupeMetrics) { await this.run('DELETE FROM body_metrics WHERE id = ?', [m.id]); await queueDelete('body_metrics', m.id); }
 
-                const dupeMeasures = await this.getAll<{ id: string }>(`SELECT id FROM measurements WHERE rowid NOT IN (SELECT MAX(rowid) FROM measurements GROUP BY date, type)`);
+                const dupeMeasures = await this.getAll<{ id: string }>(`SELECT id FROM measurements WHERE user_id = ? AND rowid NOT IN (SELECT MAX(rowid) FROM measurements WHERE user_id = ? GROUP BY date, type)`, [userId, userId]);
                 for (const m of dupeMeasures) { await this.run('DELETE FROM measurements WHERE id = ?', [m.id]); await queueDelete('measurements', m.id); }
             });
 
-            // 9. Legacy Fixes & Names
+            // 9. Legacy Fixes & Names (User Aware if needed, but mostly safe)
             await safeStep('legacyFixes', async () => {
-                await this.run("UPDATE measurements SET unit = 'kg' WHERE type = 'weight' AND (unit IS NULL OR unit = 'cm')");
-                await this.run("UPDATE measurements SET unit = '%' WHERE type = 'body_fat' AND (unit IS NULL OR unit = 'cm')");
+                await this.run("UPDATE measurements SET unit = 'kg' WHERE user_id = ? AND type = 'weight' AND (unit IS NULL OR unit = 'cm')", [userId]);
+                await this.run("UPDATE measurements SET unit = '%' WHERE user_id = ? AND type = 'body_fat' AND (unit IS NULL OR unit = 'cm')", [userId]);
                 await this.run(`
                     UPDATE user_exercise_prs 
                     SET exercise_name = (SELECT name FROM exercises WHERE exercises.id = user_exercise_prs.exercise_id)
-                    WHERE exercise_name IS NULL OR exercise_name = ''
-                `);
+                    WHERE user_id = ? AND (exercise_name IS NULL OR exercise_name = '')
+                `, [userId]);
             });
 
-            // 10. Social System Deduplication
+            // 10. Social System Deduplication (User Aware)
             await safeStep('social', async () => {
-                const dupeReactions = await this.getAll<{ id: string }>(`SELECT id FROM changelog_reactions WHERE rowid NOT IN (SELECT MIN(rowid) FROM changelog_reactions GROUP BY user_id, changelog_id, type)`);
+                const dupeReactions = await this.getAll<{ id: string }>(`SELECT id FROM changelog_reactions WHERE user_id = ? AND rowid NOT IN (SELECT MIN(rowid) FROM changelog_reactions WHERE user_id = ? GROUP BY user_id, changelog_id, type)`, [userId, userId]);
                 for (const r of dupeReactions) { await this.run('DELETE FROM changelog_reactions WHERE id = ?', [r.id]); await queueDelete('changelog_reactions', r.id); }
 
-                const dupeKudos = await this.getAll<{ id: string }>(`SELECT id FROM kudos WHERE rowid NOT IN (SELECT MIN(rowid) FROM kudos GROUP BY feed_id, giver_id)`);
+                const dupeKudos = await this.getAll<{ id: string }>(`SELECT id FROM kudos WHERE giver_id = ? AND rowid NOT IN (SELECT MIN(rowid) FROM kudos WHERE giver_id = ? GROUP BY feed_id, giver_id)`, [userId, userId]);
                 for (const k of dupeKudos) { await this.run('DELETE FROM kudos WHERE id = ?', [k.id]); await queueDelete('kudos', k.id); }
 
-                const dupeScore = await this.getAll<{ id: string }>(`SELECT id FROM score_events WHERE rowid NOT IN (SELECT MIN(rowid) FROM score_events GROUP BY user_id, type, reference_id, date)`);
+                const dupeScore = await this.getAll<{ id: string }>(`SELECT id FROM score_events WHERE user_id = ? AND rowid NOT IN (SELECT MIN(rowid) FROM score_events WHERE user_id = ? GROUP BY user_id, type, reference_id, date)`, [userId, userId]);
                 for (const s of dupeScore) { await this.run('DELETE FROM score_events WHERE id = ?', [s.id]); await queueDelete('score_events', s.id); }
 
-                const dupeFeed = await this.getAll<{ id: string }>(`SELECT id FROM activity_feed WHERE rowid NOT IN (SELECT MIN(rowid) FROM activity_feed GROUP BY user_id, action_type, reference_id, created_at)`);
+                const dupeFeed = await this.getAll<{ id: string }>(`SELECT id FROM activity_feed WHERE user_id = ? AND rowid NOT IN (SELECT MIN(rowid) FROM activity_feed WHERE user_id = ? GROUP BY user_id, action_type, reference_id, created_at)`, [userId, userId]);
                 for (const f of dupeFeed) { await this.run('DELETE FROM activity_feed WHERE id = ?', [f.id]); await queueDelete('activity_feed', f.id); }
             });
 
             // 11. Cross-Table Integrity Cleanup (Orphans)
             await safeStep('orphans', async () => {
-                const orphanKudos = await this.getAll<{ id: string }>(`SELECT id FROM kudos WHERE feed_id NOT IN (SELECT id FROM activity_feed)`);
+                const orphanKudos = await this.getAll<{ id: string }>(`SELECT id FROM kudos WHERE giver_id = ? AND feed_id NOT IN (SELECT id FROM activity_feed)`, [userId]);
                 for (const k of orphanKudos) { await this.run('DELETE FROM kudos WHERE id = ?', [k.id]); await queueDelete('kudos', k.id); }
 
-                const orphanReactions = await this.getAll<{ id: string }>(`SELECT id FROM changelog_reactions WHERE changelog_id NOT IN (SELECT id FROM changelogs)`);
+                const orphanReactions = await this.getAll<{ id: string }>(`SELECT id FROM changelog_reactions WHERE user_id = ? AND changelog_id NOT IN (SELECT id FROM changelogs)`, [userId]);
                 for (const r of orphanReactions) { await this.run('DELETE FROM changelog_reactions WHERE id = ?', [r.id]); await queueDelete('changelog_reactions', r.id); }
             });
 
-            // 12. Junction Table Cleanup
+            // 12. Junction Table Cleanup (User Aware)
             await safeStep('junctions', async () => {
-                await this.run(`DELETE FROM exercise_badges WHERE rowid NOT IN (SELECT MIN(rowid) FROM exercise_badges GROUP BY exercise_id, badge_id)`);
-                await this.run(`DELETE FROM routine_exercises WHERE rowid NOT IN (SELECT MIN(rowid) FROM routine_exercises GROUP BY routine_day_id, exercise_id, order_index)`);
+                // exercise_badges doesn't have its own user_id usually, but it's linked via exercise_id
+                await this.run(`
+                    DELETE FROM exercise_badges 
+                    WHERE exercise_id IN (SELECT id FROM exercises WHERE user_id = ?)
+                    AND rowid NOT IN (
+                        SELECT MIN(rowid) FROM exercise_badges GROUP BY exercise_id, badge_id
+                    )
+                `, [userId]);
+
+                await this.run(`
+                    DELETE FROM routine_exercises 
+                    WHERE routine_day_id IN (SELECT id FROM routine_days WHERE user_id = ?)
+                    AND rowid NOT IN (
+                        SELECT MIN(rowid) FROM routine_exercises GROUP BY routine_day_id, exercise_id, order_index
+                    )
+                `, [userId]);
             });
 
-            // 13. Systemic Backfill of user_id for all syncable tables (Zero Trust)
+            // 13. Targeted Backfill of user_id for records with NULL user_id
             await safeStep('backfillUserId', async () => {
-                const userId = useAuthStore.getState().user?.id;
-                if (!userId) return;
                 const syncableTables = [
                     'exercises', 'categories', 'workouts', 'workout_sets',
                     'routines', 'routine_days', 'routine_exercises',
@@ -1399,6 +1378,7 @@ export class DatabaseService {
                         const info = await this.getAll<{ name: string }>(`PRAGMA table_info('${table}')`);
                         const cols = info.map(c => c.name);
                         if (cols.includes('user_id')) {
+                            // Only backfill if NULL or empty, effectively claiming orphaned data for the current user
                             await this.run(`UPDATE ${table} SET user_id = ? WHERE user_id IS NULL OR user_id = ''`, [userId]);
                         } else if (table === 'kudos' && cols.includes('giver_id')) {
                             await this.run(`UPDATE kudos SET giver_id = ? WHERE giver_id IS NULL OR giver_id = ''`, [userId]);
@@ -1409,36 +1389,10 @@ export class DatabaseService {
                 }
             });
 
-            // 14. Workout Deduplication (Merge multiple workouts for same day)
-            await safeStep('workoutDedup', async () => {
-                const dupeWorkouts = await this.getAll<{ date_str: string }>(`
-                    SELECT date(date / 1000, 'unixepoch', 'localtime') as date_str FROM workouts 
-                    WHERE is_template = 0 AND deleted_at IS NULL
-                    GROUP BY date_str 
-                    HAVING COUNT(*) > 1
-                `);
-
-                for (const w of dupeWorkouts) {
-                    // Get all workouts for this date, with set counts to pick the one with most data as master
-                    const instances = await this.getAll<{ id: string, origin_id: string, set_count: number }>(
-                        `SELECT w.id, w.origin_id, 
-                            (SELECT COUNT(*) FROM workout_sets s WHERE s.workout_id = w.id) as set_count
-                         FROM workouts w 
-                         WHERE date(w.date / 1000, 'unixepoch', 'localtime') = ? AND w.is_template = 0 AND w.deleted_at IS NULL
-                         ORDER BY set_count DESC, origin_id DESC, id ASC`,
-                        [w.date_str]
-                    );
-                    if (instances.length <= 1) continue;
-
-                    const master = instances[0];
-                    const duplicates = instances.slice(1);
-                    for (const dupe of duplicates) {
-                        await this.run('UPDATE workout_sets SET workout_id = ? WHERE workout_id = ?', [master.id, dupe.id]);
-                        await this.run('DELETE FROM workouts WHERE id = ?', [dupe.id]);
-                        await queueDelete('workouts', dupe.id);
-                    }
-                }
-            });
+            // IMPORTANT: Destructive workout-by-date deduplication (Step 4.5 and 14) has been REMOVED.
+            // It was causing data loss for multiple sessions per day and triggering sync rollback loops.
+            // If we need to deduplicate workouts in the future, it must be based on globally unique IDs or content hash,
+            // NOT just the calendar date.
         } finally {
             try { await this.executeRaw('PRAGMA foreign_keys = ON;'); } catch (e) { /* safety */ }
         }
@@ -1559,6 +1513,19 @@ export class DatabaseService {
 
     // --- WORKOUTS ---
 
+    public async getWorkoutsByDate(dateStart: number, dateEnd: number): Promise<Workout[]> {
+        const sql = `
+            SELECT w.*, 
+                   (SELECT COUNT(*) FROM workout_sets ws WHERE ws.workout_id = w.id AND ws.deleted_at IS NULL) as set_count
+            FROM workouts w
+            WHERE date >= ? AND date < ? 
+              AND deleted_at IS NULL
+              AND is_template = 0
+            ORDER BY date DESC, start_time DESC, set_count DESC
+        `;
+        return await this.getAll<Workout>(sql, [dateStart, dateEnd]);
+    }
+
     public async getWorkoutByDate(dateStart: number, dateEnd: number): Promise<Workout | null> {
         // Prioritize workouts that have sets and are not deleted.
         // This handles cases where a sync might create a duplicate workout record for the same day.
@@ -1568,6 +1535,7 @@ export class DatabaseService {
             FROM workouts w
             WHERE date >= ? AND date < ? 
               AND deleted_at IS NULL
+              AND is_template = 0
             ORDER BY set_count DESC, start_time DESC, date DESC 
             LIMIT 1
         `;
@@ -1576,6 +1544,23 @@ export class DatabaseService {
 
     public async getWorkoutById(id: string): Promise<Workout | null> {
         return await this.getFirst<Workout>('SELECT * FROM workouts WHERE id = ?', [id]);
+    }
+
+    public async updateWorkout(id: string, updates: Partial<Workout>): Promise<void> {
+        const fields = Object.keys(updates);
+        if (fields.length === 0) return;
+
+        const setClause = fields.map(f => `${f} = ?`).join(', ');
+        const values = Object.values(updates);
+        const now = Date.now();
+
+        await this.run(
+            `UPDATE workouts SET ${setClause}, updated_at = ? WHERE id = ?`,
+            [...values, now, id]
+        );
+
+        // Queue sync mutation
+        await this.queueSyncMutation('workouts', id, 'UPDATE', { ...updates, updated_at: now });
     }
 
     public async createWorkout(date: number): Promise<string> {
