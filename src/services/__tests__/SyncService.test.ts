@@ -110,7 +110,10 @@ describe('SyncService', () => {
     expect(res.counts?.plate_inventory).toEqual({ active: 5, deleted: 0, total: 5 });
     expect(res.counts?.settings).toEqual({ active: 5, deleted: 0, total: 5 });
 
-    expect(res.recordCount).toBe(30);
+    // Meaningful tables: workouts, workout_sets, routines(active:1), routine_days(1), routine_exercises(1), 
+    // measurements(1), goals(1), body_metrics(1), plate_inventory(5), badges(1)
+    // 1+1+1+1+1+1+1+1+5+1 = 14
+    expect(res.recordCount).toBe(14);
     expect(res.hasData).toBe(true);
   });
 
@@ -275,7 +278,12 @@ describe('SyncService', () => {
       return {} as any;
     });
 
-    await expect((syncService as any).pullRemoteChanges('token-1')).resolves.toBeUndefined();
+    await (syncService as any).pullRemoteChanges('token-1');
+
+    // Check that we attempted to run SQL for both records (one direct, one deferred/retried)
+    const runCalls = (dbService.run as jest.Mock).mock.calls;
+    expect(runCalls.some(c => String(c[0]).includes('INSERT OR REPLACE INTO workouts'))).toBe(true);
+    expect(runCalls.some(c => String(c[0]).includes('INSERT OR REPLACE INTO workout_sets'))).toBe(true);
   });
 
   it('normalizes scoped cloud settings keys to local keys during pull', async () => {
@@ -303,7 +311,7 @@ describe('SyncService', () => {
 
     const insertCall = (dbService.run as jest.Mock).mock.calls.find((c) => String(c[0]).includes('INSERT OR REPLACE INTO settings'));
     expect(insertCall).toBeDefined();
-    expect(insertCall?.[1]).toEqual(expect.arrayContaining(['last_pull_sync']));
+    expect(insertCall?.[1]).toEqual(expect.arrayContaining(['last_pull_sync_user-1']));
   });
 
   it('uses settings.key as PK during pull (does not require payload.id)', async () => {

@@ -20,6 +20,7 @@ jest.mock('../DatabaseService', () => ({
     getLastSetForExercise: jest.fn(),
     getSetById: jest.fn(),
     getExerciseById: jest.fn(),
+    updateWorkout: jest.fn(),
   },
 }));
 
@@ -52,8 +53,8 @@ describe('WorkoutService', () => {
 
       const events = await workoutService.getCalendarEvents();
 
-      expect(events['2026-01-02']).toEqual({ status: 'completed', colors: ['#111111', '#222222'] });
-      expect(events['2026-01-03']).toEqual({ status: 'in_progress', colors: [] });
+      expect(events['2026-01-02']).toEqual({ status: 'completed', colors: ['#111111', '#222222'], completedCount: 1, totalCount: 1 });
+      expect(events['2026-01-03']).toEqual({ status: 'in_progress', colors: [], completedCount: 0, totalCount: 1 });
     });
 
     it('should cache events briefly to avoid repeated queries', async () => {
