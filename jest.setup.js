@@ -44,3 +44,21 @@ jest.mock('react-native-reanimated', () => {
     Reanimated.default.call = () => { };
     return Reanimated;
 });
+
+jest.mock('posthog-react-native', () => {
+    const mockPostHog = {
+        capture: jest.fn(),
+        identify: jest.fn(),
+        alias: jest.fn(),
+        reset: jest.fn(),
+        isFeatureEnabled: jest.fn(),
+        getFeatureFlag: jest.fn(),
+        getFeatureFlagPayload: jest.fn(),
+        reloadFeatureFlagsAsync: jest.fn(async () => undefined),
+    };
+    return {
+        __esModule: true,
+        default: jest.fn(() => mockPostHog),
+        PostHog: jest.fn(() => mockPostHog),
+    };
+});

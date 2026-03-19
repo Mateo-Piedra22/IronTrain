@@ -88,6 +88,9 @@ describe('IronScoreService', () => {
       if (sql.includes('FROM workout_sets') && sql.includes('JOIN exercises')) {
         return [{ exercise_id: 'e1', exercise_name: 'Bench Press', weight: 100, reps: 5 }];
       }
+      if (sql.includes('SELECT date FROM workouts')) {
+        return [{ date: 1700000000000 }, { date: 1700086400000 }];
+      }
       return [];
     });
 

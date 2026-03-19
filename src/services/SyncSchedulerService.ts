@@ -120,7 +120,15 @@ export class SyncSchedulerService {
 
     public requestSync(reason: SyncReason): void {
         if (!this.initialized) return;
-        if (!this.canAttemptNow(reason)) return;
+
+        const now = Date.now();
+        const sinceAttempt = now - this.lastAttemptAt;
+        const bypassMinInterval = ['manual', 'net_reconnect'].includes(reason);
+
+        let waitMs = this.options.debounceMs;
+        if (sinceAttempt < this.options.minIntervalMs && !bypassMinInterval) {
+            waitMs = Math.max(waitMs, this.options.minIntervalMs - sinceAttempt);
+        }
 
         if (this.debounceTimer) clearTimeout(this.debounceTimer);
         this.debounceTimer = setTimeout(() => {
@@ -128,7 +136,7 @@ export class SyncSchedulerService {
             this.run(reason).catch(() => {
                 return;
             });
-        }, this.options.debounceMs);
+        }, waitMs);
     }
 
     public async syncNow(): Promise<void> {
@@ -151,7 +159,7 @@ export class SyncSchedulerService {
         const now = Date.now();
         const sinceAttempt = now - this.lastAttemptAt;
 
-        const bypassMinInterval = ['manual', 'net_reconnect', 'queue'].includes(reason);
+        const bypassMinInterval = ['manual', 'net_reconnect'].includes(reason);
         if (sinceAttempt < this.options.minIntervalMs && !bypassMinInterval) return false;
 
         if (this.backoffTimer) return false;

@@ -3,7 +3,7 @@ import PostHog from 'posthog-react-native';
 const PH_KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY;
 const PH_HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
 
-export const posthog = new PostHog(PH_KEY || '', {
+export const posthog = new PostHog(PH_KEY || 'nop', {
     host: PH_HOST,
     errorTracking: {
         autocapture: {
