@@ -109,7 +109,7 @@ export const routineExercises = pgTable('routine_exercises', {
 
 export const measurements = pgTable('measurements', {
     id: text('id').primaryKey(),
-    date: integer('date').notNull(),
+    date: bigint('date', { mode: 'number' }).notNull(),
     type: text('type').notNull(),
     value: real('value').notNull(),
     unit: text('unit').notNull(),
@@ -122,7 +122,7 @@ export const goals = pgTable('goals', {
     title: text('title').notNull(),
     targetValue: real('target_value').notNull(),
     currentValue: real('current_value').default(0),
-    deadline: integer('deadline'),
+    deadline: bigint('deadline', { mode: 'number' }),
     type: text('type').notNull(),
     referenceId: text('reference_id'),
     completed: integer('completed').default(0),
@@ -132,7 +132,7 @@ export const goals = pgTable('goals', {
 
 export const bodyMetrics = pgTable('body_metrics', {
     id: text('id').primaryKey(),
-    date: integer('date').notNull(),
+    date: bigint('date', { mode: 'number' }).notNull(),
     weight: real('weight'),
     bodyFat: real('body_fat'),
     notes: text('notes'),
@@ -190,7 +190,7 @@ export const userProfiles = pgTable('user_profiles', {
     streakWeeks: integer('streak_weeks').default(0).notNull(),
     streakMultiplier: real('streak_multiplier').default(1).notNull(),
     streakWeekEvaluatedAt: text('streak_week_evaluated_at'),
-    lastActiveDate: integer('last_active_date'), // Unix timestamp
+    lastActiveDate: bigint('last_active_date', { mode: 'number' }), // Unix timestamp
     pushToken: text('push_token'), // For FCM
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),

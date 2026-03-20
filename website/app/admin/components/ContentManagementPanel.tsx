@@ -1,9 +1,7 @@
 'use client';
 
 import {
-    Bell,
     History,
-    Smartphone,
     Tag,
     Trash2,
     Zap
@@ -115,7 +113,6 @@ export default function ContentManagementPanel({
                             'Esta acción reconstruirá el caché de changelogs. ¿Continuar?',
                             () => {
                                 startTransition(async () => {
-                                    const formData = new FormData(e.currentTarget as HTMLFormElement);
                                     await handleChangelogSyncAction();
                                 });
                             }
@@ -165,7 +162,7 @@ export default function ContentManagementPanel({
                         </div>
                     </div>
                     <p className="text-sm opacity-80 mb-6 leading-relaxed max-w-2xl">
-                        El sistema de notificaciones y anuncios (Banners, Modales, Popups) ha sido migrado a <strong>PostHog Feature Flags y Surveys</strong>. 
+                        El sistema de notificaciones y anuncios (Banners, Modales, Popups) ha sido migrado a <strong>PostHog Feature Flags y Surveys</strong>.
                         Ahora puedes lanzar anuncios de forma dinámica sin necesidad de desplegar código ni usar la base de datos transaccional.
                     </p>
                     <div className="flex gap-4">
