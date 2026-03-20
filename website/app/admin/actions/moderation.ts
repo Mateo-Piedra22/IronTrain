@@ -6,28 +6,6 @@ import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { getAuthenticatedAdmin, getRedirectPath } from './shared';
 
-export async function markFeedbackStatus(formData: FormData) {
-    let redirectPath = '';
-    try {
-        const adminId = await getAuthenticatedAdmin();
-        if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
-
-        const id = String(formData.get('id') || '').trim();
-        const status = String(formData.get('status') || '').trim();
-
-        if (!id || !status) throw new Error('MISSING_FIELDS');
-
-        await db.update(schema.feedback).set({ status, updatedAt: new Date() }).where(eq(schema.feedback.id, id));
-        revalidatePath('/admin');
-        redirectPath = await getRedirectPath(formData, 'feedback');
-    } catch (error: any) {
-        console.error('Feedback Action Error:', error);
-        revalidatePath('/admin');
-        redirectPath = '/admin?tab=moderation&section=feedback&error=feedback_failed';
-    }
-    if (redirectPath) redirect(redirectPath);
-}
-
 export async function handleRoutineAction(formData: FormData) {
     let redirectPath = '';
     try {

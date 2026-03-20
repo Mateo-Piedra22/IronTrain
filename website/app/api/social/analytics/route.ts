@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '../../../../src/lib/auth';
 import { buildLeaderboard } from '../../../../src/lib/social-scoring';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(req: NextRequest) {
     try {
         const userId = await verifyAuth(req);

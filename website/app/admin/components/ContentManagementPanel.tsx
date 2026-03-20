@@ -16,8 +16,7 @@ import {
     handleChangelogPublishAction,
     handleChangelogSyncAction,
     handleGlobalEventAction,
-    handleGlobalEventDeriveAnnouncementAction,
-    handleNotificationAction
+    handleGlobalEventDeriveAnnouncementAction
 } from '../actions';
 import ConfirmModal from './ConfirmModal';
 
@@ -157,185 +156,35 @@ export default function ContentManagementPanel({
             </div>
 
             {activeSection === 'broadcast' ? (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 ">
-                    {/* Management Form */}
-                    <div className="border-2 border-[#1a1a2e] p-6 bg-[#f5f1e8] lg:sticky lg:top-8 h-fit">
-                        <div className="flex items-center gap-3 mb-6 border-b border-[#1a1a2e]/10 pb-2">
-                            <Bell className="w-4 h-4" />
-                            <h3 className="font-black text-xs uppercase">{editingNotification ? 'EDIT_BROADCAST' : 'NEW_BROADCAST'}</h3>
+                <div className="border-2 border-[#1a1a2e] bg-[#1a1a2e] text-[#f5f1e8] p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.1)]">
+                    <div className="flex items-center gap-4 mb-4">
+                        <Zap className="w-8 h-8 text-yellow-400" />
+                        <div>
+                            <h3 className="text-xl font-black uppercase tracking-tight">PostHog_Broadcast_Engine</h3>
+                            <p className="text-[10px] font-bold opacity-60 uppercase">Notificaciones Migradas</p>
                         </div>
-                        <form action={handleNotificationAction} className="space-y-4">
-                            <input type="hidden" name="id" value={editingNotification?.id || ''} />
-                            <div>
-                                <label className="text-[9px] font-black opacity-40 uppercase block mb-1">Title</label>
-                                <input name="title" defaultValue={editingNotification?.title} placeholder="Announcement Title..." className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none" required />
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-black opacity-40 uppercase block mb-1">Message</label>
-                                <textarea name="message" defaultValue={editingNotification?.message} rows={3} placeholder="Content details..." className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none" required />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-[9px] font-black opacity-40 uppercase block mb-1">Type</label>
-                                    <select name="type" defaultValue={editingNotification?.type || 'toast'} className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none">
-                                        <option value="toast">Toast (Floating)</option>
-                                        <option value="modal">Modal (Overlay)</option>
-                                        <option value="system">System Only</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-black opacity-40 uppercase block mb-1">Mode</label>
-                                    <select name="displayMode" defaultValue={editingNotification?.displayMode || 'once'} className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none">
-                                        <option value="once">Once</option>
-                                        <option value="always">Always</option>
-                                        <option value="until_closed">Until Closed</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-[9px] font-black opacity-40 uppercase block mb-1">Priority</label>
-                                    <select name="priority" defaultValue={editingNotification?.priority || 'normal'} className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none">
-                                        <option value="low">Low</option>
-                                        <option value="normal">Normal</option>
-                                        <option value="high">High</option>
-                                        <option value="critical">Critical</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-black opacity-40 uppercase block mb-1">Platform</label>
-                                    <select name="targetPlatform" defaultValue={editingNotification?.targetPlatform || 'all'} className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none">
-                                        <option value="all">All</option>
-                                        <option value="android">Android</option>
-                                        <option value="ios">iOS</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-[9px] font-black opacity-40 uppercase block mb-1">Segment</label>
-                                    <select name="targetSegment" defaultValue={editingNotification?.targetSegment || 'all'} className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none">
-                                        <option value="all">All Users</option>
-                                        <option value="active">Active (7d)</option>
-                                        <option value="inactive">Inactive (14d+)</option>
-                                        <option value="new">New (7d)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-black opacity-40 uppercase block mb-1">Version_Lock</label>
-                                    <input name="targetVersion" defaultValue={editingNotification?.targetVersion || ''} placeholder="e.g. 1.2.x" className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none" />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-black opacity-40 uppercase block mb-1">Action URL (In-App Routing)</label>
-                                <input name="actionUrl" defaultValue={editingNotification?.metadata ? JSON.parse(editingNotification.metadata).actionUrl : ''} placeholder="irontrain://changelog" className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none" />
-                            </div>
-                            <div className="flex items-center gap-2 bg-[#1a1a2e]/5 p-2 border border-[#1a1a2e]/10">
-                                <input type="checkbox" name="isActive" value="true" id="active_notif" defaultChecked={editingNotification?.isActive !== 0} className="w-4 h-4 accent-[#1a1a2e]" />
-                                <label htmlFor="active_notif" className="text-[10px] font-black uppercase">ENABLE_LIVE_FEED</label>
-                            </div>
-                            <button type="submit" name="intent" value="save" className="w-full bg-[#1a1a2e] text-[#f5f1e8] py-3 font-black uppercase text-[10px] tracking-widest hover:bg-orange-500 transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
-                                {editingNotification ? 'COMMIT_CHANGES' : 'PUBLISH_ANNOUNCEMENT'}
-                            </button>
-                            {editingNotification && (
-                                <Link
-                                    href={`?tab=${searchParams.get('tab') || 'content'}&section=broadcast`}
-                                    className="block text-center text-[9px] font-black uppercase opacity-40 hover:opacity-100 mt-2 underline"
-                                >
-                                    CANCEL_OVERRIDE
-                                </Link>
-                            )}
-                        </form>
                     </div>
-
-                    <div className="lg:col-span-2 space-y-4">
-                        <div className="flex items-center justify-between mb-4 border-b border-[#1a1a2e]/10 pb-2">
-                            <div className="text-[10px] font-black uppercase opacity-60">BROADCAST_HISTORY</div>
-                            <div className="text-[10px] font-black uppercase opacity-60">SHOWING_{notifications.length}_SENT</div>
-                        </div>
-                        {notifications.map(n => {
-                            const stats = n.stats;
-                            return (
-                                <div key={n.id} className={`border-2 border-[#1a1a2e] bg-white hover:shadow-[4px_4px_0px_0px_rgba(26,26,46,0.1)] transition-all ${n.isActive ? 'border-l-8 border-l-green-500' : 'opacity-60 border-l-8 border-l-red-500'}`}>
-                                    <div className="p-4 flex flex-col md:flex-row gap-4">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className={`text-[8px] font-black uppercase px-1 py-0.5 ${n.priority === 'critical' ? 'bg-red-600 text-white' :
-                                                    n.priority === 'high' ? 'bg-orange-600 text-white' :
-                                                        'bg-[#1a1a2e] text-[#f5f1e8]'
-                                                    }`}>
-                                                    {n.type}_{n.priority}
-                                                </span>
-                                                <div className="text-xs font-black uppercase tracking-tight">{n.title}</div>
-                                            </div>
-                                            <p className="text-[11px] leading-tight opacity-80 mb-3">{n.message}</p>
-                                            <div className="flex flex-wrap gap-2">
-                                                <div className="text-[9px] font-black uppercase opacity-40 bg-[#1a1a2e]/5 px-1.5 py-0.5 flex items-center gap-1">
-                                                    <Smartphone size={8} /> {n.targetPlatform || 'all'}
-                                                </div>
-                                                <div className="text-[9px] font-black uppercase opacity-40 bg-[#1a1a2e]/5 px-1.5 py-0.5">
-                                                    SEG: {n.targetSegment || 'all'}
-                                                </div>
-                                                {n.targetVersion && (
-                                                    <div className="text-[9px] font-black uppercase opacity-40 bg-[#1a1a2e]/5 px-1.5 py-0.5">
-                                                        VER: v{n.targetVersion}
-                                                    </div>
-                                                )}
-                                                <div className="flex items-center gap-1 bg-orange-500/10 px-1.5 py-0.5 rounded-sm border border-orange-500/10 ml-auto">
-                                                    <span className="text-[8px] font-black text-orange-600 mr-0.5">KUDOS</span>
-                                                    <span className="text-[10px] font-black text-orange-700">{n.reactionCount || 0}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-col gap-2 min-w-[120px] justify-between border-t md:border-t-0 md:border-l border-[#1a1a2e]/5 md:pl-4 pt-4 md:pt-0">
-                                            <div className="grid grid-cols-2 gap-2 text-center">
-                                                <div className="bg-[#1a1a2e]/5 p-1 border border-[#1a1a2e]/5">
-                                                    <div className="text-[8px] opacity-40 font-black">SEEN</div>
-                                                    <div className="text-xs font-black">{stats.seen}</div>
-                                                </div>
-                                                <div className="bg-[#1a1a2e]/5 p-1 border border-[#1a1a2e]/5">
-                                                    <div className="text-[8px] opacity-40 font-black">CLCK</div>
-                                                    <div className="text-xs font-black">{stats.clicked}</div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-end gap-3 pt-2">
-                                                <Link
-                                                    href={`?tab=${searchParams.get('tab') || 'content'}&section=broadcast&editNotifId=${n.id}`}
-                                                    className="text-[10px] font-black uppercase hover:underline"
-                                                >
-                                                    EDIT
-                                                </Link>
-                                                <form
-                                                    action={handleNotificationAction}
-                                                    onSubmit={(event) => {
-                                                        event.preventDefault();
-                                                        handleConfirm(
-                                                            'ELIMINAR NOTIFICACIÓN',
-                                                            '¿Estás seguro de que quieres eliminar esta notificación permanentemente?',
-                                                            () => {
-                                                                startTransition(async () => {
-                                                                    const formData = new FormData(event.currentTarget as HTMLFormElement);
-                                                                    formData.set('intent', 'delete');
-                                                                    await handleNotificationAction(formData);
-                                                                });
-                                                            }
-                                                        );
-                                                    }}
-                                                >
-                                                    <input type="hidden" name="id" value={n.id} />
-                                                    <input type="hidden" name="origin_tab" value={searchParams.get('tab') || 'content'} />
-                                                    <input type="hidden" name="origin_section" value="broadcast" />
-                                                    <button type="submit" name="intent" value="delete" className="text-red-500 hover:scale-110 transition-transform disabled:opacity-50" disabled={isPending}>
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                    <p className="text-sm opacity-80 mb-6 leading-relaxed max-w-2xl">
+                        El sistema de notificaciones y anuncios (Banners, Modales, Popups) ha sido migrado a <strong>PostHog Feature Flags y Surveys</strong>. 
+                        Ahora puedes lanzar anuncios de forma dinámica sin necesidad de desplegar código ni usar la base de datos transaccional.
+                    </p>
+                    <div className="flex gap-4">
+                        <a
+                            href="https://us.posthog.com/project/347728/feature_flags"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 bg-yellow-400 text-[#1a1a2e] px-6 py-3 text-xs font-black uppercase hover:bg-yellow-300 transition-colors"
+                        >
+                            Feature Flags (Banners)
+                        </a>
+                        <a
+                            href="https://us.posthog.com/project/347728/surveys"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 bg-white text-[#1a1a2e] px-6 py-3 text-xs font-black uppercase hover:bg-gray-200 transition-colors"
+                        >
+                            Surveys (Modales/Popups)
+                        </a>
                     </div>
                 </div>
             ) : activeSection === 'changelog' ? (

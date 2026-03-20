@@ -104,8 +104,13 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
 
         const now = Date.now();
         const last = lastTickAtMs ?? now;
-        const deltaSec = Math.max(0, Math.floor((now - last) / 1000));
+        let deltaSec = Math.max(0, Math.floor((now - last) / 1000));
         if (deltaSec <= 0) return;
+
+        // Cap delta to prevent massive duration jumps if app was suspended
+        if (deltaSec > 43200) {
+            deltaSec = 43200; // Cap at 12 hours
+        }
 
         const newTime = workoutTimer + deltaSec;
         set({ workoutTimer: newTime, lastTickAtMs: now });

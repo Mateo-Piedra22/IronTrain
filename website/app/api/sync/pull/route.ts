@@ -38,11 +38,6 @@ export async function GET(req: NextRequest) {
     const userId = await verifyAuth(req);
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Global System Status Check
-    const { validateSystemAccess } = await import('../../../../src/lib/system-status');
-    const { isRestricted, response } = await validateSystemAccess();
-    if (isRestricted) return response as NextResponse;
-
     const sp = req.nextUrl.searchParams;
     const sinceParam = sp.get('since');
     const sinceDate = sinceParam ? new Date(parseInt(sinceParam)) : new Date(0);
@@ -64,13 +59,11 @@ export async function GET(req: NextRequest) {
             badges: schema.badges,
             exercise_badges: schema.exerciseBadges,
             user_profiles: schema.userProfiles,
+            activity_feed: schema.activityFeed,
             shares_inbox: schema.sharesInbox,
-            activity_seen: schema.activitySeen,
             changelogs: schema.changelogs,
             changelog_reactions: schema.changelogReactions,
-            notification_reactions: schema.notificationReactions,
             kudos: schema.kudos,
-            activity_feed: schema.activityFeed,
             score_events: schema.scoreEvents,
             user_exercise_prs: schema.userExercisePrs,
             friendships: schema.friendships,
@@ -126,8 +119,6 @@ export async function GET(req: NextRequest) {
                     conditions.push(sql`(${tableSchema.userId} = ${userId} OR ${tableSchema.friendId} = ${userId})`);
                 } else if (tableName === 'shares_inbox') {
                     conditions.push(sql`(${tableSchema.senderId} = ${userId} OR ${tableSchema.receiverId} = ${userId})`);
-                } else if (tableName === 'activity_seen') {
-                    conditions.push(eq(tableSchema.userId, userId));
                 } else if ('userId' in tableSchema) {
                     conditions.push(eq(tableSchema.userId, userId));
                 }
@@ -173,7 +164,6 @@ export async function GET(req: NextRequest) {
             { childTable: 'user_exercise_prs', parentTable: 'exercises', fkField: 'exercise_id' },
             { childTable: 'score_events', parentTable: 'workouts', fkField: 'workout_id' },
             { childTable: 'kudos', parentTable: 'activity_feed', fkField: 'feed_id' },
-            { childTable: 'activity_seen', parentTable: 'activity_feed', fkField: 'activity_id' },
             { childTable: 'changelog_reactions', parentTable: 'changelogs', fkField: 'changelog_id' },
         ];
 
@@ -219,8 +209,6 @@ export async function GET(req: NextRequest) {
                     baseConditions.push(sql`(${tableSchema.userId} = ${userId} OR ${tableSchema.friendId} = ${userId})`);
                 } else if (parentTable === 'shares_inbox') {
                     baseConditions.push(sql`(${tableSchema.senderId} = ${userId} OR ${tableSchema.receiverId} = ${userId})`);
-                } else if (parentTable === 'activity_seen') {
-                    baseConditions.push(eq(tableSchema.userId, userId));
                 } else if (parentTable === 'kudos') {
                     baseConditions.push(eq(tableSchema.giverId, userId));
                 } else if ('userId' in tableSchema) {
@@ -267,7 +255,6 @@ export async function GET(req: NextRequest) {
             changes,
             hasMore: totalCount >= MAX_PULL_RECORDS
         });
-
     } catch (e: any) {
         console.error(`[Sync/Pull] Error pulling for user ${userId}:`, e);
         return NextResponse.json({

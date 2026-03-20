@@ -359,13 +359,7 @@ export class DatabaseService {
         deleted_at INTEGER
       );
 
-      CREATE TABLE IF NOT EXISTS activity_seen (
-        id TEXT PRIMARY KEY NOT NULL,
-        user_id TEXT NOT NULL,
-        activity_id TEXT NOT NULL,
-        seen_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
+
 
       CREATE TABLE IF NOT EXISTS notification_reactions (
         id TEXT PRIMARY KEY NOT NULL,
@@ -392,8 +386,7 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_friendships_user ON friendships(user_id);
       CREATE INDEX IF NOT EXISTS idx_friendships_friend ON friendships(friend_id);
       CREATE INDEX IF NOT EXISTS idx_activity_feed_user ON activity_feed(user_id);
-      CREATE INDEX IF NOT EXISTS idx_activity_seen_user ON activity_seen(user_id);
-      CREATE INDEX IF NOT EXISTS idx_activity_seen_activity ON activity_seen(activity_id);
+
       CREATE INDEX IF NOT EXISTS idx_shares_receiver ON shares_inbox(receiver_id);
     `;
 

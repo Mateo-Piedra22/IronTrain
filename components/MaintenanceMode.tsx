@@ -1,17 +1,27 @@
 import { AlertTriangle, Hammer } from 'lucide-react-native';
-import { useFeatureFlag } from 'posthog-react-native';
+import { useFeatureFlagWithPayload } from 'posthog-react-native';
 import React from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../src/hooks/useTheme';
 
 const { width } = Dimensions.get('window');
 
+interface MaintenancePayload {
+    title?: string;
+    description?: string;
+    errorCode?: string;
+}
+
 export default function MaintenanceMode({ children }: { children: React.ReactNode }) {
-    const isMaintenanceMode = useFeatureFlag('maintenance-mode');
+    const [isMaintenanceMode, payload] = useFeatureFlagWithPayload('maintenance-mode') as [boolean | string, MaintenancePayload | null];
     const { activeTheme } = useTheme();
     const { colors } = activeTheme;
 
     if (isMaintenanceMode === true) {
+        const title = payload?.title || 'IRONTRAIN_UNDER_REPAIR';
+        const description = payload?.description || 'Estamos optimizando la infraestructura de sincronización para que tus entrenamientos se guarden más rápido que nunca. Volvemos en breve.';
+        const errorCode = payload?.errorCode || '503_MAINTENANCE_ACTIVE';
+
         return (
             <View style={[styles.container, { backgroundColor: colors.background }]}>
                 {/* Stripe Header */}
@@ -23,7 +33,7 @@ export default function MaintenanceMode({ children }: { children: React.ReactNod
                     </View>
 
                     <Text style={[styles.title, { color: colors.text }]}>
-                        IRONTRAIN_UNDER_REPAIR
+                        {title}
                     </Text>
 
                     <View style={styles.statusBadge}>
@@ -32,13 +42,12 @@ export default function MaintenanceMode({ children }: { children: React.ReactNod
                     </View>
 
                     <Text style={[styles.description, { color: colors.text }]}>
-                        Estamos optimizando la infraestructura de sincronización para que tus entrenamientos
-                        se guarden más rápido que nunca. Volvemos en breve.
+                        {description}
                     </Text>
 
                     <View style={[styles.codeBox, { backgroundColor: colors.surfaceLighter, borderColor: colors.iron[900] || '#1a1a2e' }]}>
-                        <Text style={[styles.codeLabel, { color: colors.text }]}>Error_Code</Text>
-                        <Text style={[styles.codeText, { color: colors.text }]}>503_MAINTENANCE_ACTIVE</Text>
+                        <Text style={[styles.codeLabel, { color: colors.text }]}>System_Status</Text>
+                        <Text style={[styles.codeText, { color: colors.text }]}>{errorCode}</Text>
                     </View>
 
                     <Text style={[styles.footerText, { color: colors.text }]}>

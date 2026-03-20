@@ -86,7 +86,7 @@ export const useSocialStore = create<SocialState>((set, get) => ({
     },
 
     refreshLocation: async (silent = false) => {
-        set({ refreshingLocation: true });
+        if (!silent) set({ refreshingLocation: true });
         const { addToast } = useNotificationStore.getState();
 
         try {
@@ -135,7 +135,7 @@ export const useSocialStore = create<SocialState>((set, get) => ({
         } catch (err) {
             logger.captureException(err, { scope: 'useSocialStore.refreshLocation' });
         } finally {
-            set({ refreshingLocation: false });
+            if (!silent) set({ refreshingLocation: false });
         }
     },
 

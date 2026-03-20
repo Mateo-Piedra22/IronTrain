@@ -238,9 +238,9 @@ describe('WorkoutService', () => {
 
       await workoutService.finishWorkout('w1');
 
-      expect(dbService.run).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE workouts SET status = ?, end_time = ?, updated_at = ?'),
-        expect.arrayContaining(['completed'])
+      expect(dbService.updateWorkout).toHaveBeenCalledWith(
+        'w1',
+        expect.objectContaining({ status: 'completed' })
       );
     });
 

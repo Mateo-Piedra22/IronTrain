@@ -18,6 +18,9 @@ export type ChangelogRelease = {
 
 const CACHE_FILE = `${FileSystem.cacheDirectory ?? ''}changelog_cache.json`;
 
+// Fallback estático para primer inicio sin internet
+const STATIC_CHANGELOG = require('../changelog.generated.json');
+
 export class ChangelogService {
     static async sync(): Promise<void> {
         // Al llamar a getFeed con includeUnreleased, ya estamos sincronizando changelogs
@@ -43,6 +46,12 @@ export class ChangelogService {
 
     static async getAllReleases(): Promise<ChangelogRelease[]> {
         const feed = await BroadcastFeedService.getFeed({ includeUnreleased: true });
+
+        // Si el feed está vacío (ej: primer inicio offline), usamos el fallback estático
+        if (feed.items.length === 0 && STATIC_CHANGELOG?.releases) {
+            return STATIC_CHANGELOG.releases;
+        }
+
         return feed.items
             .filter(i => i.kind === 'changelog')
             .map(this.mapToRelease);

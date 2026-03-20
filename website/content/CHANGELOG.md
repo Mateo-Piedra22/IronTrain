@@ -6,6 +6,25 @@
 - **Conexión con múltiples dispositivos**: Posibilidad de conectar con múltiples dispositivos (relojes/bands compatibles).
 - **Vinculación con servicios de salud**: Posibilidad de vincular con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos.
 
+## 2.1.3 (2026-03-20)
+
+### Comunidad y Feedback (Nuevo Centro de Mensajes)
+- **Reportes Inteligentes**: Hemos renovado por completo el sistema de Envío de Feedback. Ahora, cuando nos escribas por un error o sugerencia, recibiremos automáticamente detalles técnicos (como tu versión y tipo de celular) para resolver tus problemas mucho más rápido.
+- **Encuestas en Vivo**: Pronto verás pequeñas encuestas dentro de la app para que puedas votar sobre qué funciones querés que hagamos primero.
+- **Acceso Directo**: El botón de "Feedback" en Ajustes vuelve a estar operativo y conectado directamente con nuestro equipo de soporte.
+
+### Novedades y Actualizaciones (Broadcast)
+- **Noticias al Instante**: Mejoramos la forma en que recibís las novedades ("Novedades y Cambios"). Ahora verás los anuncios y correcciones importantes al instante, incluso sin tener que descargar una actualización de la tienda para pequeños ajustes.
+- **Robustez Offline**: Si abrís la app sin internet por primera vez, verás igual todas las novedades que se incluyeron con la instalación. Tus "likes" a las actualizaciones ahora se guardan mejor.
+
+### Privacidad y Rendimiento
+- **Limpieza de Datos**: Eliminamos sistemas antiguos de seguimiento y bases de datos obsoletas que ya no se usaban. Esto hace que la aplicación sea más liviana, ocupe menos espacio y respete aún más tu privacidad.
+- **Sincronización más Rápida**: Al limpiar procesos en segundo plano que ya no eran necesarios, el inicio de sesión y la carga de datos ahora son más directos.
+
+### Correcciones y Mejoras Técnicas
+- **Sincronización Protegida**: Corregimos errores internos que podían afectar a tu historial de entrenamiento en casos muy específicos de mala conexión.
+- **Estabilidad General**: Actualizamos todos los servicios internos para asegurar que IronTrain siga funcionando perfectamente mientras seguimos creciendo.
+
 ## 2.1.2 (2026-03-19)
 
 ### Sincronización y Datos (Sync v2)

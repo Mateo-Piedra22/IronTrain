@@ -371,10 +371,13 @@ export default function SocialTab() {
     };
 
     const handleMarkAsSeen = async (id: string, feedType: 'direct_share' | 'activity_log') => {
+        // Optimistic UI update immediately to prevent double clicks
+        setInbox(current => current.map(item => item.id === id ? { ...item, seenAt: new Date().toISOString() } : item));
         try {
             await SocialService.markAsSeen(id, feedType);
-            setInbox(current => current.map(item => item.id === id ? { ...item, seenAt: new Date().toISOString() } : item));
         } catch (err) {
+            // Revert optimistic update on failure
+            setInbox(current => current.map(item => item.id === id ? { ...item, seenAt: null } : item));
             logger.captureException(err, { scope: 'SocialTab.markAsSeen' });
             addToast({ type: 'error', title: 'Buzón', message: 'No se pudo marcar como visto.' });
         }

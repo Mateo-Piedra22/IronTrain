@@ -20,11 +20,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Global System Status Check
-        const { validateSystemAccess } = await import('../../../../src/lib/system-status');
-        const { isRestricted, response } = await validateSystemAccess();
-        if (isRestricted) return response as NextResponse;
-
         let body;
         try {
             body = await req.json();
@@ -60,10 +55,8 @@ export async function POST(req: NextRequest) {
             'user_profiles': schema.userProfiles,
             'changelogs': schema.changelogs,
             'changelog_reactions': schema.changelogReactions,
-            'notification_reactions': schema.notificationReactions,
             'kudos': schema.kudos,
             'activity_feed': schema.activityFeed,
-            'activity_seen': schema.activitySeen,
             'shares_inbox': schema.sharesInbox,
             'score_events': schema.scoreEvents,
             'user_exercise_prs': schema.userExercisePrs,
@@ -148,8 +141,6 @@ export async function POST(req: NextRequest) {
                     } else if (tableName === 'shares_inbox') {
                         // RECEIVER can only update seenAt and status. SENDER can update payload if needed.
                         // We check this in the ownership logic below.
-                    } else if (tableName === 'activity_seen') {
-                        filteredData.userId = userId;
                     } else if (tableName === 'activity_feed') {
                         filteredData.userId = userId;
                     } else if (tableName === 'friendships') {
@@ -182,9 +173,6 @@ export async function POST(req: NextRequest) {
                             filteredData.id = pkValue;
                         } else if (tableName === 'kudos' && filteredData.feedId) {
                             pkValue = `${filteredData.feedId}_${userId}`;
-                            filteredData.id = pkValue;
-                        } else if (tableName === 'notification_reactions' && filteredData.notificationId) {
-                            pkValue = `${filteredData.notificationId}_${userId}`;
                             filteredData.id = pkValue;
                         }
                     }
@@ -233,7 +221,7 @@ export async function POST(req: NextRequest) {
                                 (tableName === 'user_profiles' ? existingRecord.id : undefined);
                             const isSystemRecord = existingRecord.isSystem === 1 || existingRecord.is_system === 1;
 
-                            if (ownerId && ownerId !== userId && !['friendships', 'activity_feed', 'kudos', 'changelog_reactions', 'notification_reactions', 'shares_inbox', 'activity_seen'].includes(tableName)) {
+                            if (ownerId && ownerId !== userId && !['friendships', 'activity_feed', 'kudos', 'changelog_reactions', 'shares_inbox'].includes(tableName)) {
                                 if (isSystemRecord) {
                                     // Zero Trust: Ignore sync attempts to modify official system records
                                     return;
@@ -254,11 +242,6 @@ export async function POST(req: NextRequest) {
                                 } else if (existingRecord.senderId !== userId) {
                                     throw new Error('Forbidden: Not sender or receiver of this share');
                                 }
-                            }
-
-                            // ZERO TRUST: activity_seen check
-                            if (tableName === 'activity_seen' && existingRecord.userId !== userId) {
-                                throw new Error('Forbidden: Cannot update seen status for another user');
                             }
 
                             // ZERO TRUST: Specifically for friendships, block status changes via sync
@@ -321,10 +304,6 @@ export async function POST(req: NextRequest) {
                                     await tx.update(schema.changelogs)
                                         .set({ reactionCount: sql`${schema.changelogs.reactionCount} + 1`, updatedAt: new Date() })
                                         .where(eq(schema.changelogs.id, insertPayload.changelogId));
-                                } else if (tableName === 'notification_reactions' && insertPayload.notificationId) {
-                                    await tx.update(schema.adminNotifications)
-                                        .set({ reactionCount: sql`${schema.adminNotifications.reactionCount} + 1`, updatedAt: new Date() })
-                                        .where(eq(schema.adminNotifications.id, insertPayload.notificationId));
                                 }
                             }
 
@@ -337,10 +316,6 @@ export async function POST(req: NextRequest) {
                                     await tx.update(schema.changelogs)
                                         .set({ reactionCount: sql`GREATEST(0, ${schema.changelogs.reactionCount} - 1)`, updatedAt: new Date() })
                                         .where(eq(schema.changelogs.id, existingRecord.changelogId));
-                                } else if (tableName === 'notification_reactions' && existingRecord.notificationId) {
-                                    await tx.update(schema.adminNotifications)
-                                        .set({ reactionCount: sql`GREATEST(0, ${schema.adminNotifications.reactionCount} - 1)`, updatedAt: new Date() })
-                                        .where(eq(schema.adminNotifications.id, existingRecord.notificationId));
                                 }
                             }
                         }
@@ -366,14 +341,8 @@ export async function POST(req: NextRequest) {
                                         )
                                     );
 
-                                // Reset per-user seen records so friends see it as a new notification
-                                await tx.delete(schema.activitySeen)
-                                    .where(
-                                        or(
-                                            eq(schema.activitySeen.activityId, `activity-workout-${pkValue}`),
-                                            like(schema.activitySeen.activityId, `activity-pr-${pkValue}-%`)
-                                        )
-                                    );
+                                // Reset per-user seen status for everyone so it pops up as new
+                                // (Implementation note: This was previously handled by activity_seen table, now handled via activityFeed.seenAt)
                             } else if (!isCompleted && wasCompleted) {
                                 // Deactivation (Resumed or Soft-deleted)
                                 await revertWorkoutScoring(tx, userId, pkValue);
@@ -426,13 +395,9 @@ export async function POST(req: NextRequest) {
                                 // Side effect: Decrement count if it wasn't already deleted
                                 if (!alreadyDeleted) {
                                     if (tableName === 'kudos' && record.feedId) {
-                                        await tx.update(schema.activityFeed).set({ kudoCount: sql`${schema.activityFeed.kudoCount} - 1`, updatedAt: new Date() }).where(eq(schema.activityFeed.id, record.feedId));
+                                        await tx.update(schema.activityFeed).set({ kudoCount: sql`GREATEST(0, ${schema.activityFeed.kudoCount} - 1)`, updatedAt: new Date() }).where(eq(schema.activityFeed.id, record.feedId));
                                     } else if (tableName === 'changelog_reactions' && record.changelogId) {
-                                        await tx.update(schema.changelogs).set({ reactionCount: sql`${schema.changelogs.reactionCount} - 1`, updatedAt: new Date() }).where(eq(schema.changelogs.id, record.changelogId));
-                                    } else if (tableName === 'notification_reactions' && record.notificationId) {
-                                        await tx.update(schema.adminNotifications)
-                                            .set({ reactionCount: sql`GREATEST(0, ${schema.adminNotifications.reactionCount} - 1)`, updatedAt: new Date() })
-                                            .where(eq(schema.adminNotifications.id, record.notificationId));
+                                        await tx.update(schema.changelogs).set({ reactionCount: sql`GREATEST(0, ${schema.changelogs.reactionCount} - 1)`, updatedAt: new Date() }).where(eq(schema.changelogs.id, record.changelogId));
                                     }
 
                                     if (tableName === 'workouts') {

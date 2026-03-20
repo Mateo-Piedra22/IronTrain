@@ -3,49 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
-import { systemStatusSchema } from './schemas';
 import { getAuthenticatedAdmin, getRedirectPath } from './shared';
-
-export async function handleUpdateSystemStatus(formData: FormData) {
-    let redirectPath = '';
-    try {
-        const adminId = await getAuthenticatedAdmin();
-        if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
-
-        const validated = systemStatusSchema.parse({
-            maintenance_mode: formData.get('maintenanceMode') === '1',
-            offline_only: formData.get('offlineOnlyMode') === '1',
-            motd: String(formData.get('message') || '').trim()
-        });
-
-        await db.insert(schema.systemStatus).values({
-            id: 'global',
-            maintenanceMode: validated.maintenance_mode ? 1 : 0,
-            offlineOnlyMode: validated.offline_only ? 1 : 0,
-            message: validated.motd,
-            updatedAt: new Date(),
-            updatedBy: adminId,
-        }).onConflictDoUpdate({
-            target: schema.systemStatus.id,
-            set: {
-                maintenanceMode: validated.maintenance_mode ? 1 : 0,
-                offlineOnlyMode: validated.offline_only ? 1 : 0,
-                message: validated.motd,
-                updatedAt: new Date(),
-                updatedBy: adminId,
-            }
-        });
-
-        revalidatePath('/admin');
-        revalidatePath('/');
-        redirectPath = await getRedirectPath(formData, 'system');
-    } catch (error: any) {
-        console.error('System Status Action Error:', error);
-        revalidatePath('/admin');
-        redirectPath = '/admin?tab=system&section=status&error=status_update_failed';
-    }
-    if (redirectPath) redirect(redirectPath);
-}
 
 export async function handleScoringConfigAction(formData: FormData) {
     let redirectPath = '';

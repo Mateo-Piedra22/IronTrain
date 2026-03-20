@@ -5,7 +5,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { AlertTriangle, Download } from 'lucide-react-native';
-import { PostHogProvider } from 'posthog-react-native';
+import { PostHogProvider, PostHogSurveyProvider } from 'posthog-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -25,7 +25,7 @@ import { useTheme } from '../src/hooks/useTheme';
 import { configService } from '../src/services/ConfigService';
 import { dbService } from '../src/services/DatabaseService';
 import { feedbackService } from '../src/services/FeedbackService';
-import { MetricsAndFeedbackService } from '../src/services/MetricsAndFeedbackService';
+
 import { syncScheduler } from '../src/services/SyncSchedulerService';
 import { SyncDiagnostics, syncService } from '../src/services/SyncService';
 import { updateService } from '../src/services/UpdateService';
@@ -209,7 +209,6 @@ export default function RootLayout() {
         await dbService.init();
         await configService.init();
         setDbInitialized(true);
-        MetricsAndFeedbackService.trackInstallIfNeeded();
         await notificationPermissionsService.requestPermissionOnce(false);
         await locationPermissionsService.requestWeatherBonusPermissionOnce();
       } catch (e) {
@@ -290,21 +289,23 @@ export default function RootLayout() {
 
   return (
     <PostHogProvider client={posthog}>
-      <SafeAreaProvider>
-        <AppThemeProvider>
-          <MaintenanceMode>
-            <MainAppContent
-              dbInitialized={dbInitialized}
-              fontsLoaded={fontsLoaded}
-              fontError={fontError}
-              installedVersion={installedVersion}
-              latestVersion={latestVersion}
-              downloadUrl={downloadUrl}
-              notesUrl={notesUrl}
-            />
-          </MaintenanceMode>
-        </AppThemeProvider>
-      </SafeAreaProvider>
+      <PostHogSurveyProvider>
+        <SafeAreaProvider>
+          <AppThemeProvider>
+            <MaintenanceMode>
+              <MainAppContent
+                dbInitialized={dbInitialized}
+                fontsLoaded={fontsLoaded}
+                fontError={fontError}
+                installedVersion={installedVersion}
+                latestVersion={latestVersion}
+                downloadUrl={downloadUrl}
+                notesUrl={notesUrl}
+              />
+            </MaintenanceMode>
+          </AppThemeProvider>
+        </SafeAreaProvider>
+      </PostHogSurveyProvider>
     </PostHogProvider>
   );
 }

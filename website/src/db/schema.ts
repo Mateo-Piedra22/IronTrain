@@ -231,14 +231,6 @@ export const activityFeed = pgTable('activity_feed', {
     kudoCount: integer('kudo_count').default(0).notNull(),
 });
 
-export const activitySeen = pgTable('activity_seen', {
-    id: text('id').primaryKey(), // user_id + activity_id
-    userId: text('user_id').notNull(),
-    activityId: text('activity_id').notNull(),
-    seenAt: timestamp('seen_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
-
 export const kudos = pgTable('kudos', {
     id: text('id').primaryKey(),
     feedId: text('feed_id').notNull(),
@@ -249,25 +241,6 @@ export const kudos = pgTable('kudos', {
 });
 
 // --- ADMIN & METRICS ---
-export const appInstalls = pgTable('app_installs', {
-    id: text('id').primaryKey(), // uniquely generated uuid per device installation
-    platform: text('platform').notNull(), // 'android', 'ios', 'web'
-    version: text('version'), // e.g. '1.0.0'
-    metadata: jsonb('metadata'), // Extra JSON data (device model, os version)
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
-export const feedback = pgTable('feedback', {
-    id: text('id').primaryKey(),
-    userId: text('user_id'), // Optional if anonymous, refs userProfiles.id
-    type: text('type').notNull(), // 'bug', 'feature_request', 'review', 'other'
-    message: text('message').notNull(),
-    status: text('status').default('open').notNull(), // 'open', 'in_progress', 'resolved', 'closed'
-    metadata: jsonb('metadata'), // JSON with app version, OS, etc. for repro
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
-
 // --- CHANGELOG SYSTEM ---
 export const changelogs = pgTable('changelogs', {
     id: text('id').primaryKey(), // Usually UUID
@@ -281,48 +254,9 @@ export const changelogs = pgTable('changelogs', {
     reactionCount: integer('reaction_count').default(0).notNull(),
 });
 
-// --- NOTIFICATION SYSTEM ---
-export const adminNotifications = pgTable('admin_notifications', {
-    id: text('id').primaryKey(),
-    title: text('title').notNull(),
-    message: text('message').notNull(),
-    type: text('type').notNull(), // 'toast', 'modal', 'system'
-    priority: text('priority').default('normal'), // 'low', 'normal', 'high', 'critical'
-    displayMode: text('display_mode').default('once'), // 'once', 'always', 'until_closed'
-    targetVersion: text('target_version'), // if null, all versions
-    targetPlatform: text('target_platform'), // 'android', 'ios', 'all'
-    targetSegment: text('target_segment'), // 'all', 'premium', 'new_users', etc.
-    isActive: integer('is_active').default(1),
-    scheduledAt: timestamp('scheduled_at').defaultNow().notNull(),
-    metadata: jsonb('metadata'), // JSON: icons, action buttons, styles
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-    expiresAt: timestamp('expires_at'),
-    reactionCount: integer('reaction_count').default(0).notNull(),
-});
-
-export const notificationLogs = pgTable('notification_logs', {
-    id: text('id').primaryKey(),
-    notificationId: text('notification_id').notNull(),
-    userId: text('user_id').notNull(),
-    action: text('action').notNull(), // 'seen', 'closed', 'clicked'
-    metadata: jsonb('metadata'), // e.g. platform, app version when action was taken
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
 export const changelogReactions = pgTable('changelog_reactions', {
     id: text('id').primaryKey(),
     changelogId: text('changelog_id').notNull(),
-    userId: text('user_id').notNull(),
-    type: text('type').notNull().default('kudos'),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-    deletedAt: timestamp('deleted_at'),
-});
-
-export const notificationReactions = pgTable('notification_reactions', {
-    id: text('id').primaryKey(),
-    notificationId: text('notification_id').notNull(),
     userId: text('user_id').notNull(),
     type: text('type').notNull().default('kudos'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -388,15 +322,6 @@ export const scoreEvents = pgTable('score_events', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
-});
-
-export const systemStatus = pgTable('system_status', {
-    id: text('id').primaryKey(), // singleton: 'global'
-    maintenanceMode: integer('maintenance_mode').default(0).notNull(), // 0: off, 1: on
-    offlineOnlyMode: integer('offline_only_mode').default(0).notNull(), // 0: off, 1: on
-    message: text('message'), // Optional custom message for maintenance
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-    updatedBy: text('updated_by'),
 });
 
 // --- RELATIONS FOR DRIZZLE QUERY API ---

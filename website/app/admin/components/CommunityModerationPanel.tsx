@@ -2,7 +2,6 @@
 
 import {
     Activity,
-    Check,
     CheckCircle,
     Clock,
     EyeOff,
@@ -12,14 +11,13 @@ import {
     User,
     Zap
 } from 'lucide-react';
-import { handleRoutineAction, markFeedbackStatus } from '../actions';
+import { handleRoutineAction } from '../actions';
 
 interface CommunityModerationPanelProps {
     routines: any[];
-    feedback: any[];
 }
 
-export default function CommunityModerationPanel({ routines, feedback }: CommunityModerationPanelProps) {
+export default function CommunityModerationPanel({ routines }: CommunityModerationPanelProps) {
     return (
         <div className="space-y-12">
             {/* PUBLIC_ROUTINES_MODERATION */}
@@ -124,52 +122,29 @@ export default function CommunityModerationPanel({ routines, feedback }: Communi
                     <h2 className="text-lg font-black uppercase tracking-tight">COMMUNITY_FEEDBACK_&_REPORTS</h2>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {feedback.map(f => (
-                        <div key={f.id} className={`border-2 border-[#1a1a2e] bg-white p-4 relative hover:shadow-[4px_4px_0px_0px_rgba(26,26,46,0.1)] transition-all ${f.status === 'resolved' ? 'opacity-50' : ''}`}>
-                            <div className="flex items-center justify-between mb-3 border-b border-[#1a1a2e]/5 pb-2">
-                                <div className="text-[10px] font-black opacity-40 uppercase tracking-widest">{f.type || 'FEEDBACK'}</div>
-                                <div className="text-[9px] font-mono opacity-40">{new Date(f.createdAt).toLocaleDateString()}</div>
-                            </div>
-
-                            {f.metadata?.subject && (
-                                <div className="mb-2 text-[10px] font-black uppercase flex items-center gap-1.5 text-[#1a1a2e]">
-                                    <Hash className="w-3 h-3 opacity-40" /> {f.metadata.subject}
-                                </div>
-                            )}
-
-                            {f.metadata?.contactEmail && (
-                                <div className="mb-3 text-[9px] font-mono bg-[#1a1a2e]/5 px-2 py-1 inline-block opacity-60">
-                                    {f.metadata.contactEmail}
-                                </div>
-                            )}
-
-                            <p className="text-xs font-bold leading-tight mb-4 min-h-[40px]">"{f.message}"</p>
-
-                            <div className="flex items-center justify-between mt-auto">
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-5 h-5 rounded-full bg-[#1a1a2e]/10 flex items-center justify-center">
-                                        <User className="w-3 h-3 opacity-40" />
-                                    </div>
-                                    <div className="text-[9px] font-black uppercase truncate max-w-[80px]">{f.userId ? f.userId.slice(0, 8) : 'anon_node'}</div>
-                                </div>
-
-                                {f.status !== 'resolved' ? (
-                                    <form action={markFeedbackStatus}>
-                                        <input type="hidden" name="id" value={f.id} />
-                                        <input type="hidden" name="status" value="resolved" />
-                                        <button type="submit" className="flex items-center gap-1 bg-green-400 px-2 py-1 text-[8px] font-black uppercase hover:bg-[#1a1a2e] hover:text-white transition-colors">
-                                            <Check className="w-3 h-3" /> MARK_SOLVED
-                                        </button>
-                                    </form>
-                                ) : (
-                                    <div className="flex items-center gap-1 text-green-600 px-2 py-1 text-[8px] font-black uppercase">
-                                        <CheckCircle className="w-3 h-3" /> SOLVED
-                                    </div>
-                                )}
-                            </div>
+                <div className="border-2 border-[#1a1a2e] bg-[#1a1a2e] text-[#f5f1e8] p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.1)]">
+                    <div className="flex items-center gap-4 mb-4">
+                        <Zap className="w-8 h-8 text-yellow-400" />
+                        <div>
+                            <h3 className="text-xl font-black uppercase tracking-tight">PostHog_Surveys_Engine</h3>
+                            <p className="text-[10px] font-bold opacity-60 uppercase">Feedback Reubicado</p>
                         </div>
-                    ))}
+                    </div>
+                    <p className="text-sm opacity-80 mb-6 leading-relaxed max-w-2xl">
+                        El sistema de feedback ha sido migrado a <strong>PostHog Surveys</strong>. 
+                        Ahora todos los reportes de bugs y sugerencias se vinculan automáticamente con 
+                        las grabaciones de sesión (Session Replay) para entender exactamente qué hizo 
+                        el usuario antes del error.
+                    </p>
+                    <a
+                        href="https://us.posthog.com/project/347728/surveys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 bg-yellow-400 text-[#1a1a2e] px-6 py-3 text-xs font-black uppercase hover:bg-yellow-300 transition-colors"
+                    >
+                        Ver Feedback en PostHog
+                        <Zap className="w-4 h-4" />
+                    </a>
                 </div>
             </div>
         </div>

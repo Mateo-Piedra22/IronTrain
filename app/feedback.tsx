@@ -505,4 +505,3 @@ export default function FeedbackScreen() {
         </SafeAreaWrapper>
     );
 }
-

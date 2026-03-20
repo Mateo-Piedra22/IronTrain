@@ -1,4 +1,4 @@
-﻿import { and, desc, eq, gte, lte, ne } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, ne } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
@@ -13,6 +13,9 @@ function toIsoSafe(value: unknown): string | null {
     }
     return null;
 }
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
     try {

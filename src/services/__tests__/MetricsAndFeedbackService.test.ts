@@ -1,60 +1,35 @@
-import { logger } from '../../utils/logger';
 import { MetricsAndFeedbackService } from '../MetricsAndFeedbackService';
 
+jest.mock('expo-secure-store');
 jest.mock('expo-application', () => ({
-  nativeApplicationVersion: '2.1.0',
-  nativeBuildVersion: '210',
+    nativeApplicationVersion: '1.0.0',
+    nativeBuildVersion: '1'
 }));
-
 jest.mock('expo-device', () => ({
-  osVersion: '16',
-  modelName: 'TestDevice',
+    osVersion: '15.0',
+    modelName: 'iPhone 13'
+}));
+jest.mock('../../utils/analytics', () => ({
+    posthog: {
+        capture: jest.fn()
+    }
 }));
 
-jest.mock('expo-secure-store', () => ({
-  __esModule: true,
-  getItemAsync: jest.fn(async () => null),
-  setItemAsync: jest.fn(async () => undefined),
-}));
+describe('MetricsAndFeedbackService', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
 
-jest.mock('react-native', () => ({
-  Platform: { OS: 'android' },
-}));
+    it('should capture feedback in posthog', async () => {
+        const { posthog } = require('../../utils/analytics');
 
-jest.mock('../../constants/Config', () => ({
-  Config: {
-    API_URL: 'https://example.test',
-  },
-}));
+        const result = await MetricsAndFeedbackService.submitFeedback('bug', 'Test message');
 
-describe('MetricsAndFeedbackService.submitFeedback', () => {
-  beforeEach(() => {
-    logger.clear();
-    jest.clearAllMocks();
-  });
-
-  it('submits feedback successfully without attaching logs', async () => {
-    const fetchMock = jest.fn(async () => ({
-      ok: true,
-      json: async () => ({ success: true }),
-    }));
-    // @ts-expect-error override global
-    global.fetch = fetchMock;
-
-    const res = await MetricsAndFeedbackService.submitFeedback('bug', 'test', { context: 'unit_test' });
-
-    expect(res).toBe(true);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
-    const call = (fetchMock.mock.calls as unknown[][])[0];
-    expect(call).toBeDefined();
-
-    const init = call?.[1] as { body?: unknown } | undefined;
-    expect(init?.body).toBeDefined();
-
-    const body = JSON.parse(String(init?.body));
-
-    expect(body.metadata.context).toBe('unit_test');
-    expect(body.metadata.logs).toBeUndefined();
-  });
+        expect(result).toBe(true);
+        expect(posthog.capture).toHaveBeenCalledWith('user_feedback', expect.objectContaining({
+            message: 'Test message',
+            feedbackType: 'bug',
+            platform: 'ios' // default in jest-expo
+        }));
+    });
 });

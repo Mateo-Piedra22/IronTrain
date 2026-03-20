@@ -30,7 +30,6 @@ export async function GET(req: NextRequest) {
             { key: 'exercise_badges', table: schema.exerciseBadges, supportsDelete: true, ownerField: 'userId' },
             { key: 'user_profiles', table: schema.userProfiles, supportsDelete: false, ownerField: 'id' },
             { key: 'changelog_reactions', table: schema.changelogReactions, supportsDelete: true, ownerField: 'userId' },
-            { key: 'notification_reactions', table: schema.notificationReactions, supportsDelete: true, ownerField: 'userId' },
             { key: 'kudos', table: schema.kudos, supportsDelete: true, ownerField: 'giverId' },
             { key: 'activity_feed', table: schema.activityFeed, supportsDelete: true, ownerField: 'userId' },
         ] as const;

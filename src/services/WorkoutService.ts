@@ -687,7 +687,7 @@ class WorkoutService {
         this.invalidateCaches();
     }
 
-    public async finishWorkout(id: string) {
+    public async finishWorkout(id: string, finalDurationSeconds?: number) {
         const workout = await dbService.getWorkoutById(id);
         if (workout?.status === 'completed') return; // Idempotent
 
@@ -704,29 +704,23 @@ class WorkoutService {
 
         const location = await this.captureFinishLocation();
 
+        const updateData: any = { status: 'completed', end_time: now, updated_at: now };
         if (location) {
-            await dbService.run(
-                'UPDATE workouts SET status = ?, end_time = ?, finish_lat = ?, finish_lon = ?, updated_at = ? WHERE id = ?',
-                ['completed', now, location.lat, location.lon, now, id]
-            );
-            await dbService.queueSyncMutation('workouts', id, 'UPDATE', {
-                status: 'completed',
-                end_time: now,
-                finish_lat: location.lat,
-                finish_lon: location.lon,
-                updated_at: now,
-            });
-        } else {
-            await dbService.run(
-                'UPDATE workouts SET status = ?, end_time = ?, updated_at = ? WHERE id = ?',
-                ['completed', now, now, id]
-            );
-            await dbService.queueSyncMutation('workouts', id, 'UPDATE', { status: 'completed', end_time: now, updated_at: now });
+            updateData.finish_lat = location.lat;
+            updateData.finish_lon = location.lon;
         }
+        if (finalDurationSeconds !== undefined) {
+            updateData.duration = finalDurationSeconds;
+        }
+
+        await dbService.updateWorkout(id, updateData);
+
+        const calculatedDuration = workout?.start_time ? Math.round((now - workout.start_time) / 1000) : 0;
+        const safeDuration = finalDurationSeconds ?? Math.min(calculatedDuration, 43200);
 
         analytics.capture('workout_completed', {
             workout_id: id,
-            duration_seconds: workout?.start_time ? Math.round((now - workout.start_time) / 1000) : 0,
+            duration_seconds: safeDuration,
             has_location: !!location,
         });
 
@@ -994,8 +988,7 @@ class WorkoutService {
                 deleted_at: null,
             });
 
-            // IMPORTANT: Clear seen records locally to ensure UI shows it as new
-            await dbService.run('DELETE FROM activity_seen WHERE activity_id = ?', [payload.id]);
+
             // (Sync concern: activity_seen deletions are usually managed by the server when the parent activity is updated)
             return;
         }
@@ -1035,8 +1028,7 @@ class WorkoutService {
             // Queue sync deletion
             await dbService.queueSyncMutation('activity_feed', act.id, 'DELETE');
 
-            // Also clear seen records locally
-            await dbService.run('DELETE FROM activity_seen WHERE activity_id = ?', [act.id]);
+
         }
     }
 

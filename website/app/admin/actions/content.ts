@@ -77,87 +77,6 @@ export async function handleChangelogAction(formData: FormData) {
     if (redirectPath) redirect(redirectPath);
 }
 
-export async function handleNotificationAction(formData: FormData) {
-    let redirectPath = '';
-    try {
-        const adminId = await getAuthenticatedAdmin();
-        if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
-
-        const intent = String(formData.get('intent') || '');
-        const id = String(formData.get('id') || '').trim() || randomUUID();
-
-        if (intent === 'delete') {
-            await db.delete(schema.notificationLogs).where(eq(schema.notificationLogs.notificationId, id));
-            await db.delete(schema.notificationReactions).where(eq(schema.notificationReactions.notificationId, id));
-            await db.delete(schema.adminNotifications).where(eq(schema.adminNotifications.id, id));
-            redirectPath = await getRedirectPath(formData, 'broadcast');
-        } else if (intent === 'save') {
-            const actionUrl = formData.get('actionUrl') as string;
-            const validated = notificationSchema.parse({
-                id,
-                title: String(formData.get('title') || '').trim(),
-                body: String(formData.get('message') || '').trim(),
-                type: (formData.get('type') as any) || 'broadcast',
-                priority: (formData.get('priority') as any) || 'medium',
-                is_active: formData.get('isActive') === 'true'
-            });
-
-            const displayMode = String(formData.get('displayMode') || 'once');
-            const targetVersion = formData.get('targetVersion') as string;
-            const targetPlatform = formData.get('targetPlatform') as string;
-            const targetSegment = String(formData.get('targetSegment') || 'all');
-            const metadata = actionUrl ? { actionUrl } : null;
-
-            await db.insert(schema.adminNotifications)
-                .values({
-                    id,
-                    title: validated.title,
-                    message: validated.body,
-                    type: validated.type,
-                    priority: validated.priority,
-                    displayMode,
-                    targetVersion: targetVersion || null,
-                    targetPlatform: targetPlatform || 'all',
-                    targetSegment,
-                    metadata,
-                    isActive: validated.is_active ? 1 : 0,
-                    updatedAt: new Date(),
-                })
-                .onConflictDoUpdate({
-                    target: schema.adminNotifications.id,
-                    set: {
-                        title: validated.title,
-                        message: validated.body,
-                        type: validated.type,
-                        priority: validated.priority,
-                        displayMode,
-                        targetVersion: targetVersion || null,
-                        targetPlatform: targetPlatform || 'all',
-                        targetSegment,
-                        metadata,
-                        isActive: validated.is_active ? 1 : 0,
-                        updatedAt: new Date(),
-                    }
-                });
-
-            if (validated.is_active) {
-                await sendSegmentedPush(targetSegment, validated.title, validated.body, {
-                    id,
-                    type: validated.type,
-                    actionUrl: actionUrl || ''
-                });
-            }
-            redirectPath = await getRedirectPath(formData, 'broadcast');
-        }
-        revalidatePath('/admin');
-    } catch (error: any) {
-        console.error('Notification Action Error:', error);
-        revalidatePath('/admin');
-        redirectPath = '/admin?tab=content&section=broadcast&error=action_failed';
-    }
-    if (redirectPath) redirect(redirectPath);
-}
-
 export async function handleGlobalEventAction(formData: FormData) {
     let redirectPath = '';
     try {
@@ -275,21 +194,6 @@ export async function handleGlobalEventDeriveAnnouncementAction(formData: FormDa
         const [event] = await db.select().from(schema.globalEvents).where(eq(schema.globalEvents.id, id)).limit(1);
         if (!event) throw new Error('EVENT_NOT_FOUND');
 
-        const notifId = `broadcast_${randomUUID()}`;
-        await db.insert(schema.adminNotifications).values({
-            id: notifId,
-            title: '¡Evento Global Activo!',
-            message: `${event.name} · multiplicador x${Number(event.multiplier).toFixed(2)} en todo tu puntaje.`,
-            type: 'toast',
-            priority: 'high',
-            displayMode: 'once',
-            targetPlatform: 'all',
-            targetSegment: 'all',
-            metadata: { actionUrl: 'irontrain://social' },
-            isActive: 1,
-            updatedAt: new Date(),
-        });
-
         await sendSegmentedPush(
             'all',
             '¡Evento Global Activo!',
@@ -298,7 +202,7 @@ export async function handleGlobalEventDeriveAnnouncementAction(formData: FormDa
         );
 
         revalidatePath('/admin');
-        redirectPath = `/admin?tab=content&section=broadcast&editNotifId=${notifId}&success=derived`;
+        redirectPath = `/admin?tab=content&section=broadcast&success=derived`;
     } catch (error: any) {
         console.error('Global Event Derive Action Error:', error);
         revalidatePath('/admin');

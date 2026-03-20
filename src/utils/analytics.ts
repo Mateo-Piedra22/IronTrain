@@ -5,6 +5,7 @@ const PH_HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.co
 
 export const posthog = new PostHog(PH_KEY || 'nop', {
     host: PH_HOST,
+    captureAppLifecycleEvents: true,
     errorTracking: {
         autocapture: {
             uncaughtExceptions: true,

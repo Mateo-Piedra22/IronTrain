@@ -407,73 +407,73 @@ export default function SettingsScreen() {
                 };
 
                 confirm.custom({
-                title: 'Resolución de Conflictos',
-                message: `${contextLine}\n\n**Resumen Global:**\n**Celular**: ${Number(local.recordCount)} registros\n**Nube Neon**: ${Number(remote.recordCount)} registros${formatMergedDetail()}\n\n**Estado de la Cola de Sync:**\n**Pendientes**: ${queue.pending}\n**Fallidos**: ${queue.failed}\n**Procesando**: ${queue.processing}\n**Total**: ${queue.totalOutstanding}\n\n¿Qué querés hacer?`,
-                variant: 'warning',
-                buttons: [
-                    {
-                        label: 'Cancelar',
-                        variant: 'ghost',
-                        onPress: confirm.hide
-                    },
-                    {
-                        label: 'Sincronizar (Mezclar)',
-                        variant: 'outline',
-                        onPress: async () => {
-                            confirm.hide();
-                            try {
-                                notify.info('Sincronizando...', 'Fusionando datos local-nube sin perder métricas.');
-                                syncScheduler.init();
-                                await syncService.syncBidirectional({ forcePull: true });
-                                await configService.reload();
-                                await loadSettings();
-                                const { useSettingsStore } = await import('../src/store/useSettingsStore');
-                                await useSettingsStore.getState().loadSettings();
-                                notify.success('Éxito', 'Sincronización híbrida completa.');
-                                const next = await getDiag();
-                                openConflictModal(next);
-                            } catch (e: any) {
-                                notify.error('Error', e?.message || 'No se pudo sincronizar.');
+                    title: 'Resolución de Conflictos',
+                    message: `${contextLine}\n\n**Resumen Global:**\n**Celular**: ${Number(local.recordCount)} registros\n**Nube Neon**: ${Number(remote.recordCount)} registros${formatMergedDetail()}\n\n**Estado de la Cola de Sync:**\n**Pendientes**: ${queue.pending}\n**Fallidos**: ${queue.failed}\n**Procesando**: ${queue.processing}\n**Total**: ${queue.totalOutstanding}\n\n¿Qué querés hacer?`,
+                    variant: 'warning',
+                    buttons: [
+                        {
+                            label: 'Cancelar',
+                            variant: 'ghost',
+                            onPress: confirm.hide
+                        },
+                        {
+                            label: 'Sincronizar (Mezclar)',
+                            variant: 'outline',
+                            onPress: async () => {
+                                confirm.hide();
+                                try {
+                                    notify.info('Sincronizando...', 'Fusionando datos local-nube sin perder métricas.');
+                                    syncScheduler.init();
+                                    await syncService.syncBidirectional({ forcePull: true });
+                                    await configService.reload();
+                                    await loadSettings();
+                                    const { useSettingsStore } = await import('../src/store/useSettingsStore');
+                                    await useSettingsStore.getState().loadSettings();
+                                    notify.success('Éxito', 'Sincronización híbrida completa.');
+                                    const next = await getDiag();
+                                    openConflictModal(next);
+                                } catch (e: any) {
+                                    notify.error('Error', e?.message || 'No se pudo sincronizar.');
+                                }
+                            }
+                        },
+                        {
+                            label: 'Nube -> Celular',
+                            variant: 'outline',
+                            onPress: async () => {
+                                confirm.hide();
+                                try {
+                                    notify.info('Cargando...', 'Descargando Snapshot de la Nube...');
+                                    await syncService.pullCloudSnapshot();
+                                    await configService.reload();
+                                    await loadSettings();
+                                    const { useSettingsStore } = await import('../src/store/useSettingsStore');
+                                    await useSettingsStore.getState().loadSettings();
+                                    notify.success('Éxito', 'Celular actualizado con los datos de la nube.');
+                                    const next = await getDiag();
+                                    openConflictModal(next);
+                                } catch (e: any) {
+                                    notify.error('Error', e?.message || 'No se pudo descargar el snapshot.');
+                                }
+                            }
+                        },
+                        {
+                            label: 'Celular -> Nube',
+                            variant: 'solid',
+                            onPress: async () => {
+                                confirm.hide();
+                                try {
+                                    notify.info('Cargando...', 'Subiendo Snapshot a la Nube...');
+                                    await syncService.pushLocalSnapshot();
+                                    notify.success('Éxito', 'Nube actualizada con los datos de tu celular.');
+                                    const next = await getDiag();
+                                    openConflictModal(next);
+                                } catch (e: any) {
+                                    notify.error('Error', e?.message || 'No se pudo subir el snapshot.');
+                                }
                             }
                         }
-                    },
-                    {
-                        label: 'Nube -> Celular',
-                        variant: 'outline',
-                        onPress: async () => {
-                            confirm.hide();
-                            try {
-                                notify.info('Cargando...', 'Descargando Snapshot de la Nube...');
-                                await syncService.pullCloudSnapshot();
-                                await configService.reload();
-                                await loadSettings();
-                                const { useSettingsStore } = await import('../src/store/useSettingsStore');
-                                await useSettingsStore.getState().loadSettings();
-                                notify.success('Éxito', 'Celular actualizado con los datos de la nube.');
-                                const next = await getDiag();
-                                openConflictModal(next);
-                            } catch (e: any) {
-                                notify.error('Error', e?.message || 'No se pudo descargar el snapshot.');
-                            }
-                        }
-                    },
-                    {
-                        label: 'Celular -> Nube',
-                        variant: 'solid',
-                        onPress: async () => {
-                            confirm.hide();
-                            try {
-                                notify.info('Cargando...', 'Subiendo Snapshot a la Nube...');
-                                await syncService.pushLocalSnapshot();
-                                notify.success('Éxito', 'Nube actualizada con los datos de tu celular.');
-                                const next = await getDiag();
-                                openConflictModal(next);
-                            } catch (e: any) {
-                                notify.error('Error', e?.message || 'No se pudo subir el snapshot.');
-                            }
-                        }
-                    }
-                ]
+                    ]
                 });
             };
 

@@ -334,20 +334,7 @@ export class SocialService {
                 await dbService.run('UPDATE activity_feed SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
                 await dbService.queueSyncMutation('activity_feed', id, 'UPDATE', { seen_at: now, updated_at: now });
 
-                // Per-user global tracking record (If viewing a friend's activity)
-                if (userId) {
-                    const seenId = `${userId}_${id}`;
-                    await dbService.run(
-                        'INSERT OR REPLACE INTO activity_seen (id, user_id, activity_id, seen_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-                        [seenId, userId, id, now, now]
-                    );
-                    await dbService.queueSyncMutation('activity_seen', seenId, 'INSERT', {
-                        user_id: userId,
-                        activity_id: id,
-                        seen_at: now,
-                        updated_at: now
-                    });
-                }
+
             } else {
                 await dbService.run('UPDATE shares_inbox SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
                 await dbService.queueSyncMutation('shares_inbox', id, 'UPDATE', {
@@ -402,19 +389,7 @@ export class SocialService {
                         await dbService.run('UPDATE activity_feed SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
                         await dbService.queueSyncMutation('activity_feed', id, 'UPDATE', { seen_at: now, updated_at: now });
 
-                        if (userId) {
-                            const seenId = `${userId}_${id}`;
-                            await dbService.run(
-                                'INSERT OR REPLACE INTO activity_seen (id, user_id, activity_id, seen_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-                                [seenId, userId, id, now, now]
-                            );
-                            await dbService.queueSyncMutation('activity_seen', seenId, 'INSERT', {
-                                user_id: userId,
-                                activity_id: id,
-                                seen_at: now,
-                                updated_at: now
-                            });
-                        }
+
                     } else {
                         await dbService.run('UPDATE shares_inbox SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
                         await dbService.queueSyncMutation('shares_inbox', id, 'UPDATE', { seen_at: now, updated_at: now });

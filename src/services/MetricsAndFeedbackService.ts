@@ -1,67 +1,23 @@
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
-import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import { Config } from '../constants/Config';
 import { logger } from '../utils/logger';
 
-const API_URL = Config.API_URL;
-const INSTALL_TRACKED_KEY = 'irontrain_install_tracked';
-
+/**
+ * Modernized Service for User Feedback.
+ * Integrated with PostHog for centralized tracking.
+ */
 export class MetricsAndFeedbackService {
-    static async getToken(): Promise<string | null> {
-        return await SecureStore.getItemAsync('irontrain_auth_token');
-    }
-
-    static async trackInstallIfNeeded(): Promise<void> {
-        try {
-            const hasTracked = await SecureStore.getItemAsync(INSTALL_TRACKED_KEY);
-            if (hasTracked) return;
-
-            // Generate a stable installation ID for analytics
-            let installId = await SecureStore.getItemAsync('irontrain_install_id');
-            if (!installId) {
-                installId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-                await SecureStore.setItemAsync('irontrain_install_id', installId);
-            }
-
-            const metadata = {
-                modelName: Device.modelName,
-                osName: Device.osName,
-                osVersion: Device.osVersion,
-            };
-
-            const body = {
-                id: installId,
-                platform: Platform.OS,
-                version: Application.nativeApplicationVersion || '1.0.0',
-                metadata,
-            };
-
-            const res = await fetch(`${API_URL}/api/metrics/install`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-
-            if (res.ok) {
-                await SecureStore.setItemAsync(INSTALL_TRACKED_KEY, 'true');
-            }
-        } catch (e) {
-            logger.captureException(e, { scope: 'MetricsAndFeedbackService.trackInstallIfNeeded', message: 'Failed to track install (Offline or block)' });
-        }
-    }
-
+    /**
+     * Submits user feedback directly to PostHog.
+     * This avoids maintaining a custom feedback table in the database.
+     */
     static async submitFeedback(
         type: 'bug' | 'feature_request' | 'review' | 'other',
         message: string,
         extras?: { subject?: string; contactEmail?: string; context?: string }
     ): Promise<boolean> {
         try {
-            const token = await this.getToken();
-            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
             const metadata = {
                 appVersion: Application.nativeApplicationVersion || '1.0.0',
                 appBuild: Application.nativeBuildVersion || '0',
@@ -71,18 +27,17 @@ export class MetricsAndFeedbackService {
                 context: extras?.context || 'feedback_screen',
                 subject: extras?.subject || null,
                 contactEmail: extras?.contactEmail || null,
+                feedbackType: type,
             };
 
-            const res = await fetch(`${API_URL}/api/feedback`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ type, message, metadata }),
+            // Capture event in PostHog
+            const { posthog } = require('../utils/analytics');
+            posthog.capture('user_feedback', {
+                message,
+                ...metadata
             });
 
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Server Error');
-
-            return data.success;
+            return true;
         } catch (e) {
             logger.captureException(e, { scope: 'MetricsAndFeedbackService.submitFeedback' });
             throw e;

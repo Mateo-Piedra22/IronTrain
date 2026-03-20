@@ -36,6 +36,20 @@
       "when": 1773806824335,
       "tag": "0004_jsonb_migration_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774017818477,
+      "tag": "0005_past_plazm",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774022346570,
+      "tag": "0006_wide_nemesis",
+      "breakpoints": true
     }
   ]
 }

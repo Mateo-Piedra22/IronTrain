@@ -111,27 +111,18 @@ export default async function AdminPage({
     const [
         totalWorkoutsResult,
         totalProfilesResult,
-        systemStatusData,
-        installsCount,
-        feedbackCountResult
     ] = await Promise.all([
         db.select({ count: sql<number>`count(*)` }).from(schema.workouts),
         db.select({ count: sql<number>`count(*)` }).from(schema.userProfiles),
-        db.select().from(schema.systemStatus).where(eq(schema.systemStatus.id, 'global')).limit(1),
-        db.select({ count: sql<number>`count(*)` }).from(schema.appInstalls),
-        db.select({ count: sql<number>`count(*)` }).from(schema.feedback).where(eq(schema.feedback.status, 'open')),
     ]);
 
     const totalWorkouts = Number(totalWorkoutsResult[0]?.count || 0);
     const totalProfiles = Number(totalProfilesResult[0]?.count || 0);
-    const pendingFeedbackCount = Number(feedbackCountResult[0]?.count || 0);
+    const pendingFeedbackCount = 0; // Removed custom feedback table
 
     // 2. Conditional Panel Data
     let routinesData: any[] = [];
-    let feedbackData: any[] = [];
     let changelogsRaw: any[] = [];
-    let adminNotificationsData: any[] = [];
-    let notificationLogsResult: any[] = [];
     let changelogReactionsResult: any[] = [];
     let scoringConfigData: any[] = [];
     let globalEventsData: any[] = [];
@@ -187,14 +178,8 @@ export default async function AdminPage({
         globalEventsData = events;
         leaderboardData = leaderboard;
     } else if (activeTab === 'content') {
-        const [logs, notifs, nLogs, cReactions, events] = await Promise.all([
+        const [logs, cReactions, events] = await Promise.all([
             db.select().from(schema.changelogs).orderBy(desc(schema.changelogs.version)),
-            db.select().from(schema.adminNotifications).orderBy(desc(schema.adminNotifications.createdAt)),
-            db.select({
-                notificationId: schema.notificationLogs.notificationId,
-                action: schema.notificationLogs.action,
-                count: sql<number>`count(*)`
-            }).from(schema.notificationLogs).groupBy(schema.notificationLogs.notificationId, schema.notificationLogs.action),
             db.select({
                 changelogId: schema.changelogReactions.changelogId,
                 count: sql<number>`count(*)`
@@ -204,12 +189,10 @@ export default async function AdminPage({
             db.select().from(schema.globalEvents).orderBy(desc(schema.globalEvents.startDate)),
         ]);
         changelogsRaw = logs;
-        adminNotificationsData = notifs;
-        notificationLogsResult = nLogs;
         changelogReactionsResult = cReactions;
         globalEventsData = events;
     } else if (activeTab === 'moderation') {
-        const [routines, feedback] = await Promise.all([
+        const [routines] = await Promise.all([
             db.select({
                 id: schema.routines.id,
                 name: schema.routines.name,
@@ -225,25 +208,8 @@ export default async function AdminPage({
                 .where(isNull(schema.routines.deletedAt))
                 .orderBy(desc(schema.routines.updatedAt))
                 .limit(100),
-            db.select({
-                id: schema.feedback.id,
-                userId: schema.feedback.userId,
-                type: schema.feedback.type,
-                message: schema.feedback.message,
-                status: schema.feedback.status,
-                metadata: schema.feedback.metadata,
-                createdAt: schema.feedback.createdAt,
-                updatedAt: schema.feedback.updatedAt,
-                senderDisplayName: schema.userProfiles.displayName,
-                senderUsername: schema.userProfiles.username,
-            })
-                .from(schema.feedback)
-                .leftJoin(schema.userProfiles, eq(schema.feedback.userId, schema.userProfiles.id))
-                .orderBy(desc(schema.feedback.createdAt))
-                .limit(100),
         ]);
         routinesData = routines;
-        feedbackData = feedback;
     } else if (activeTab === 'marketplace') {
         const [exercises, categories, badges] = await Promise.all([
             db.query.exercises.findMany({
@@ -290,12 +256,6 @@ export default async function AdminPage({
         kudos: (changelogReactionsResult as any[] || []).find((r: any) => r.changelogId === c.id)?.count || 0
     }));
 
-    const feedbackRows = feedbackData.map((f) => {
-        const metadata = f.metadata as any;
-        const senderName = f.senderDisplayName || (f.senderUsername ? `@${f.senderUsername}` : (f.userId || 'Anónimo'));
-        return { ...f, metadata, senderName };
-    });
-
     const breakdownByUser = scoreBreakdownRows.reduce<Record<string, any[]>>((acc, row) => {
         if (!acc[row.userId]) acc[row.userId] = [];
         acc[row.userId].push({ eventType: row.eventType, count: Number(row.count), points: Number(row.points) });
@@ -308,14 +268,6 @@ export default async function AdminPage({
         return acc;
     }, {});
 
-    const getNotifStats = (id: string) => {
-        const stats = notificationLogsResult.filter(l => l.notificationId === id);
-        return {
-            seen: stats.find(s => s.action === 'seen')?.count || 0,
-            clicked: stats.find(s => s.action === 'clicked')?.count || 0
-        };
-    };
-
     const scoreConfig = (scoringConfigData as any)?.[0] ?? {
         workoutCompletePoints: 20,
         extraDayPoints: 10,
@@ -323,16 +275,9 @@ export default async function AdminPage({
         coldThresholdC: 3,
     };
 
-    const systemStatus = systemStatusData?.[0] ?? {
-        id: 'global',
-        maintenanceMode: 0,
-        offlineOnlyMode: 0,
-        message: '',
-    };
-
     const now = new Date();
     const metrics = {
-        installs: Number(installsCount[0]?.count || 0),
+        installs: 0, // Migrado a PostHog
         users: totalProfiles,
         activeEvents: globalEventsData.length > 0 ? globalEventsData.filter((e) => {
             if (e.isActive !== 1) return false;
@@ -364,15 +309,6 @@ export default async function AdminPage({
         updatedAt: toIsoSafe((c as any)?.updatedAt),
     }));
 
-    const sanitizedNotifications = adminNotificationsData.map(n => ({
-        ...n,
-        scheduledAt: toIsoSafe((n as any)?.scheduledAt),
-        createdAt: toIsoSafe((n as any)?.createdAt),
-        updatedAt: toIsoSafe((n as any)?.updatedAt),
-        expiresAt: toIsoSafe((n as any)?.expiresAt),
-        stats: getNotifStats(n.id)
-    }));
-
     const sanitizedGlobalEvents = globalEventsData.map(e => ({
         ...e,
         startDate: toIsoSafe((e as any)?.startDate) ?? ISO_EPOCH_FALLBACK,
@@ -384,12 +320,6 @@ export default async function AdminPage({
     const sanitizedRoutines = routinesData.map(r => ({
         ...r,
         updatedAt: toIsoSafe((r as any)?.updatedAt),
-    }));
-
-    const sanitizedFeedback = feedbackRows.map(f => ({
-        ...f,
-        createdAt: toIsoSafe((f as any)?.createdAt),
-        updatedAt: toIsoSafe((f as any)?.updatedAt),
     }));
 
     const sanitizedLeaderboard = leaderboardData.map(p => ({
@@ -476,7 +406,6 @@ export default async function AdminPage({
                         <SystemStatusPanel
                             metrics={metrics}
                             syncHealth={syncHealth}
-                            systemStatus={systemStatus}
                         />
                     }
                     syncPanel={
@@ -506,10 +435,10 @@ export default async function AdminPage({
                     contentPanel={
                         <ContentManagementPanel
                             changelogs={sanitizedChangelogs}
-                            notifications={sanitizedNotifications}
+                            notifications={[]}
                             globalEvents={sanitizedGlobalEvents}
                             editingChangelog={editChangelogId ? (sanitizedChangelogs.find(c => c.id === editChangelogId) ?? null) : null}
-                            editingNotification={editNotifId ? (sanitizedNotifications.find(n => n.id === editNotifId) ?? null) : null}
+                            editingNotification={null}
                             editingGlobalEvent={editEventId ? (sanitizedGlobalEvents.find(e => e.id === editEventId) ?? null) : null}
                             syncStatus={{
                                 lastSyncAt: toIsoSafe(lastChangelogSync),
@@ -524,7 +453,6 @@ export default async function AdminPage({
                     moderationPanel={
                         <CommunityModerationPanel
                             routines={sanitizedRoutines}
-                            feedback={sanitizedFeedback}
                         />
                     }
                     marketplacePanel={

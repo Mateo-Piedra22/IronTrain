@@ -322,7 +322,10 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
         const startTs = config.getGeneric(`runningWorkoutTimerStartTimestamp_${workout.id}`) as number | null;
         const baseSec = config.getGeneric(`runningWorkoutTimerBaseSeconds_${workout.id}`) as number | null;
         if (startTs) {
-            const liveSeconds = (baseSec ?? 0) + Math.floor((Date.now() - startTs) / 1000);
+            const deltaSec = Math.floor((Date.now() - startTs) / 1000);
+            // Cap delta at 12 hours (43200 seconds) to prevent ridiculous durations if app left running
+            const safeDeltaSec = Math.min(deltaSec, 43200);
+            const liveSeconds = (baseSec ?? 0) + safeDeltaSec;
             seconds = Math.max(seconds, liveSeconds);
         } else if (baseSec !== null && baseSec !== undefined) {
             seconds = Math.max(seconds, baseSec);
@@ -389,8 +392,11 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
             lastTickRef.current = Date.now();
             intervalRef.current = setInterval(() => {
                 const now = Date.now();
-                const delta = Math.floor((now - lastTickRef.current) / 1000);
+                let delta = Math.floor((now - lastTickRef.current) / 1000);
                 if (delta <= 0) return;
+                
+                if (delta > 43200) delta = 43200; // Cap at 12 hours
+                
                 lastTickRef.current = now;
 
                 setTimerSeconds(prev => {

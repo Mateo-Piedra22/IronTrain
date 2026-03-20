@@ -4,20 +4,17 @@ export {
     handleChangelogPublishAction,
     handleChangelogSyncAction,
     handleGlobalEventAction,
-    handleGlobalEventDeriveAnnouncementAction,
-    handleNotificationAction
+    handleGlobalEventDeriveAnnouncementAction
 } from './actions/content';
 
 export { handleMarketplaceEntityAction } from './actions/marketplace';
 
 export {
-    handleRoutineAction,
-    markFeedbackStatus
+    handleRoutineAction
 } from './actions/moderation';
 
 export {
-    handleScoringConfigAction,
-    handleUpdateSystemStatus
+    handleScoringConfigAction
 } from './actions/system';
 
 export { getAuthenticatedAdmin } from './actions/shared';

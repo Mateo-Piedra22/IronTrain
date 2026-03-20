@@ -239,6 +239,7 @@ class RoutineService {
         const normalizedName = capitalizeWords(name);
         await dbService.run('INSERT INTO routine_days (id, routine_id, name, order_index) VALUES (?, ?, ?, ?)', [id, routineId, normalizedName, orderIndex]);
         await dbService.queueSyncMutation('routine_days', id, 'INSERT', { id, routine_id: routineId, name: normalizedName, order_index: orderIndex });
+        this.clearCache();
         return id;
     }
 
@@ -246,11 +247,13 @@ class RoutineService {
         const normalizedName = capitalizeWords(name);
         await dbService.run('UPDATE routine_days SET name = ?, order_index = ? WHERE id = ?', [normalizedName, orderIndex, id]);
         await dbService.queueSyncMutation('routine_days', id, 'UPDATE', { name: normalizedName, order_index: orderIndex });
+        this.clearCache();
     }
 
     public async deleteRoutineDay(id: string): Promise<void> {
         await dbService.run('DELETE FROM routine_days WHERE id = ?', [id]);
         await dbService.queueSyncMutation('routine_days', id, 'DELETE');
+        this.clearCache();
     }
 
     public async reorderRoutineDays(updates: { id: string; order_index: number }[]): Promise<void> {
@@ -260,6 +263,7 @@ class RoutineService {
                 await dbService.queueSyncMutation('routine_days', update.id, 'UPDATE', { order_index: update.order_index });
             }
         });
+        this.clearCache();
     }
 
     // --- ROUTINE EXERCISES ---
@@ -270,17 +274,20 @@ class RoutineService {
             [id, routineDayId, exerciseId, orderIndex, notes || null]
         );
         await dbService.queueSyncMutation('routine_exercises', id, 'INSERT', { id, routine_day_id: routineDayId, exercise_id: exerciseId, order_index: orderIndex, notes: notes || null });
+        this.clearCache();
         return id;
     }
 
     public async updateRoutineExercise(id: string, orderIndex: number, notes?: string): Promise<void> {
         await dbService.run('UPDATE routine_exercises SET order_index = ?, notes = ? WHERE id = ?', [orderIndex, notes || null, id]);
         await dbService.queueSyncMutation('routine_exercises', id, 'UPDATE', { order_index: orderIndex, notes: notes || null });
+        this.clearCache();
     }
 
     public async deleteRoutineExercise(id: string): Promise<void> {
         await dbService.run('DELETE FROM routine_exercises WHERE id = ?', [id]);
         await dbService.queueSyncMutation('routine_exercises', id, 'DELETE');
+        this.clearCache();
     }
 
     public async reorderRoutineExercises(updates: { id: string; order_index: number }[]): Promise<void> {
@@ -290,6 +297,7 @@ class RoutineService {
                 await dbService.queueSyncMutation('routine_exercises', update.id, 'UPDATE', { order_index: update.order_index });
             }
         });
+        this.clearCache();
     }
 
     // --- P2P IMPORTATION ---
