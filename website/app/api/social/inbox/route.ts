@@ -36,20 +36,15 @@ export async function GET(req: NextRequest) {
         const feedUsers = [userId, ...friendIds];
 
         // 3. Fetch Activity Feed for these users
-        let activityRecords: { activity: typeof schema.activityFeed.$inferSelect, seenAt: Date | null }[] = [];
+        let activityRecords: { activity: typeof schema.activityFeed.$inferSelect }[] = [];
         let kudosCounts: any[] = [];
         let userKudos: any[] = [];
 
         if (feedUsers.length > 0) {
             activityRecords = await db.select({
-                activity: schema.activityFeed,
-                seenAt: schema.activitySeen.seenAt
+                activity: schema.activityFeed
             })
                 .from(schema.activityFeed)
-                .leftJoin(schema.activitySeen, and(
-                    eq(schema.activitySeen.activityId, schema.activityFeed.id),
-                    eq(schema.activitySeen.userId, userId)
-                ))
                 .where(
                     and(
                         inArray(schema.activityFeed.userId, feedUsers),
@@ -133,7 +128,7 @@ export async function GET(req: NextRequest) {
                 kudosCount: kudoCountMap.get(a.activity.id) || 0,
                 hasKudoed: userKudosSet.has(a.activity.id),
                 createdAt: a.activity.createdAt,
-                seenAt: a.seenAt || (a.activity.userId === userId ? a.activity.seenAt : null),
+                seenAt: a.activity.seenAt,
             }))
         ];
 
@@ -177,21 +172,7 @@ export async function POST(req: NextRequest) {
                 .set({ seenAt: new Date(), updatedAt: new Date() })
                 .where(and(eq(schema.sharesInbox.id, id), eq(schema.sharesInbox.receiverId, userId)));
         } else if (feedType === 'activity_log') {
-            // Per-user seen status for shared activities
-            const seenId = `${userId}_${id}`;
-            await db.insert(schema.activitySeen)
-                .values({
-                    id: seenId,
-                    userId,
-                    activityId: id,
-                    seenAt: new Date()
-                })
-                .onConflictDoUpdate({
-                    target: schema.activitySeen.id,
-                    set: { seenAt: new Date() }
-                });
-
-            // Also update the main activity_feed.seenAt if it's our own activity (legacy/simplicity)
+            // Only update status if the user is the owner of the activity
             await db.update(schema.activityFeed)
                 .set({ seenAt: new Date(), updatedAt: new Date() })
                 .where(and(eq(schema.activityFeed.id, id), eq(schema.activityFeed.userId, userId)));
