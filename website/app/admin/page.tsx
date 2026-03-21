@@ -271,7 +271,7 @@ export default async function AdminPage({
     const scoreConfig = (scoringConfigData as any)?.[0] ?? {
         workoutCompletePoints: 20,
         extraDayPoints: 10,
-        weatherBonusEnabled: 1,
+        weatherBonusEnabled: true,
         coldThresholdC: 3,
     };
 

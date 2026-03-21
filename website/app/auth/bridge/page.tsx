@@ -97,7 +97,7 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
                     id: sessionId,
                     username,
                     displayName,
-                    isPublic: 1,
+                    isPublic: true,
                     updatedAt: new Date()
                 });
             } else {

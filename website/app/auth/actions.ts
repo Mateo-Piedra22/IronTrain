@@ -28,7 +28,7 @@ export async function createProfileAfterSignUp(username: string, displayName: st
             id: data.user.id,
             username: cleanUsername,
             displayName: displayName.trim(),
-            isPublic: 1,
+            isPublic: true,
             updatedAt: new Date()
         });
 
