@@ -6,7 +6,8 @@ jest.mock('../../services/ConfigService', () => ({
       if (key === 'runningWorkoutTimerWorkoutId') return 'w1';
       return false;
     }),
-    set: jest.fn(async () => {}),
+    set: jest.fn(async () => { }),
+    setGeneric: jest.fn(async () => { }),
   },
 }));
 
@@ -54,8 +55,8 @@ describe('workoutStore', () => {
 
     await useWorkoutStore.getState().setWorkoutStatus('completed');
 
-    expect(mockFinishWorkout).toHaveBeenCalledWith('w1');
-    expect(useWorkoutStore.getState().activeWorkout?.status).toBe('completed');
+    expect(mockFinishWorkout).toHaveBeenCalledWith('w1', 0);
+    expect(useWorkoutStore.getState().activeWorkout).toBe(null);
     expect(useWorkoutStore.getState().isTimerRunning).toBe(false);
   });
 
