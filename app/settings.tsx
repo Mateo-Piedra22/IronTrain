@@ -1010,7 +1010,7 @@ export default function SettingsScreen() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        onPress={() => Linking.openURL('https://irontrain.app/delete-account')}
+                        onPress={() => Linking.openURL('https://irontrain.motiona.xyz/delete-account')}
                         style={s.settingRow}
                     >
                         <View style={s.settingLeft}>
@@ -1028,7 +1028,7 @@ export default function SettingsScreen() {
                 <SectionHeader icon={Shield} title="Soporte" />
                 <View style={[s.card, { marginBottom: 24 }]}>
                     <TouchableOpacity
-                        onPress={() => Linking.openURL('https://irontrain.app/help')}
+                        onPress={() => Linking.openURL('https://irontrain.motiona.xyz/help')}
                         style={s.settingRow}
                     >
                         <View style={s.settingLeft}>
