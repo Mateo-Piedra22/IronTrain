@@ -5,6 +5,22 @@
 - **Soporte para diferentes idiomas**: Posibilidad de elegir entre inglés y español.
 - **Conexión con múltiples dispositivos**: Posibilidad de conectar con múltiples dispositivos (relojes/bands compatibles).
 - **Vinculación con servicios de salud**: Posibilidad de vincular con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos.
+- **Configuración de la App**: Posibilidad de configurar la aplicación a través de una página web.
+
+## 2.1.4 (2026-03-21)
+
+### Novedades y Funcionalidades Principales
+- **Bandeja de Entrada Social Mejorada**: Tu experiencia en la comunidad de IronTrain ahora es más fluida:
+  - **Gestión de Actividad en Tiempo Real**: Notificaciones y actualizaciones del feed social más rápidas y fiables.
+  - **Marca de "Leído"**: Ahora podés marcar tus notificaciones y actividades como vistas, permitiéndote mantener tu bandeja de entrada organizada.
+### Nueva Pantalla de Ajustes
+- **Centralización de Preferencias**: Todo lo que necesitás configurar está ahora en una sola pantalla, más limpia y accesible.
+- **Control de Notificaciones**: Gestioná qué avisos querés recibir directamente desde los nuevos controles de configuración.
+### Mejoras en la Gestión Interna
+- **Panel de Control**: Un nuevo sistema que nos permite gestionar actualizaciones y corregir problemas de contenido al instante sin que tengás que esperar a una nueva versión de la tienda.
+- **Anuncios Fiables**: Optimizamos el sistema de "Broadcast" para asegurar que siempre estés al día con las últimas noticias y cambios importantes.
+### Conexión y Seguridad
+- **Puente de Autenticación**: Hemos pulido el "puente" de autenticación, asegurando que tu sesión sea mucho más estable y segura cuando navegás entre la aplicación y el portal web.
 
 ## 2.1.3 (2026-03-20)
 
