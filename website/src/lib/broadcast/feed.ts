@@ -19,7 +19,7 @@ function buildChangelogItem(row: typeof schema.changelogs.$inferSelect): Broadca
         body = '';
     }
 
-    const unreleased = row.isUnreleased === 1;
+    const unreleased = row.isUnreleased === true;
 
     return {
         id: row.id,
@@ -49,7 +49,7 @@ function buildChangelogItem(row: typeof schema.changelogs.$inferSelect): Broadca
 }
 
 function buildGlobalEventItem(row: typeof schema.globalEvents.$inferSelect, now: Date): BroadcastItem {
-    const active = row.isActive === 1 && row.startDate <= now && row.endDate >= now;
+    const active = row.isActive === true && row.startDate <= now && row.endDate >= now;
 
     return {
         id: row.id,
@@ -88,7 +88,7 @@ export async function buildBroadcastFeed(params: {
 
     const changelogRows = await params.db.select().from(schema.changelogs).orderBy(desc(schema.changelogs.date), desc(schema.changelogs.version));
     const changelogItems = changelogRows
-        .filter((c) => params.query.includeUnreleased || c.isUnreleased !== 1)
+        .filter((c) => params.query.includeUnreleased || c.isUnreleased !== true)
         .map((c) => buildChangelogItem(c));
 
     const globalEventRows = await params.db.select().from(schema.globalEvents).orderBy(desc(schema.globalEvents.updatedAt));

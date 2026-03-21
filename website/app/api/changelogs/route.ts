@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
             version: c.version,
             date: toIsoSafe((c as any)?.date),
             items: (c.items as string[]) || [],
-            unreleased: c.isUnreleased === 1,
+            unreleased: c.isUnreleased === true,
             metadata: (c.metadata as any) || null,
             reactionCount: c.reactionCount
         }))

@@ -280,7 +280,7 @@ export default async function AdminPage({
         installs: 0, // Migrado a PostHog
         users: totalProfiles,
         activeEvents: globalEventsData.length > 0 ? globalEventsData.filter((e) => {
-            if (e.isActive !== 1) return false;
+            if (e.isActive !== true) return false;
             const start = toDateSafe((e as any)?.startDate);
             const end = toDateSafe((e as any)?.endDate);
             if (!start || !end) return false;

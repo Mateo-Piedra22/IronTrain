@@ -190,7 +190,7 @@ export const userProfiles = pgTable('user_profiles', {
     username: text('username').unique(), // Optional searchable tag
     displayName: text('display_name'),
     isPublic: boolean('is_public').default(true),
-    shareStats: boolean('share_stats').default(false),
+    shareStats: integer('share_stats').default(0),
     currentStreak: integer('current_streak').default(0), // A.3: Streak tracking
     highestStreak: integer('highest_streak').default(0),
     scoreLifetime: integer('score_lifetime').default(0).notNull(),

@@ -13,7 +13,7 @@ type DerivedAnnouncement = {
     targetPlatform: 'android' | 'ios' | 'all' | null;
     targetSegment: string;
     metadata: Record<string, any> | null;
-    isActive: 0 | 1;
+    isActive: boolean;
 };
 
 export function buildDerivedGlobalEventAnnouncement(event: GlobalEventRow): DerivedAnnouncement {
@@ -38,6 +38,6 @@ export function buildDerivedGlobalEventAnnouncement(event: GlobalEventRow): Deri
         targetPlatform: 'all',
         targetSegment: 'all',
         metadata,
-        isActive: event.isActive === 1 ? 1 : 0,
+        isActive: event.isActive ? true : false,
     };
 }

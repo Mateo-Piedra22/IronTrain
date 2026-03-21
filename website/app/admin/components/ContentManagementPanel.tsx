@@ -24,7 +24,7 @@ type GlobalEventRow = {
     multiplier: number;
     startDate: string;
     endDate: string;
-    isActive: number;
+    isActive: boolean;
 };
 
 interface ContentManagementPanelProps {
@@ -203,7 +203,7 @@ export default function ContentManagementPanel({
                                 <textarea name="items" defaultValue={editingChangelog?.items?.join('\n') || ''} rows={10} placeholder="- Added X\n- Fixed Y" className="w-full bg-white border border-[#1a1a2e] p-2 text-xs font-bold focus:outline-none" required />
                             </div>
                             <div className="flex items-center gap-2 bg-[#1a1a2e]/5 p-2">
-                                <input type="checkbox" name="isUnreleased" value="true" id="unreleased_check" defaultChecked={editingChangelog?.isUnreleased === 1} className="w-4 h-4 accent-[#1a1a2e]" />
+                                <input type="checkbox" name="isUnreleased" value="true" id="unreleased_check" defaultChecked={editingChangelog?.isUnreleased === true} className="w-4 h-4 accent-[#1a1a2e]" />
                                 <label htmlFor="unreleased_check" className="text-[10px] font-black uppercase">UNRELEASED_DRAFT_ONLY</label>
                             </div>
                             <button type="submit" name="intent" value="save" className="w-full bg-[#1a1a2e] text-green-400 py-3 font-black uppercase text-[10px] tracking-widest hover:bg-green-600 hover:text-[#1a1a2e] transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
@@ -322,7 +322,7 @@ export default function ContentManagementPanel({
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 bg-[#1a1a2e]/5 p-2 border border-[#1a1a2e]/10">
-                                <input type="checkbox" name="isActive" value="true" id="event_active" defaultChecked={editingGlobalEvent ? editingGlobalEvent.isActive !== 0 : true} className="w-4 h-4 accent-[#1a1a2e]" />
+                                <input type="checkbox" name="isActive" value="true" id="event_active" defaultChecked={editingGlobalEvent ? editingGlobalEvent.isActive !== false : true} className="w-4 h-4 accent-[#1a1a2e]" />
                                 <label htmlFor="event_active" className="text-[10px] font-black uppercase">ACTIVE</label>
                             </div>
                             <div className="flex items-center gap-2 bg-[#1a1a2e]/5 p-2 border border-[#1a1a2e]/10">

@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
         const [activeEvent] = await db.select()
             .from(schema.globalEvents)
             .where(and(
-                eq(schema.globalEvents.isActive, 1),
+                eq(schema.globalEvents.isActive, true),
                 lte(schema.globalEvents.startDate, now),
                 gte(schema.globalEvents.endDate, now)
             ))
@@ -122,11 +122,11 @@ export async function PUT(req: NextRequest) {
             }
         }
 
-        let normalizedIsPublic: 0 | 1 | undefined;
+        let normalizedIsPublic: boolean | undefined;
         if (body.isPublic !== undefined) {
             const raw = body.isPublic;
-            if (raw === 1 || raw === true || raw === '1' || raw === 'true') normalizedIsPublic = 1;
-            else if (raw === 0 || raw === false || raw === '0' || raw === 'false') normalizedIsPublic = 0;
+            if (raw === 1 || raw === true || raw === '1' || raw === 'true') normalizedIsPublic = true;
+            else if (raw === 0 || raw === false || raw === '0' || raw === 'false') normalizedIsPublic = false;
             else return NextResponse.json({ error: 'isPublic inválido' }, { status: 400 });
         }
 
@@ -164,7 +164,7 @@ export async function PUT(req: NextRequest) {
                 id: userId,
                 displayName: sanitizedDisplayName || 'Atleta',
                 username: sanitizedUsername === undefined ? null : sanitizedUsername,
-                isPublic: normalizedIsPublic ?? 1,
+                isPublic: normalizedIsPublic ?? true,
                 lastUsernameChangeAt: sanitizedUsername !== undefined ? new Date() : null,
             });
         } else {

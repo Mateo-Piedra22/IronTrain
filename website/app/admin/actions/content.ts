@@ -7,7 +7,7 @@ import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { syncChangelogToDatabase } from '../../../src/lib/changelog-db-sync';
 import { sendSegmentedPush } from '../../../src/lib/firebase-admin';
-import { changelogSchema, globalEventSchema, notificationSchema } from './schemas';
+import { changelogSchema, globalEventSchema } from './schemas';
 import { getAuthenticatedAdmin, getRedirectPath } from './shared';
 
 export async function handleChangelogAction(formData: FormData) {
@@ -37,9 +37,9 @@ export async function handleChangelogAction(formData: FormData) {
                 items: items
             });
 
-            const isUnreleased = formData.get('isUnreleased') === 'true' ? 1 : 0;
+            const isUnreleased = formData.get('isUnreleased') === 'true';
             const [existing] = await db.select().from(schema.changelogs).where(eq(schema.changelogs.id, id)).limit(1);
-            const becomingReleased = isUnreleased === 0 && (!existing || existing.isUnreleased === 1);
+            const becomingReleased = isUnreleased === false && (!existing || existing.isUnreleased === true);
 
             await db.insert(schema.changelogs)
                 .values({
@@ -113,8 +113,8 @@ export async function handleGlobalEventAction(formData: FormData) {
                 multiplier: validated.multiplier,
                 startDate,
                 endDate,
-                isActive: validated.is_active ? 1 : 0,
-                pushSent: 0,
+                isActive: validated.is_active,
+                pushSent: false,
                 updatedAt: new Date(),
                 createdBy: adminId,
             }).onConflictDoUpdate({
@@ -124,7 +124,7 @@ export async function handleGlobalEventAction(formData: FormData) {
                     multiplier: validated.multiplier,
                     startDate,
                     endDate,
-                    isActive: validated.is_active ? 1 : 0,
+                    isActive: validated.is_active,
                     updatedAt: new Date(),
                 }
             });
@@ -136,7 +136,7 @@ export async function handleGlobalEventAction(formData: FormData) {
                     `${validated.name} · multiplicador x${validated.multiplier.toFixed(2)} en todo tu puntaje.`,
                     { type: 'system', actionUrl: 'irontrain://social' }
                 );
-                await db.update(schema.globalEvents).set({ pushSent: 1, updatedAt: new Date() }).where(eq(schema.globalEvents.id, id));
+                await db.update(schema.globalEvents).set({ pushSent: true, updatedAt: new Date() }).where(eq(schema.globalEvents.id, id));
             }
 
             revalidatePath('/admin');
@@ -164,7 +164,7 @@ export async function handleChangelogPublishAction(formData: FormData) {
         if (!changelog) throw new Error('CHANGELOG_NOT_FOUND');
 
         await db.update(schema.changelogs)
-            .set({ isUnreleased: 0, updatedAt: new Date() })
+            .set({ isUnreleased: false, updatedAt: new Date() })
             .where(eq(schema.changelogs.id, id));
 
         await sendSegmentedPush('all', 'Nueva Versión Disponible', `Actualización v${changelog.version} lista. Entra para ver qué hay de nuevo.`, {

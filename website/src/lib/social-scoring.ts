@@ -17,7 +17,7 @@ type ScoreConfig = {
     tier3Multiplier: number;
     tier4Multiplier: number;
     coldThresholdC: number;
-    weatherBonusEnabled: number;
+    weatherBonusEnabled: boolean;
 };
 
 const DEFAULT_SCORE_CONFIG: ScoreConfig = {
@@ -34,7 +34,7 @@ const DEFAULT_SCORE_CONFIG: ScoreConfig = {
     tier3Multiplier: 1.25,
     tier4Multiplier: 1.5,
     coldThresholdC: 3,
-    weatherBonusEnabled: 1,
+    weatherBonusEnabled: true,
 };
 
 function weekStartUtcSeconds(epochSeconds: number): number {
@@ -96,7 +96,7 @@ async function getActiveGlobalMultiplier(trx: any, now: Date): Promise<number> {
         .from(schema.globalEvents)
         .where(
             and(
-                eq(schema.globalEvents.isActive, 1),
+                eq(schema.globalEvents.isActive, true),
                 lte(schema.globalEvents.startDate, now),
                 gte(schema.globalEvents.endDate, now)
             )
@@ -407,7 +407,7 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
         });
     }
 
-    if (cfg.weatherBonusEnabled === 1 && Number.isFinite(workout.finishLat) && Number.isFinite(workout.finishLon)) {
+    if (cfg.weatherBonusEnabled === true && Number.isFinite(workout.finishLat) && Number.isFinite(workout.finishLon)) {
         try {
             const weather = await isAdverseWeather(Number(workout.finishLat), Number(workout.finishLon), cfg.coldThresholdC);
             if (weather.adverse) {
