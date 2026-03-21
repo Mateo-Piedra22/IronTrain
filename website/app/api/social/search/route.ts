@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
             username: schema.userProfiles.username,
         }).from(schema.userProfiles).where(
             and(
-                eq(schema.userProfiles.isPublic, 1),
+                eq(schema.userProfiles.isPublic, true),
                 or(
                     eq(schema.userProfiles.id, query),
                     eq(schema.userProfiles.username, query.toLowerCase())

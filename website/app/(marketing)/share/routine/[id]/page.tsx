@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: RoutinePageProps): Promise<Me
         and(
             eq(schema.routines.id, id),
             isNull(schema.routines.deletedAt),
-            or(isNull(schema.routines.isModerated), eq(schema.routines.isModerated, 0))
+            or(isNull(schema.routines.isModerated), eq(schema.routines.isModerated, false))
         )
     );
     const routine = routineRecords[0];
@@ -47,7 +47,7 @@ export default async function RoutineSharePage({ params }: RoutinePageProps) {
             and(
                 eq(schema.routines.id, id),
                 isNull(schema.routines.deletedAt),
-                or(isNull(schema.routines.isModerated), eq(schema.routines.isModerated, 0))
+                or(isNull(schema.routines.isModerated), eq(schema.routines.isModerated, false))
             )
         );
 

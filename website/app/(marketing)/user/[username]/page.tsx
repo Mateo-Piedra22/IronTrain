@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, or } from 'drizzle-orm';
 import {
     Activity,
     ChevronRight,
@@ -50,9 +50,9 @@ export default async function UserProfilePage(props: { params: Promise<{ usernam
         .where(
             and(
                 eq(schema.routines.userId, profile.id),
-                eq(schema.routines.isPublic, 1),
+                eq(schema.routines.isPublic, true),
                 isNull(schema.routines.deletedAt),
-                sql`${schema.routines.isModerated} = 0 OR ${schema.routines.isModerated} IS NULL`
+                or(isNull(schema.routines.isModerated), eq(schema.routines.isModerated, false))
             )
         )
         .orderBy(desc(schema.routines.updatedAt));
