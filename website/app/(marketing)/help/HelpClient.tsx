@@ -2,13 +2,34 @@
 
 import {
     Book,
+    CheckCircle2,
     ChevronRight,
     LifeBuoy,
     MessageSquare
 } from 'lucide-react';
 import Link from 'next/link';
+import { useState } from 'react';
 
 export default function HelpClient() {
+    const [sent, setSent] = useState(false);
+
+    const guides = [
+        { name: 'Primeros Pasos', path: '/faq' },
+        { name: 'Sincronización de Perfil', path: '/faq' },
+        { name: 'Protocolos de IronScore', path: '/faq' },
+        { name: 'Exportar Data', path: '/faq' }
+    ];
+
+    const handleTicket = () => {
+        // @ts-ignore
+        if (typeof window !== 'undefined' && window.posthog) {
+            // @ts-ignore
+            window.posthog.capture('support_ticket_opened');
+        }
+        setSent(true);
+        setTimeout(() => setSent(false), 3000);
+    };
+
     return (
         <main className="min-h-screen bg-[#f5f1e8] text-[#1a1a2e] selection:bg-[#1a1a2e] selection:text-[#f5f1e8] py-20 lg:py-32">
             <div className="container mx-auto px-4 max-w-4xl">
@@ -32,10 +53,15 @@ export default function HelpClient() {
                         <Book className="w-10 h-10 mb-6 opacity-20 group-hover:opacity-100 transition-opacity" />
                         <h2 className="text-2xl font-black uppercase tracking-tight mb-4 group-hover:italic transition-all">GUÍAS_RÁPIDAS</h2>
                         <ul className="space-y-3">
-                            {['Primeros Pasos', 'Sincronización de Perfil', 'Protocolos de IronScore', 'Exportar Data'].map((item) => (
-                                <li key={item} className="flex items-center justify-between group/item">
-                                    <span className="text-xs font-bold uppercase italic opacity-60 group-hover/item:opacity-100 transition-opacity">{item}</span>
-                                    <ChevronRight className="w-4 h-4 opacity-0 group-hover/item:opacity-40 transition-all -translate-x-2 group-hover/item:translate-x-0" />
+                            {guides.map((item) => (
+                                <li key={item.name}>
+                                    <Link
+                                        href={item.path}
+                                        className="flex items-center justify-between group/item py-1"
+                                    >
+                                        <span className="text-xs font-bold uppercase italic opacity-60 group-hover/item:opacity-100 transition-opacity">{item.name}</span>
+                                        <ChevronRight className="w-4 h-4 opacity-0 group-hover/item:opacity-40 transition-all -translate-x-2 group-hover/item:translate-x-0" />
+                                    </Link>
                                 </li>
                             ))}
                         </ul>
@@ -48,17 +74,19 @@ export default function HelpClient() {
                             ¿PROBLEMAS CON TU TRANSMISIÓN? NUESTROS OPERADORES ESTÁN DISPONIBLES.
                         </p>
                         <button
-                            className="w-full bg-[#f5f1e8] text-[#1a1a2e] py-4 font-black uppercase tracking-widest text-[10px] hover:invert transition-all flex items-center justify-center gap-2"
-                            onClick={() => {
-                                // @ts-ignore
-                                if (window.posthog) {
-                                    // Triggering a generic feedback survey as "Support Call"
-                                    // @ts-ignore
-                                    window.posthog.capture('support_ticket_opened');
-                                }
-                            }}
+                            className={`w-full py-4 font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-2 ${sent ? 'bg-green-500 text-white border-green-500' : 'bg-[#f5f1e8] text-[#1a1a2e] border-[#f5f1e8] hover:invert'
+                                } border-[2px]`}
+                            onClick={handleTicket}
+                            disabled={sent}
                         >
-                            INICIAR_TICKET_POSTHOG
+                            {sent ? (
+                                <>
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    TRANSMISIÓN_ENVIADA_✓
+                                </>
+                            ) : (
+                                'INICIAR_TICKET_POSTHOG'
+                            )}
                         </button>
                     </div>
                 </div>
@@ -77,7 +105,6 @@ export default function HelpClient() {
     );
 }
 
-// Minimal icons for HelpPage since we moved major UI to client
 function ExternalLink({ className }: { className?: string }) {
     return (
         <svg
