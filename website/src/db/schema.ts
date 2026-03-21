@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { bigint, integer, jsonb, pgTable, real, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, boolean, integer, jsonb, pgTable, real, text, timestamp } from 'drizzle-orm/pg-core';
 
 const commonFields = {
     userId: text('user_id').notNull(),
@@ -84,8 +84,8 @@ export const routines = pgTable('routines', {
     id: text('id').primaryKey(),
     name: text('name').notNull(),
     description: text('description'),
-    isPublic: integer('is_public').default(0), // Funciones Sociales
-    isModerated: integer('is_moderated').default(0), // Moderación de administración
+    isPublic: boolean('is_public').default(false), // Funciones Sociales
+    isModerated: boolean('is_moderated').default(false), // Moderación de administración
     moderationMessage: text('moderation_message'), // Mensaje para el usuario si se modera
     ...commonFields,
 });
@@ -189,8 +189,8 @@ export const userProfiles = pgTable('user_profiles', {
     id: text('id').primaryKey(), // The user's ID
     username: text('username').unique(), // Optional searchable tag
     displayName: text('display_name'),
-    isPublic: integer('is_public').default(1),
-    shareStats: integer('share_stats').default(0),
+    isPublic: boolean('is_public').default(true),
+    shareStats: boolean('share_stats').default(false),
     currentStreak: integer('current_streak').default(0), // A.3: Streak tracking
     highestStreak: integer('highest_streak').default(0),
     scoreLifetime: integer('score_lifetime').default(0).notNull(),
@@ -254,7 +254,7 @@ export const changelogs = pgTable('changelogs', {
     version: text('version').notNull().unique(), // e.g. '1.2.0'
     date: timestamp('date').defaultNow().notNull(),
     items: jsonb('items').notNull(), // JSON: string[]
-    isUnreleased: integer('is_unreleased').default(0),
+    isUnreleased: boolean('is_unreleased').default(false),
     metadata: jsonb('metadata'), // JSON: icon, bannerImage, etc.
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -286,7 +286,7 @@ export const socialScoringConfig = pgTable('social_scoring_config', {
     tier3Multiplier: real('tier3_multiplier').default(1.25).notNull(),
     tier4Multiplier: real('tier4_multiplier').default(1.5).notNull(),
     coldThresholdC: real('cold_threshold_c').default(3).notNull(),
-    weatherBonusEnabled: integer('weather_bonus_enabled').default(1).notNull(),
+    weatherBonusEnabled: boolean('weather_bonus_enabled').default(true).notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     updatedBy: text('updated_by'),
 });
@@ -297,8 +297,8 @@ export const globalEvents = pgTable('global_events', {
     multiplier: real('multiplier').default(1).notNull(),
     startDate: timestamp('start_date').notNull(),
     endDate: timestamp('end_date').notNull(),
-    isActive: integer('is_active').default(1).notNull(),
-    pushSent: integer('push_sent').default(0).notNull(),
+    isActive: boolean('is_active').default(true).notNull(),
+    pushSent: boolean('push_sent').default(false).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     createdBy: text('created_by'),

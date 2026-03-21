@@ -32,7 +32,7 @@ export function WorkoutTimerSync() {
             if (notifCounterRef.current >= 10) {
                 notifCounterRef.current = 0;
 
-                const completedSets = activeSets.filter(s => s.completed === 1).length;
+                const completedSets = activeSets.filter(s => !!s.completed).length;
                 const uniqueExercises = new Set(activeSets.map(s => s.exercise_id)).size;
 
                 systemNotificationService.showPersistentWorkout({

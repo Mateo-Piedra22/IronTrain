@@ -337,7 +337,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
     }, [phase, isPaused, dotPulse]);
 
     // ─── Stats ───────────────────────────────────────────────────────────────
-    const completedSets = sets.filter(s => s.completed === 1).length;
+    const completedSets = sets.filter(s => !!s.completed).length;
     const uniqueExercises = new Set(sets.map(s => s.exercise_id)).size;
 
     // ═══════════════════════════════════════════════════════════════════════════

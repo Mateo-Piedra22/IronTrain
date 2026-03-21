@@ -204,7 +204,7 @@ export function CategoryManager() {
                                 <View style={{ flex: 1 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                                         <Text style={ss.categoryName}>{item.name}</Text>
-                                        {item.is_system === 1 && (
+                                        {(item.is_system === 1 || item.is_system === true) && (
                                             <View style={ss.systemBadge}>
                                                 <Text style={ss.systemBadgeText}>SISTEMA</Text>
                                             </View>

@@ -701,7 +701,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                 contentContainerStyle={ss.listContent}
                                 ListHeaderComponent={(
                                     <View>
-                                        {routine?.is_moderated === 1 ? (
+                                        {!!routine?.is_moderated ? (
                                             <View style={[ss.infoCard, ss.warningCard]}>
                                                 <Text style={ss.warningLabel}>⚠️ ESTADO: OCULTA</Text>
                                                 <Text style={ss.infoCardText}>
@@ -729,7 +729,10 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                             </View>
                                             <View style={ss.btnCol}>
                                                 <TouchableOpacity style={ss.smallBtn} onPress={() => {
-                                                    setEditRoutineName(routine?.name || ''); setEditRoutineDesc(routine?.description || ''); setEditRoutinePublic(routine?.is_public === 1); setEditRoutineVisible(true);
+                                                    setEditRoutineName(routine?.name || '');
+                                                    setEditRoutineDesc(routine?.description || '');
+                                                    setEditRoutinePublic(!!routine?.is_public);
+                                                    setEditRoutineVisible(true);
                                                 }}>
                                                     <Edit3 size={12} color={colors.primary.DEFAULT} />
                                                     <Text style={ss.smallBtnText}>Edit</Text>

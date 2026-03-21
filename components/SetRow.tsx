@@ -189,7 +189,7 @@ export function SetRow({ set, index, normalIndex, onUpdate, onDelete, onCopy, ex
         });
     };
 
-    const isCompleted = set.completed === 1;
+    const isCompleted = !!set.completed;
     const canSwipe = !disabled;
     const typeColor = TYPE_COLORS[set.type || 'normal'] || TYPE_COLORS.normal;
 

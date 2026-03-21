@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or } from 'drizzle-orm';
 import {
     ChevronRight,
     Clock,
@@ -48,9 +48,12 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
         .leftJoin(schema.userProfiles, eq(schema.routines.userId, schema.userProfiles.id))
         .where(
             and(
-                eq(schema.routines.isPublic, 1),
+                eq(schema.routines.isPublic, true),
                 isNull(schema.routines.deletedAt),
-                sql`${schema.routines.isModerated} = 0 OR ${schema.routines.isModerated} IS NULL`
+                or(
+                    eq(schema.routines.isModerated, false),
+                    isNull(schema.routines.isModerated)
+                )
             )
         )
         .orderBy(desc(schema.routines.updatedAt));

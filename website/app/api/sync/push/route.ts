@@ -66,8 +66,8 @@ export async function POST(req: NextRequest) {
         const results: Array<{ id: string; status: string; reason?: string }> = [];
         let processedCount = 0;
 
-        // BigInt columns in DB (snake_case from app)
         const knownBigIntColumns = new Set(['date', 'start_time', 'end_time', 'duration', 'time', 'order_index']);
+        const knownBooleanColumns = new Set(['is_public', 'is_moderated', 'share_stats', 'is_unreleased', 'weather_bonus_enabled', 'is_active', 'push_sent']);
 
         const incomingIdsByTable = collectIncomingRecordIdsByTable(operations as PushOperation[]);
         const incomingWorkouts = incomingIdsByTable.get('workouts') ?? new Set<string>();
@@ -110,6 +110,10 @@ export async function POST(req: NextRequest) {
                             // BigInt handling for timestamps and metadata
                             else if (knownBigIntColumns.has(key) && (value !== null && value !== undefined)) {
                                 convertedValue = BigInt(Math.floor(Number(value)));
+                            }
+                            // Boolean handling (SQLite 0/1 -> Postgres true/false)
+                            else if (knownBooleanColumns.has(key) && (value !== null && value !== undefined)) {
+                                convertedValue = value === 1 || value === '1' || value === true || value === 'true';
                             }
 
                             filteredData[propName] = convertedValue;

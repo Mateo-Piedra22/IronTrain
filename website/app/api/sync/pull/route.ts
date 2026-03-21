@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, or, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { SYNC_TABLES } from '../../../../src/constants/sync';
 import { db } from '../../../../src/db';
@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
                 // EXCEPTION: Users need other people's Display Names/Usernames for Social Feed & Ranking
                 // We pull our own profile OR any profile that is public AND has changed.
                 // Strict PII removal below ensures no sensitive data leaks.
-                conditions.push(sql`(${tableSchema.id} = ${userId} OR ${tableSchema.isPublic} = 1)`);
+                conditions.push(or(eq(tableSchema.id, userId), eq(tableSchema.isPublic, true)));
             } else if (!PURE_GLOBAL_TABLES.includes(tableName)) {
                 // USER-SPECIFIC DATA (Workouts, PRs, Friends, Activity, etc.)
                 if (tableName === 'activity_feed' || tableName === 'kudos') {
@@ -202,7 +202,7 @@ export async function GET(req: NextRequest) {
                 }
             } else if (parentTable === 'user_profiles') {
                 baseConditions.push(inArray(pkField, limited));
-                baseConditions.push(sql`(${tableSchema.id} = ${userId} OR ${tableSchema.isPublic} = 1)`);
+                baseConditions.push(or(eq(tableSchema.id, userId), eq(tableSchema.isPublic, true)));
             } else if (!PURE_GLOBAL_TABLES.includes(parentTable)) {
                 baseConditions.push(inArray(pkField, limited));
                 if (parentTable === 'friendships') {
