@@ -36,7 +36,7 @@ export async function handleScoringConfigAction(formData: FormData) {
             tier3Multiplier: toFloat('tier3Multiplier', 1.25),
             tier4Multiplier: toFloat('tier4Multiplier', 1.5),
             coldThresholdC: toFloat('coldThresholdC', 3),
-            weatherBonusEnabled: formData.get('weatherBonusEnabled') === 'true' ? 1 : 0,
+            weatherBonusEnabled: formData.get('weatherBonusEnabled') === 'true',
         };
 
         await db.insert(schema.socialScoringConfig).values({

@@ -1098,6 +1098,22 @@ export class DatabaseService {
         } catch (e) {
             logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 23 failed' });
         }
+
+        // Migration 24: Moderation Support for Routines (Social 2.2.0)
+        try {
+            const info = await this.getAll<{ name: string }>("PRAGMA table_info('routines')");
+            const columns = info.map((c) => c.name);
+            if (!columns.includes('is_moderated')) {
+                logger.info('[Migration 24] Adding is_moderated to routines');
+                await this.executeRaw('ALTER TABLE routines ADD COLUMN is_moderated INTEGER DEFAULT 0');
+            }
+            if (!columns.includes('moderation_message')) {
+                logger.info('[Migration 24] Adding moderation_message to routines');
+                await this.executeRaw('ALTER TABLE routines ADD COLUMN moderation_message TEXT');
+            }
+        } catch (e) {
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: '[Migration] Migration 24 failed (routine moderation)' });
+        }
     }
 
     /**

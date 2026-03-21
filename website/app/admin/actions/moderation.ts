@@ -20,12 +20,12 @@ export async function handleRoutineAction(formData: FormData) {
         if (!id) throw new Error('MISSING_ROUTINE_ID');
 
         if (intent === 'toggle-moderation') {
-            const newStatus = currentModerated ? 0 : 1;
+            const nextModerated = !currentModerated;
             await db.update(schema.routines)
                 .set({
-                    isModerated: newStatus,
-                    moderationMessage: newStatus === 1 ? (message || 'Contenido ocultado por incumplir las normas de la comunidad.') : null,
-                    ...(newStatus === 1 ? { isPublic: 0 } : {}),
+                    isModerated: nextModerated,
+                    moderationMessage: nextModerated ? (message || 'Contenido ocultado por incumplir las normas de la comunidad.') : null,
+                    ...(nextModerated ? { isPublic: false } : {}),
                     updatedAt: new Date()
                 })
                 .where(eq(schema.routines.id, id));
@@ -33,8 +33,8 @@ export async function handleRoutineAction(formData: FormData) {
             await db.update(schema.routines)
                 .set({
                     deletedAt: new Date(),
-                    isPublic: 0,
-                    isModerated: 1,
+                    isPublic: false,
+                    isModerated: true,
                     moderationMessage: 'Esta rutina ha sido eliminada permanentemente por un administrador.',
                     updatedAt: new Date()
                 })

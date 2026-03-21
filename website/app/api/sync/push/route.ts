@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
         let processedCount = 0;
 
         const knownBigIntColumns = new Set(['date', 'start_time', 'end_time', 'duration', 'time', 'order_index']);
-        const knownBooleanColumns = new Set(['is_public', 'is_moderated', 'share_stats', 'is_unreleased', 'weather_bonus_enabled', 'is_active', 'push_sent']);
+        const knownBooleanColumns = new Set(['is_public', 'is_moderated', 'is_unreleased', 'weather_bonus_enabled', 'is_active', 'push_sent']);
 
         const incomingIdsByTable = collectIncomingRecordIdsByTable(operations as PushOperation[]);
         const incomingWorkouts = incomingIdsByTable.get('workouts') ?? new Set<string>();
