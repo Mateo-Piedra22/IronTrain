@@ -4,6 +4,7 @@ import { jwtDecode } from 'jwt-decode';
 import { AlertCircle, ShieldCheck } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { Config } from '../src/constants/Config';
 import { useColors } from '../src/hooks/useColors';
 import { useAuthStore } from '../src/store/authStore';
 import { ThemeFx, withAlpha } from '../src/theme';
@@ -16,7 +17,7 @@ export default function AuthCallback() {
     const router = useRouter();
     const colors = useColors();
     const rootNavigationState = useRootNavigationState();
-    const { token } = useLocalSearchParams<{ token: string }>();
+    const { token, code } = useLocalSearchParams<{ token?: string; code?: string }>();
     const [status, setStatus] = useState<'validating' | 'success' | 'error'>('validating');
 
     const ss = useMemo(() => StyleSheet.create({
@@ -86,10 +87,36 @@ export default function AuthCallback() {
 
         async function handleToken() {
             // Expo Router params can be array or string
-            const rawToken = Array.isArray(token) ? token[0] : token;
+            let rawToken = Array.isArray(token) ? token[0] : token;
+            const rawCode = Array.isArray(code) ? code[0] : code;
+
+            if (rawCode) {
+                logger.debug('Auth callback: found code, starting exchange...', { scope: 'callback.handleToken' });
+                try {
+                    const response = await fetch(`${Config.API_URL}/api/auth/exchange`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code: rawCode })
+                    });
+
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        throw new Error(errData.error || `Error ${response.status} en intercambio`);
+                    }
+
+                    const data = await response.json();
+                    rawToken = data.token;
+                    logger.info('Auth callback: code exchanged successfully', { scope: 'callback.handleToken' });
+                } catch (exchError: any) {
+                    logger.captureException(exchError, { scope: 'callback.handleToken', context: 'Exchange failed' });
+                    setStatus('error');
+                    notify.error('Fallo en autenticación', 'No se pudo canjear el código de acceso.');
+                    return;
+                }
+            }
 
             if (!rawToken) {
-                logger.warn('Auth callback: token missing in query params', { scope: 'callback.handleToken' });
+                logger.warn('Auth callback: token/code missing in query params', { scope: 'callback.handleToken' });
                 setStatus('error');
                 return;
             }

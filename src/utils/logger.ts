@@ -20,8 +20,36 @@ function safeString(value: unknown): string {
     }
 }
 
+function sanitize(val: any): any {
+    if (typeof val === 'string') {
+        // Redact JWTs (3 parts, roughly matching character set)
+        return val.replace(/[a-zA-Z0-9-_]+\.[a-zA-Z0-9-_]+\.[a-zA-Z0-9-_]+/g, '[JWT_REDACTED]');
+    }
+    if (val && typeof val === 'object') {
+        if (Array.isArray(val)) return val.map(sanitize);
+        const copy: any = {};
+        for (const key in val) {
+            const lowKey = key.toLowerCase();
+            if (['token', 'auth', 'password', 'secret', 'code', 'jwt'].some(k => lowKey.includes(k))) {
+                copy[key] = '[SENSITIVE_REDACTED]';
+            } else {
+                copy[key] = sanitize(val[key]);
+            }
+        }
+        return copy;
+    }
+    return val;
+}
+
 function push(entry: Omit<LogEntry, 'at'>): void {
-    const next: LogEntry = { ...entry, at: new Date().toISOString() };
+    const sanitizedMsg = sanitize(entry.message);
+    const sanitizedCtx = sanitize(entry.context);
+    const next: LogEntry = {
+        level: entry.level,
+        message: sanitizedMsg,
+        context: sanitizedCtx,
+        at: new Date().toISOString()
+    };
     buffer = buffer.length >= MAX_ENTRIES ? [...buffer.slice(1), next] : [...buffer, next];
 }
 

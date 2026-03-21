@@ -32,6 +32,7 @@ const NOTIFICATION_IDS = {
     UPDATE_AVAILABLE: 'update-available',
     APP_UPDATED: 'app-updated',
     STREAK_REMINDER: 'streak-daily-reminder',
+    PR_BROKEN: 'pr-broken',
 } as const;
 
 /** Hour of day (0-23) at which to fire the daily streak reminder */
@@ -228,7 +229,12 @@ class SystemNotificationServiceImpl {
     }
 
     async dismissPersistentWorkout(): Promise<void> {
-        try { await notifee.cancelNotification(NOTIFICATION_IDS.PERSISTENT_WORKOUT); } catch (e) { logger.captureException(e, { scope: 'SystemNotificationService.dismissPersistentWorkout' }); /* */ }
+        try {
+            await notifee.cancelNotification(NOTIFICATION_IDS.PERSISTENT_WORKOUT);
+            await notifee.cancelNotification(NOTIFICATION_IDS.INACTIVITY_REMINDER);
+        } catch (e) {
+            logger.captureException(e, { scope: 'SystemNotificationService.dismissPersistentWorkout' });
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -595,6 +601,44 @@ class SystemNotificationServiceImpl {
         const seconds = totalSeconds % 60;
         if (hours > 0) return `${hours}h ${String(minutes).padStart(2, '0')}m`;
         return `${minutes}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 11. PR NOTIFICATION
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    async showPRNotification(prs: { exerciseName: string; oneRm: number }[], force = false): Promise<void> {
+        if (!force && !(await this.canNotifyType('workoutComplete'))) return;
+        await this.ensureChannels();
+
+        if (prs.length === 0) return;
+
+        let title = '🔥 ¡Nuevo Récord Personal!';
+        let body = '';
+
+        if (prs.length === 1) {
+            body = `¡Rompiste tu marca en ${prs[0].exerciseName} con ${Math.round(prs[0].oneRm)}kg!`;
+        } else {
+            title = `🔥 ¡${prs.length} Nuevos Récords!`;
+            body = prs.map(p => `${p.exerciseName} (${Math.round(p.oneRm)}kg)`).join(', ');
+        }
+
+        try {
+            await notifee.displayNotification({
+                id: NOTIFICATION_IDS.PR_BROKEN,
+                title,
+                body,
+                android: {
+                    channelId: CHANNELS.WORKOUT_EVENTS,
+                    pressAction: { id: 'default' },
+                    autoCancel: true,
+                    importance: AndroidImportance.HIGH,
+                },
+                ios: { sound: 'default' },
+            });
+        } catch (e) {
+            logger.captureException(e, { scope: 'SystemNotificationService.showPRNotification' });
+        }
     }
 }
 

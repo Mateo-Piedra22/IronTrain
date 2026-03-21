@@ -20,6 +20,9 @@ interface ActiveWorkoutState {
     // Actions
     startWorkout: (name?: string) => Promise<void>;
     resumeWorkout: (workout: Workout) => Promise<void>;
+    pauseWorkout: () => void;
+    unpauseWorkout: () => void;
+    updateDuration: (seconds: number) => Promise<void>;
     finishWorkout: () => Promise<void>;
     cancelWorkout: () => Promise<void>;
     tickTimer: () => void;
@@ -80,15 +83,54 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
         await get().loadSetsForWorkout(workout.id);
     },
 
+    pauseWorkout: () => {
+        set({ isTimerRunning: false, lastTickAtMs: null });
+        const { activeWorkout, workoutTimer } = get();
+        if (activeWorkout) {
+            configService.setGeneric(`runningWorkoutTimerStartTimestamp_${activeWorkout.id}`, null);
+            configService.setGeneric(`runningWorkoutTimerBaseSeconds_${activeWorkout.id}`, workoutTimer);
+            workoutService.update(activeWorkout.id, { duration: workoutTimer });
+        }
+    },
+
+    unpauseWorkout: () => {
+        const { activeWorkout, workoutTimer } = get();
+        set({ isTimerRunning: true, lastTickAtMs: Date.now() });
+        if (activeWorkout) {
+            configService.setGeneric(`runningWorkoutTimerStartTimestamp_${activeWorkout.id}`, Date.now());
+            configService.setGeneric(`runningWorkoutTimerBaseSeconds_${activeWorkout.id}`, workoutTimer);
+            configService.set('runningWorkoutTimerWorkoutId', activeWorkout.id);
+        }
+    },
+
+    updateDuration: async (seconds: number) => {
+        const { activeWorkout, isTimerRunning } = get();
+        set({ workoutTimer: seconds, lastTickAtMs: isTimerRunning ? Date.now() : null });
+        if (activeWorkout) {
+            await workoutService.update(activeWorkout.id, { duration: seconds });
+            configService.setGeneric(`runningWorkoutTimerBaseSeconds_${activeWorkout.id}`, seconds);
+            if (isTimerRunning) {
+                configService.setGeneric(`runningWorkoutTimerStartTimestamp_${activeWorkout.id}`, Date.now());
+            }
+        }
+    },
+
     resumeWorkout: async (workout) => {
+        // If it was already completed, we NEED to resume it in the DB
+        if (workout.status === 'completed') {
+            await workoutService.resumeWorkout(workout.id);
+            workout.status = 'in_progress';
+        }
+
         const savedDuration = workout.duration ?? 0;
         set({
-            activeWorkout: workout,
+            activeWorkout: { ...workout, status: 'in_progress' } as any,
             workoutTimer: savedDuration,
-            isTimerRunning: workout.status !== 'completed' && workout.is_template !== 1,
+            isTimerRunning: workout.is_template !== 1,
             lastTickAtMs: Date.now()
         });
-        if (workout.status !== 'completed' && workout.is_template !== 1) {
+
+        if (workout.is_template !== 1) {
             await configService.set('runningWorkoutTimerWorkoutId', workout.id);
         }
         await get().loadSetsForWorkout(workout.id);
@@ -99,25 +141,36 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
         if (!activeWorkout || !isTimerRunning) return;
         if (activeWorkout.status === 'completed' || activeWorkout.is_template === 1) return;
 
+        // Ensure we only tick if this workout is the globally "active" one
         const ownerId = configService.get('runningWorkoutTimerWorkoutId');
         if (!ownerId || ownerId !== activeWorkout.id) return;
 
         const now = Date.now();
         const last = lastTickAtMs ?? now;
-        let deltaSec = Math.max(0, Math.floor((now - last) / 1000));
-        if (deltaSec <= 0) return;
+        const deltaMs = now - last;
 
-        // Cap delta to prevent massive duration jumps if app was suspended
-        if (deltaSec > 43200) {
-            deltaSec = 43200; // Cap at 12 hours
-        }
+        // Only tick if at least 1 second has passed
+        if (deltaMs < 1000) return;
+
+        let deltaSec = Math.floor(deltaMs / 1000);
+
+        // Cap delta to prevent massive duration jumps if app was suspended/backgrounded
+        // 43200s = 12 hours
+        if (deltaSec > 43200) deltaSec = 43200;
 
         const newTime = workoutTimer + deltaSec;
-        set({ workoutTimer: newTime, lastTickAtMs: now });
 
-        // Persist to DB every 10 seconds
-        if (newTime % 10 < deltaSec) {
+        // Update state with new time and precisely tracked last tick (accounting for floor loss)
+        set({
+            workoutTimer: newTime,
+            lastTickAtMs: last + (deltaSec * 1000)
+        });
+
+        // Persist to DB periodically (every ~10s) or if it's the first tick
+        if (newTime % 10 < deltaSec || workoutTimer === 0) {
             workoutService.update(activeWorkout.id, { duration: newTime });
+            // Also sync to global config for StatusBar recovery
+            configService.setGeneric(`runningWorkoutTimerBaseSeconds_${activeWorkout.id}`, newTime);
         }
     },
 
@@ -146,17 +199,21 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
     },
 
     finishWorkout: async () => {
-        const { activeWorkout } = get();
+        const { activeWorkout, workoutTimer } = get();
         if (!activeWorkout) return;
 
-        await workoutService.finishWorkout(activeWorkout.id);
+        // Use the accumulated timer as the final duration
+        await workoutService.finishWorkout(activeWorkout.id, workoutTimer);
+
         const ownerId = configService.get('runningWorkoutTimerWorkoutId');
         if (ownerId === activeWorkout.id) {
             await configService.set('runningWorkoutTimerWorkoutId', null);
         }
+
         set({
-            activeWorkout: { ...activeWorkout, status: 'completed', end_time: Date.now() } as any,
+            activeWorkout: null, // Clear active workout to signal finish to UI
             isTimerRunning: false,
+            workoutTimer: 0,
             lastTickAtMs: null
         });
     },
@@ -179,16 +236,7 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
         if (activeWorkout.is_template === 1) return;
 
         if (status === 'completed') {
-            await workoutService.finishWorkout(activeWorkout.id);
-            const ownerId = configService.get('runningWorkoutTimerWorkoutId');
-            if (ownerId === activeWorkout.id) {
-                await configService.set('runningWorkoutTimerWorkoutId', null);
-            }
-            set({
-                activeWorkout: { ...activeWorkout, status: 'completed', end_time: Date.now() } as any,
-                isTimerRunning: false,
-                lastTickAtMs: null
-            });
+            await get().finishWorkout();
             return;
         }
 

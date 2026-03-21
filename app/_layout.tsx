@@ -15,6 +15,7 @@ import { GlobalNoticeHandler } from '../components/GlobalNoticeHandler';
 import MaintenanceMode from '../components/MaintenanceMode';
 import { SyncConflictModal } from '../components/SyncConflictModal';
 import { TimerOverlay } from '../components/TimerOverlay';
+import { WorkoutTimerSync } from '../components/WorkoutTimerSync';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { GlobalBanner } from '../components/ui/GlobalBanner';
 import { SyncingOverlay } from '../components/ui/SyncingOverlay';
@@ -152,6 +153,7 @@ function MainAppContent({ dbInitialized, fontsLoaded, fontError, installedVersio
         <GlobalBanner />
         <GlobalNoticeHandler />
         <TimerOverlay />
+        <WorkoutTimerSync />
         <GlobalConfirmModal />
         <SyncConflictModal
           visible={syncModalVisible}

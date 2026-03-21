@@ -220,8 +220,21 @@ export class IronScoreService {
                         'SELECT score_lifetime FROM user_profiles WHERE id = ? AND deleted_at IS NULL',
                         [userId]
                     );
-                    const prevScore = typeof prev?.score_lifetime === 'number' && Number.isFinite(prev.score_lifetime) ? prev.score_lifetime : 0;
-                    const nextScore = prevScore + pointsAwarded;
+
+                    // Robustness check: if score_lifetime is suspiciously low (0 or 0 from local fresh install),
+                    // try to use the sum of existing local events as a safer baseline for the new total.
+                    const localSumRow = await dbService.getFirst<{ sum: number }>(
+                        'SELECT SUM(points_awarded) as sum FROM score_events WHERE user_id = ? AND deleted_at IS NULL',
+                        [userId]
+                    );
+                    const localEventSum = localSumRow?.sum ?? 0;
+
+                    const storedScore = typeof prev?.score_lifetime === 'number' && Number.isFinite(prev.score_lifetime) ? prev.score_lifetime : 0;
+
+                    // Use the higher of the two as the baseline (stored vs current sum of events)
+                    // This prevents overwriting a server total with a zero/stale local profile total.
+                    const baselineScore = Math.max(storedScore, localEventSum - pointsAwarded);
+                    const nextScore = baselineScore + pointsAwarded;
 
                     await dbService.run(
                         'UPDATE user_profiles SET score_lifetime = ?, updated_at = ? WHERE id = ?',

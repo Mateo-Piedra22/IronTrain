@@ -2,7 +2,6 @@ import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
     ChevronRight,
     Clock,
-    Dumbbell,
     Globe,
     Plus,
     ShoppingBag,
@@ -16,7 +15,7 @@ import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { verifyAuth } from '../../../src/lib/auth';
 import { MarketplaceResolver } from '../../../src/lib/marketplace';
-import { ExperimentWrapper, PremiumFeatureBadge } from '../../components/PostHogFeatures';
+import { ExperimentWrapper } from '../../components/PostHogFeatures';
 
 
 // Force dynamic rendering since we want real-time social feed
@@ -35,13 +34,14 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
     } as any;
     const currentUserId = await verifyAuth(request);
 
-    // Fetch public routines with user profile usernames
+    // Fetch public routines with user profile usernames and scores
     const publicRoutinesData = await db.select({
         id: schema.routines.id,
         name: schema.routines.name,
         description: schema.routines.description,
         userId: schema.routines.userId,
         username: schema.userProfiles.username,
+        scoreLifetime: schema.userProfiles.scoreLifetime,
         updatedAt: schema.routines.updatedAt,
     })
         .from(schema.routines)
@@ -109,36 +109,33 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                             DIRECTORIO_GLOBAL_ESTADOS_Y_ACCION
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e] animate-pulse"></span>
                             <span className="text-[10px] font-black opacity-60 uppercase">SYNC_LIVE</span>
                         </div>
                     </div>
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
                         <div>
                             <h1 className="text-5xl lg:text-7xl font-black tracking-tighter mb-4 leading-[0.85] uppercase italic">
-                                FEED_X_<span className="text-red-600">HUB</span>
+                                FEED_X_<span className="opacity-40">HUB</span>
                             </h1>
                             <p className="text-xs font-black opacity-40 max-w-xl leading-relaxed uppercase tracking-widest italic">
-                                Explora el ecosistema IronTrain: rutinas de la comunidad y ejercicios oficiales del Marketplace.
+                                Ecosistema IronTrain v2.0: Directorio social de rutinas P2P y activos oficiales.
                             </p>
-                            <div className="mt-4">
-                                <PremiumFeatureBadge />
-                            </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Tab Switcher */}
-                <div className="flex bg-[#1a1a2e]/5 p-1 border-2 border-[#1a1a2e] mb-12">
+                <div className="flex bg-transparent border-2 border-[#1a1a2e] mb-12">
                     <Link
                         href="/feed?view=community"
-                        className={`flex-1 text-center py-3 font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${!isMarketplace ? 'bg-[#1a1a2e] text-[#f5f1e8]' : 'text-[#1a1a2e] hover:bg-[#1a1a2e]/10'}`}
+                        className={`flex-1 text-center py-4 font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${!isMarketplace ? 'bg-[#1a1a2e] text-[#f5f1e8]' : 'text-[#1a1a2e] hover:bg-[#1a1a2e]/5'}`}
                     >
                         <User className="w-3.5 h-3.5" /> COMUNIDAD_P2P
                     </Link>
                     <Link
                         href="/feed?view=marketplace"
-                        className={`flex-1 text-center py-3 font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${isMarketplace ? 'bg-[#1a1a2e] text-[#f5f1e8]' : 'text-[#1a1a2e] hover:bg-[#1a1a2e]/10'}`}
+                        className={`flex-1 text-center py-4 font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${isMarketplace ? 'bg-[#1a1a2e] text-[#f5f1e8]' : 'text-[#1a1a2e] hover:bg-[#1a1a2e]/5'}`}
                     >
                         <ShoppingBag className="w-3.5 h-3.5" /> MARKETPLACE_OFFICIAL
                     </Link>
@@ -147,10 +144,10 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                 {/* List View */}
                 {!isMarketplace ? (
                     publicRoutinesData.length === 0 ? (
-                        <div className="text-center py-20 border-2 border-[#1a1a2e] border-dashed bg-white/50">
-                            <Globe className="w-12 h-12 mx-auto opacity-20 mb-4" />
-                            <h3 className="text-lg font-black uppercase mb-2">Ninguna rutina pública aún</h3>
-                            <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">Sé el primero en compartir tu entrenamiento con el mundo.</p>
+                        <div className="text-center py-24 border-2 border-[#1a1a2e] border-dashed bg-white/30">
+                            <Globe className="w-12 h-12 mx-auto opacity-10 mb-6" />
+                            <h3 className="text-base font-black uppercase mb-2">0_SOCIAL_DATA_FOUND</h3>
+                            <p className="text-[9px] font-bold opacity-30 uppercase tracking-[0.3em]">No hay transmisiones públicas activas en este momento.</p>
                         </div>
                     ) : (
                         <div className="grid gap-6">
@@ -158,31 +155,43 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                                 <ExperimentWrapper key={routine.id}>
                                     <Link
                                         href={`/share/routine/${routine.id}`}
-                                        className="group block border-2 border-[#1a1a2e] p-6 hover:shadow-[12px_12px_0px_0px_rgba(26,26,46,1)] transition-all hover:-translate-y-1 bg-white"
+                                        className="group block border-2 border-[#1a1a2e] p-7 transition-all hover:bg-[#1a1a2e] hover:text-[#f5f1e8] bg-white relative overflow-hidden"
                                     >
-                                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                                            <div className="flex-1 space-y-4">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="bg-[#1a1a2e] text-[#f5f1e8] px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter">P2P_ROUTINE</div>
-                                                    <h2 className="text-2xl font-black uppercase tracking-tighter truncate group-hover:text-red-600">
-                                                        {routine.name}
-                                                    </h2>
+                                        <div className="absolute top-0 right-0 p-2 opacity-5 font-bold text-[60px] leading-none select-none pointer-events-none">
+                                            {routine.scoreLifetime}
+                                        </div>
+
+                                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 relative z-10">
+                                            <div className="flex-1 space-y-5">
+                                                <div className="flex flex-wrap items-center gap-3">
+                                                    <div className="border border-current px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter">P2P_DATABANK</div>
+                                                    <div className="bg-current text-background px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter flex items-center gap-1">
+                                                        SCORE: {routine.scoreLifetime} PTS
+                                                    </div>
                                                 </div>
 
+                                                <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tighter leading-none">
+                                                    {routine.name}
+                                                </h2>
+
                                                 {routine.description && (
-                                                    <p className="text-xs font-bold opacity-60 line-clamp-2 md:line-clamp-3 leading-relaxed uppercase italic">
+                                                    <p className="text-xs font-bold opacity-60 line-clamp-2 md:line-clamp-3 leading-relaxed uppercase italic max-w-2xl">
                                                         {routine.description}
                                                     </p>
                                                 )}
 
-                                                <div className="flex flex-wrap items-center gap-6 pt-4 text-[10px] font-black uppercase tracking-[0.2em]">
-                                                    <div className="flex items-center gap-2 opacity-100">
-                                                        <User className="w-3.5 h-3.5 text-red-600" />
-                                                        <span>@{routine.username || 'user'}</span>
+                                                <div className="flex flex-wrap items-center gap-x-8 gap-y-3 pt-2 text-[9px] font-bold uppercase tracking-[0.25em]">
+                                                    <div className="flex items-center gap-2">
+                                                        <User className="w-3.5 h-3.5" />
+                                                        <span className="opacity-100 italic">CREATOR:
+                                                            <Link href={`/user/${routine.username}`} className="hover:underline ml-1">
+                                                                @{routine.username || 'ANON'}
+                                                            </Link>
+                                                        </span>
                                                     </div>
-                                                    <div className="flex items-center gap-2 opacity-30">
+                                                    <div className="flex items-center gap-2 opacity-40">
                                                         <Clock className="w-3.5 h-3.5" />
-                                                        <span>{routine.updatedAt && new Date(routine.updatedAt).getTime() > 0
+                                                        <span>TS: {routine.updatedAt && new Date(routine.updatedAt).getTime() > 0
                                                             ? new Date(routine.updatedAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
                                                             : new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                                                         </span>
@@ -190,10 +199,8 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                                                 </div>
                                             </div>
 
-                                            <div className="flex flex-col items-end justify-center h-full sm:pl-6 sm:border-l-2 sm:border-[#1a1a2e]/10">
-                                                <div className="bg-[#1a1a2e] text-[#f5f1e8] h-12 w-12 flex items-center justify-center group-hover:bg-red-600 transition-colors shadow-[4px_4px_0px_0px_rgba(26,26,46,0.2)]">
-                                                    <ChevronRight className="w-6 h-6" />
-                                                </div>
+                                            <div className="flex items-center md:items-start pt-2">
+                                                <ChevronRight className="w-8 h-8 opacity-20 group-hover:opacity-100 transition-opacity" />
                                             </div>
                                         </div>
                                     </Link>
@@ -202,7 +209,7 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                         </div>
                     )
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {officialExercises.map((exercise: any) => {
                             const category = categories.find((c: any) => c.id === exercise.categoryId);
                             const isAdopted = adoptedOriginIds.includes(exercise.id);
@@ -210,32 +217,31 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                             return (
                                 <div
                                     key={exercise.id}
-                                    className="group relative border-2 border-[#1a1a2e] bg-white p-6 pb-20 flex flex-col justify-between hover:shadow-[12px_12px_0px_0px_rgba(26,26,46,1)] transition-all hover:-translate-y-1"
+                                    className="group relative border-[3px] border-[#1a1a2e] bg-white p-8 pb-24 flex flex-col justify-between hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all shadow-[12px_12px_0px_0px_rgba(26,26,46,0.05)]"
                                 >
-                                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                                        <ShoppingBag size={80} strokeWidth={1} />
+                                    <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
+                                        <ShoppingBag size={100} strokeWidth={1.5} />
                                     </div>
 
-                                    {category?.color && (
-                                        <div className="absolute top-0 left-0 w-full h-1.5" style={{ backgroundColor: category.color }} />
-                                    )}
-
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-2">
-                                            <div className="bg-red-600 text-white px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter">OFFICIAL_ASSET</div>
-                                            <span className="text-[9px] font-black uppercase opacity-40">{category?.name || 'EJERCICIO'}</span>
+                                    <div className="space-y-6 relative z-10">
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-current text-background px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter">OFFICIAL_CORE_ASSET</div>
+                                            <span className="text-[10px] font-black uppercase opacity-40 italic tracking-widest">{category?.name || 'GENERIC_COMPONENT'}</span>
                                         </div>
 
-                                        <h2 className="text-2xl font-black uppercase tracking-tighter leading-none italic decoration-red-600 group-hover:underline">
+                                        <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tighter leading-[0.9] italic group-hover:underline">
                                             {exercise.name}
                                         </h2>
 
-                                        <div className="flex flex-wrap gap-1.5">
+                                        <div className="flex flex-wrap gap-2">
                                             {exercise.badges.map((eb: any) => (
                                                 <span
                                                     key={eb.badge.id}
-                                                    className="px-2 py-0.5 border border-[#1a1a2e] text-[8px] font-black uppercase tracking-widest bg-[#f5f1e8]"
-                                                    style={{ color: eb.badge.color }}
+                                                    className="px-2 py-0.5 border border-current text-[8px] font-black uppercase tracking-widest bg-current/5"
+                                                    style={{
+                                                        color: eb.badge.color === '#ef4444' ? 'inherit' : eb.badge.color,
+                                                        borderColor: `${eb.badge.color}40`
+                                                    }}
                                                 >
                                                     {eb.badge.name}
                                                 </span>
@@ -243,24 +249,24 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                                         </div>
 
                                         {exercise.notes && (
-                                            <p className="text-[9px] font-bold opacity-50 uppercase tracking-widest leading-relaxed line-clamp-2 italic">
+                                            <p className="text-[10px] font-bold opacity-60 uppercase tracking-tight leading-relaxed line-clamp-2 italic max-w-xs">
                                                 {exercise.notes}
                                             </p>
                                         )}
                                     </div>
 
-                                    <div className="absolute bottom-0 left-0 w-full p-4 border-t-2 border-[#1a1a2e] flex items-center justify-between">
-                                        <div className="flex items-center gap-1">
-                                            <Dumbbell className="w-3 h-3 opacity-20" />
-                                            <span className="text-[8px] font-black opacity-30 uppercase">IRON_ASSET_ID: {exercise.id.slice(0, 8)}</span>
+                                    <div className="absolute bottom-0 left-0 w-full p-6 border-t-[1px] border-current/20 flex items-center justify-between z-20">
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-[8px] font-black opacity-30 uppercase tracking-[0.2em]">IRON_ASSET_ID</span>
+                                            <span className="text-[10px] font-black tracking-tighter">{exercise.id.slice(0, 12).toUpperCase()}</span>
                                         </div>
 
                                         {!currentUserId ? (
                                             <Link
-                                                href={`/`}
-                                                className="px-4 py-2 bg-[#1a1a2e] text-[#f5f1e8] font-black text-[10px] uppercase tracking-widest hover:bg-red-600 transition-all shadow-[4px_4px_0px_0px_rgba(26,26,46,0.2)] flex items-center gap-2"
+                                                href={`/auth/login`}
+                                                className="px-6 py-3 bg-current text-background font-black text-[10px] uppercase tracking-[0.2em] hover:invert transition-all flex items-center gap-2"
                                             >
-                                                LOGIN <Plus className="w-3 h-3 text-red-600" />
+                                                AUTH_REQUIRED <Plus className="w-3.5 h-3.5" />
                                             </Link>
                                         ) : (
                                             <form action={handleAdoptAction}>

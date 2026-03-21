@@ -138,6 +138,15 @@ export default function SocialTab() {
         }, [user, loadTrainingDays, refreshLocation])
     );
 
+    // Synchronize local modal states when opened
+    useEffect(() => {
+        if (isProfileModalVisible && profile) {
+            setDisplayName(profile.displayName || '');
+            setUsername(profile.username || '');
+            setIsPublic(profile.isPublic === 1);
+        }
+    }, [isProfileModalVisible, profile]);
+
     const handleRefresh = () => {
         setRefreshing(true);
         // Refresh data from API
@@ -409,6 +418,56 @@ export default function SocialTab() {
         );
     };
 
+    const renderTabsMenu = () => (
+        <View style={styles.tabsMenu}>
+            <TouchableOpacity
+                style={[styles.tabBtn, activeTab === 'leaderboard' && styles.tabBtnActive]}
+                onPress={() => setActiveTab('leaderboard')}
+            >
+                <Trophy size={18} color={activeTab === 'leaderboard' ? colors.onPrimary : colors.textMuted} />
+                <Text style={[styles.tabText, activeTab === 'leaderboard' && styles.tabTextActive]}>Ranking</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={[styles.tabBtn, activeTab === 'friends' && styles.tabBtnActive]}
+                onPress={() => setActiveTab('friends')}
+            >
+                <Users size={18} color={activeTab === 'friends' ? colors.onPrimary : colors.textMuted} />
+                <Text style={[styles.tabText, activeTab === 'friends' && styles.tabTextActive]}>
+                    Amigos{incomingFriendRequests > 0 ? ` (${incomingFriendRequests})` : ''}
+                </Text>
+                {incomingFriendRequests > 0 && (
+                    <View style={[styles.inboxBadge, { backgroundColor: colors.red }]}>
+                        <Text style={styles.inboxBadgeText}>{incomingFriendRequests}</Text>
+                    </View>
+                )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={[styles.tabBtn, activeTab === 'inbox' && styles.tabBtnActive]}
+                onPress={() => setActiveTab('inbox')}
+            >
+                <InboxIcon size={18} color={activeTab === 'inbox' ? colors.onPrimary : colors.textMuted} />
+                <Text style={[styles.tabText, activeTab === 'inbox' && styles.tabTextActive]}>
+                    Feed{unseenFeedCount > 0 ? ` (${unseenFeedCount})` : ''}
+                </Text>
+                {unseenFeedCount > 0 && (
+                    <View style={styles.inboxBadge}>
+                        <Text style={styles.inboxBadgeText}>{unseenFeedCount}</Text>
+                    </View>
+                )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={[styles.tabBtn, activeTab === 'search' && styles.tabBtnActive]}
+                onPress={() => setActiveTab('search')}
+            >
+                <Search size={18} color={activeTab === 'search' ? colors.onPrimary : colors.textMuted} />
+                <Text style={[styles.tabText, activeTab === 'search' && styles.tabTextActive]}>Buscar</Text>
+            </TouchableOpacity>
+        </View>
+    );
+
     if (!user) {
         return (
             <SafeAreaWrapper style={styles.container} centered contentStyle={{ alignItems: 'center', justifyContent: 'center' }}>
@@ -456,112 +515,88 @@ export default function SocialTab() {
                 </View>
             </View>
 
-            <ScrollView
-                style={{ flex: 1 }}
-                contentContainerStyle={styles.scrollContent}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary.DEFAULT} />}
-            >
-                <ProfileCard
-                    profile={profile}
-                    isProfileExpanded={isProfileExpanded}
-                    setIsProfileExpanded={setIsProfileExpanded}
-                    isGoalsExpanded={isGoalsExpanded}
-                    setIsGoalsExpanded={setIsGoalsExpanded}
-                    trainingDays={trainingDays}
-                    onToggleTrainingDay={handleToggleTrainingDay}
-                    onCopyId={handleCopyId}
-                    onEditProfile={() => setIsProfileModalVisible(true)}
-                    onShowEventModal={() => setIsEventModalVisible(true)}
-                    onShowWeatherModal={() => setIsWeatherModalVisible(true)}
-                    onRefreshLocation={refreshLocation}
-                    refreshingLocation={refreshingLocation}
-                    locationPermissionDenied={locationPermissionDenied}
-                    lastKnownLocation={lastKnownLocation}
-                    colors={colors}
-                    styles={styles}
-                />
-
-                <View style={styles.tabsMenuWrapper}>
-                    <View style={styles.tabsMenu}>
-                        <TouchableOpacity
-                            style={[styles.tabBtn, activeTab === 'leaderboard' && styles.tabBtnActive]}
-                            onPress={() => setActiveTab('leaderboard')}
-                        >
-                            <Trophy size={18} color={activeTab === 'leaderboard' ? colors.onPrimary : colors.textMuted} />
-                            <Text style={[styles.tabText, activeTab === 'leaderboard' && styles.tabTextActive]}>Ranking</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.tabBtn, activeTab === 'friends' && styles.tabBtnActive]}
-                            onPress={() => setActiveTab('friends')}
-                        >
-                            <Users size={18} color={activeTab === 'friends' ? colors.onPrimary : colors.textMuted} />
-                            <Text style={[styles.tabText, activeTab === 'friends' && styles.tabTextActive]}>
-                                Amigos{incomingFriendRequests > 0 ? ` (${incomingFriendRequests})` : ''}
-                            </Text>
-                            {incomingFriendRequests > 0 && (
-                                <View style={[styles.inboxBadge, { backgroundColor: colors.red }]}>
-                                    <Text style={styles.inboxBadgeText}>{incomingFriendRequests}</Text>
-                                </View>
-                            )}
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.tabBtn, activeTab === 'inbox' && styles.tabBtnActive]}
-                            onPress={() => setActiveTab('inbox')}
-                        >
-                            <InboxIcon size={18} color={activeTab === 'inbox' ? colors.onPrimary : colors.textMuted} />
-                            <Text style={[styles.tabText, activeTab === 'inbox' && styles.tabTextActive]}>
-                                Feed{unseenFeedCount > 0 ? ` (${unseenFeedCount})` : ''}
-                            </Text>
-                            {unseenFeedCount > 0 && (
-                                <View style={styles.inboxBadge}>
-                                    <Text style={styles.inboxBadgeText}>{unseenFeedCount}</Text>
-                                </View>
-                            )}
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.tabBtn, activeTab === 'search' && styles.tabBtnActive]}
-                            onPress={() => setActiveTab('search')}
-                        >
-                            <Search size={18} color={activeTab === 'search' ? colors.onPrimary : colors.textMuted} />
-                            <Text style={[styles.tabText, activeTab === 'search' && styles.tabTextActive]}>Buscar</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
+            <View style={styles.tabContent}>
                 {loading && !refreshing ? (
-                    <View style={{ padding: 40, alignItems: 'center' }}>
+                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                         <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
                         <Text style={[styles.emptyText, { marginTop: 12 }]}>Sincronizando comunidad...</Text>
                     </View>
                 ) : (
-                    <View style={styles.tabContent}>
+                    <>
                         {activeTab === 'leaderboard' && (
-                            <LeaderboardTab
-                                leaderboard={leaderboard}
-                                profile={profile}
-                                rankingSegment={rankingSegment}
-                                expandedFriendId={expandedFriendId}
-                                comparisons={comparisons}
-                                loadingCompare={loadingCompare}
-                                onExpandFriend={handleExpandFriend}
-                                onShowScoreInfo={() => setIsScoreModalVisible(true)}
-                                setRankingSegment={setRankingSegment}
-                                colors={colors}
-                                styles={styles}
-                            />
+                            <ScrollView
+                                contentContainerStyle={styles.scrollContent}
+                                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary.DEFAULT} />}
+                            >
+                                <ProfileCard
+                                    profile={profile}
+                                    isProfileExpanded={isProfileExpanded}
+                                    setIsProfileExpanded={setIsProfileExpanded}
+                                    isGoalsExpanded={isGoalsExpanded}
+                                    setIsGoalsExpanded={setIsGoalsExpanded}
+                                    trainingDays={trainingDays}
+                                    onToggleTrainingDay={handleToggleTrainingDay}
+                                    onCopyId={handleCopyId}
+                                    onEditProfile={() => setIsProfileModalVisible(true)}
+                                    onShowEventModal={() => setIsEventModalVisible(true)}
+                                    onShowWeatherModal={() => setIsWeatherModalVisible(true)}
+                                    onRefreshLocation={refreshLocation}
+                                    refreshingLocation={refreshingLocation}
+                                    locationPermissionDenied={locationPermissionDenied}
+                                    lastKnownLocation={lastKnownLocation}
+                                    colors={colors}
+                                    styles={styles}
+                                />
+                                <View style={styles.tabsMenuWrapper}>{renderTabsMenu()}</View>
+                                <LeaderboardTab
+                                    leaderboard={leaderboard}
+                                    profile={profile}
+                                    rankingSegment={rankingSegment}
+                                    expandedFriendId={expandedFriendId}
+                                    comparisons={comparisons}
+                                    loadingCompare={loadingCompare}
+                                    onExpandFriend={handleExpandFriend}
+                                    onShowScoreInfo={() => setIsScoreModalVisible(true)}
+                                    setRankingSegment={setRankingSegment}
+                                    colors={colors}
+                                    styles={styles}
+                                />
+                            </ScrollView>
                         )}
                         {activeTab === 'friends' && (
-                            <FriendsTab
-                                friends={friends}
-                                onAcceptRequest={handleAcceptFriend}
-                                onRejectRequest={handleRejectFriend}
-                                onShowFriendActions={setSelectedFriend}
-                                colors={colors}
-                                styles={styles}
-                            />
+                            <ScrollView
+                                contentContainerStyle={styles.scrollContent}
+                                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary.DEFAULT} />}
+                            >
+                                <ProfileCard
+                                    profile={profile}
+                                    isProfileExpanded={isProfileExpanded}
+                                    setIsProfileExpanded={setIsProfileExpanded}
+                                    isGoalsExpanded={isGoalsExpanded}
+                                    setIsGoalsExpanded={setIsGoalsExpanded}
+                                    trainingDays={trainingDays}
+                                    onToggleTrainingDay={handleToggleTrainingDay}
+                                    onCopyId={handleCopyId}
+                                    onEditProfile={() => setIsProfileModalVisible(true)}
+                                    onShowEventModal={() => setIsEventModalVisible(true)}
+                                    onShowWeatherModal={() => setIsWeatherModalVisible(true)}
+                                    onRefreshLocation={refreshLocation}
+                                    refreshingLocation={refreshingLocation}
+                                    locationPermissionDenied={locationPermissionDenied}
+                                    lastKnownLocation={lastKnownLocation}
+                                    colors={colors}
+                                    styles={styles}
+                                />
+                                <View style={styles.tabsMenuWrapper}>{renderTabsMenu()}</View>
+                                <FriendsTab
+                                    friends={friends}
+                                    onAcceptRequest={handleAcceptFriend}
+                                    onRejectRequest={handleRejectFriend}
+                                    onShowFriendActions={setSelectedFriend}
+                                    colors={colors}
+                                    styles={styles}
+                                />
+                            </ScrollView>
                         )}
                         {activeTab === 'inbox' && (
                             <InboxTab
@@ -579,23 +614,74 @@ export default function SocialTab() {
                                 profile={profile}
                                 colors={colors}
                                 styles={styles}
+                                refreshing={refreshing}
+                                onRefresh={handleRefresh}
+                                renderHeader={() => (
+                                    <>
+                                        <ProfileCard
+                                            profile={profile}
+                                            isProfileExpanded={isProfileExpanded}
+                                            setIsProfileExpanded={setIsProfileExpanded}
+                                            isGoalsExpanded={isGoalsExpanded}
+                                            setIsGoalsExpanded={setIsGoalsExpanded}
+                                            trainingDays={trainingDays}
+                                            onToggleTrainingDay={handleToggleTrainingDay}
+                                            onCopyId={handleCopyId}
+                                            onEditProfile={() => setIsProfileModalVisible(true)}
+                                            onShowEventModal={() => setIsEventModalVisible(true)}
+                                            onShowWeatherModal={() => setIsWeatherModalVisible(true)}
+                                            onRefreshLocation={refreshLocation}
+                                            refreshingLocation={refreshingLocation}
+                                            locationPermissionDenied={locationPermissionDenied}
+                                            lastKnownLocation={lastKnownLocation}
+                                            colors={colors}
+                                            styles={styles}
+                                        />
+                                        <View style={styles.tabsMenuWrapper}>{renderTabsMenu()}</View>
+                                    </>
+                                )}
                             />
                         )}
                         {activeTab === 'search' && (
-                            <SearchTab
-                                searchQuery={searchQuery}
-                                setSearchQuery={setSearchQuery}
-                                onSearch={handleSearch}
-                                searchResults={searchResults}
-                                onSendRequest={handleSendFriendRequest}
-                                loading={searching}
-                                colors={colors}
-                                styles={styles}
-                            />
+                            <ScrollView
+                                contentContainerStyle={styles.scrollContent}
+                                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary.DEFAULT} />}
+                            >
+                                <ProfileCard
+                                    profile={profile}
+                                    isProfileExpanded={isProfileExpanded}
+                                    setIsProfileExpanded={setIsProfileExpanded}
+                                    isGoalsExpanded={isGoalsExpanded}
+                                    setIsGoalsExpanded={setIsGoalsExpanded}
+                                    trainingDays={trainingDays}
+                                    onToggleTrainingDay={handleToggleTrainingDay}
+                                    onCopyId={handleCopyId}
+                                    onEditProfile={() => setIsProfileModalVisible(true)}
+                                    onShowEventModal={() => setIsEventModalVisible(true)}
+                                    onShowWeatherModal={() => setIsWeatherModalVisible(true)}
+                                    onRefreshLocation={refreshLocation}
+                                    refreshingLocation={refreshingLocation}
+                                    locationPermissionDenied={locationPermissionDenied}
+                                    lastKnownLocation={lastKnownLocation}
+                                    colors={colors}
+                                    styles={styles}
+                                />
+                                <View style={styles.tabsMenuWrapper}>{renderTabsMenu()}</View>
+                                <SearchTab
+                                    searchQuery={searchQuery}
+                                    setSearchQuery={setSearchQuery}
+                                    onSearch={handleSearch}
+                                    searchResults={searchResults}
+                                    onSendRequest={handleSendFriendRequest}
+                                    loading={searching}
+                                    colors={colors}
+                                    styles={styles}
+                                />
+                            </ScrollView>
                         )}
-                    </View>
+                    </>
                 )}
-            </ScrollView>
+            </View>
 
             <ProfileEditModal
                 visible={isProfileModalVisible}
@@ -649,6 +735,6 @@ export default function SocialTab() {
                 colors={colors}
                 styles={styles}
             />
-        </SafeAreaWrapper>
+        </SafeAreaWrapper >
     );
 }

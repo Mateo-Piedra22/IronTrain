@@ -158,6 +158,7 @@ export class SocialService {
         return {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
+            'X-Requested-With': 'XMLHttpRequest',
         };
     }
 
@@ -318,6 +319,8 @@ export class SocialService {
             body: JSON.stringify({ friendId, payload, type }),
         });
         try {
+            // Clear local cache BEFORE emitting event to ensure consistency
+            this.clearCache();
             dataEventService.emit('SOCIAL_UPDATED');
         } catch { }
         return data.success;
@@ -365,6 +368,7 @@ export class SocialService {
         // Emit local event AFTER server request (successful or failed-but-queued)
         // This ensures that when subscribers (like SocialTab) reload data, 
         // they fetch the updated state from the server/synced pool.
+        this.clearCache();
         dataEventService.emit('SOCIAL_UPDATED');
 
         return true;
@@ -417,6 +421,7 @@ export class SocialService {
             logger.info('[SocialService] Batch server markAllAsSeen pending (synced locally)', { error: e });
         }
 
+        this.clearCache();
         dataEventService.emit('SOCIAL_UPDATED');
         return true;
     }

@@ -177,6 +177,13 @@ export const syncRateLimits = pgTable('sync_rate_limits', {
     count: integer('count').default(0).notNull(),
 });
 
+export const authCodes = pgTable('auth_codes', {
+    code: text('code').primaryKey(),
+    userId: text('user_id').notNull(),
+    expiresAt: timestamp('expires_at').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // --- IRON SOCIAL ---
 export const userProfiles = pgTable('user_profiles', {
     id: text('id').primaryKey(), // The user's ID

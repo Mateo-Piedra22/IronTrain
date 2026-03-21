@@ -45,44 +45,62 @@ export const ProfileEditModal = React.memo(({
                                 Entre 2 y 64 caracteres. Evitá datos sensibles.
                             </Text>
 
-                            <Text style={styles.modalLabel}>Username</Text>
+                            <Text style={styles.modalLabel}>Username (@)</Text>
                             <TextInput
                                 style={[
                                     styles.modalInput,
                                     profile?.lastUsernameChangeAt &&
                                     (Date.now() - new Date(profile.lastUsernameChangeAt).getTime() < 30 * 24 * 60 * 60 * 1000) &&
-                                    { backgroundColor: colors.surface, color: colors.textMuted }
+                                    { opacity: 0.5, borderColor: colors.red }
                                 ]}
                                 value={username}
-                                onChangeText={(value) => setUsername(value.replace(/\s+/g, '').toLowerCase())}
+                                onChangeText={(val) => setUsername(val.replace(/\s+/g, '').toLowerCase())}
                                 maxLength={32}
                                 autoCapitalize="none"
                                 autoCorrect={false}
-                                placeholder="sin espacios"
+                                placeholder="tu_username"
                                 placeholderTextColor={colors.textMuted}
                                 editable={!profile?.lastUsernameChangeAt || (Date.now() - new Date(profile.lastUsernameChangeAt).getTime() >= 30 * 24 * 60 * 60 * 1000)}
                             />
+
                             {profile?.lastUsernameChangeAt && (Date.now() - new Date(profile.lastUsernameChangeAt).getTime() < 30 * 24 * 60 * 60 * 1000) ? (
-                                <Text style={[styles.modalFieldHint, { color: colors.primary.DEFAULT, fontWeight: '900' }]}>
-                                    Bloqueado hasta: {new Date(new Date(profile.lastUsernameChangeAt).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}
-                                </Text>
+                                <View style={{
+                                    backgroundColor: withAlpha(colors.red, '10'),
+                                    borderColor: withAlpha(colors.red, '30'),
+                                    borderWidth: 1,
+                                    borderRadius: 12,
+                                    marginTop: 4,
+                                    padding: 12
+                                }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                        <XCircle size={14} color={colors.red} />
+                                        <Text style={{ color: colors.red, fontSize: 11, fontWeight: '900', textTransform: 'uppercase' }}>Restricción Temporal</Text>
+                                    </View>
+                                    <Text style={[styles.modalFieldHint, { marginBottom: 0 }]}>
+                                        Cambio bloqueado. Podrás modificarlo nuevamente el {new Date(new Date(profile.lastUsernameChangeAt).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}.
+                                    </Text>
+                                </View>
                             ) : (
                                 <Text style={styles.modalFieldHint}>
-                                    Dejá vacío para quitar username. Permitido: a-z, 0-9 y _ (1 vez cada 30 días)
+                                    Permitido: a-z, 0-9 y _ (1 vez cada 30 días). Dejá vacío para quitar.
                                 </Text>
                             )}
 
+                            <View style={{ height: 16 }} />
+
                             <View style={styles.privacyRow}>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.modalLabel}>Visibilidad del perfil</Text>
+                                    <Text style={styles.modalLabel}>Visibilidad pública</Text>
                                     <Text style={styles.privacyHint}>
-                                        {isPublic ? 'Público: apareces en búsqueda social.' : 'Privado: no apareces en búsqueda social.'}
+                                        {isPublic
+                                            ? "Tu perfil y rutinas son visibles para otros atletas."
+                                            : "Solo vos podés ver tu progreso y rutinas."}
                                     </Text>
                                 </View>
                                 <Switch
                                     value={isPublic}
                                     onValueChange={setIsPublic}
-                                    trackColor={{ false: colors.border, true: withAlpha(colors.primary.DEFAULT, '66') }}
+                                    trackColor={{ false: colors.border, true: withAlpha(colors.primary.DEFAULT, '40') }}
                                     thumbColor={isPublic ? colors.primary.DEFAULT : colors.textMuted}
                                 />
                             </View>
@@ -90,10 +108,10 @@ export const ProfileEditModal = React.memo(({
 
                         <View style={styles.modalActions}>
                             <TouchableOpacity style={styles.modalCancelBtn} onPress={onClose}>
-                                <Text style={styles.modalCancelText}>Cancelar</Text>
+                                <Text style={styles.modalCancelText}>CANCELAR</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.modalPrimaryBtn} onPress={onSave} disabled={saving}>
-                                {saving ? <ActivityIndicator size="small" color={colors.onPrimary} /> : <Text style={styles.modalPrimaryText}>Guardar</Text>}
+                                {saving ? <ActivityIndicator size="small" color={colors.onPrimary} /> : <Text style={styles.modalPrimaryText}>GUARDAR</Text>}
                             </TouchableOpacity>
                         </View>
                     </Pressable>

@@ -320,25 +320,11 @@ export class AnalysisService {
         const avgDurationRow = await dbService.getFirst<{ avgMin: number | null }>(
             `
                 SELECT AVG(
-                    COALESCE(
-                        CASE 
-                            WHEN duration > 0 THEN 
-                                CASE 
-                                    WHEN duration > 43200000 THEN NULL 
-                                    WHEN duration > 43200 THEN duration / 60000.0 
-                                    ELSE duration / 60.0 
-                                END
-                            ELSE NULL 
-                        END,
-                        CASE 
-                            WHEN end_time > start_time THEN 
-                                CASE 
-                                    WHEN (end_time - start_time) > 43200000 THEN NULL 
-                                    ELSE (end_time - start_time) / 60000.0 
-                                END
-                            ELSE NULL 
-                        END
-                    )
+                    CASE 
+                        WHEN duration > 0 THEN duration / 60.0
+                        WHEN end_time > start_time THEN (end_time - start_time) / 60000.0
+                        ELSE NULL
+                    END
                 ) as avgMin
                 FROM workouts
                 WHERE status = 'completed'

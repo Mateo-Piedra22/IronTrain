@@ -13,6 +13,7 @@ import { configService } from '@/src/services/ConfigService';
 import { RoutineDayWithExercises } from '@/src/services/RoutineService';
 import { confirm } from '@/src/store/confirmStore';
 import { useTimerStore } from '@/src/store/timerStore';
+import { formatTimeSeconds } from '@/src/utils/time';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { addDays, subDays } from 'date-fns';
 import * as Haptics from 'expo-haptics';
@@ -58,42 +59,7 @@ export default function DailyLogScreen() {
   const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
   const bottomOffset = (tabBarHeight ? tabBarHeight : insets.bottom) + 12;
 
-  // Auto-focus notification when switching sessions if the new one is active
-  useEffect(() => {
-    const current = workouts[activeWorkoutIndex];
-    if (current && current.status === 'in_progress') {
-      configService.set('runningWorkoutTimerWorkoutId', current.id);
-      // Also force an immediate update of the notification to show the new name
-      const startTs = configService.getGeneric(`runningWorkoutTimerStartTimestamp_${current.id}`) as number | null;
-      const baseSec = configService.getGeneric(`runningWorkoutTimerBaseSeconds_${current.id}`) as number | null;
-      if (typeof startTs === 'number' && startTs > 0) {
-        const b = typeof baseSec === 'number' ? baseSec : 0;
-        const totalSec = b + Math.floor((Date.now() - startTs) / 1000);
-        const name = current.name || `Sesión ${workouts.length - activeWorkoutIndex}`;
-        import('@/src/services/SystemNotificationService').then(({ systemNotificationService }) => {
-          systemNotificationService.showPersistentWorkout({
-            elapsedSeconds: totalSec,
-            completedSets: 0,
-            totalExercises: 0,
-            isPaused: false,
-            workoutName: name
-          });
-        });
-      }
-    }
-  }, [activeWorkoutIndex, workouts.length]);
-
-  const formatDurationRaw = (ms: number) => {
-    if (isNaN(ms) || ms < 0) return '00:00';
-    const totalSec = Math.floor(ms / 1000);
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    const s = totalSec % 60;
-    const pad = (n: number) => String(n).padStart(2, '0');
-    if (h > 0) return `${h}h ${pad(m)}m ${pad(s)}s`;
-    return `${pad(m)}:${pad(s)}`;
-  };
-
+  // --- Data Loading ---
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -188,43 +154,7 @@ export default function DailyLogScreen() {
     return () => clearInterval(interval);
   }, [showSessionModal]);
 
-  // Background Notification Keeper (for persistence when switching sessions)
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const runningId = configService.get('runningWorkoutTimerWorkoutId');
-      if (!runningId) return;
-
-      // Find the running workout in our current state list
-      const runningWorkout = workouts.find(w => w.id === runningId);
-      if (!runningWorkout) return;
-
-      const startTs = configService.getGeneric(`runningWorkoutTimerStartTimestamp_${runningId}`) as number | null;
-      const baseSec = configService.getGeneric(`runningWorkoutTimerBaseSeconds_${runningId}`) as number | null;
-
-      if (typeof startTs === 'number' && startTs > 0) {
-        const b = typeof baseSec === 'number' ? baseSec : 0;
-        const totalSec = b + Math.floor((Date.now() - startTs) / 1000);
-
-        // Only update if we are NOT in the session that is already updating itself (WorkoutStatusBar)
-        const currentVisibleWorkout = workouts[activeWorkoutIndex];
-        if (currentVisibleWorkout?.id !== runningId) {
-          const { systemNotificationService } = await import('@/src/services/SystemNotificationService');
-          // Simplified stats since we don't have the full sets list easily here without fetching, 
-          // but we can at least keep the time alive.
-          systemNotificationService.showPersistentWorkout({
-            elapsedSeconds: totalSec,
-            completedSets: 0, // Placeholder or we could fetch
-            totalExercises: 0,
-            isPaused: false,
-            workoutName: runningWorkout.name || `Sesión ${workouts.length - workouts.indexOf(runningWorkout)}`
-          });
-        }
-      }
-    }, 15000);
-
-    return () => clearInterval(interval);
-  }, [workouts, activeWorkoutIndex]);
-
+  // Add Set logic
   const handleAddSet = useCallback(async (exerciseId: string) => {
     if (!workout) return;
     try {
@@ -883,7 +813,7 @@ export default function DailyLogScreen() {
                               totalSec = Math.max(rawDur, baseSec);
                             }
 
-                            return formatDurationRaw(totalSec * 1000);
+                            return formatTimeSeconds(totalSec);
                           })()}
                         </Text>
                       </View>

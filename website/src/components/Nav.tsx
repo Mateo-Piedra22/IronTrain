@@ -11,7 +11,7 @@ const links = [
   { href: '/downloads', label: 'Descargas' },
   { href: '/changelog', label: 'Novedades' },
   { href: '/faq', label: 'FAQ' },
-  { href: '/support', label: 'Soporte' },
+  { href: '/help', label: 'Ayuda' },
   { href: '/donate', label: 'Donar' },
 ];
 

@@ -1384,48 +1384,7 @@ export const createSocialStyles = (colors: any) => StyleSheet.create({
         color: colors.primary.DEFAULT,
         fontWeight: '900',
     },
-    inboxSecondaryHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-        paddingHorizontal: 4,
-    },
-    inboxStatusTitle: {
-        fontSize: 14,
-        fontWeight: '800',
-        color: colors.text,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-    archiveToggle: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        backgroundColor: colors.surfaceLighter,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    archiveToggleActive: {
-        backgroundColor: colors.primary.DEFAULT,
-        borderColor: colors.primary.DEFAULT,
-    },
-    archiveToggleText: {
-        fontSize: 12,
-        fontWeight: '800',
-        color: colors.textMuted,
-    },
-    archiveToggleTextActive: {
-        color: colors.onPrimary,
-    },
-    markSeenBtn: {
-        padding: 8,
-        backgroundColor: withAlpha(colors.textMuted, '10'),
-        borderRadius: 10,
-    },
+
     // Collapsible Profile Styles
     mainScroll: {
         flex: 1,
@@ -1488,6 +1447,69 @@ export const createSocialStyles = (colors: any) => StyleSheet.create({
     },
     badgeSmall: {
         paddingHorizontal: 8,
+    },
+    // --- Thermal Aesthetic (Science-y / High contrast) ---
+    thermalCard: {
+        backgroundColor: '#050505',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#333',
+        padding: 20,
+        marginVertical: 10,
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.5,
+        shadowRadius: 10,
+    },
+    thermalTitleMono: {
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+        fontSize: 18,
+        fontWeight: '900',
+        color: '#fff',
+        textTransform: 'uppercase',
+        letterSpacing: 2,
+        marginBottom: 15,
+    },
+    thermalValueMono: {
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+        fontSize: 32,
+        fontWeight: '900',
+        color: colors.primary.DEFAULT,
+        textAlign: 'center',
+        marginVertical: 10,
+    },
+    thermalLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#666',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    thermalSeparator: {
+        height: 1,
+        backgroundColor: '#222',
+        marginVertical: 15,
+    },
+    thermalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+    },
+    thermalBadge: {
+        backgroundColor: '#111',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    thermalBadgeText: {
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#fff',
     },
 });
 

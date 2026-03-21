@@ -10,6 +10,9 @@ export interface NotificationPreferences {
         workoutStatus: boolean;
         updates: boolean;
         intervalTimer: boolean;
+        personalRecord: boolean;
+        social: boolean;
+        kudos: boolean;
     };
     system: {
         enabled: boolean;
@@ -21,6 +24,9 @@ export interface NotificationPreferences {
         updateAvailable: boolean;
         appUpdated: boolean;
         streakReminder: boolean;
+        personalRecord: boolean;
+        social: boolean;
+        kudos: boolean;
     };
     sounds: {
         restTimer: boolean;
@@ -90,8 +96,8 @@ const DEFAULT_CONFIG: AppConfig = {
     systemNotificationsEnabled: true,
     androidForegroundServiceNotificationsEnabled: false,
     notificationPreferences: {
-        inApp: { enabled: true, restTimer: true, workoutStatus: true, updates: true, intervalTimer: true },
-        system: { enabled: true, restTimer: true, workoutPersistent: true, inactivityReminder: true, workoutComplete: true, intervalTimer: true, updateAvailable: true, appUpdated: true, streakReminder: true },
+        inApp: { enabled: true, restTimer: true, workoutStatus: true, updates: true, intervalTimer: true, personalRecord: true, social: true, kudos: true },
+        system: { enabled: true, restTimer: true, workoutPersistent: true, inactivityReminder: true, workoutComplete: true, intervalTimer: true, updateAvailable: true, appUpdated: true, streakReminder: true, personalRecord: true, social: true, kudos: true },
         sounds: { restTimer: true, intervalTimer: true, workoutComplete: true, countdown: true },
     },
 

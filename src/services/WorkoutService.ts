@@ -7,6 +7,7 @@ import { uuidV4 } from '../utils/uuid';
 import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
 import { IronScoreService } from './IronScoreService';
+import { systemNotificationService } from './SystemNotificationService';
 
 type CopyMode = 'replace' | 'append';
 type CopyNameMode = 'if_empty' | 'always' | 'never';
@@ -207,7 +208,7 @@ class WorkoutService {
         return await dbService.getWorkoutById(id);
     }
 
-    public async updateWorkout(id: string, updates: Partial<Pick<Workout, 'name' | 'notes'>>): Promise<void> {
+    public async updateWorkout(id: string, updates: Partial<Pick<Workout, 'name' | 'notes' | 'duration'>>): Promise<void> {
         await dbService.updateWorkout(id, updates);
         this.invalidateCaches();
         dataEventService.emit('DATA_UPDATED');
@@ -733,6 +734,9 @@ class WorkoutService {
 
         await this.createSocialFeedEventsForFinishedWorkout(id, now);
 
+        // Dismiss persistent notification
+        systemNotificationService.dismissPersistentWorkout();
+
         dataEventService.emit('DATA_UPDATED');
 
         this.invalidateCaches();
@@ -807,6 +811,7 @@ class WorkoutService {
                 w.date,
                 w.start_time,
                 w.end_time,
+                w.duration,
                 w.status,
                 COUNT(DISTINCT s.id) as set_count,
                 COUNT(DISTINCT s.exercise_id) as exercise_count
@@ -922,6 +927,7 @@ class WorkoutService {
             }
         }
 
+        const achievedPrs: { exerciseName: string; oneRm: number }[] = [];
         for (const [exerciseId, current] of bestByExercise.entries()) {
             const previousMax = await dbService.getFirst<{ max_1rm: number | null }>(
                 `SELECT MAX(s.weight * (1.0 + (s.reps / 30.0))) as max_1rm
@@ -944,6 +950,16 @@ class WorkoutService {
             }
 
             const roundedOneRm = Math.round(current.oneRm);
+
+            // Find the actual weight and reps that achieved this best 1RM in this workout
+            const bestSet = workoutSets
+                .filter(s => s.exercise_id === exerciseId)
+                .reduce((prev, curr) => {
+                    const curr1rm = curr.weight * (1 + curr.reps / 30);
+                    const prev1rm = prev.weight * (1 + prev.reps / 30);
+                    return curr1rm > prev1rm ? curr : prev;
+                });
+
             await this.upsertActivityFeedRecord({
                 id: `activity-pr-${workoutId}-${exerciseId}`,
                 userId,
@@ -955,9 +971,23 @@ class WorkoutService {
                     exerciseName: current.exerciseName,
                     oneRm: roundedOneRm,
                     previousOneRm: Math.round(oldOneRm),
+                    weight: bestSet.weight,
+                    reps: bestSet.reps,
                 }),
                 createdAt: timestamp,
                 updatedAt: timestamp,
+            });
+
+            achievedPrs.push({
+                exerciseName: current.exerciseName,
+                oneRm: roundedOneRm,
+            });
+        }
+
+        if (achievedPrs.length > 0) {
+            // Trigger system notification for PRs
+            systemNotificationService.showPRNotification(achievedPrs).catch(e => {
+                logger.captureException(e, { scope: 'WorkoutService.createSocialFeedEventsForFinishedWorkout.notification' });
             });
         }
     }
@@ -1157,6 +1187,9 @@ class WorkoutService {
             dataEventService.emit('DATA_UPDATED');
 
             this.invalidateCaches();
+
+            // Dismiss notification if it was this workout
+            systemNotificationService.dismissPersistentWorkout();
         } catch (e) {
             throw e;
         }

@@ -2,9 +2,19 @@ import { SocialInboxItem, SocialProfile } from '@/src/services/SocialService';
 import { withAlpha } from '@/src/theme';
 import { getInboxKey } from '@/src/utils/dedupe';
 import { FlashList } from '@shopify/flash-list';
-import { CheckCircle, Dumbbell, Eye, EyeOff, Filter, Flame, Globe, Trophy, User, XCircle } from 'lucide-react-native';
-import React, { useCallback, useMemo } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { CheckCircle, ChevronDown, ChevronUp, Dumbbell, Eye, EyeOff, Filter, Flame, Globe, Trophy, User, XCircle } from 'lucide-react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { LayoutAnimation, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+
+const safeDate = (dateStr: any): Date => {
+    try {
+        if (!dateStr) return new Date();
+        const d = new Date(dateStr);
+        return isNaN(d.getTime()) ? new Date() : d;
+    } catch {
+        return new Date();
+    }
+};
 
 interface InboxTabProps {
     inbox: SocialInboxItem[];
@@ -29,7 +39,19 @@ interface InboxTabProps {
 const getActivityDescription = (item: SocialInboxItem): string => {
     const isPr = item.actionType === 'pr_broken';
     const isRoutineShared = item.actionType === 'routine_shared';
-    if (isPr) return 'Rompió un Récord Personal';
+    if (isPr) {
+        try {
+            const meta = item.metadata ? JSON.parse(item.metadata) : {};
+            const exercise = meta.exerciseName || 'un ejercicio';
+            if (meta.weight && meta.reps) {
+                return `Nuevo PR en ${exercise}: ${meta.weight}kg x ${meta.reps}`;
+            }
+            if (meta.oneRm) {
+                return `Nuevo PR en ${exercise}: ${Math.round(meta.oneRm)}kg (1RM)`;
+            }
+        } catch { }
+        return 'Rompió un Récord Personal';
+    }
     if (isRoutineShared) return 'Compartió una rutina';
     return 'Completó un Entrenamiento';
 };
@@ -47,7 +69,7 @@ const DirectShareItem = React.memo(({ item, onResponse, onMarkAsSeen, colors, st
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 4 }}>
                     <Text style={styles.activityDate}>
-                        {new Date(item.createdAt).toLocaleDateString()}
+                        {safeDate(item.createdAt).toLocaleDateString()}
                     </Text>
                     {!item.seenAt && (
                         <TouchableOpacity style={styles.markSeenBtn} onPress={() => onMarkAsSeen(item.id, 'direct_share')}>
@@ -93,7 +115,7 @@ const DirectShareItem = React.memo(({ item, onResponse, onMarkAsSeen, colors, st
     );
 });
 
-const ActivityItem = React.memo(({ item, onToggleKudo, onMarkAsSeen, profileId, colors, styles }: any) => {
+const ActivityItem = React.memo(({ item, onToggleKudo, onMarkAsSeen, profileId, colors, styles, isGrouped = false }: any) => {
     const isOwn = item.senderId === profileId;
     const senderLabel = isOwn ? 'Tú' : (item.senderUsername ? `@${item.senderUsername}` : item.senderName);
     const isPr = item.actionType === 'pr_broken';
@@ -104,7 +126,7 @@ const ActivityItem = React.memo(({ item, onToggleKudo, onMarkAsSeen, profileId, 
             ? { backgroundColor: withAlpha(colors.primary.DEFAULT, '30') }
             : { backgroundColor: withAlpha(colors.primary.DEFAULT, '15') };
     return (
-        <View style={styles.activityRow}>
+        <View style={[styles.activityRow, isGrouped && { paddingLeft: 16, borderLeftWidth: 2, borderLeftColor: colors.border }]}>
             <View style={styles.activityHeader}>
                 <View style={[styles.activityIconBox, iconBg]}>
                     {isPr ? (
@@ -117,15 +139,17 @@ const ActivityItem = React.memo(({ item, onToggleKudo, onMarkAsSeen, profileId, 
                 </View>
                 <View style={{ flex: 1 }}>
                     <Text style={styles.activityUser}>
-                        {senderLabel}
+                        {!isGrouped && senderLabel}
                     </Text>
                     <Text style={styles.activityDesc}>{getActivityDescription(item)}</Text>
                 </View>
-                <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                    <Text style={styles.activityDate}>
-                        {new Date(item.createdAt).toLocaleDateString()}
-                    </Text>
-                </View>
+                {!isGrouped && (
+                    <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                        <Text style={styles.activityDate}>
+                            {safeDate(item.createdAt).toLocaleDateString()}
+                        </Text>
+                    </View>
+                )}
             </View>
             <View style={styles.activityFooter}>
                 <TouchableOpacity
@@ -170,17 +194,26 @@ const InboxTab = React.memo(({
     refreshing,
     onRefresh
 }: InboxTabProps) => {
+    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
-    const filteredInbox = useMemo(() => {
-        return inbox.filter(item => {
-            // 1. Seen/Unseen filtering
+    const toggleGroup = (groupId: string) => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setExpandedGroups((prev: Record<string, boolean>) => ({ ...prev, [groupId]: !prev[groupId] }));
+    };
+
+    const organizedData = useMemo(() => {
+        if (!inbox) return [];
+
+        // 1. Initial Filtering
+        const filtered = inbox.filter(item => {
+            // Seen/Unseen filtering
             const matchesSeen = showSeen ? !!item.seenAt : !item.seenAt;
             if (!matchesSeen) return false;
 
-            // 2. Own activity filtering
-            if (hideOwnActivity && item.senderId === profile?.id) return false;
+            // Own activity filtering
+            if (hideOwnActivity && profile?.id && item.senderId === profile.id) return false;
 
-            // 3. Type filtering
+            // Type filtering
             if (typeFilter !== 'all') {
                 if (typeFilter === 'pr' && item.actionType !== 'pr_broken') return false;
                 if (typeFilter === 'workout' && item.actionType !== 'workout_completed') return false;
@@ -189,10 +222,99 @@ const InboxTab = React.memo(({
 
             return true;
         });
-    }, [inbox, showSeen, hideOwnActivity, typeFilter, profile?.id]);
 
-    const renderItem = useCallback(({ item }: { item: SocialInboxItem }) => {
-        if (item.feedType === 'direct_share' || !item.feedType) {
+        // 2. Grouping PRs
+        const result: any[] = [];
+        const prGroups: Record<string, SocialInboxItem[]> = {};
+
+        filtered.forEach(item => {
+            if (item.actionType === 'pr_broken') {
+                const dateKey = safeDate(item.createdAt).toISOString().split('T')[0];
+                const groupKey = `pr_group:${item.senderId}:${dateKey}`;
+                if (!prGroups[groupKey]) prGroups[groupKey] = [];
+                prGroups[groupKey].push(item);
+            } else {
+                result.push(item);
+            }
+        });
+
+        // Add groups or single items
+        Object.entries(prGroups).forEach(([key, items]) => {
+            if (items.length > 2) { // Only group if more than 2 PRs
+                result.push({
+                    id: key,
+                    type: 'pr_group',
+                    senderId: items[0].senderId,
+                    senderName: items[0].senderName,
+                    senderUsername: items[0].senderUsername,
+                    createdAt: items[0].createdAt,
+                    items: items.sort((a, b) => safeDate(b.createdAt).getTime() - safeDate(a.createdAt).getTime()),
+                    unseenCount: items.filter(i => !i.seenAt).length
+                });
+            } else {
+                items.forEach(i => result.push(i));
+            }
+        });
+
+        // Sort everything by date
+        return result.sort((a, b) => safeDate(b.createdAt).getTime() - safeDate(a.createdAt).getTime());
+    }, [inbox, showSeen, profile?.id, hideOwnActivity, typeFilter]);
+
+    const renderGroupItem = (group: any) => {
+        const isExpanded = !!expandedGroups[group.id];
+        const isOwn = group.senderId === profile?.id;
+        const senderLabel = isOwn ? 'Tú' : (group.senderUsername ? `@${group.senderUsername}` : group.senderName);
+
+        return (
+            <View style={{ marginBottom: 16 }}>
+                <TouchableOpacity
+                    style={styles.activityRow}
+                    onPress={() => toggleGroup(group.id)}
+                    activeOpacity={0.7}
+                >
+                    <View style={styles.activityHeader}>
+                        <View style={[styles.activityIconBox, { backgroundColor: withAlpha(colors.yellow, '30') }]}>
+                            <Trophy size={18} color={colors.yellow} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.activityUser}>{senderLabel}</Text>
+                            <Text style={styles.activityDesc}>Batió {group.items.length} Récords Personales</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                            <Text style={styles.activityDate}>
+                                {safeDate(group.createdAt).toLocaleDateString()}
+                            </Text>
+                            {isExpanded ? (
+                                <ChevronUp size={16} color={colors.textMuted} />
+                            ) : (
+                                <ChevronDown size={16} color={colors.textMuted} />
+                            )}
+                        </View>
+                    </View>
+                </TouchableOpacity>
+
+                {isExpanded && (
+                    <View style={{ marginTop: -8 }}>
+                        {group.items.map((item: SocialInboxItem) => (
+                            <ActivityItem
+                                key={item.id}
+                                item={item}
+                                onToggleKudo={handleToggleKudo}
+                                onMarkAsSeen={handleMarkAsSeen}
+                                profileId={profile?.id}
+                                colors={colors}
+                                styles={styles}
+                                isGrouped={true}
+                            />
+                        ))}
+                    </View>
+                )}
+            </View>
+        );
+    };
+
+    const renderItem = useCallback(({ item }: { item: any }) => {
+        if (item.feedType === 'direct_share' || !item.feedType && item.type !== 'pr_group') {
             return (
                 <View style={{ marginBottom: 16 }}>
                     <DirectShareItem
@@ -205,6 +327,11 @@ const InboxTab = React.memo(({
                 </View>
             );
         }
+
+        if (item.type === 'pr_group') {
+            return renderGroupItem(item);
+        }
+
         return (
             <View style={{ marginBottom: 16 }}>
                 <ActivityItem
@@ -217,14 +344,14 @@ const InboxTab = React.memo(({
                 />
             </View>
         );
-    }, [handleInboxResponse, handleMarkAsSeen, handleToggleKudo, profile?.id, colors, styles]);
+    }, [handleInboxResponse, handleMarkAsSeen, handleToggleKudo, profile?.id, colors, styles, expandedGroups]);
 
     return (
         <View style={{ flex: 1 }}>
             <FlashList
-                data={filteredInbox}
+                data={organizedData}
                 renderItem={renderItem}
-                keyExtractor={(item) => getInboxKey(item)}
+                keyExtractor={(item) => item.id || getInboxKey(item)}
                 ListHeaderComponent={() => (
                     <View style={{ paddingTop: 8 }}>
                         {renderHeader && renderHeader()}
@@ -301,7 +428,7 @@ const InboxTab = React.memo(({
                         {showSeen ? 'No tenés notificaciones archivadas.' : 'Todo al día por acá.'}
                     </Text>
                 }
-                contentContainerStyle={{ paddingBottom: 100 }}
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}
             />
         </View>
     );

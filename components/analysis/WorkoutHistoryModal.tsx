@@ -5,7 +5,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -35,6 +37,9 @@ export function WorkoutHistoryModal({ visible, onClose }: WorkoutHistoryModalPro
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
     const [editNotes, setEditNotes] = useState('');
+    const [editHours, setEditHours] = useState('0');
+    const [editMinutes, setEditMinutes] = useState('0');
+    const [editSeconds, setEditSeconds] = useState('0');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -59,15 +64,30 @@ export function WorkoutHistoryModal({ visible, onClose }: WorkoutHistoryModalPro
         setEditingId(workout.id);
         setEditName(workout.name || '');
         setEditNotes(workout.notes || '');
+
+        const totalSeconds = Number(workout.duration) || 0;
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+
+        setEditHours(h.toString());
+        setEditMinutes(m.toString());
+        setEditSeconds(s.toString());
     };
 
     const handleSave = async (id: string) => {
         if (!id) return;
         setSaving(true);
         try {
+            const h = parseInt(editHours) || 0;
+            const m = parseInt(editMinutes) || 0;
+            const s = parseInt(editSeconds) || 0;
+            const totalDuration = (h * 3600) + (m * 60) + s;
+
             await workoutService.updateWorkout(id, {
                 name: editName.trim(),
-                notes: editNotes.trim()
+                notes: editNotes.trim(),
+                duration: totalDuration
             });
             setEditingId(null);
             loadHistory();
@@ -227,7 +247,7 @@ export function WorkoutHistoryModal({ visible, onClose }: WorkoutHistoryModalPro
         },
         listContent: {
             padding: 16,
-            paddingBottom: 40,
+            paddingBottom: 350, // Extra padding for keyboard
         },
         card: {
             backgroundColor: colors.surface,
@@ -373,7 +393,7 @@ export function WorkoutHistoryModal({ visible, onClose }: WorkoutHistoryModalPro
     }), [colors]);
 
     const renderItem = ({ item }: { item: any }) => {
-        const duration = item.end_time && item.start_time ? Math.round((item.end_time - item.start_time) / 1000) : 0;
+        const duration = Number(item.duration) || 0;
         const statusConfig = item.status === 'completed'
             ? { label: 'Completado', color: colors.green, bg: withAlpha(colors.green, '15') }
             : { label: 'En progreso', color: colors.primary.DEFAULT, bg: withAlpha(colors.primary.DEFAULT, '15') };
@@ -432,14 +452,49 @@ export function WorkoutHistoryModal({ visible, onClose }: WorkoutHistoryModalPro
                 </View>
 
                 {isEditing ? (
-                    <TextInput
-                        style={styles.notesInput}
-                        value={editNotes}
-                        onChangeText={setEditNotes}
-                        placeholder="Añadir notas..."
-                        placeholderTextColor={colors.textMuted}
-                        multiline
-                    />
+                    <View style={{ marginBottom: 12 }}>
+                        <Text style={[styles.infoText, { marginBottom: 6 }]}>Duración</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <View style={{ flex: 1 }}>
+                                <TextInput
+                                    style={styles.editInput}
+                                    value={editHours}
+                                    onChangeText={setEditHours}
+                                    keyboardType="numeric"
+                                    placeholder="HH"
+                                />
+                                <Text style={{ fontSize: 10, color: colors.textMuted, textAlign: 'center' }}>Horas</Text>
+                            </View>
+                            <Text style={{ fontWeight: 'bold', color: colors.text }}>:</Text>
+                            <View style={{ flex: 1 }}>
+                                <TextInput
+                                    style={styles.editInput}
+                                    value={editMinutes}
+                                    onChangeText={(v) => {
+                                        const n = parseInt(v) || 0;
+                                        setEditMinutes(n > 59 ? '59' : v);
+                                    }}
+                                    keyboardType="numeric"
+                                    placeholder="MM"
+                                />
+                                <Text style={{ fontSize: 10, color: colors.textMuted, textAlign: 'center' }}>Min</Text>
+                            </View>
+                            <Text style={{ fontWeight: 'bold', color: colors.text }}>:</Text>
+                            <View style={{ flex: 1 }}>
+                                <TextInput
+                                    style={styles.editInput}
+                                    value={editSeconds}
+                                    onChangeText={(v) => {
+                                        const n = parseInt(v) || 0;
+                                        setEditSeconds(n > 59 ? '59' : v);
+                                    }}
+                                    keyboardType="numeric"
+                                    placeholder="SS"
+                                />
+                                <Text style={{ fontSize: 10, color: colors.textMuted, textAlign: 'center' }}>Seg</Text>
+                            </View>
+                        </View>
+                    </View>
                 ) : (
                     item.notes && (
                         <View style={styles.notesContainer}>
@@ -484,7 +539,10 @@ export function WorkoutHistoryModal({ visible, onClose }: WorkoutHistoryModalPro
             onRequestClose={onClose}
         >
             <View style={styles.overlay}>
-                <View style={styles.container}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    style={styles.container}
+                >
                     {/* Header */}
                     <View style={styles.header}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -572,7 +630,7 @@ export function WorkoutHistoryModal({ visible, onClose }: WorkoutHistoryModalPro
                             }
                         />
                     )}
-                </View>
+                </KeyboardAvoidingView>
             </View>
         </Modal>
     );

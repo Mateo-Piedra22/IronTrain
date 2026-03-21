@@ -1,5 +1,5 @@
+import { randomBytes } from 'crypto';
 import { eq } from 'drizzle-orm';
-import * as jose from 'jose';
 import { AlertTriangle, Check, ExternalLink, User } from 'lucide-react';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { auth } from '../../../src/lib/auth/server';
+import { validateDisplayName, validateUsername } from '../../../src/lib/moderation';
 
 export const revalidate = 0;
 
@@ -78,20 +79,16 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
 
             console.log(`[Bridge] Attempting to set username:${username} for User:${sessionId}`);
 
-            // Rules
-            if (username.length < 3 || username.length > 20) return redirect('/auth/bridge?error=Debe_tener_entre_3_y_20_caracteres');
-            // Valid pattern: lowercase, numbers, and underscores (e.g. "mateo_fitness")
-            if (!/^[a-z0-9_]+$/.test(username)) return redirect('/auth/bridge?error=Solo_minusculas_numeros_y_guiones');
-
-            const blacklist = ['admin', 'irontrain', 'motiona', 'put', 'mierd', 'fuck', 'shit', 'bitch', 'conch', 'verg', 'pij', 'bolud', 'pelotud', 'trol', 'sex', 'porn'];
-            if (blacklist.some(b => username.includes(b))) return redirect('/auth/bridge?error=Palabra_no_permitida');
-
-            // Unique
-            const existing = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.username, username));
-            if (existing.length > 0) return redirect('/auth/bridge?error=El_usuario_ya_existe_elige_otro');
+            // Unified Rules
+            const userValid = validateUsername(username);
+            if (!userValid.valid) return redirect(`/auth/bridge?error=${userValid.error?.replace(/ /g, '_')}`);
 
             // Get display name from form
-            const displayName = formData.get('display_name') as string;
+            const rawDisplayName = formData.get('display_name') as string;
+            const displayName = rawDisplayName?.trim() || session.name || 'Atleta Iron';
+
+            const nameValid = validateDisplayName(displayName);
+            if (!nameValid.valid) return redirect(`/auth/bridge?error=${nameValid.error?.replace(/ /g, '_')}`);
 
             // Create or update profile with both username and display name
             // By doing this only here, we ensure the account isn't 'created' in our DB until after the setup
@@ -99,14 +96,14 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
                 await db.insert(schema.userProfiles).values({
                     id: sessionId,
                     username,
-                    displayName: displayName?.trim() || session.name || 'Atleta Iron',
+                    displayName,
                     isPublic: 1,
                     updatedAt: new Date()
                 });
             } else {
                 await db.update(schema.userProfiles).set({
                     username,
-                    displayName: displayName?.trim() || profile.displayName || session.name || 'Atleta Iron',
+                    displayName,
                     updatedAt: new Date()
                 }).where(eq(schema.userProfiles.id, sessionId));
             }
@@ -198,23 +195,17 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
 
     // NORMAL SUCCESS / REDIRECT BRIDGE
     if (redirectUri) {
-        // We generate our own JWT for the mobile app, signed with our secret
-        // so the API verifyAuth (jose.jwtVerify) can trust it.
-        const secretStr = process.env.NEON_AUTH_COOKIE_SECRET;
-        if (!secretStr) throw new Error('NEON_AUTH_COOKIE_SECRET not configured');
-        const secret = new TextEncoder().encode(secretStr);
+        // We generate a temporary exchange code instead of a JWT
+        const exchangeCode = randomBytes(24).toString('hex');
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-        const jwt = await new jose.SignJWT({
-            id: session.id,
-            email: session.email,
-        })
-            .setProtectedHeader({ alg: 'HS256' })
-            .setIssuedAt()
-            .setSubject(session.id)
-            .setExpirationTime('30d') // Long lived for mobile app
-            .sign(secret);
+        await db.insert(schema.authCodes).values({
+            code: exchangeCode,
+            userId: session.id,
+            expiresAt,
+        });
 
-        const appUrl = `${redirectUri}${redirectUri.includes('?') ? '&' : '?'}token=${encodeURIComponent(jwt)}`;
+        const appUrl = `${redirectUri}${redirectUri.includes('?') ? '&' : '?'}code=${exchangeCode}`;
 
         return (
             <div className="min-h-screen bg-[#f5f1e8] flex flex-col items-center justify-center p-6 font-mono text-[#1a1a2e]">
@@ -283,7 +274,10 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
                     </div>
                 </div>
 
-                <div className="pt-6 space-y-3">
+                <div className="pt-6 space-y-4">
+                    <Link href="/settings/delete-account" className="block text-[10px] font-black uppercase text-red-400 hover:text-red-600 transition-colors tracking-widest">
+                        Eliminar Cuenta (Zona de Peligro)
+                    </Link>
                     <Link href="/auth/sign-out" className="block text-xs font-black uppercase text-red-600 hover:opacity-70 transition-opacity tracking-widest">
                         Cerrar Sesión
                     </Link>

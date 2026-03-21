@@ -87,8 +87,8 @@ export default function SettingsScreen() {
     const [soundEnabled, setSoundEnabled] = useState(true);
     const [systemNotificationsEnabled, setSystemNotificationsEnabled] = useState(true);
     const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>({
-        inApp: { enabled: true, restTimer: true, workoutStatus: true, updates: true, intervalTimer: true },
-        system: { enabled: true, restTimer: true, workoutPersistent: true, inactivityReminder: true, workoutComplete: true, intervalTimer: true, updateAvailable: true, appUpdated: true, streakReminder: true },
+        inApp: { enabled: true, restTimer: true, workoutStatus: true, updates: true, intervalTimer: true, personalRecord: true, social: true, kudos: true },
+        system: { enabled: true, restTimer: true, workoutPersistent: true, inactivityReminder: true, workoutComplete: true, intervalTimer: true, updateAvailable: true, appUpdated: true, streakReminder: true, personalRecord: true, social: true, kudos: true },
         sounds: { restTimer: true, intervalTimer: true, workoutComplete: true, countdown: true },
     });
     const [expandedNotifGroup, setExpandedNotifGroup] = useState<string | null>(null);
@@ -791,7 +791,7 @@ export default function SettingsScreen() {
                         expanded={expandedNotifGroup === 'inApp'}
                         onExpand={() => setExpandedNotifGroup(expandedNotifGroup === 'inApp' ? null : 'inApp')}
                         activeCount={Object.values(notifPrefs.inApp).filter(v => v === true).length - (notifPrefs.inApp.enabled ? 1 : 0)}
-                        totalCount={4}
+                        totalCount={7}
                         borderBottom
                     />
                     {expandedNotifGroup === 'inApp' && notifPrefs.inApp.enabled && (
@@ -799,6 +799,9 @@ export default function SettingsScreen() {
                             <NotifSubToggle label="Rest timer" enabled={notifPrefs.inApp.restTimer} onToggle={(v) => updateNotifPref('inApp', 'restTimer', v)} />
                             <NotifSubToggle label="Estado del entrenamiento" enabled={notifPrefs.inApp.workoutStatus} onToggle={(v) => updateNotifPref('inApp', 'workoutStatus', v)} />
                             <NotifSubToggle label="Actualizaciones" enabled={notifPrefs.inApp.updates} onToggle={(v) => updateNotifPref('inApp', 'updates', v)} />
+                            <NotifSubToggle label="Nuevos Récords (PR)" enabled={notifPrefs.inApp.personalRecord} onToggle={(v) => updateNotifPref('inApp', 'personalRecord', v)} />
+                            <NotifSubToggle label="Actividad Social" enabled={notifPrefs.inApp.social} onToggle={(v) => updateNotifPref('inApp', 'social', v)} />
+                            <NotifSubToggle label="Kudos recibidos" enabled={notifPrefs.inApp.kudos} onToggle={(v) => updateNotifPref('inApp', 'kudos', v)} />
                             <NotifSubToggle label="Interval timer" enabled={notifPrefs.inApp.intervalTimer} onToggle={(v) => updateNotifPref('inApp', 'intervalTimer', v)} last />
                         </View>
                     )}
@@ -817,7 +820,7 @@ export default function SettingsScreen() {
                         expanded={expandedNotifGroup === 'system'}
                         onExpand={() => setExpandedNotifGroup(expandedNotifGroup === 'system' ? null : 'system')}
                         activeCount={Object.values(notifPrefs.system).filter(v => v === true).length - (notifPrefs.system.enabled ? 1 : 0)}
-                        totalCount={8}
+                        totalCount={11}
                         borderBottom
                     />
                     {expandedNotifGroup === 'system' && notifPrefs.system.enabled && (
@@ -829,6 +832,9 @@ export default function SettingsScreen() {
                             <NotifSubToggle label="Interval timer" enabled={notifPrefs.system.intervalTimer} onToggle={(v) => updateNotifPref('system', 'intervalTimer', v)} />
                             <NotifSubToggle label="Actualización disponible" enabled={notifPrefs.system.updateAvailable} onToggle={(v) => updateNotifPref('system', 'updateAvailable', v)} />
                             <NotifSubToggle label="App actualizada" enabled={notifPrefs.system.appUpdated} onToggle={(v) => updateNotifPref('system', 'appUpdated', v)} />
+                            <NotifSubToggle label="Nuevos Récords (PR)" enabled={notifPrefs.system.personalRecord} onToggle={(v) => updateNotifPref('system', 'personalRecord', v)} />
+                            <NotifSubToggle label="Actividad Social" enabled={notifPrefs.system.social} onToggle={(v) => updateNotifPref('system', 'social', v)} />
+                            <NotifSubToggle label="Kudos recibidos" enabled={notifPrefs.system.kudos} onToggle={(v) => updateNotifPref('system', 'kudos', v)} />
                             <NotifSubToggle label="Recordatorio de racha" enabled={notifPrefs.system.streakReminder} onToggle={(v) => updateNotifPref('system', 'streakReminder', v)} />
 
                         </View>
@@ -992,7 +998,7 @@ export default function SettingsScreen() {
                         <ChevronRight size={16} color={colors.red} />
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={handleFullAccountWipe} style={s.settingRow}>
+                    <TouchableOpacity onPress={handleFullAccountWipe} style={[s.settingRow, s.settingRowBorder]}>
                         <View style={s.settingLeft}>
                             <View style={[s.settingIconCircle, { backgroundColor: withAlpha(colors.red, '20') }]}><AlertTriangle size={16} color={colors.red} /></View>
                             <View style={{ flex: 1 }}>
@@ -1001,6 +1007,35 @@ export default function SettingsScreen() {
                             </View>
                         </View>
                         <ChevronRight size={16} color={colors.red} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={() => Linking.openURL('https://irontrain.app/delete-account')}
+                        style={s.settingRow}
+                    >
+                        <View style={s.settingLeft}>
+                            <View style={[s.settingIconCircle, { backgroundColor: withAlpha(colors.red, '10') }]}><User size={16} color={colors.red} /></View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[s.settingLabel, { color: colors.red }]}>Eliminar Cuenta IronTrain</Text>
+                                <Text style={s.settingSubtitle}>Solicitar la eliminación definitiva de tu cuenta y datos personales.</Text>
+                            </View>
+                        </View>
+                        <ChevronRight size={16} color={colors.red} />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Help & Support */}
+                <SectionHeader icon={Shield} title="Soporte" />
+                <View style={[s.card, { marginBottom: 24 }]}>
+                    <TouchableOpacity
+                        onPress={() => Linking.openURL('https://irontrain.app/help')}
+                        style={s.settingRow}
+                    >
+                        <View style={s.settingLeft}>
+                            <View style={s.settingIconCircle}><MessageSquare size={16} color={colors.primary.DEFAULT} /></View>
+                            <Text style={s.settingLabel}>Centro de Ayuda</Text>
+                        </View>
+                        <ChevronRight size={16} color={colors.textMuted} />
                     </TouchableOpacity>
                 </View>
 

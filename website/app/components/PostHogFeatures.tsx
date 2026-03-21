@@ -40,3 +40,8 @@ export function ExperimentWrapper({ children }: { children: React.ReactNode }) {
 
     return <>{children}</>;
 }
+
+export function FeatureWrapper({ flagKey, children, fallback = null }: { flagKey: string, children: React.ReactNode, fallback?: React.ReactNode }) {
+    const isEnabled = useFeatureFlagEnabled(flagKey);
+    return isEnabled ? <>{children}</> : <>{fallback}</>;
+}

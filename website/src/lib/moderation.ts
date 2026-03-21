@@ -4,15 +4,16 @@
  */
 
 const BAD_WORDS = [
-    // Spanish (Common)
+    // Spanish
     'pelotudo', 'boludo', 'mierda', 'puto', 'puta', 'concha', 'carajo', 'pendejo', 'culiao', 'culia',
     'forro', 'pajero', 'pajera', 'choto', 'chota', 'orto', 'garca', 'zorra', 'zorrillo',
     'maricon', 'putazo', 'cornudo', 'ojete', 'pija', 'vagina', 'pene', 'teta', 'culo', 'mogolico', 'putito', 'putita',
-    'gay', 'therian', 'zorrita',
+    'gay', 'therian', 'zorrita', 'verga', 'coño', 'gilipollas', 'jodido', 'puchica', 'pucha',
 
-    // English (Common)
+    // English
     'fuck', 'shit', 'asshole', 'bitch', 'cunt', 'dick', 'pussy', 'faggot', 'nigger', 'bastard',
-    'cock', 'jerk', 'sex', 'porn', 'nude', 'slut', 'whore',
+    'cock', 'jerk', 'sex', 'porn', 'nude', 'slut', 'whore', 'fucker', 'motherfucker', 'retard',
+    'dumbass', 'piss', 'pissed',
 
     // Management/System reserved
     'admin', 'irontrain', 'moderator', 'support', 'system', 'root', 'motiona', 'staff',
@@ -52,7 +53,29 @@ export function validateUsername(username: string): { valid: boolean; error?: st
     }
 
     if (hasProfanity(username)) {
-        return { valid: false, error: 'Username contains restricted content' };
+        return { valid: false, error: 'Username contains restricted or offensive content' };
+    }
+
+    return { valid: true };
+}
+
+/**
+ * Validates a display name (used in social profile)
+ */
+export function validateDisplayName(name: string): { valid: boolean; error?: string } {
+    if (!name) return { valid: false, error: 'Display name is required' };
+
+    const clean = name.trim();
+    if (clean.length < 2) return { valid: false, error: 'Display name too short (min 2)' };
+    if (clean.length > 50) return { valid: false, error: 'Display name too long (max 50)' };
+
+    // More permissive than username, but still no pure symbols/crap
+    if (!/^[a-zA-Z0-9\s.\-_áéíóúÁÉÍÓÚñÑ]+$/.test(clean)) {
+        return { valid: false, error: 'Display name contains invalid characters' };
+    }
+
+    if (hasProfanity(clean)) {
+        return { valid: false, error: 'Display name contains restricted or offensive content' };
     }
 
     return { valid: true };

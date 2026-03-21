@@ -1,14 +1,13 @@
 import { feedbackService } from '@/src/services/FeedbackService';
-import { systemNotificationService } from '@/src/services/SystemNotificationService';
 import { workoutService } from '@/src/services/WorkoutService';
+import { useWorkoutStore } from '@/src/store/workoutStore';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { Workout, WorkoutSet } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
-import { Check, Pencil, Play, Square, Timer } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Check, Pause, Pencil, Play, RotateCcw, X } from 'lucide-react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useColors } from '../src/hooks/useColors';
-import { configService } from '../src/services/ConfigService';
 import { confirm } from '../src/store/confirmStore';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -23,10 +22,7 @@ interface WorkoutStatusBarProps {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function formatTimer(totalSeconds: number): string {
-    // Sanitization: If value is ridiculously large (> 1 year in seconds), 
-    // it was likely stored in milliseconds by mistake.
     const sanitizedSeconds = totalSeconds > 31536000 ? Math.floor(totalSeconds / 1000) : totalSeconds;
-
     if (isNaN(sanitizedSeconds) || sanitizedSeconds < 0) return '00:00';
     const h = Math.floor(sanitizedSeconds / 3600);
     const m = Math.floor((sanitizedSeconds % 3600) / 60);
@@ -36,12 +32,6 @@ function formatTimer(totalSeconds: number): string {
     return `${pad(m)}:${pad(s)}`;
 }
 
-/**
- * Workout status bar — integrated into the main page between the DateStrip and WorkoutLog.
- * Uses the app's warm industrial design language (brown primary, cream bg, rounded cards).
- *
- * Duration is stored in the `workouts.duration` column (INTEGER, seconds).
- */
 export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber }: WorkoutStatusBarProps) {
     const colors = useColors();
     const st = useMemo(() => StyleSheet.create({
@@ -119,7 +109,6 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
         liveDotIdle: { backgroundColor: colors.textMuted },
         liveDotActive: { backgroundColor: colors.primary.DEFAULT },
         liveDotPaused: { backgroundColor: colors.yellow },
-
         centerBlock: {
             alignItems: 'center',
         },
@@ -243,7 +232,6 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
         pickerSheet: {
             backgroundColor: colors.surface,
             width: '100%',
-            maxWidth: 320,
             borderRadius: 24,
             padding: 16,
             borderWidth: 1.5,
@@ -251,6 +239,9 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
             ...ThemeFx.shadowLg,
         },
         pickerHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
             paddingBottom: 16,
             marginBottom: 8,
             borderBottomWidth: 1.5,
@@ -260,7 +251,6 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
             fontSize: 16,
             fontWeight: '900',
             color: colors.text,
-            textAlign: 'center',
         },
         pickerOption: {
             flexDirection: 'row',
@@ -298,79 +288,42 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
         },
         pickerOptionTextDelete: {
             color: colors.red,
+            fontWeight: '800',
         },
     }), [colors]);
-    const config: any = configService;
+
+    const {
+        activeWorkout,
+        workoutTimer,
+        isTimerRunning,
+        startWorkout,
+        resumeWorkout: storeResumeWorkout,
+        pauseWorkout,
+        unpauseWorkout,
+        updateDuration,
+        finishWorkout: storeFinishWorkout,
+    } = useWorkoutStore();
+
+    const isThisWorkoutActive = activeWorkout?.id === workout.id && workout.status !== 'completed';
 
     // ─── Phase ───────────────────────────────────────────────────────────────
-    const derivePhase = useCallback((): WorkoutPhase => {
+    const phase = useMemo((): WorkoutPhase => {
         if (workout.status === 'completed') return 'completed';
-        const startTs = config.getGeneric(`runningWorkoutTimerStartTimestamp_${workout.id}`) as number | null;
-        // If it has a start timestamp, it's active
-        if (startTs) return 'active';
-        // If it's in progress but no live timer, it might be paused or idle
+        if (isThisWorkoutActive) return 'active';
         return 'idle';
-    }, [workout.id, workout.status]);
+    }, [workout.id, workout.status, isThisWorkoutActive]);
 
-    // ─── Initial State Recovery ─────────────────────────────────────────────
-    const getInitialSeconds = useCallback(() => {
-        let raw = workout.duration || 0;
-        // Sanitization: If value is ridiculously large (> 1 year in seconds), 
-        // it was likely stored in milliseconds by mistake.
-        let seconds = raw > 31536000 ? Math.floor(raw / 1000) : raw;
+    const displaySeconds = isThisWorkoutActive ? workoutTimer : (workout.duration || 0);
+    const isPaused = isThisWorkoutActive && !isTimerRunning;
 
-        const startTs = config.getGeneric(`runningWorkoutTimerStartTimestamp_${workout.id}`) as number | null;
-        const baseSec = config.getGeneric(`runningWorkoutTimerBaseSeconds_${workout.id}`) as number | null;
-        if (startTs) {
-            const deltaSec = Math.floor((Date.now() - startTs) / 1000);
-            // Cap delta at 12 hours (43200 seconds) to prevent ridiculous durations if app left running
-            const safeDeltaSec = Math.min(deltaSec, 43200);
-            const liveSeconds = (baseSec ?? 0) + safeDeltaSec;
-            seconds = Math.max(seconds, liveSeconds);
-        } else if (baseSec !== null && baseSec !== undefined) {
-            seconds = Math.max(seconds, baseSec);
-        }
-        return seconds;
-    }, [workout.id, workout.duration]);
-
-    const [phase, setPhase] = useState<WorkoutPhase>(derivePhase);
-    const [timerSeconds, setTimerSeconds] = useState(getInitialSeconds);
-    const [isPaused, setIsPaused] = useState(() => {
-        const hasBase = config.getGeneric(`runningWorkoutTimerBaseSeconds_${workout.id}`) !== null;
-        const hasStart = !!config.getGeneric(`runningWorkoutTimerStartTimestamp_${workout.id}`);
-        return hasBase && !hasStart;
-    });
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState('');
     const [showStatePicker, setShowStatePicker] = useState(false);
-    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-    const lastTickRef = useRef<number>(Date.now());
-    const notifCounterRef = useRef<number>(0);
     const dotPulse = useRef(new Animated.Value(1)).current;
-
-    // Sync on external workout changes or navigation
-    useEffect(() => {
-        const p = derivePhase();
-        setPhase(p);
-        const initialSeconds = getInitialSeconds();
-        setTimerSeconds(initialSeconds);
-
-        const hasBase = config.getGeneric(`runningWorkoutTimerBaseSeconds_${workout.id}`) !== null;
-        const hasStart = !!config.getGeneric(`runningWorkoutTimerStartTimestamp_${workout.id}`);
-        setIsPaused(hasBase && !hasStart);
-
-        setIsEditing(false);
-    }, [workout.id, workout.status, workout.duration, derivePhase, getInitialSeconds]);
-
-    const isTimerOwner = useCallback(() => {
-        // Now only checks if the local phase is active. 
-        // This ensures the local UI timer keeps running even if another session has the notification focus.
-        return phase === 'active';
-    }, [phase]);
 
     // ─── Pulsing dot ─────────────────────────────────────────────────────────
     useEffect(() => {
-        if (phase === 'active' && !isPaused && isTimerOwner()) {
+        if (phase === 'active' && !isPaused) {
             const anim = Animated.loop(
                 Animated.sequence([
                     Animated.timing(dotPulse, { toValue: 0.3, duration: 800, useNativeDriver: true }),
@@ -381,58 +334,7 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
             return () => anim.stop();
         }
         dotPulse.setValue(1);
-    }, [phase, isPaused, dotPulse, isTimerOwner]);
-
-    // ─── Timer tick ──────────────────────────────────────────────────────────
-    const timerSecondsRef = useRef(timerSeconds);
-    timerSecondsRef.current = timerSeconds;
-
-    useEffect(() => {
-        if (phase === 'active' && !isPaused && isTimerOwner()) {
-            lastTickRef.current = Date.now();
-            intervalRef.current = setInterval(() => {
-                const now = Date.now();
-                let delta = Math.floor((now - lastTickRef.current) / 1000);
-                if (delta <= 0) return;
-                
-                if (delta > 43200) delta = 43200; // Cap at 12 hours
-                
-                lastTickRef.current = now;
-
-                setTimerSeconds(prev => {
-                    const next = prev + delta;
-                    if (next % 10 < delta) {
-                        workoutService.update(workout.id, { duration: next });
-                    }
-                    timerSecondsRef.current = next;
-                    return next;
-                });
-
-                notifCounterRef.current += 1;
-                if (notifCounterRef.current % 15 === 0) {
-                    const focusedId = config.get('runningWorkoutTimerWorkoutId');
-                    // Only update global notification if THIS workout has the focus
-                    if (focusedId === workout.id) {
-                        const cs = sets.filter(s => s.completed === 1).length;
-                        const ue = new Set(sets.map(s => s.exercise_id)).size;
-                        systemNotificationService.showPersistentWorkout({
-                            elapsedSeconds: timerSecondsRef.current,
-                            completedSets: cs,
-                            totalExercises: ue,
-                            isPaused: false,
-                            workoutName: workout.name || `Sesión ${sessionNumber}`
-                        });
-                    }
-                }
-            }, 1000);
-
-            return () => {
-                if (intervalRef.current) clearInterval(intervalRef.current);
-            };
-        }
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        return undefined;
-    }, [phase, isPaused, workout.id, sets, isTimerOwner, config.get('runningWorkoutTimerWorkoutId')]);
+    }, [phase, isPaused, dotPulse]);
 
     // ─── Stats ───────────────────────────────────────────────────────────────
     const completedSets = sets.filter(s => s.completed === 1).length;
@@ -444,29 +346,8 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
 
     const handleStart = async () => {
         try {
-            const now = Date.now();
-            await config.set('runningWorkoutTimerWorkoutId', workout.id);
-            await config.setGeneric(`runningWorkoutTimerStartTimestamp_${workout.id}`, now);
-            await config.setGeneric(`runningWorkoutTimerBaseSeconds_${workout.id}`, workout.duration || 0);
-
-            setPhase('active');
-            setIsPaused(false);
-            setTimerSeconds(prev => prev || 0);
-            const currentSeconds = timerSeconds || workout.duration || 0;
-            lastTickRef.current = now;
-            notifCounterRef.current = 0;
-
-            await workoutService.resumeWorkout(workout.id);
+            await startWorkout(workout.name);
             feedbackService.buttonPress();
-
-            systemNotificationService.showPersistentWorkout({
-                elapsedSeconds: currentSeconds,
-                completedSets,
-                totalExercises: uniqueExercises,
-                isPaused: false,
-                workoutName: workout.name || `Sesión ${sessionNumber}`
-            });
-            systemNotificationService.scheduleInactivityReminder(currentSeconds);
             onStatusChange();
         } catch (e: any) {
             notify.error('Error', e?.message ?? 'No se pudo iniciar.');
@@ -476,45 +357,23 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
     const handleFinish = () => {
         const doFinish = async () => {
             try {
-                if (intervalRef.current) clearInterval(intervalRef.current);
-                setPhase('completed');
-                setIsPaused(false);
-
-                await workoutService.update(workout.id, { duration: timerSeconds });
-                await workoutService.finishWorkout(workout.id);
-
-                await config.setGeneric(`runningWorkoutTimerStartTimestamp_${workout.id}`, null);
-                await config.setGeneric(`runningWorkoutTimerBaseSeconds_${workout.id}`, 0);
-
-                const focusedId = config.get('runningWorkoutTimerWorkoutId');
-                if (focusedId === workout.id) {
-                    await config.set('runningWorkoutTimerWorkoutId', null);
-                    systemNotificationService.dismissPersistentWorkout();
-                    systemNotificationService.cancelInactivityReminder();
+                if (isThisWorkoutActive) {
+                    await storeFinishWorkout();
+                } else {
+                    await workoutService.finishWorkout(workout.id);
                 }
-
                 feedbackService.dayCompleted();
-
-                if (focusedId === workout.id) {
-                    systemNotificationService.showCongratulation({
-                        durationSeconds: timerSeconds,
-                        completedSets,
-                        totalExercises: uniqueExercises,
-                        workoutName: workout.name || `Sesión ${sessionNumber}`
-                    });
-                }
-
-                notify.success('¡Día Finalizado!', `Duración: ${formatTimer(timerSeconds)} · ${completedSets} series`);
+                notify.success('¡Día Finalizado!', `Duración: ${formatTimer(displaySeconds)} · ${completedSets} series`);
                 onStatusChange();
             } catch (e: any) {
                 notify.error('Error', e?.message ?? 'No se pudo finalizar.');
             }
         };
 
-        if (phase === 'active' && timerSeconds > 0) {
+        if (phase === 'active' && displaySeconds > 0) {
             confirm.ask(
                 '¿Finalizar entrenamiento?',
-                `Duración: ${formatTimer(timerSeconds)} · ${completedSets} series completadas`,
+                `Duración: ${formatTimer(displaySeconds)} · ${completedSets} series completadas`,
                 doFinish,
                 'Finalizar'
             );
@@ -525,27 +384,8 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
 
     const handleResume = async () => {
         try {
-            const now = Date.now();
-            await workoutService.resumeWorkout(workout.id);
-            await config.set('runningWorkoutTimerWorkoutId', workout.id);
-            await config.setGeneric(`runningWorkoutTimerStartTimestamp_${workout.id}`, now);
-            await config.setGeneric(`runningWorkoutTimerBaseSeconds_${workout.id}`, workout.duration || 0);
-
-            setPhase('active');
-            setIsPaused(false);
-            const currentSeconds = workout.duration || 0;
-            setTimerSeconds(currentSeconds);
-            lastTickRef.current = now;
+            await storeResumeWorkout(workout);
             feedbackService.buttonPress();
-
-            systemNotificationService.showPersistentWorkout({
-                elapsedSeconds: currentSeconds,
-                completedSets,
-                totalExercises: uniqueExercises,
-                isPaused: false,
-                workoutName: workout.name || `Sesión ${sessionNumber}`
-            });
-
             notify.info('Entrenamiento Reabierto', 'Podés seguir editando.');
             onStatusChange();
         } catch (e: any) {
@@ -554,42 +394,19 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
     };
 
     const handleTogglePause = async () => {
+        if (!isThisWorkoutActive) return;
         if (isPaused) {
-            const now = Date.now();
-            setIsPaused(false);
-            lastTickRef.current = now;
-            await config.setGeneric(`runningWorkoutTimerStartTimestamp_${workout.id}`, now);
-            await config.setGeneric(`runningWorkoutTimerBaseSeconds_${workout.id}`, timerSeconds);
-            await config.set('runningWorkoutTimerWorkoutId', workout.id);
-            feedbackService.buttonPress();
-            systemNotificationService.showPersistentWorkout({
-                elapsedSeconds: timerSeconds, completedSets, totalExercises: uniqueExercises, isPaused: false,
-                workoutName: workout.name || 'Entrenamiento'
-            });
-            systemNotificationService.scheduleInactivityReminder(timerSeconds);
+            unpauseWorkout();
         } else {
-            setIsPaused(true);
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            await config.setGeneric(`runningWorkoutTimerStartTimestamp_${workout.id}`, null);
-            await config.setGeneric(`runningWorkoutTimerBaseSeconds_${workout.id}`, timerSeconds);
-            feedbackService.buttonPress();
-            await workoutService.update(workout.id, { duration: timerSeconds });
-
-            const focusedId = config.get('runningWorkoutTimerWorkoutId');
-            if (focusedId === workout.id) {
-                systemNotificationService.showPersistentWorkout({
-                    elapsedSeconds: timerSeconds, completedSets, totalExercises: uniqueExercises, isPaused: true,
-                    workoutName: workout.name || `Sesión ${sessionNumber}`
-                });
-                systemNotificationService.cancelInactivityReminder();
-            }
+            pauseWorkout();
         }
+        feedbackService.buttonPress();
     };
 
     const handleEditTimer = () => {
-        const h = Math.floor(timerSeconds / 3600);
-        const m = Math.floor((timerSeconds % 3600) / 60);
-        const s = timerSeconds % 60;
+        const h = Math.floor(displaySeconds / 3600);
+        const m = Math.floor((displaySeconds % 3600) / 60);
+        const s = displaySeconds % 60;
         setEditValue(`${h > 0 ? `${h}:` : ''}${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
         setIsEditing(true);
         feedbackService.selection();
@@ -603,31 +420,14 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
         else totalSec = parts[0] || 0;
 
         totalSec = Math.max(0, Math.min(totalSec, 86400));
-        setTimerSeconds(totalSec);
         setIsEditing(false);
-        const now = Date.now();
-        // Reset tick reference so the interval doesn't compute a huge delta
-        lastTickRef.current = now;
 
-        // Persist manual change globally if this is focusing the active timer
-        await config.setGeneric(`runningWorkoutTimerBaseSeconds_${workout.id}`, totalSec);
-        if (phase === 'active' && !isPaused) {
-            await config.setGeneric(`runningWorkoutTimerStartTimestamp_${workout.id}`, now);
+        if (isThisWorkoutActive) {
+            await updateDuration(totalSec);
+        } else {
+            await workoutService.update(workout.id, { duration: totalSec });
+            onStatusChange();
         }
-
-        await workoutService.update(workout.id, { duration: totalSec });
-
-        // Refresh notification with new timestamp base if we are active
-        if (phase === 'active' && isTimerOwner()) {
-            systemNotificationService.showPersistentWorkout({
-                elapsedSeconds: totalSec,
-                completedSets,
-                totalExercises: uniqueExercises,
-                isPaused,
-                workoutName: workout.name || 'Entrenamiento'
-            });
-        }
-
         feedbackService.buttonPress();
     };
 
@@ -640,20 +440,11 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
                     '¿Volver a Sin Iniciar?',
                     'El temporizador volverá a 0 y el entrenamiento quedará como no iniciado.',
                     async () => {
-                        setPhase('idle');
-                        setIsPaused(false);
-                        setTimerSeconds(0);
-                        if (intervalRef.current) clearInterval(intervalRef.current);
-                        await workoutService.update(workout.id, { duration: 0, status: 'in_progress' });
-
-                        await config.setGeneric(`runningWorkoutTimerStartTimestamp_${workout.id}`, null);
-                        await config.setGeneric(`runningWorkoutTimerBaseSeconds_${workout.id}`, 0);
-
-                        const focusedId = config.get('runningWorkoutTimerWorkoutId');
-                        if (focusedId === workout.id) {
-                            await config.set('runningWorkoutTimerWorkoutId', null);
-                            systemNotificationService.dismissPersistentWorkout();
-                            systemNotificationService.cancelInactivityReminder();
+                        if (isThisWorkoutActive) {
+                            const { cancelWorkout } = useWorkoutStore.getState();
+                            await cancelWorkout();
+                        } else {
+                            await workoutService.update(workout.id, { duration: 0, status: 'in_progress' });
                         }
                         onStatusChange();
                     },
@@ -661,22 +452,21 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
                 );
             } else if (newState === 'active') {
                 if (phase === 'idle' || isPaused) {
-                    await handleStart();
+                    if (phase === 'idle') await handleStart();
+                    else unpauseWorkout();
                 } else if (phase === 'completed') {
                     await handleResume();
+                    unpauseWorkout();
                 }
             } else if (newState === 'paused') {
                 if (phase === 'active' && !isPaused) {
-                    await handleTogglePause();
+                    pauseWorkout();
                 } else if (phase === 'idle') {
-                    await config.set('runningWorkoutTimerWorkoutId', workout.id);
-                    setPhase('active');
-                    setIsPaused(true);
-                    await workoutService.update(workout.id, { status: 'in_progress' });
-                    onStatusChange();
+                    await handleStart();
+                    pauseWorkout();
                 } else if (phase === 'completed') {
                     await handleResume();
-                    await handleTogglePause();
+                    pauseWorkout();
                 }
             } else if (newState === 'completed') {
                 if (phase !== 'completed') {
@@ -696,20 +486,14 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
             : 'Se borrará permanentemente este entrenamiento.';
 
         confirm.destructive(
-            '¿Eliminar Sesión?',
+            'Sesión No Iniciada',
             msg,
             async () => {
                 try {
-                    // Cleanup timers
-                    await config.setGeneric(`runningWorkoutTimerStartTimestamp_${workout.id}`, null);
-                    await config.setGeneric(`runningWorkoutTimerBaseSeconds_${workout.id}`, 0);
-
-                    const focusedId = config.get('runningWorkoutTimerWorkoutId');
-                    if (focusedId === workout.id) {
-                        await config.set('runningWorkoutTimerWorkoutId', null);
-                        systemNotificationService.dismissPersistentWorkout();
+                    if (isThisWorkoutActive) {
+                        const { cancelWorkout } = useWorkoutStore.getState();
+                        await cancelWorkout();
                     }
-
                     await workoutService.deleteWorkout(workout.id);
                     feedbackService.buttonPress();
                     notify.success('Sesión eliminada');
@@ -723,167 +507,189 @@ export function WorkoutStatusBar({ workout, sets, onStatusChange, sessionNumber 
     };
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // RENDER — Uses the same card / pill language as the rest of the app
+    // RENDER
     // ═══════════════════════════════════════════════════════════════════════════
 
-    const renderPhase = () => {
-        // ─── COMPLETED ───────────────────────────────────────────────────────────
+    const renderPhaseContent = () => {
         if (phase === 'completed') {
             return (
-                <View style={st.wrapper}>
-                    <View style={st.card}>
-                        <View style={st.row}>
-                            {/* Status pill */}
-                            <Pressable style={[st.pill, st.pillComplete]} onPress={() => setShowStatePicker(true)}>
-                                <Check size={10} color={colors.onPrimary} strokeWidth={3} />
-                                <Text style={st.pillTextComplete}>Finalizado</Text>
-                            </Pressable>
-
-                            {/* Duration */}
-                            <View style={st.centerBlock}>
-                                <Text style={st.timerLabel}>Duración</Text>
-                                <Text style={st.timerValue}>{formatTimer(timerSeconds)}</Text>
-                            </View>
-
-                            {/* Reopen */}
-                            <Pressable onPress={handleResume} style={st.secondaryBtn} hitSlop={8}>
-                                <Text style={st.secondaryBtnText}>Reabrir</Text>
-                            </Pressable>
-                        </View>
-
-                        {/* Stats row */}
-                        <View style={st.statsRow}>
-                            <Text style={st.statText}>{completedSets} series</Text>
-                            <View style={st.statDot} />
-                            <Text style={st.statText}>{uniqueExercises} ejercicios</Text>
-                        </View>
-                    </View>
-                </View>
-            );
-        }
-
-        // ─── ACTIVE ──────────────────────────────────────────────────────────────
-        if (phase === 'active') {
-            return (
-                <View style={st.wrapper}>
-                    <View style={[st.card, st.cardActive]}>
-                        <View style={st.row}>
-                            {/* Status pill */}
-                            <Pressable style={[st.pill, isPaused ? st.pillPaused : st.pillActive]} onPress={() => setShowStatePicker(true)}>
-                                <Animated.View style={[
-                                    st.liveDot,
-                                    isPaused ? st.liveDotPaused : st.liveDotActive,
-                                    { opacity: isPaused ? 1 : dotPulse },
-                                ]} />
-                                <Text style={[st.pillTextActive, isPaused && st.pillTextPaused]}>
-                                    {isPaused ? 'Pausado' : 'En curso'}
-                                </Text>
-                            </Pressable>
-
-                            {/* Timer (editable) */}
-                            <View style={st.centerBlock}>
-                                {isEditing ? (
-                                    <TextInput
-                                        style={st.timerEdit}
-                                        value={editValue}
-                                        onChangeText={setEditValue}
-                                        onSubmitEditing={handleSaveEdit}
-                                        onBlur={handleSaveEdit}
-                                        keyboardType="numbers-and-punctuation"
-                                        autoFocus
-                                        selectTextOnFocus
-                                    />
-                                ) : (
-                                    <Pressable onPress={handleEditTimer} style={st.timerTouchable} hitSlop={4}>
-                                        <Text style={st.timerValue}>{formatTimer(timerSeconds)}</Text>
-                                        <Pencil size={10} color={colors.textMuted} />
-                                    </Pressable>
-                                )}
-                            </View>
-
-                            {/* Controls */}
-                            <View style={st.controlsRow}>
-                                <Pressable onPress={handleTogglePause} style={st.ctrlBtn} hitSlop={4}>
-                                    {isPaused ? (
-                                        <Play size={13} color={colors.primary.DEFAULT} fill={colors.primary.DEFAULT} />
-                                    ) : (
-                                        <Timer size={13} color={colors.yellow} />
-                                    )}
-                                </Pressable>
-                                <Pressable onPress={handleFinish} style={st.ctrlBtnFinish} hitSlop={4}>
-                                    <Square size={11} color={colors.primary.DEFAULT} fill={colors.primary.DEFAULT} />
-                                </Pressable>
-                            </View>
-                        </View>
-                    </View>
-                </View>
-            );
-        }
-
-        // ─── IDLE ────────────────────────────────────────────────────────────────
-        return (
-            <View style={st.wrapper}>
                 <View style={st.card}>
                     <View style={st.row}>
-                        {/* Status pill */}
-                        <Pressable style={[st.pill, st.pillIdle]} onPress={() => setShowStatePicker(true)}>
-                            <View style={[st.liveDot, st.liveDotIdle]} />
-                            <Text style={st.pillTextIdle}>Sin iniciar</Text>
+                        <Pressable style={[st.pill, st.pillComplete]} onPress={() => setShowStatePicker(true)}>
+                            <Check size={10} color={colors.onPrimary} strokeWidth={3} />
+                            <Text style={st.pillTextComplete}>Finalizado</Text>
                         </Pressable>
 
-                        {/* Actions */}
+                        <View style={st.centerBlock}>
+                            <Text style={st.timerLabel}>Duración</Text>
+                            <Text style={st.timerValue}>{formatTimer(displaySeconds)}</Text>
+                        </View>
+
+                        <Pressable onPress={handleResume} style={st.primaryBtn} hitSlop={8}>
+                            <RotateCcw size={14} color={colors.onPrimary} />
+                            <Text style={st.primaryBtnText}>Reabrir</Text>
+                        </Pressable>
+                    </View>
+
+                    <View style={st.statsRow}>
+                        <Text style={st.statText}>{completedSets} series</Text>
+                        <View style={st.statDot} />
+                        <Text style={st.statText}>{uniqueExercises} ejercicios</Text>
+                    </View>
+                </View>
+            );
+        }
+
+        if (phase === 'active') {
+            return (
+                <View style={[st.card, st.cardActive]}>
+                    <View style={st.row}>
+                        <Pressable style={[st.pill, isPaused ? st.pillPaused : st.pillActive]} onPress={() => setShowStatePicker(true)}>
+                            <Animated.View style={[
+                                st.liveDot,
+                                isPaused ? st.liveDotPaused : st.liveDotActive,
+                                { opacity: isPaused ? 1 : dotPulse },
+                            ]} />
+                            <Text style={[st.pillTextActive, isPaused && st.pillTextPaused]}>
+                                {isPaused ? 'Pausado' : 'En curso'}
+                            </Text>
+                        </Pressable>
+
+                        <View style={st.centerBlock}>
+                            <Text style={st.timerLabel}>Duración</Text>
+                            {isEditing ? (
+                                <TextInput
+                                    style={st.timerEdit}
+                                    value={editValue}
+                                    onChangeText={setEditValue}
+                                    onSubmitEditing={handleSaveEdit}
+                                    onBlur={handleSaveEdit}
+                                    keyboardType="numbers-and-punctuation"
+                                    autoFocus
+                                    selectTextOnFocus
+                                />
+                            ) : (
+                                <Pressable onPress={handleEditTimer} style={st.timerTouchable} hitSlop={4}>
+                                    <Text style={st.timerValue}>{formatTimer(displaySeconds)}</Text>
+                                    <Pencil size={10} color={colors.textMuted} />
+                                </Pressable>
+                            )}
+                        </View>
+
                         <View style={st.controlsRow}>
-                            <Pressable onPress={handleStart} style={st.primaryBtn} hitSlop={6}>
-                                <Play size={11} color={colors.onPrimary} fill={colors.onPrimary} />
-                                <Text style={st.primaryBtnText}>Iniciar</Text>
+                            <Pressable
+                                style={[
+                                    st.ctrlBtn,
+                                    !isPaused && {
+                                        backgroundColor: withAlpha(colors.yellow, '10'),
+                                        borderColor: withAlpha(colors.yellow, '20'),
+                                        shadowOpacity: 0,
+                                        elevation: 0
+                                    }
+                                ]}
+                                onPress={handleTogglePause}
+                                hitSlop={8}
+                            >
+                                {isPaused ? (
+                                    <Play size={18} color={colors.primary.DEFAULT} fill={colors.primary.DEFAULT} />
+                                ) : (
+                                    <Pause size={18} color={colors.yellow} fill={colors.yellow} />
+                                )}
                             </Pressable>
-                            <Pressable onPress={handleFinish} style={st.secondaryBtn} hitSlop={6}>
-                                <Check size={11} color={colors.textMuted} strokeWidth={3} />
-                                <Text style={st.secondaryBtnText}>Finalizar</Text>
+                            <Pressable style={st.ctrlBtnFinish} onPress={handleFinish} hitSlop={8}>
+                                <Check size={18} color={colors.primary.DEFAULT} strokeWidth={3} />
                             </Pressable>
                         </View>
                     </View>
+
+                    <View style={st.statsRow}>
+                        <Text style={st.statText}>{completedSets} series completadas</Text>
+                    </View>
+                </View>
+            );
+        }
+
+        // IDLE
+        return (
+            <View style={st.card}>
+                <View style={st.row}>
+                    <Pressable style={[st.pill, st.pillIdle]} onPress={() => setShowStatePicker(true)}>
+                        <View style={[st.liveDot, st.liveDotIdle]} />
+                        <Text style={st.pillTextIdle}>Sesión {sessionNumber}</Text>
+                    </Pressable>
+
+                    <View style={st.centerBlock}>
+                        <Text style={st.timerLabel}>Lista para iniciar</Text>
+                        <Text style={[st.timerValue, { color: colors.textMuted, opacity: 0.5 }]}>00:00</Text>
+                    </View>
+
+                    <Pressable style={st.primaryBtn} onPress={handleStart} hitSlop={8}>
+                        <Play size={14} color={colors.onPrimary} fill={colors.onPrimary} />
+                        <Text style={st.primaryBtnText}>Iniciar</Text>
+                    </Pressable>
                 </View>
             </View>
         );
     };
 
     return (
-        <>
-            {renderPhase()}
+        <View style={st.wrapper}>
+            {renderPhaseContent()}
 
-            <Modal visible={showStatePicker} transparent animationType="fade" onRequestClose={() => setShowStatePicker(false)}>
+            <Modal
+                visible={showStatePicker}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowStatePicker(false)}
+            >
                 <Pressable style={st.pickerOverlay} onPress={() => setShowStatePicker(false)}>
                     <View style={st.pickerSheet}>
                         <View style={st.pickerHeader}>
-                            <Text style={st.pickerTitle}>Estado del entrenamiento</Text>
+                            <Text style={st.pickerTitle}>Estado de la Sesión</Text>
+                            <Pressable onPress={() => setShowStatePicker(false)} hitSlop={8}>
+                                <X size={20} color={colors.textMuted} />
+                            </Pressable>
                         </View>
 
-                        <Pressable onPress={() => handleSelectState('idle')} style={[st.pickerOption, phase === 'idle' && st.pickerOptionActive]}>
+                        <Pressable
+                            style={[st.pickerOption, phase === 'idle' && st.pickerOptionActive]}
+                            onPress={() => handleSelectState('idle')}
+                        >
                             <View style={[st.pickerDot, st.pickerDotIdle]} />
-                            <Text style={[st.pickerOptionText, phase === 'idle' && st.pickerOptionTextActive]}>Sin iniciar</Text>
+                            <Text style={[st.pickerOptionText, phase === 'idle' && st.pickerOptionTextActive]}>Sin Iniciar</Text>
                         </Pressable>
 
-                        <Pressable onPress={() => handleSelectState('active')} style={[st.pickerOption, phase === 'active' && !isPaused && st.pickerOptionActive]}>
+                        <Pressable
+                            style={[st.pickerOption, (phase === 'active' && !isPaused) && st.pickerOptionActive]}
+                            onPress={() => handleSelectState('active')}
+                        >
                             <View style={[st.pickerDot, st.pickerDotActive]} />
-                            <Text style={[st.pickerOptionText, phase === 'active' && !isPaused && st.pickerOptionTextActive]}>En curso</Text>
+                            <Text style={[st.pickerOptionText, (phase === 'active' && !isPaused) && st.pickerOptionTextActive]}>En curso</Text>
                         </Pressable>
 
-                        <Pressable onPress={() => handleSelectState('paused')} style={[st.pickerOption, phase === 'active' && isPaused && st.pickerOptionActive]}>
+                        <Pressable
+                            style={[st.pickerOption, isPaused && st.pickerOptionActive]}
+                            onPress={() => handleSelectState('paused')}
+                        >
                             <View style={[st.pickerDot, st.pickerDotPaused]} />
-                            <Text style={[st.pickerOptionText, phase === 'active' && isPaused && st.pickerOptionTextActive]}>En pausa</Text>
+                            <Text style={[st.pickerOptionText, isPaused && st.pickerOptionTextActive]}>Pausado</Text>
                         </Pressable>
 
-                        <Pressable onPress={() => handleSelectState('completed')} style={[st.pickerOption, phase === 'completed' && st.pickerOptionActive]}>
-                            <Check size={12} color={phase === 'completed' ? colors.primary.DEFAULT : colors.textMuted} strokeWidth={3} />
+                        <Pressable
+                            style={[st.pickerOption, phase === 'completed' && st.pickerOptionActive]}
+                            onPress={() => handleSelectState('completed')}
+                        >
+                            <Check size={14} color={phase === 'completed' ? colors.primary.DEFAULT : colors.textMuted} strokeWidth={3} />
                             <Text style={[st.pickerOptionText, phase === 'completed' && st.pickerOptionTextActive]}>Finalizado</Text>
+                        </Pressable>
+
+                        <Pressable style={[st.pickerOption, st.pickerOptionDelete]} onPress={handleDeleteWorkout}>
+                            <X size={14} color={colors.red} strokeWidth={3} />
+                            <Text style={st.pickerOptionTextDelete}>Eliminar Entrenamiento</Text>
                         </Pressable>
                     </View>
                 </Pressable>
             </Modal>
-        </>
+        </View>
     );
 }
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
-
