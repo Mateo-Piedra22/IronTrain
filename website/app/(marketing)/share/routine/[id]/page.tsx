@@ -231,7 +231,7 @@ export default async function RoutineSharePage({ params }: RoutinePageProps) {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <button
                                     type="button"
-                                    className="border-[2px] border-current py-4 px-6 flex items-center justify-center gap-3 hover:bg-current hover:text-white transition-all text-[10px] font-black uppercase tracking-[0.2em]"
+                                    className="border-[2px] border-[#1a1a2e] py-4 px-6 flex items-center justify-center gap-3 hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all text-[10px] font-black uppercase tracking-[0.2em]"
                                     data-copy={publicLink}
                                 >
                                     <Copy className="w-4 h-4" />
@@ -239,7 +239,7 @@ export default async function RoutineSharePage({ params }: RoutinePageProps) {
                                 </button>
                                 <Link
                                     href="/downloads"
-                                    className="border-[2px] border-current py-4 px-6 flex items-center justify-center gap-3 hover:bg-current hover:text-white transition-all text-[10px] font-black uppercase tracking-[0.2em]"
+                                    className="border-[2px] border-[#1a1a2e] py-4 px-6 flex items-center justify-center gap-3 hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all text-[10px] font-black uppercase tracking-[0.2em]"
                                 >
                                     ACQUIRE_IRONTRAIN_V2.0
                                 </Link>

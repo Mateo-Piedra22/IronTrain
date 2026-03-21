@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function SupportPage() {
   return (
     <>
@@ -24,6 +26,18 @@ export default function SupportPage() {
           <a className="inline-flex px-5 py-3 font-bold border border-current bg-[#1a1a2e]/10 hover:bg-[#1a1a2e]/20 transition-colors" href="https://cafecito.app/motiona">
             Abrir Cafecito
           </a>
+        </div>
+      </section>
+
+      <section className="border border-current/20 p-6 bg-[#f5f1e8]">
+        <h2 className="text-xl font-bold">HELP CENTER</h2>
+        <p className="mt-2 opacity-80 leading-relaxed">
+          Consulta guías rápidas, protocolos de IronScore y soporte técnico directo en nuestro centro de ayuda interactivo.
+        </p>
+        <div className="mt-4">
+          <Link href="/help" className="inline-flex px-5 py-3 font-bold bg-[#1a1a2e] text-[#f5f1e8] hover:opacity-90 transition-opacity">
+            Abrir Help Center
+          </Link>
         </div>
       </section>
 

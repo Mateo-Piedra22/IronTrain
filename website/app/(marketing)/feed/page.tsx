@@ -164,8 +164,8 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                                         <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 relative z-10">
                                             <div className="flex-1 space-y-5">
                                                 <div className="flex flex-wrap items-center gap-3">
-                                                    <div className="border border-current px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter">P2P_DATABANK</div>
-                                                    <div className="bg-current text-background px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter flex items-center gap-1">
+                                                    <div className="border border-[#1a1a2e] group-hover:border-[#f5f1e8] px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter transition-colors">P2P_DATABANK</div>
+                                                    <div className="bg-[#1a1a2e] text-[#f5f1e8] group-hover:bg-[#f5f1e8] group-hover:text-[#1a1a2e] px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter flex items-center gap-1 transition-colors">
                                                         SCORE: {routine.scoreLifetime} PTS
                                                     </div>
                                                 </div>
