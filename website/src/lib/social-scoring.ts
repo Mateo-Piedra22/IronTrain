@@ -37,7 +37,9 @@ const DEFAULT_SCORE_CONFIG: ScoreConfig = {
     weatherBonusEnabled: true,
 };
 
-function weekStartUtcSeconds(epochSeconds: number): number {
+function weekStartUtcSeconds(epochTimestamp: number): number {
+    // Robustly handle both seconds and milliseconds (if > year 2286 in seconds, assume ms)
+    const epochSeconds = epochTimestamp > 10000000000 ? Math.floor(epochTimestamp / 1000) : epochTimestamp;
     const d = new Date(epochSeconds * 1000);
     const day = d.getUTCDay();
     const mondayOffset = (day + 6) % 7;
@@ -46,7 +48,8 @@ function weekStartUtcSeconds(epochSeconds: number): number {
     return Math.floor(d.getTime() / 1000);
 }
 
-function weekKeyFromSeconds(epochSeconds: number): string {
+function weekKeyFromSeconds(epochTimestamp: number): string {
+    const epochSeconds = epochTimestamp > 10000000000 ? Math.floor(epochTimestamp / 1000) : epochTimestamp;
     const start = weekStartUtcSeconds(epochSeconds);
     const d = new Date(start * 1000);
     const y = d.getUTCFullYear();
@@ -157,7 +160,17 @@ async function ensureStreakState(trx: any, userId: string, workoutDateSeconds: n
     }
 
     const currentWeekKey = weekKeyFromSeconds(workoutDateSeconds);
-    if (profile.streakWeekEvaluatedAt === currentWeekKey) {
+
+    // Legacy support: check if streakWeekEvaluatedAt is an old timestamp format
+    let evalKey = profile.streakWeekEvaluatedAt;
+    if (evalKey && !evalKey.includes('-')) {
+        const parsedMs = parseInt(evalKey, 10);
+        if (!isNaN(parsedMs)) {
+            evalKey = weekKeyFromSeconds(parsedMs);
+        }
+    }
+
+    if (evalKey === currentWeekKey) {
         const weeks = Number(profile.streakWeeks || 0);
         const multiplier = Number(profile.streakMultiplier || resolveStreakMultiplier(cfg, weeks) || 1);
         return { streakWeeks: weeks, multiplier };
@@ -168,13 +181,13 @@ async function ensureStreakState(trx: any, userId: string, workoutDateSeconds: n
     const goalDays = await getWeeklyGoalDays(trx, userId);
 
     const [countRow] = await trx
-        .select({ count: sql<number>`count(*)`.mapWith(Number) })
+        .select({ count: sql<number>`count(distinct(floor(${schema.workouts.date} / 86400000)))`.mapWith(Number) })
         .from(schema.workouts)
         .where(and(
             eq(schema.workouts.userId, userId),
             eq(schema.workouts.status, 'completed'),
-            gte(schema.workouts.date, previousWeekStart),
-            lte(schema.workouts.date, previousWeekEnd),
+            gte(schema.workouts.date, previousWeekStart * 1000),
+            lte(schema.workouts.date, previousWeekEnd * 1000),
             isNull(schema.workouts.deletedAt)
         ));
 
@@ -209,14 +222,25 @@ type AwardArgs = {
 };
 
 async function awardEvent(args: AwardArgs): Promise<number> {
-    const [existing] = await args.trx.select({ id: schema.scoreEvents.id }).from(schema.scoreEvents).where(eq(schema.scoreEvents.eventKey, args.eventKey)).limit(1);
-    if (existing) return 0;
+    const [existing] = await args.trx.select().from(schema.scoreEvents).where(eq(schema.scoreEvents.eventKey, args.eventKey)).limit(1);
+
+    if (existing) {
+        if (existing.deletedAt) {
+            // Revive soft-deleted event (e.g. if the client synced a deletion but now we are re-awarding)
+            await args.trx.update(schema.scoreEvents).set({ deletedAt: null, updatedAt: new Date() }).where(eq(schema.scoreEvents.id, existing.id));
+            return Number(existing.pointsAwarded || 0);
+        }
+        return 0;
+    }
 
     const pointsAwarded = Math.max(0, Math.round(args.pointsBase * args.streakMultiplier * args.globalMultiplier));
     if (pointsAwarded <= 0) return 0;
 
+    // Use eventKey as part of the ID to make it deterministic and unique across syncs
+    const id = `score:${args.eventKey}`;
+
     await args.trx.insert(schema.scoreEvents).values({
-        id: crypto.randomUUID(),
+        id,
         userId: args.userId,
         workoutId: args.workoutId,
         eventType: args.eventType,
@@ -226,6 +250,12 @@ async function awardEvent(args: AwardArgs): Promise<number> {
         globalMultiplier: args.globalMultiplier,
         pointsAwarded,
         metadata: args.metadata ?? null,
+    }).onConflictDoUpdate({
+        target: schema.scoreEvents.eventKey,
+        set: {
+            pointsAwarded,
+            updatedAt: new Date(),
+        }
     });
 
     await args.trx
@@ -281,8 +311,8 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
         trx,
         userId,
         workoutId,
-        eventType: 'workout_complete',
-        eventKey: `workout_complete:${workoutId}`,
+        eventType: 'workout_completed',
+        eventKey: `workout_completed:${workoutId}`,
         pointsBase: cfg.workoutCompletePoints,
         streakMultiplier: streak.multiplier,
         globalMultiplier,
@@ -293,13 +323,13 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
     const weekEnd = weekStart + (7 * 86400) - 1;
 
     const [weekCountRow] = await trx
-        .select({ count: sql<number>`count(*)`.mapWith(Number) })
+        .select({ count: sql<number>`count(distinct(floor(${schema.workouts.date} / 86400000)))`.mapWith(Number) })
         .from(schema.workouts)
         .where(and(
             eq(schema.workouts.userId, userId),
             eq(schema.workouts.status, 'completed'),
-            gte(schema.workouts.date, weekStart),
-            lte(schema.workouts.date, weekEnd),
+            gte(schema.workouts.date, weekStart * 1000),
+            lte(schema.workouts.date, weekEnd * 1000),
             isNull(schema.workouts.deletedAt)
         ));
 
@@ -391,8 +421,8 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
             trx,
             userId,
             workoutId,
-            eventType: 'pr_break',
-            eventKey: `pr:${workoutId}:${exerciseId}`,
+            eventType: 'pr_broken',
+            eventKey: `pr_broken:${workoutId}:${exerciseId}`,
             pointsBase,
             streakMultiplier: streak.multiplier,
             globalMultiplier,
@@ -468,9 +498,9 @@ export async function revertWorkoutScoring(trx: any, userId: string, workoutId: 
         .where(eq(schema.userProfiles.id, userId));
 
     // 3. Revert PR records if necessary
-    const prEvents = events.filter((e: any) => e.eventType === 'pr_break');
+    const prEvents = events.filter((e: any) => e.eventType === 'pr_broken');
     for (const event of prEvents) {
-        // eventKey format: pr:${workoutId}:${exerciseId}
+        // eventKey format: pr_broken:${workoutId}:${exerciseId}
         const parts = (event as any).eventKey?.split(':');
         const exerciseId = parts?.[2];
         if (!exerciseId) continue;
@@ -528,7 +558,8 @@ export async function revertWorkoutScoring(trx: any, userId: string, workoutId: 
 
 export async function buildLeaderboard(userId: string) {
     const now = new Date();
-    const weekAgo = new Date(now.getTime() - 7 * 86400000);
+    const mondayStartSeconds = weekStartUtcSeconds(now.getTime() / 1000);
+    const weekStart = new Date(mondayStartSeconds * 1000);
     const monthAgo = new Date(now.getTime() - 30 * 86400000);
 
     const records = await db.select().from(schema.friendships).where(
@@ -552,7 +583,7 @@ export async function buildLeaderboard(userId: string) {
         db.select({
             userId: schema.scoreEvents.userId,
             total: sql<number>`coalesce(sum(${schema.scoreEvents.pointsAwarded}), 0)`.mapWith(Number),
-        }).from(schema.scoreEvents).where(and(inArray(schema.scoreEvents.userId, userIds), gte(schema.scoreEvents.createdAt, weekAgo))).groupBy(schema.scoreEvents.userId),
+        }).from(schema.scoreEvents).where(and(inArray(schema.scoreEvents.userId, userIds), gte(schema.scoreEvents.createdAt, weekStart))).groupBy(schema.scoreEvents.userId),
         db.select({
             userId: schema.workouts.userId,
             total: sql<number>`count(*)`.mapWith(Number),
@@ -560,11 +591,11 @@ export async function buildLeaderboard(userId: string) {
         db.select({
             userId: schema.workouts.userId,
             total: sql<number>`count(*)`.mapWith(Number),
-        }).from(schema.workouts).where(and(inArray(schema.workouts.userId, userIds), eq(schema.workouts.status, 'completed'), isNull(schema.workouts.deletedAt), gte(schema.workouts.date, Math.floor(monthAgo.getTime() / 1000)))).groupBy(schema.workouts.userId),
+        }).from(schema.workouts).where(and(inArray(schema.workouts.userId, userIds), eq(schema.workouts.status, 'completed'), isNull(schema.workouts.deletedAt), gte(schema.workouts.date, monthAgo.getTime()))).groupBy(schema.workouts.userId),
         db.select({
             userId: schema.workouts.userId,
             total: sql<number>`count(*)`.mapWith(Number),
-        }).from(schema.workouts).where(and(inArray(schema.workouts.userId, userIds), eq(schema.workouts.status, 'completed'), isNull(schema.workouts.deletedAt), gte(schema.workouts.date, Math.floor(weekAgo.getTime() / 1000)))).groupBy(schema.workouts.userId),
+        }).from(schema.workouts).where(and(inArray(schema.workouts.userId, userIds), eq(schema.workouts.status, 'completed'), isNull(schema.workouts.deletedAt), gte(schema.workouts.date, weekStart.getTime()))).groupBy(schema.workouts.userId),
     ]);
 
     const profileMap = new Map(profiles.map((p) => [p.id, p]));

@@ -1,5 +1,5 @@
 import { SocialProfile } from '@/src/services/SocialService';
-import { CalendarDays, ChevronDown, ChevronUp, CloudRain, Copy, Globe, Lock as LockIcon, MapPin, MapPinOff, Shield as ShieldIcon, Zap } from 'lucide-react-native';
+import { CalendarCheck, CalendarDays, ChevronDown, ChevronUp, CloudRain, Copy, Flame, Globe, Lock as LockIcon, MapPin, MapPinOff, Shield as ShieldIcon, Trophy, Zap } from 'lucide-react-native';
 import React from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 
@@ -94,7 +94,22 @@ export const ProfileCard = React.memo(({
                     </View>
                 </View>
 
-                {!isProfileExpanded && (
+                {!isProfileExpanded ? (
+                    <View style={styles.profileStatsRow}>
+                        <View style={styles.statMiniItem}>
+                            <Trophy size={14} color={colors.yellow} fill={colors.yellow + '20'} />
+                            <Text style={styles.statMiniText}>{profile.scoreLifetime || 0}</Text>
+                        </View>
+                        <View style={styles.statMiniItem}>
+                            <Flame size={14} color={colors.red} fill={colors.red + '20'} />
+                            <Text style={styles.statMiniText}>{profile.currentStreak || 0}</Text>
+                        </View>
+                        <View style={styles.statMiniItem}>
+                            <CalendarCheck size={14} color={colors.primary.DEFAULT} />
+                            <Text style={styles.statMiniText}>{profile.streakWeeks || 0}w</Text>
+                        </View>
+                    </View>
+                ) : (
                     <View style={styles.metaSummaryRow}>
                         <CalendarDays size={14} color={colors.primary.DEFAULT} />
                         <Text style={styles.metaSummaryText}>Meta: {trainingDays.length} días</Text>
@@ -104,6 +119,24 @@ export const ProfileCard = React.memo(({
 
             {isProfileExpanded && (
                 <View style={styles.expandedDetails}>
+                    <View style={styles.statsGrid}>
+                        <View style={styles.statGridItem}>
+                            <Trophy size={20} color={colors.yellow} fill={colors.yellow + '20'} />
+                            <Text style={styles.statGridValue}>{profile.scoreLifetime || 0}</Text>
+                            <Text style={styles.statGridLabel}>IronScore</Text>
+                        </View>
+                        <View style={styles.statGridItem}>
+                            <Flame size={20} color={colors.red} fill={colors.red + '20'} />
+                            <Text style={styles.statGridValue}>{profile.currentStreak || 0}</Text>
+                            <Text style={styles.statGridLabel}>Racha Días</Text>
+                        </View>
+                        <View style={styles.statGridItem}>
+                            <CalendarCheck size={20} color={colors.primary.DEFAULT} />
+                            <Text style={styles.statGridValue}>{profile.streakWeeks || 0}</Text>
+                            <Text style={styles.statGridLabel}>Racha Semanas</Text>
+                        </View>
+                    </View>
+
                     <Text style={styles.profileStats}>Rutinas compartidas: {profile.shareStats || 0}</Text>
                     <View style={styles.profileMetaRow}>
                         <View style={styles.profileVisibilityBadge}>

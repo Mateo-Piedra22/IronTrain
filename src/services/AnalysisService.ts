@@ -792,36 +792,56 @@ export class AnalysisService {
             [cutoffMs]
         );
 
-        const map = new Map<string, { exerciseId: string; exerciseName: string; start: number; end: number; badges: any[] }>();
+        const map = new Map<string, { exerciseId: string; exerciseName: string; first: number; last: number; dateFirst: number; dateLast: number; badges: any[] }>();
         for (const r of rows as any[]) {
             const epley = Math.round(r.weight * (1 + r.reps / 30));
             if (!Number.isFinite(epley) || epley <= 0) continue;
+
             if (!map.has(r.exerciseId)) {
                 const badges = r.badges_csv ? r.badges_csv.split(',').map((s: string) => {
                     const [name, color, icon] = s.split('|');
                     return { name, color, icon: icon || undefined };
                 }) : [];
-                map.set(r.exerciseId, { exerciseId: r.exerciseId, exerciseName: r.exerciseName, start: 0, end: 0, badges });
-            }
-            const cur = map.get(r.exerciseId)!;
-            if (r.date <= midMs) {
-                if (epley > cur.start) cur.start = epley;
+                map.set(r.exerciseId, {
+                    exerciseId: r.exerciseId,
+                    exerciseName: r.exerciseName,
+                    first: epley,
+                    last: epley,
+                    dateFirst: r.date,
+                    dateLast: r.date,
+                    badges
+                });
             } else {
-                if (epley > cur.end) cur.end = epley;
+                const cur = map.get(r.exerciseId)!;
+                // Update first if earlier, last if later
+                if (r.date < cur.dateFirst) {
+                    cur.dateFirst = r.date;
+                    cur.first = epley;
+                }
+                if (r.date > cur.dateLast) {
+                    cur.dateLast = r.date;
+                    cur.last = epley;
+                } else if (r.date === cur.dateLast) {
+                    // Same session/day, take the best
+                    if (epley > cur.last) cur.last = epley;
+                }
+                if (r.date === cur.dateFirst) {
+                    if (epley > cur.first) cur.first = epley;
+                }
             }
         }
 
         const result: OneRMProgressRow[] = [];
         map.forEach((v) => {
-            if (v.start <= 0 || v.end <= 0) return;
-            const delta = v.end - v.start;
+            if (v.first <= 0 || v.last <= 0 || v.dateFirst === v.dateLast) return;
+            const delta = v.last - v.first;
             if (delta <= 0) return;
-            const deltaPct = v.start > 0 ? Math.round((delta / v.start) * 100) : null;
+            const deltaPct = v.first > 0 ? Math.round((delta / v.first) * 100) : null;
             result.push({
                 exerciseId: v.exerciseId,
                 exerciseName: v.exerciseName,
-                start1RM: v.start,
-                end1RM: v.end,
+                start1RM: v.first,
+                end1RM: v.last,
                 delta,
                 deltaPct,
                 badges: v.badges
@@ -834,12 +854,29 @@ export class AnalysisService {
     }
 
 
+    static async getWorkoutHeatmapData(): Promise<{ date: number; sets: number; volume: number }[]> {
+        const rows = await dbService.getAll<{ date: number; total_sets: number; volume: number }>(
+            `SELECT w.date, COUNT(ws.id) as total_sets, SUM(ws.weight * (1 + ws.reps/30.0)) as volume
+             FROM workouts w
+             LEFT JOIN workout_sets ws ON w.id = ws.workout_id AND ws.completed = 1
+             WHERE w.date > ? AND w.status = 'completed'
+             GROUP BY w.id
+             ORDER BY w.date ASC`,
+            [Date.now() - 366 * 86400000]
+        );
+        return rows.map(r => ({
+            date: r.date,
+            sets: r.total_sets || 0,
+            volume: Math.round(r.volume || 0)
+        }));
+    }
+
     static async getWorkoutStreakLastYear(): Promise<WorkoutStreak> {
         const cacheKey = 'workout_streak_year';
         const cached = this.getCached<WorkoutStreak>(cacheKey);
         if (cached) return cached;
 
-        const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+        const oneYearAgo = Date.now() - 366 * 24 * 60 * 60 * 1000;
         const rows = await dbService.getAll<{ date: number }>(
             'SELECT date FROM workouts WHERE status = ? AND date > ? ORDER BY date ASC',
             ['completed', oneYearAgo]
@@ -850,36 +887,33 @@ export class AnalysisService {
             return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
         }));
 
-        const { configService } = await import('./ConfigService');
-        const rawDays = await configService.get('training_days' as any);
+        const { configService: cfg } = await import('./ConfigService');
+        const rawDays = cfg.get('training_days');
         let trainingDays = [1, 2, 3, 4, 5, 6]; // default Mon-Sat
         if (rawDays) {
-            try { trainingDays = typeof rawDays === 'string' ? JSON.parse(rawDays) : rawDays; } catch (e) { }
+            trainingDays = rawDays;
         }
 
         const today = new Date();
-        const todayMidnightMs = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-
-        let iteratorMs = todayMidnightMs - 365 * 86400000;
+        const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
         let currentRun = 0;
         let best = 0;
 
         for (let i = 0; i <= 365; i++) {
-            const date = new Date(iteratorMs);
+            const date = new Date(todayMidnight);
+            date.setDate(date.getDate() - (365 - i));
+            const currentMs = date.getTime();
+
             const dow = date.getDay();
-            const isTrained = trainedKeys.has(iteratorMs);
+            const isTrained = trainedKeys.has(currentMs);
             const isTrainingDay = trainingDays.includes(dow);
 
             if (isTrained) {
                 currentRun++;
                 if (currentRun > best) best = currentRun;
             } else if (isTrainingDay && i !== 365) {
-                // We missed a training day!
-                // We exclude today (i === 365) to give them until midnight.
                 currentRun = 0;
             }
-
-            iteratorMs += 86400000;
         }
 
         const result = { current: currentRun, best };

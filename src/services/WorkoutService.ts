@@ -4,6 +4,7 @@ import { ExerciseType, SetType, Workout, WorkoutSet } from '../types/db';
 import * as analytics from '../utils/analytics';
 import { logger } from '../utils/logger';
 import { uuidV4 } from '../utils/uuid';
+import { configService } from './ConfigService';
 import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
 import { IronScoreService } from './IronScoreService';
@@ -753,6 +754,14 @@ class WorkoutService {
         // Clean up social feed events because the workout is no longer completed
         await this.cleanupActivityFeedForWorkout(id);
 
+        // Revert points locally so they are re-awarded when finished again
+        try {
+            const { IronScoreService } = require('./IronScoreService');
+            await IronScoreService.revertScoreForWorkout(id);
+        } catch (e) {
+            console.error('[Scoring] Revert failed on resume', e);
+        }
+
         dataEventService.emit('DATA_UPDATED');
 
         this.invalidateCaches();
@@ -969,6 +978,7 @@ class WorkoutService {
                     workoutId,
                     exerciseId,
                     exerciseName: current.exerciseName,
+                    unit: configService.get('weightUnit'),
                     oneRm: roundedOneRm,
                     previousOneRm: Math.round(oldOneRm),
                     weight: bestSet.weight,

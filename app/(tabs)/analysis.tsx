@@ -10,7 +10,6 @@ import { useDataReload } from '@/src/hooks/useDataReload';
 import { AnalysisService, CardioSummary, CategoryVolumeRow, ExerciseVolumeRow, OneRMProgressRow, OneRepMax, RepsOnlySummary, VolumeSeriesPoint, WeightOnlySummary, WorkoutComparison, WorkoutStreak, WorkoutSummary } from '@/src/services/AnalysisService';
 import { configService } from '@/src/services/ConfigService';
 import { UnitService } from '@/src/services/UnitService';
-import { workoutService } from '@/src/services/WorkoutService';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -35,7 +34,7 @@ interface RangeAnalysisState {
 }
 
 interface CoreAnalysisState {
-    heatmapData: number[];
+    heatmapData: { date: number; sets: number; volume: number }[];
     streak: WorkoutStreak | null;
 }
 
@@ -168,14 +167,14 @@ export default function AnalysisScreen() {
         setError(null);
         const requestId = ++coreRequestIdRef.current;
         try {
-            const [dates, st] = await Promise.all([
-                workoutService.getCompletedWorkoutsLastYear(),
+            const [data, st] = await Promise.all([
+                AnalysisService.getWorkoutHeatmapData(),
                 AnalysisService.getWorkoutStreakLastYear(),
             ]);
             if (coreRequestIdRef.current !== requestId) return;
 
             setCoreData({
-                heatmapData: dates,
+                heatmapData: data,
                 streak: st
             });
 
@@ -183,7 +182,7 @@ export default function AnalysisScreen() {
             try {
                 const todayStart = new Date();
                 todayStart.setHours(0, 0, 0, 0);
-                const hasTrainedToday = dates.some(d => d >= todayStart.getTime());
+                const hasTrainedToday = data.some(d => d.date >= todayStart.getTime());
                 const { systemNotificationService } = await import('../../src/services/SystemNotificationService');
                 systemNotificationService.scheduleStreakReminder(st.current, hasTrainedToday);
             } catch { /* non-critical, streak notification scheduling failure should not block UI */ }

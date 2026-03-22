@@ -1,7 +1,6 @@
 import { startOfWeek } from 'date-fns';
 import { useAuthStore } from '../store/authStore';
 import { logger } from '../utils/logger';
-import { uuidV4 } from '../utils/uuid';
 import { configService } from './ConfigService';
 import { dbService } from './DatabaseService';
 import type { GlobalEvent, ScoreConfig, SocialProfile, WeatherInfo } from './SocialService';
@@ -149,7 +148,7 @@ export class IronScoreService {
                     if (exists?.id) continue;
 
                     const points_awarded = Math.max(0, Math.round((e.points_base) * multipliers.streak_multiplier * multipliers.global_multiplier));
-                    const id = uuidV4();
+                    const id = `score:${e.event_key}`;
 
                     await dbService.run(
                         `INSERT INTO score_events (
@@ -360,11 +359,31 @@ export class IronScoreService {
     private static parseWeekEvaluatedAtMs(v: unknown): number | null {
         if (v == null) return null;
         const s = String(v);
+
+        // Handle string formats like "YYYY-MM-DD" relative to local timezone
+        if (s.includes('-')) {
+            const parts = s.split('-');
+            if (parts.length === 3) {
+                const y = Number(parts[0]);
+                const m = Number(parts[1]);
+                const d = Number(parts[2]);
+                if (Number.isFinite(y) && Number.isFinite(m) && Number.isFinite(d)) {
+                    const localDate = new Date(y, m - 1, d, 0, 0, 0, 0);
+                    return localDate.getTime();
+                }
+            }
+        }
+
         const n = Number(s);
-        if (Number.isFinite(n) && n > 0) return n;
+        const maxValidFuture = Date.now() + 7 * 24 * 60 * 60 * 1000;
+
+        // Safeguard to prevent far-future bugged timestamps (like 2026 ms epoch bugs) from locking streaks
+        if (Number.isFinite(n) && n > 0 && n < maxValidFuture) return n;
+
         const d = new Date(s);
         const ms = d.getTime();
-        if (Number.isFinite(ms) && ms > 0) return ms;
+        if (Number.isFinite(ms) && ms > 0 && ms < maxValidFuture) return ms;
+
         return null;
     }
 
@@ -396,7 +415,8 @@ export class IronScoreService {
             );
             const completedPrevWeek = new Set(rows.map(r => {
                 const d = new Date(r.date);
-                return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+                // Use UTC to avoid timezone-related streak issues
+                return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
             })).size;
             nextStreakWeeks = completedPrevWeek >= weeklyGoal ? (prevStreakWeeks + 1) : 0;
         }
@@ -404,14 +424,20 @@ export class IronScoreService {
         const nextMultiplier = this.resolveStreakMultiplier(cfg, nextStreakWeeks);
         const now = Date.now();
 
+        // Use local time accessors because weekStart is based on a local midnight timestamp
+        const dWeek = new Date(weekStart);
+        const yStr = dWeek.getFullYear();
+        const mStr = String(dWeek.getMonth() + 1).padStart(2, '0');
+        const dStr = String(dWeek.getDate()).padStart(2, '0');
+        const weekKey = `${yStr}-${mStr}-${dStr}`;
         await dbService.run(
             'UPDATE user_profiles SET streak_weeks = ?, streak_multiplier = ?, streak_week_evaluated_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
-            [nextStreakWeeks, nextMultiplier, String(weekStart), now, userId]
+            [nextStreakWeeks, nextMultiplier, weekKey, now, userId]
         );
         await dbService.queueSyncMutation('user_profiles', userId, 'UPDATE', {
             streak_weeks: nextStreakWeeks,
             streak_multiplier: nextMultiplier,
-            streak_week_evaluated_at: String(weekStart),
+            streak_week_evaluated_at: weekKey,
             updated_at: now,
         });
 

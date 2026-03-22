@@ -1,10 +1,12 @@
 import { and, desc, eq, isNull, or } from 'drizzle-orm';
 import {
     Activity,
+    Calendar,
     ChevronRight,
     Clock,
     Flame,
     Globe,
+    History,
     Trophy,
     User as UserIcon
 } from 'lucide-react';
@@ -57,6 +59,16 @@ export default async function UserProfilePage(props: { params: Promise<{ usernam
         )
         .orderBy(desc(schema.routines.updatedAt));
 
+    // Fetch Score History
+    const scoreHistory = await db.select()
+        .from(schema.scoreEvents)
+        .where(and(
+            eq(schema.scoreEvents.userId, profile.id),
+            isNull(schema.scoreEvents.deletedAt)
+        ))
+        .orderBy(desc(schema.scoreEvents.createdAt))
+        .limit(10);
+
     return (
         <main className="min-h-screen bg-[#f5f1e8] text-[#1a1a2e] selection:bg-[#1a1a2e] selection:text-[#f5f1e8]">
             {/* Profile Header */}
@@ -89,7 +101,7 @@ export default async function UserProfilePage(props: { params: Promise<{ usernam
                     </div>
 
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-0 border-[3px] border-[#1a1a2e] bg-white divide-y-[3px] md:divide-y-0 md:divide-x-[3px] divide-[#1a1a2e] shadow-[16px_16px_0px_0px_rgba(26,26,46,0.05)]">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-0 border-[3px] border-[#1a1a2e] bg-white divide-y-[3px] lg:divide-y-0 lg:divide-x-[3px] divide-[#1a1a2e] shadow-[16px_16px_0px_0px_rgba(26,26,46,0.05)]">
                         <div className="p-8 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all">
                             <Trophy className="w-6 h-6 mb-3 opacity-20 group-hover:opacity-100 transition-opacity" />
                             <div className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40 mb-1">TOTAL_IRONSCORE</div>
@@ -98,13 +110,19 @@ export default async function UserProfilePage(props: { params: Promise<{ usernam
 
                         <div className="p-8 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all">
                             <Flame className="w-6 h-6 mb-3 opacity-20 group-hover:opacity-100 transition-opacity text-orange-600 group-hover:text-current" />
-                            <div className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40 mb-1">CURRENT_STREAK</div>
-                            <div className="text-4xl lg:text-5xl font-black tracking-tighter">{profile.currentStreak || 0}W</div>
+                            <div className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40 mb-1">DAILY_STREAK</div>
+                            <div className="text-4xl lg:text-5xl font-black tracking-tighter">{profile.currentStreak || 0}D</div>
+                        </div>
+
+                        <div className="p-8 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all">
+                            <Calendar className="w-6 h-6 mb-3 opacity-20 group-hover:opacity-100 transition-opacity text-blue-600 group-hover:text-current" />
+                            <div className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40 mb-1">WEEKLY_STREAK</div>
+                            <div className="text-4xl lg:text-5xl font-black tracking-tighter">{profile.streakWeeks || 0}W</div>
                         </div>
 
                         <div className="p-8 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all">
                             <Globe className="w-6 h-6 mb-3 opacity-20 group-hover:opacity-100 transition-opacity" />
-                            <div className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40 mb-1">SHARED_COMMUNICATION</div>
+                            <div className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40 mb-1">DATA_SHARED</div>
                             <div className="text-4xl lg:text-5xl font-black tracking-tighter">{routines.length}</div>
                         </div>
                     </div>
@@ -165,6 +183,79 @@ export default async function UserProfilePage(props: { params: Promise<{ usernam
                             ))}
                         </div>
                     )}
+                </div>
+            </section>
+
+            {/* Score History Section */}
+            <section className="py-20 bg-[#1a1a2e] text-[#f5f1e8]">
+                <div className="container mx-auto px-4 max-w-5xl">
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+                        <div>
+                            <div className="flex items-center gap-3 mb-4">
+                                <History className="w-5 h-5 opacity-40" />
+                                <h2 className="text-sm font-black uppercase tracking-[0.5em] opacity-60 text-white/40">OPERATIONAL_LOGS</h2>
+                            </div>
+                            <h3 className="text-4xl lg:text-6xl font-black uppercase tracking-tighter italic">PUNTUACIÓN_HISTORIAL</h3>
+                        </div>
+                        <p className="text-[10px] font-bold opacity-30 uppercase max-w-xs leading-relaxed">
+                            Registro de transmisiones de datos y bonus acumulados durante misiones de entrenamiento.
+                        </p>
+                    </div>
+
+                    <div className="border-[3px] border-white/10 overflow-hidden">
+                        <table className="w-100 text-left border-collapse">
+                            <thead>
+                                <tr className="border-b-[3px] border-white/10 bg-white/5">
+                                    <th className="p-6 text-[10px] font-black uppercase tracking-widest opacity-40">TIPO_EVENTO</th>
+                                    <th className="p-6 text-[10px] font-black uppercase tracking-widest opacity-40">FECHA_STAMP</th>
+                                    <th className="p-6 text-[10px] font-black uppercase tracking-widest opacity-40 text-right">MAGNITUD</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {scoreHistory.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={3} className="p-12 text-center text-sm font-bold opacity-20 italic">
+                                            SIN_REGISTROS_DISPONIBLES
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    scoreHistory.map((item) => (
+                                        <tr key={item.id} className="hover:bg-white/5 transition-colors group">
+                                            <td className="p-6">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse group-hover:scale-150 transition-transform"></div>
+                                                    <span className="text-sm font-black uppercase tracking-tight">{item.eventType.replace('_', ' ')}</span>
+                                                </div>
+                                            </td>
+                                            <td className="p-6">
+                                                <span className="text-[11px] font-bold opacity-40 uppercase tabular-nums tracking-widest">
+                                                    {new Date(item.createdAt || new Date()).toLocaleDateString('es-AR', {
+                                                        day: '2-digit',
+                                                        month: '2-digit',
+                                                        year: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </span>
+                                            </td>
+                                            <td className="p-6 text-right">
+                                                <span className="text-xl font-black tracking-tighter text-yellow-500">
+                                                    +{item.pointsAwarded}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="mt-12 flex justify-center">
+                        <div className="px-6 py-4 border-[2px] border-white/5 bg-white/[0.02] inline-flex flex-col items-center">
+                            <Activity className="w-4 h-4 mb-2 opacity-20" />
+                            <div className="text-[8px] font-black uppercase tracking-[0.5em] opacity-30">END_OF_DATAFEED</div>
+                        </div>
+                    </div>
                 </div>
             </section>
         </main>

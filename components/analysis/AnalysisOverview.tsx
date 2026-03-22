@@ -17,7 +17,7 @@ interface AnalysisOverviewProps {
     streak: WorkoutStreak | null;
     summaryRange: WorkoutSummary | null;
     comparison: WorkoutComparison | null;
-    heatmapData: number[]; // timestamps
+    heatmapData: { date: number; sets: number; volume: number }[];
     volumeSeries: { value: number; sets?: number; label: string; dateMs: number }[];
     bucket: 'day' | 'week' | 'month';
     categoryVolume: CategoryVolumeRow[];
@@ -612,23 +612,23 @@ export const AnalysisOverview = React.memo(({
                         <View style={styles.summaryAccent} />
                         <Text style={styles.summaryTitle}>Resumen · {rangeDays} días</Text>
                     </View>
-                    {comparison?.workoutChangePct != null && (
+                    {comparison?.volumeChangePct != null && (
                         <View style={[
                             styles.changeBadge,
                             {
-                                backgroundColor: comparison.workoutChangePct >= 0 ? withAlpha(colors.green, '15') : withAlpha(colors.red, '15'),
-                                borderColor: comparison.workoutChangePct >= 0 ? withAlpha(colors.green, '30') : withAlpha(colors.red, '30'),
+                                backgroundColor: comparison.volumeChangePct >= 0 ? withAlpha(colors.green, '15') : withAlpha(colors.red, '15'),
+                                borderColor: comparison.volumeChangePct >= 0 ? withAlpha(colors.green, '30') : withAlpha(colors.red, '30'),
                             }
                         ]}>
-                            {comparison.workoutChangePct >= 0
+                            {comparison.volumeChangePct >= 0
                                 ? <TrendingUp size={14} color={colors.green} />
                                 : <TrendingDown size={14} color={colors.red} />}
                             <Text style={{
                                 fontSize: 13,
                                 fontWeight: '900',
-                                color: comparison.workoutChangePct >= 0 ? colors.green : colors.red,
+                                color: comparison.volumeChangePct >= 0 ? colors.green : colors.red,
                             }}>
-                                {comparison.workoutChangePct > 0 ? '+' : ''}{comparison.workoutChangePct}%
+                                {comparison.volumeChangePct > 0 ? '+' : ''}{comparison.volumeChangePct}%
                             </Text>
                         </View>
                     )}
@@ -729,7 +729,7 @@ export const AnalysisOverview = React.memo(({
 
             {/* Heatmap */}
             <View style={styles.widgetSpacingLarge}>
-                <ConsistencyHeatmap timestamps={heatmapData} />
+                <ConsistencyHeatmap data={heatmapData} />
             </View>
 
             {/* Volume Chart */}

@@ -43,11 +43,12 @@ const getActivityDescription = (item: SocialInboxItem): string => {
         try {
             const meta = item.metadata ? JSON.parse(item.metadata) : {};
             const exercise = meta.exerciseName || 'un ejercicio';
+            const unit = meta.unit || 'kg';
             if (meta.weight && meta.reps) {
-                return `Nuevo PR en ${exercise}: ${meta.weight}kg x ${meta.reps}`;
+                return `Nuevo PR en ${exercise}: ${meta.weight}${unit} x ${meta.reps}`;
             }
             if (meta.oneRm) {
-                return `Nuevo PR en ${exercise}: ${Math.round(meta.oneRm)}kg (1RM)`;
+                return `Nuevo PR en ${exercise}: ${Math.round(meta.oneRm)}${unit} (1RM)`;
             }
         } catch { }
         return 'Rompió un Récord Personal';

@@ -7,7 +7,7 @@ import { useColors } from '../src/hooks/useColors';
 import { ThemeFx } from '../src/theme';
 
 interface ConsistencyHeatmapProps {
-    timestamps: number[];
+    data: { date: number; sets: number; volume: number }[];
 }
 
 const CELL_SIZE = 12;
@@ -15,9 +15,9 @@ const GAP = 2;
 const MONTH_GAP = 10;
 const MONTH_CARD_PADDING = 6;
 
-export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
+export function ConsistencyHeatmap({ data }: ConsistencyHeatmapProps) {
     const colors = useColors();
-    const [selectedDate, setSelectedDate] = useState<{ date: Date; count: number } | null>(null);
+    const [selectedDate, setSelectedDate] = useState<{ date: Date; sets: number; sessions: number } | null>(null);
     const scrollViewRef = useRef<ScrollView>(null);
 
     const ss = useMemo(() => StyleSheet.create({
@@ -259,19 +259,24 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
 
     /** Map timestamps to day keys for O(1) lookup */
     const countMap = useMemo(() => {
-        const map = new Map<string, number>();
-        timestamps.forEach((ts) => {
-            const key = format(new Date(ts), 'yyyy-MM-dd');
-            map.set(key, (map.get(key) ?? 0) + 1);
+        const map = new Map<string, { sets: number; sessions: number }>();
+        (data || []).forEach((item) => {
+            const date = new Date(item.date);
+            const key = format(date, 'yyyy-MM-dd');
+            const current = map.get(key) ?? { sets: 0, sessions: 0 };
+            map.set(key, {
+                sets: current.sets + item.sets,
+                sessions: current.sessions + 1
+            });
         });
         return map;
-    }, [timestamps]);
+    }, [data]);
 
-    const getCellColor = (count: number, isSelected: boolean): string => {
+    const getCellColor = (sets: number, isSelected: boolean): string => {
         if (isSelected) return colors.text;
-        if (count === 0) return colors.isDark ? colors.surface : colors.border;
-        if (count === 1) return colors.primary.light;
-        if (count === 2) return colors.primary.DEFAULT;
+        if (sets === 0) return colors.isDark ? colors.surface : colors.border;
+        if (sets <= 5) return colors.primary.light;
+        if (sets <= 12) return colors.primary.DEFAULT;
         return colors.primary.dark;
     };
 
@@ -283,7 +288,7 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
     }, [months]);
 
     const totalActiveDays = countMap.size;
-    const totalSessions = timestamps.length;
+    const totalSessions = (data || []).length;
     const currentYear = new Date().getFullYear();
 
     return (
@@ -307,11 +312,9 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
                             {format(selectedDate.date, 'd MMM yyyy', { locale: es })}
                         </Text>
                         <Text style={ss.tooltipCount}>
-                            {selectedDate.count === 0
+                            {selectedDate.sets === 0
                                 ? 'Descanso'
-                                : selectedDate.count === 1
-                                    ? '1 sesión'
-                                    : `${selectedDate.count} sesiones`}
+                                : `${selectedDate.sessions} ${selectedDate.sessions === 1 ? 'sesión' : 'sesiones'}${selectedDate.sets > 0 ? ` · ${selectedDate.sets} series` : ''}`}
                         </Text>
                     </View>
                 )}
@@ -374,7 +377,7 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
                                                         }
 
                                                         const key = format(day, 'yyyy-MM-dd');
-                                                        const count = countMap.get(key) ?? 0;
+                                                        const stats = countMap.get(key) ?? { sets: 0, sessions: 0 };
                                                         const isToday = isSameDay(day, new Date());
                                                         const isSelected = selectedDate ? isSameDay(day, selectedDate.date) : false;
 
@@ -383,11 +386,11 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
                                                                 key={dIdx}
                                                                 onPress={() => {
                                                                     Haptics.selectionAsync();
-                                                                    setSelectedDate({ date: day, count });
+                                                                    setSelectedDate({ date: day, ...stats });
                                                                 }}
                                                                 style={[
                                                                     ss.cell,
-                                                                    { backgroundColor: getCellColor(count, isSelected) },
+                                                                    { backgroundColor: getCellColor(stats.sets, isSelected) },
                                                                     isToday && !isSelected && ss.cellToday,
                                                                 ]}
                                                             />
@@ -407,7 +410,7 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
             {/* Legend */}
             <View style={ss.legend}>
                 <Text style={ss.legendLabel}>Menos</Text>
-                <View style={[ss.legendCell, { backgroundColor: colors.border }]} />
+                <View style={[ss.legendCell, { backgroundColor: colors.isDark ? colors.surface : colors.border }]} />
                 <View style={[ss.legendCell, { backgroundColor: colors.primary.light }]} />
                 <View style={[ss.legendCell, { backgroundColor: colors.primary.DEFAULT }]} />
                 <View style={[ss.legendCell, { backgroundColor: colors.primary.dark }]} />
@@ -416,4 +419,3 @@ export function ConsistencyHeatmap({ timestamps }: ConsistencyHeatmapProps) {
         </View>
     );
 }
-

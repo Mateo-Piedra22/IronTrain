@@ -9,6 +9,7 @@ import { confirm } from '@/src/store/confirmStore';
 import { useNotificationStore } from '@/src/store/notificationStore';
 import { useSettingsStore } from '@/src/store/useSettingsStore';
 import { useSocialStore } from '@/src/store/useSocialStore';
+import * as analytics from '@/src/utils/analytics';
 import { logger } from '@/src/utils/logger';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
@@ -88,6 +89,12 @@ export default function SocialTab() {
     const [savingProfile, setSavingProfile] = useState(false);
     const [trainingDays, setTrainingDays] = useState<number[]>([]);
 
+    useFocusEffect(
+        useCallback(() => {
+            analytics.capture('social_tab_viewed');
+        }, [])
+    );
+
     const loadTrainingDays = useCallback(async () => {
         const rawDays = configService.get('training_days');
         setTrainingDays(Array.isArray(rawDays) ? rawDays : [1, 2, 3, 4, 5, 6]);
@@ -128,6 +135,9 @@ export default function SocialTab() {
             if (!user) return;
             loadTrainingDays();
             refreshLocation(true);
+
+            // Capture analytics event for survey triggering
+            analytics.capture('social_tab_viewed');
 
             // Per user request: Re-check location in background every X time (3 minutes) while on Social tab
             const locInterval = setInterval(() => {
@@ -349,6 +359,9 @@ export default function SocialTab() {
                 const routine = payload;
                 await routineService.importSharedRoutine(routine);
                 addToast({ type: 'success', title: 'Rutina importada', message: 'Ya podés verla en tu biblioteca.' });
+            }
+            if (action === 'accept') {
+                analytics.capture('routine_imported', { source: 'inbox', inbox_id: inboxId });
             }
             await SocialService.respondInbox(inboxId, action);
             fetchInitialData(true, true);

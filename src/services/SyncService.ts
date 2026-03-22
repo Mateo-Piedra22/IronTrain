@@ -107,7 +107,7 @@ export interface SyncDiagnostics {
 export class SyncService {
     private isSyncing = false;
 
-    private syncPreconditionError(code: 'ALREADY_SYNCING' | 'UNAUTHENTICATED' | 'OFFLINE', message: string): Error {
+    private syncPreconditionError(code: 'ALREADY_SYNCING' | 'UNAUTHENTICATED' | 'OFFLINE' | 'OFFLINE_MODE_ACTIVE', message: string): Error {
         const e = new Error(message);
         (e as any).code = code;
         return e;
@@ -373,9 +373,19 @@ export class SyncService {
      * @param options.verify If true, performs an additional push check if pull triggered consistency repairs
      */
     public async syncBidirectional(options?: { forcePull?: boolean; verify?: boolean }): Promise<void> {
+        if (analytics.isFeatureFlagEnabled('offline-mode')) {
+            throw this.syncPreconditionError('OFFLINE_MODE_ACTIVE', 'Sincronización deshabilitada por mantenimiento');
+        }
+
         if (this.isSyncing) {
             throw this.syncPreconditionError('ALREADY_SYNCING', 'Sync en progreso');
         }
+
+        // Check for PostHog offline-mode flag to prevent syncing during maintenance or incidents
+        if (analytics.isFeatureFlagEnabled('offline-mode')) {
+            throw this.syncPreconditionError('OFFLINE_MODE_ACTIVE', 'Sincronización deshabilitada por mantenimiento');
+        }
+
         this.isSyncing = true;
 
         let totalPushed = 0;

@@ -31,6 +31,12 @@ export interface SocialProfile {
     username: string | null;
     shareStats?: number | null;
     isPublic?: number | null;
+    // Streak and Score - Added for IronScore integration
+    currentStreak?: number;
+    highestStreak?: number;
+    streakWeeks?: number;
+    scoreLifetime?: number;
+    streakMultiplier?: number;
     updatedAt?: string | number | Date | null;
     lastUsernameChangeAt?: string | null;
     activeEvent?: GlobalEvent | null;

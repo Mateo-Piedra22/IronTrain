@@ -7,6 +7,7 @@ import { useAuthStore } from '@/src/store/authStore';
 import { confirm } from '@/src/store/confirmStore';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { Routine } from '@/src/types/db';
+import * as analytics from '@/src/utils/analytics';
 import { buildDuplicateMessage, findNameDuplicates } from '@/src/utils/duplicates';
 import { notify } from '@/src/utils/notify';
 import { Calendar, ChevronRight, Dumbbell, Edit3, GripVertical, Plus, Send, Share2, Trash2, User, Users, X } from 'lucide-react-native';
@@ -531,6 +532,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
         if (!routineId) return;
         try {
             const url = `https://irontrain.motiona.xyz/share/routine/${routineId}`;
+            analytics.capture('routine_share_initiated', { method: 'link', routine_id: routineId });
             await Share.share({
                 message: `¡Mirá mi rutina en IronTrain y descargala gratis!\n\n${url}`,
                 url, // For iOS
@@ -558,6 +560,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
         setSendingRoutine(true);
         try {
             const payload = await routineService.exportRoutine(routineId);
+            analytics.capture('routine_share_initiated', { method: 'friend', routine_id: routineId, friend_id: friendId });
             await SocialService.sendToInbox(friendId, payload, 'routine');
             notify.success('Enviado', 'Rutina enviada a tu amigo.');
             setFriendPickerVisible(false);

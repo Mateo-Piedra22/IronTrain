@@ -247,10 +247,12 @@ export const AnalysisTrends = React.memo(({ volumeSeries, topExercisesByVolume, 
 
     const volumeTrend = useMemo(() => {
         if (volumeSeries.length < 2) {
-            return { slopePerPoint: 0, first: 0, last: 0, changePct: null as number | null };
+            return { slopePerDay: 0, first: 0, last: 0, changePct: null as number | null };
         }
         const y = volumeSeries.map((p) => p.volume);
-        const x = volumeSeries.map((_, i) => i);
+        const firstMs = volumeSeries[0].dateMs;
+        const x = volumeSeries.map((p) => (p.dateMs - firstMs) / 86400000);
+
         const mean = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / Math.max(1, arr.length);
         const mx = mean(x);
         const my = mean(y);
@@ -261,15 +263,26 @@ export const AnalysisTrends = React.memo(({ volumeSeries, topExercisesByVolume, 
             num += dx * (y[i] - my);
             den += dx * dx;
         }
-        const slopePerPoint = den > 0 ? num / den : 0;
+        const slopePerDay = den > 0 ? num / den : 0;
+        const intercept = my - slopePerDay * mx;
+
+        const firstFitted = intercept; // value at x=0
+        const lastX = x[x.length - 1];
+        const lastFitted = slopePerDay * lastX + intercept;
+
         const first = y[0] ?? 0;
         const last = y[y.length - 1] ?? 0;
-        const changePct = first > 0 ? Math.round(((last - first) / first) * 100) : null;
-        return { slopePerPoint, first, last, changePct };
+
+        // Use fitted values for a more robust change percentage if possible, 
+        // but avoid division by zero or negative values for volume
+        const baseValue = Math.max(first, firstFitted);
+        const changePct = baseValue > 0 ? Math.round(((lastFitted - firstFitted) / baseValue) * 100) : null;
+
+        return { slopePerDay, first, last, changePct };
     }, [volumeSeries]);
 
-    const isUp = volumeTrend.slopePerPoint > 0.01;
-    const isDown = volumeTrend.slopePerPoint < -0.01;
+    const isUp = volumeTrend.slopePerDay > 0.5; // At least 0.5kg per day increase
+    const isDown = volumeTrend.slopePerDay < -0.5;
 
     return (
         <View style={styles.container}>

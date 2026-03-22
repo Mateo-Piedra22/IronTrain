@@ -233,7 +233,7 @@ export class SyncSchedulerService {
             }
         } catch (e: any) {
             const code = e?.code as string | undefined;
-            if (code === 'ALREADY_SYNCING' || code === 'OFFLINE' || code === 'UNAUTHENTICATED') {
+            if (code === 'ALREADY_SYNCING' || code === 'OFFLINE' || code === 'UNAUTHENTICATED' || code === 'OFFLINE_MODE_ACTIVE') {
                 return;
             }
 

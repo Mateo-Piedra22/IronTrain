@@ -3,6 +3,7 @@ import { BadgePill } from '@/components/ui/BadgePill';
 import { ModalScreenOverlayHost } from '@/components/ui/ModalScreenOverlayHost';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { routineService } from '@/src/services/RoutineService';
+import * as analytics from '@/src/utils/analytics';
 import { notify } from '@/src/utils/notify';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Calendar, ChevronLeft, Dumbbell, Info } from 'lucide-react-native';
@@ -63,6 +64,7 @@ export default function ShareRoutineScreen() {
         setImporting(true);
         try {
             await routineService.importSharedRoutine(payload);
+            analytics.capture('routine_imported', { source: 'link', routine_id: id });
             notify.success('Rutina Importada', 'Se ha guardado en tus rutinas exitosamente.');
             router.dismissAll();
         } catch (err: any) {

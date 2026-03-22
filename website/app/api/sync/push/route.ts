@@ -248,6 +248,16 @@ export async function POST(req: NextRequest) {
                                 }
                             }
 
+                            // ZERO TRUST: user_profiles social stats are server-authoritative
+                            if (tableName === 'user_profiles') {
+                                const socialFields = new Set(['score_lifetime', 'streak_weeks', 'streak_multiplier', 'current_streak', 'highest_streak', 'streak_week_evaluated_at']);
+                                for (const key of Object.keys(filteredData)) {
+                                    if (socialFields.has(key)) {
+                                        delete filteredData[key];
+                                    }
+                                }
+                            }
+
                             // ZERO TRUST: Specifically for friendships, block status changes via sync
                             if (tableName === 'friendships') {
                                 if (filteredData.status && filteredData.status !== existingRecord.status) {
@@ -279,6 +289,25 @@ export async function POST(req: NextRequest) {
                         // ZERO TRUST: Friendships cannot be created as 'accepted' via sync
                         if (tableName === 'friendships' && !existingRecord && insertPayload.status !== 'pending') {
                             throw new Error('Forbidden: New friendships must start as pending');
+                        }
+
+                        // perform a custom de-duplication for score_events by eventKey
+                        if (tableName === 'score_events' && (operation === 'INSERT' || !existingRecord)) {
+                            const eventKey = filteredData.eventKey;
+                            if (eventKey) {
+                                const foundByEventKey = await tx
+                                    .select({ id: schema.scoreEvents.id })
+                                    .from(schema.scoreEvents)
+                                    .where(eq(schema.scoreEvents.eventKey, eventKey))
+                                    .limit(1);
+
+                                if (foundByEventKey[0]) {
+                                    await tx.update(schema.scoreEvents)
+                                        .set(filteredData)
+                                        .where(eq(schema.scoreEvents.id, foundByEventKey[0].id));
+                                    return;
+                                }
+                            }
                         }
 
                         // Perform UPSERT
@@ -441,6 +470,20 @@ export async function POST(req: NextRequest) {
                 await handleOperation(op);
             }
         }
+
+        // Final Social Scoring Integrity Check: Recalculate lifetime score from events
+        // This fixes any past discrepancies and ensures the Profile total matches the Events sum.
+        await db.update(schema.userProfiles)
+            .set({
+                scoreLifetime: sql`(
+                    SELECT COALESCE(SUM(${schema.scoreEvents.pointsAwarded}), 0)
+                    FROM ${schema.scoreEvents}
+                    WHERE ${schema.scoreEvents.userId} = ${schema.userProfiles.id}
+                      AND ${schema.scoreEvents.deletedAt} IS NULL
+                )`,
+                updatedAt: new Date(),
+            })
+            .where(eq(schema.userProfiles.id, userId));
 
         return NextResponse.json({ success: true, processed: processedCount, results });
 

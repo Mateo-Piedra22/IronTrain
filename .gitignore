@@ -62,3 +62,4 @@ GoogleService-Info.plist
 jest_out.txt
 tmp/
 website/tmp/
+src/changelog_incremental.md
