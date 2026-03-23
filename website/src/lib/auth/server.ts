@@ -1,19 +1,17 @@
 import { createNeonAuth } from '@neondatabase/auth/next/server';
 
-// Instancia para el HANDLER de la API (Proxy)
-// Usamos la URL pública para que el router de Better Auth reconozca los paths entrantes.
-export const authHandler = createNeonAuth({
-    baseUrl: process.env.NEXT_PUBLIC_NEON_AUTH_URL!,
-    cookies: {
-        secret: process.env.NEON_AUTH_COOKIE_SECRET!,
-    },
-});
-
-// Instancia para llamadas desde el SERVIDOR (SSR / getSession)
-// Usamos la URL interna para evitar el bucle 508 (Loop Detected) en Next.js.
+/**
+ * Instancia de autenticación para IronTrain.
+ * IMPORTANTE: Usamos NEON_AUTH_SERVICE_URL (dominio interno de Neon) como baseUrl.
+ * 1. Evita bucles 508 al hacer fetch directo a Neon en SSR.
+ * 2. Permite que el proxy de la API funcione sin llamarse a sí mismo.
+ */
 export const auth = createNeonAuth({
     baseUrl: process.env.NEON_AUTH_SERVICE_URL!,
     cookies: {
         secret: process.env.NEON_AUTH_COOKIE_SECRET!,
     },
 });
+
+// Alias para compatibilidad si fuera necesario
+export const authHandler = auth;
