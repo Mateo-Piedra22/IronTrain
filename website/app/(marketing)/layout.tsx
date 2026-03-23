@@ -68,19 +68,31 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
                 ))}
 
                 <div className="mt-8 mb-3 text-[10px] opacity-40">━━ CUENTA ━━</div>
-                {!loading && (
+                {!loading ? (
                     <>
                         {session ? (
-                            <>
-                                <Link href="/profile" className="group flex items-center justify-between py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-current font-bold italic">
-                                    <span>MI_PERFIL_SOCIAL</span>
-                                    <span className="text-[10px] opacity-40 group-hover:opacity-100 transition-opacity">[099]</span>
+                            <div className="space-y-1">
+                                <Link
+                                    href={`/@${(session as any).user?.username || ''}`}
+                                    className="group flex items-center gap-3 py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-current"
+                                >
+                                    <div className="w-6 h-6 rounded-full bg-current/10 flex items-center justify-center overflow-hidden">
+                                        {(session as any).user?.image ? (
+                                            <img src={(session as any).user.image} alt="" className="w-full h-full object-cover grayscale" />
+                                        ) : (
+                                            <span className="text-[10px] font-bold">U</span>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 overflow-hidden">
+                                        <div className="font-bold truncate text-xs">{(session as any).user?.name || 'MI_CUENTA'}</div>
+                                        <div className="text-[10px] opacity-40 truncate italic">Ver Perfil [099]</div>
+                                    </div>
                                 </Link>
-                                <Link href="/auth/sign-out" className="group flex items-center justify-between py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-red-600 text-red-600 opacity-70 hover:opacity-100">
+                                <Link href="/auth/sign-out" className="group flex items-center justify-between py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-red-600 text-red-600/70 hover:text-red-600">
                                     <span>CERRAR SESIÓN</span>
                                     <span className="text-[10px] opacity-40 group-hover:opacity-100 transition-opacity">[OFF]</span>
                                 </Link>
-                            </>
+                            </div>
                         ) : (
                             <>
                                 <Link href="/auth/sign-in" className="group flex items-center justify-between py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-current">
@@ -94,6 +106,11 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
                             </>
                         )}
                     </>
+                ) : (
+                    <div className="px-3 py-2 animate-pulse flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-full bg-current/5" />
+                        <div className="h-3 w-20 bg-current/5 rounded" />
+                    </div>
                 )}
             </nav>
 
