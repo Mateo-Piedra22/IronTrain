@@ -1646,6 +1646,21 @@ export const createSocialStyles = (colors: any) => StyleSheet.create({
         fontWeight: '600',
         color: colors.primary.DEFAULT,
     },
+    infoFooterBox: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: colors.surfaceLighter,
+        padding: 14,
+        borderRadius: 12,
+        gap: 10,
+        marginTop: 10,
+    },
+    infoFooterText: {
+        flex: 1,
+        fontSize: 12,
+        lineHeight: 18,
+        color: colors.textMuted,
+    },
     // --- Thermal Aesthetic (Science-y / High contrast) ---
     thermalCard: {
         backgroundColor: '#050505',

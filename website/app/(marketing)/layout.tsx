@@ -5,10 +5,12 @@
  * Identidad única: MotionA Brand Identity
  */
 
+import { useAuthData } from '@neondatabase/auth/react';
 import { Mail, MapPin, Menu, Phone, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { ReactNode, useState } from "react";
+import { authClient } from "../../src/lib/auth/client";
 
 interface MarketingLayoutProps {
     children: ReactNode;
@@ -26,6 +28,8 @@ const primaryLinks = [
 
 export default function MarketingLayout({ children }: MarketingLayoutProps) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const { data: session, isPending: loading } = useAuthData(authClient as any);
+
     const currentDate = new Date().toLocaleDateString('es-AR', {
         day: '2-digit',
         month: '2-digit',
@@ -62,10 +66,38 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
                         <span className="text-[10px] opacity-40 group-hover:opacity-100 transition-opacity">[{item.code}]</span>
                     </Link>
                 ))}
+
+                <div className="mt-8 mb-3 text-[10px] opacity-40">━━ CUENTA ━━</div>
+                {!loading && (
+                    <>
+                        {session ? (
+                            <>
+                                <Link href="/profile" className="group flex items-center justify-between py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-current font-bold italic">
+                                    <span>MI_PERFIL_SOCIAL</span>
+                                    <span className="text-[10px] opacity-40 group-hover:opacity-100 transition-opacity">[099]</span>
+                                </Link>
+                                <Link href="/auth/sign-out" className="group flex items-center justify-between py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-red-600 text-red-600 opacity-70 hover:opacity-100">
+                                    <span>CERRAR SESIÓN</span>
+                                    <span className="text-[10px] opacity-40 group-hover:opacity-100 transition-opacity">[OFF]</span>
+                                </Link>
+                            </>
+                        ) : (
+                            <>
+                                <Link href="/auth/sign-in" className="group flex items-center justify-between py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-current">
+                                    <span>INICIAR SESIÓN</span>
+                                    <span className="text-[10px] opacity-40 group-hover:opacity-100 transition-opacity">[IN]</span>
+                                </Link>
+                                <Link href="/auth/sign-up" className="group flex items-center justify-between py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-current">
+                                    <span>REGISTRARSE</span>
+                                    <span className="text-[10px] opacity-40 group-hover:opacity-100 transition-opacity">[NEW]</span>
+                                </Link>
+                            </>
+                        )}
+                    </>
+                )}
             </nav>
 
             <div className="border-t border-current pt-4 mt-6 space-y-3">
-                {/* TODO: Change this link to official stores when officially deployed to stores. Currently points to /downloads. */}
                 <Link
                     href="/downloads"
                     className="block py-2 px-3 text-center border border-current hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all"
@@ -78,7 +110,7 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
                 >
                     ▸ DESCARGA DIRECTA
                 </Link>
-                <Link href="/feed" className="block py-2 px-3 text-center border border-current hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all">
+                <Link href="/feed" className="block py-2 px-3 text-center border-2 border-current shadow-[4px_4px_0px_0px_rgba(26,26,46,0.1)] hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all font-black">
                     FEED SOCIAL P2P
                 </Link>
             </div>
