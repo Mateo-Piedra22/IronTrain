@@ -3,8 +3,7 @@ import { auth } from '../../../../src/lib/auth/server';
 const handlers = auth.handler();
 
 /**
- * Proxy Quirúrgico de Autenticación
- * Soluciona 404s preservando Query Params y limpia el enrutamiento para evitar 508s.
+ * Proxy de Autenticación con Logging y Resiliencia
  */
 async function proxy(request: Request, { params }: { params: Promise<{ path: string[] }> }) {
     const { path } = await params;
@@ -14,23 +13,49 @@ async function proxy(request: Request, { params }: { params: Promise<{ path: str
     url.protocol = serviceUrl.protocol;
     url.host = serviceUrl.host;
 
-    // 1. Limpiamos la barra final para evitar URLs malformadas como '//path'
+    // Limpieza de ruta base
     const basePath = serviceUrl.pathname.replace(/\/$/, '');
     url.pathname = `${basePath}/${path.join('/')}`;
 
-    // 2. Transmisión CRÍTICA de parámetros de búsqueda (soluciona 404s)
+    // Preservar parámetros de búsqueda (?token=, etc)
     url.search = new URL(request.url).search;
 
-    // 3. Pasamos la petición con todos los headers y cuerpo originales
-    const proxiedRequest = new Request(url, request);
+    console.log(`[AuthProxy] IN: ${request.url} | OUT: ${url.toString()}`);
+
+    const proxiedRequest = new Request(url, {
+        method: request.method,
+        headers: request.headers,
+        body: request.body,
+        // Importante para no romper el stream del body si existe
+        duplex: 'half'
+    } as any);
+
     const method = request.method as keyof typeof handlers;
     const handler = handlers[method];
 
     if (typeof handler !== 'function') {
+        console.error(`[AuthProxy] Method ${method} not allowed for ${path.join('/')}`);
         return new Response('Method not allowed', { status: 405 });
     }
 
-    return (handler as any)(proxiedRequest, { params: Promise.resolve({ path }) });
+    try {
+        const response = await (handler as any)(proxiedRequest, { params: Promise.resolve({ path }) });
+        console.log(`[AuthProxy] Result for ${path.join('/')}: ${response.status}`);
+
+        // Estrategia de Silenciamiento para query-fn (Parche para React Query/Proxy conflict)
+        if (path[0] === 'query-fn' && response.status === 404) {
+            console.log(`[AuthProxy] ✅ Silencing phantom query-fn 404`);
+            return new Response(JSON.stringify({}), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        return response;
+    } catch (error) {
+        console.error(`[AuthProxy] CRITICAL ERROR for ${path.join('/')}:`, error);
+        return new Response('Internal Server Error', { status: 500 });
+    }
 }
 
 export const GET = proxy;
