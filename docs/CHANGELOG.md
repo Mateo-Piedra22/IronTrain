@@ -7,6 +7,34 @@
 - **Vinculación con servicios de salud**: Posibilidad de vincular con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos.
 - **Configuración de la App**: Posibilidad de configurar la aplicación a través de una página web.
 
+## 2.1.5 (2026-03-23)
+### "Voluntad de Hierro" (Weather Bonus)
+- **Detección Automática**: Mejor integración con OpenWeather API para validar bonus por entrenar bajo lluvia, nieve, frío extremo (<3°C) o calor intenso (>30°C).
+- **Puntos Extra (+15 pts)**: Recompensa automática al finalizar entrenamientos en condiciones climáticas desafiantes.
+- **Historial de Detecciones**: 
+    - Nueva sección "Detecciones Recientes" en el modal de Clima para transparencia del usuario.
+    - Registro persistente (`weather_logs`) que incluye temperatura, viento, humedad y ubicación exacta del chequeo.
+- **Optimización de API**: Periodo de gracia de 20 minutos entre chequeos para minimizar llamadas a la API externa.
+
+### IronScore & Streaks (Sistema de Puntuación)
+- **Cálculo Retroactivo**: `IronScoreService` ahora puede identificar y corregir puntajes faltantes en entrenamientos previos.
+- **Rachas Semanales Refinadas**:
+    - Evaluación estricta Lunes-Domingo.
+    - Multiplicadores progresivos: x1.1 (3 sem.), x1.25 (5 sem.), x1.5 (10 sem.).
+    - Nuevo: Los multiplicadores ahora se aplican también a los puntos por PRs y Clima.
+- **PRs (The Big 3)**: Bonus premium (+25 pts) para récords en Sentadilla, Banca y Peso Muerto.
+
+### Interfaz de Usuario (App)
+- **Social Dashboard**:
+    - Integración de badges dinámicos para Eventos Globales ( multipliers activos) y "Voluntad de Hierro".
+    - Mejora en `ProfileCard` para mostrar la ubicación detectada o el estado del bonus en tiempo real.
+- **Modales de Detalle**: Rediseño de `WeatherBonusModal` y `GlobalEventModal` con estética técnica ("science-y") y datos precisos.
+
+### Backend & Infraestructura
+- **Drizzle Schema**: Adición de la tabla `weather_logs` para monitoreo y auditoría de bonus.
+- **API History**: Nuevo endpoint `/api/social/weather-bonus/history` para alimentar la vista de detecciones recientes.
+- **Scoring Logic**: Unificación total de la librería de scoring en `website/src/lib/social-scoring.ts` para garantizar paridad entre App y Web.
+
 ## 2.1.4 (2026-03-21)
 
 ### Novedades y Funcionalidades Principales
