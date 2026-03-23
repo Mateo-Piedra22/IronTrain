@@ -6,23 +6,21 @@ const handler = auth.handler();
 export const GET = async (req: NextRequest, { params }: { params: Promise<{ auth: string[] }> }) => {
     const p = await params;
     // INCONSISTENCY FIX:
-    // Next.js 15 expects 'auth' in params because the folder is [...auth].
-    // BUT the library runtime logic (v0.2.0-beta.1) internally looks for 'path'.
-    // We provide both to satisfy everyone.
+    // Pasamos el objeto resuelto directamente en lugar de una Promesa
     return (handler as any).GET(req, {
-        params: Promise.resolve({
+        params: {
             ...p,
             path: p.auth
-        })
+        }
     });
 };
 
 export const POST = async (req: NextRequest, { params }: { params: Promise<{ auth: string[] }> }) => {
     const p = await params;
     return (handler as any).POST(req, {
-        params: Promise.resolve({
+        params: {
             ...p,
             path: p.auth
-        })
+        }
     });
 };
