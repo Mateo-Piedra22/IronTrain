@@ -238,6 +238,22 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
                         </p>
                     </div>
 
+                    {/* WEB REDIRECTS (Optional for web users) */}
+                    <div className="grid grid-cols-2 gap-3 pt-6 border-t border-[#1a1a2e]/5">
+                        <Link
+                            href="/feed"
+                            className="bg-white/50 border border-[#1a1a2e]/10 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wider hover:bg-white transition-all flex items-center justify-center gap-2"
+                        >
+                            Ir al Feed
+                        </Link>
+                        <Link
+                            href={`/@${profile.username}`}
+                            className="bg-white/50 border border-[#1a1a2e]/10 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wider hover:bg-white transition-all flex items-center justify-center gap-2"
+                        >
+                            Ver Perfil
+                        </Link>
+                    </div>
+
                     <script dangerouslySetInnerHTML={{
                         __html: `
                         // Clear cookie via document.cookie since we can't do it on server during render
