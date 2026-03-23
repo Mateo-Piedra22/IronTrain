@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { bigint, boolean, integer, jsonb, pgTable, real, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, boolean, index, integer, jsonb, pgTable, real, text, timestamp } from 'drizzle-orm/pg-core';
 
 const commonFields = {
     userId: text('user_id').notNull(),
@@ -345,7 +345,9 @@ export const weatherLogs = pgTable('weather_logs', {
     isAdverse: boolean('is_adverse').default(false),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     workoutId: text('workout_id'),
-});
+}, (table) => ({
+    userTimeIdx: index('weather_user_time_idx').on(table.userId, table.createdAt),
+}));
 
 // --- RELATIONS FOR DRIZZLE QUERY API ---
 export const categoriesRelations = relations(categories, ({ many }) => ({

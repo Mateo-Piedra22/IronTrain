@@ -276,7 +276,7 @@ export const ScoreInfoModal = React.memo(({
                         {profile?.scoreConfig?.weatherBonusEnabled !== 0 && (
                             <View style={styles.infoPointRow}>
                                 <CloudRain size={18} color={colors.blue} />
-                                <Text style={styles.infoPointText}>Voluntad de Hierro ({'<'}{profile?.scoreConfig?.coldThresholdC || 5}°C)</Text>
+                                <Text style={styles.infoPointText}>Voluntad de Hierro ({'<'}{profile?.scoreConfig?.coldThresholdC || 5}°C o {'>'}{profile?.scoreConfig?.heatThresholdC || 33}°C)</Text>
                                 <Text style={styles.infoPointValue}>+{profile?.scoreConfig?.adverseWeatherPoints || 15} pts</Text>
                             </View>
                         )}
@@ -455,7 +455,7 @@ export const WeatherBonusModal = React.memo(({
                     <Text style={styles.detailDesc}>
                         {profile?.weatherBonus?.isActive
                             ? '¡Has vencido a los elementos! Entrenar con clima adverso te otorga puntos extra por tu disciplina inquebrantable.'
-                            : 'El sistema detecta tu ubicación para validar bonus por clima adverso. Podrás obtener puntos extra si entrenas bajo lluvia, nieve o frío extremo.'}
+                            : 'El sistema detecta tu ubicación para validar bonus por clima adverso. Podrás obtener puntos extra si entrenas bajo lluvia, nieve, frío o calor extremo.'}
                     </Text>
 
                     <View style={styles.detailInfoGrid}>

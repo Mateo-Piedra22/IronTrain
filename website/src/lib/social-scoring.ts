@@ -36,7 +36,7 @@ const DEFAULT_SCORE_CONFIG: ScoreConfig = {
     tier3Multiplier: 1.25,
     tier4Multiplier: 1.5,
     coldThresholdC: 3,
-    heatThresholdC: 30,
+    heatThresholdC: 33,
     weatherBonusEnabled: true,
 };
 
@@ -117,29 +117,39 @@ async function calculateDailyStreak(trx: any, userId: string, trainingDays: numb
     const sortedDays = Array.from(uniqueDays).sort().reverse();
     let streak = 0;
     const now = new Date();
+    // Use local coordinates for "today" to match user expectations
     const checkDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // If today is NOT a training day AND doesn't have a workout, skip to yesterday to avoid breaking streak prematurely
+    // ALGORITHM: We go backwards from "today".
+    // 1. If today has a workout, streak starts at 1.
+    // 2. If today doesn't have a workout, but it's NOT a training day, we allow skipping it.
+    // 3. We allow a 1-day "grace period" for ANY day to account for late-night workouts or travel.
+
     const todayStr = checkDate.toISOString().split('T')[0];
-    const todayDay = checkDate.getUTCDay();
+    const todayDay = checkDate.getDay(); // 0-6 (Sun-Sat)
+
+    // Check if we should skip today in the loop
     if (!uniqueDays.has(todayStr) && !trainingDays.includes(todayDay)) {
-        checkDate.setUTCDate(checkDate.getUTCDate() - 1);
+        checkDate.setDate(checkDate.getDate() - 1);
     }
 
     const firstWorkoutDay = sortedDays[sortedDays.length - 1];
 
     while (true) {
         const dateStr = checkDate.toISOString().split('T')[0];
-        const dayOfWeek = checkDate.getUTCDay();
+        const dayOfWeek = checkDate.getDay();
 
         if (uniqueDays.has(dateStr)) {
             streak++;
         } else if (trainingDays.includes(dayOfWeek)) {
-            // Missed a planned training day
+            // It was a training day but no workout found.
+            // BREAK the streak as it's a missed goal day.
             break;
+        } else {
+            // Not a training day and no workout. We just skip it without breaking.
         }
 
-        checkDate.setUTCDate(checkDate.getUTCDate() - 1);
+        checkDate.setDate(checkDate.getDate() - 1);
         if (streak > 365) break;
         if (dateStr < firstWorkoutDay) break;
     }
@@ -178,7 +188,8 @@ export async function isAdverseWeather(
     lat: number,
     lon: number,
     coldThresholdC: number,
-    heatThresholdC: number
+    heatThresholdC: number,
+    workoutId?: string
 ): Promise<{ adverse: boolean; reason: string | null; tempC: number | null; windSpeed: number | null; humidity: number | null; logId: string | null }> {
     // 1. Check for recent weather logs to avoid API calls and implement grace period
     const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000);
@@ -260,6 +271,7 @@ export async function isAdverseWeather(
             windSpeed: result.windSpeed,
             humidity: result.humidity,
             isAdverse: adverse,
+            workoutId,
         });
 
         // 4. Clean up old logs (older than 48 hours) to keep DB small
@@ -292,11 +304,27 @@ async function ensureStreakState(trx: any, userId: string, workoutDateSeconds: n
 
     const currentWeekKey = weekKeyFromSeconds(workoutDateSeconds);
     const trainingDays = await getWeeklyGoalDays(trx, userId);
-    const currentStreak = await calculateDailyStreak(trx, userId, trainingDays);
+    const calculatedStreak = await calculateDailyStreak(trx, userId, trainingDays);
 
-    // Always update currentStreak to ensure it stays fresh on every workout
+    // Protection: If the new calculated streak is 0, but the profile has a high streak,
+    // we only overwrite it if the last update was a long time ago (e.g. 1 week).
+    // This prevents accidental wipes due to logic changes or timezone edge cases.
+    let finalCurrentStreak = calculatedStreak;
+    if (calculatedStreak === 0 && (profile.currentStreak || 0) > 3) {
+        const lastUpdate = profile.updatedAt ? new Date(profile.updatedAt).getTime() : 0;
+        const oneWeekAgo = Date.now() - 7 * 86400000;
+        if (lastUpdate > oneWeekAgo) {
+            // Keep the old streak for now to be safe
+            finalCurrentStreak = Number(profile.currentStreak);
+        }
+    }
+
+    const nextHighest = Math.max(Number(profile.highestStreak || 0), finalCurrentStreak);
+
+    // Always update currentStreak and highestStreak to ensure they stay fresh on every workout
     await trx.update(schema.userProfiles).set({
-        currentStreak: currentStreak,
+        currentStreak: finalCurrentStreak,
+        highestStreak: nextHighest,
         updatedAt: new Date(),
     }).where(eq(schema.userProfiles.id, userId));
 
@@ -334,12 +362,11 @@ async function ensureStreakState(trx: any, userId: string, workoutDateSeconds: n
     const metGoal = completedDays >= goalDays;
     const nextWeeks = metGoal ? Number(profile.streakWeeks || 0) + 1 : 0;
     const nextMultiplier = resolveStreakMultiplier(cfg, nextWeeks);
-    const nextHighest = Math.max(Number(profile.highestStreak || 0), nextWeeks);
 
     await trx.update(schema.userProfiles).set({
         streakWeeks: nextWeeks,
         streakMultiplier: nextMultiplier,
-        currentStreak: currentStreak,
+        currentStreak: finalCurrentStreak,
         highestStreak: nextHighest,
         streakWeekEvaluatedAt: currentWeekKey,
         updatedAt: new Date(),
@@ -592,7 +619,7 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
 
     if (cfg.weatherBonusEnabled === true && Number.isFinite(workout.finishLat) && Number.isFinite(workout.finishLon)) {
         try {
-            const weather = await isAdverseWeather(trx, userId, Number(workout.finishLat), Number(workout.finishLon), cfg.coldThresholdC, cfg.heatThresholdC);
+            const weather = await isAdverseWeather(trx, userId, Number(workout.finishLat), Number(workout.finishLon), cfg.coldThresholdC, cfg.heatThresholdC, workout.id);
             if (weather.adverse) {
                 totalAwarded += await awardEvent({
                     trx,
@@ -766,6 +793,8 @@ export async function buildLeaderboard(userId: string) {
         return {
             id,
             displayName: p?.displayName || 'Unknown',
+            // Backward compatibility for root-level daily streak
+            currentStreak: Number(p?.currentStreak || 0),
             scores: {
                 lifetime: Number(p?.scoreLifetime || 0),
                 monthly: Number(monthMap.get(id) || 0),
