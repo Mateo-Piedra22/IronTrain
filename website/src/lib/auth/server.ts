@@ -1,10 +1,8 @@
 import { createNeonAuth } from '@neondatabase/auth/next/server';
 
 /**
- * Instancia de autenticación para IronTrain.
- * IMPORTANTE: Usamos NEON_AUTH_SERVICE_URL (dominio interno de Neon) como baseUrl.
- * 1. Evita bucles 508 al hacer fetch directo a Neon en SSR.
- * 2. Permite que el proxy de la API funcione sin llamarse a sí mismo.
+ * Instancia única de autenticación.
+ * Forzamos NEON_AUTH_SERVICE_URL para evitar bucles 508 de autorreferencia.
  */
 export const auth = createNeonAuth({
     baseUrl: process.env.NEON_AUTH_SERVICE_URL!,
@@ -13,5 +11,5 @@ export const auth = createNeonAuth({
     },
 });
 
-// Alias para compatibilidad si fuera necesario
+// Exportamos authHandler como alias de auth para el proxy
 export const authHandler = auth;
