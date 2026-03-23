@@ -1,5 +1,6 @@
 import { NeonAuthUIProvider } from '@neondatabase/auth/react';
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 
 import { PHProvider } from '../src/components/PostHogProvider';
 import { authClient } from '../src/lib/auth/client';
@@ -83,6 +84,13 @@ export default async function RootLayout({
 }) {
     // 1. User Session for Analytics
     const { data: sessionData } = await auth.getSession();
+
+    console.log(`[RootLayout] SSR Session found: ${!!sessionData?.session}`);
+    if (!sessionData?.session) {
+        const cookiesList = (await cookies()).getAll();
+        console.log(`[RootLayout] Cookies count: ${cookiesList.length}`);
+    }
+
     const user = sessionData?.user;
 
     return (
