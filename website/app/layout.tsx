@@ -7,6 +7,8 @@ import { auth } from '../src/lib/auth/server';
 import MaintenanceGuard from './components/MaintenanceGuard';
 import './globals.css';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
     title: {
         default: 'IronTrain - App de Entrenamiento Personalizado con Rutinas Inteligentes',
