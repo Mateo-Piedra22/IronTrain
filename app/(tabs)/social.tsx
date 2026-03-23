@@ -107,7 +107,8 @@ export default function SocialTab() {
         if (p) {
             setDisplayName(p.displayName || '');
             setUsername(p.username || '');
-            setIsPublic(p.isPublic === 1);
+            const val = p.is_public !== undefined ? p.is_public : p.isPublic;
+            setIsPublic(val !== 0 && val !== false);
         }
         setRefreshing(false);
     }, [user, loadData]);
@@ -153,7 +154,8 @@ export default function SocialTab() {
         if (isProfileModalVisible && profile) {
             setDisplayName(profile.displayName || '');
             setUsername(profile.username || '');
-            setIsPublic(profile.isPublic === 1);
+            const val = profile.is_public !== undefined ? profile.is_public : profile.isPublic;
+            setIsPublic(val !== 0 && val !== false);
         }
     }, [isProfileModalVisible, profile]);
 

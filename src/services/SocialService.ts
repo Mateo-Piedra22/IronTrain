@@ -30,9 +30,11 @@ export interface ScoreConfig {
 export interface SocialProfile {
     id: string;
     displayName: string | null;
+    display_name?: string | null; // Fallback for snake_case
     username: string | null;
     shareStats?: number | null;
-    isPublic?: number | null;
+    isPublic?: number | boolean | null;
+    is_public?: number | boolean | null; // Fallback for snake_case
     // Streak and Score - Added for IronScore integration
     currentStreak?: number;
     highestStreak?: number;
@@ -266,6 +268,24 @@ export class SocialService {
 
         const headers = await this.getHeaders();
         const data = await this.request<{ profile: SocialProfile }>(`${API_URL}/api/social/profile`, { headers });
+
+        // Ensure both naming conventions exist for local compatibility and coerce types
+        if (data.profile) {
+            // Handle display_name mapping
+            if (data.profile.display_name !== undefined && data.profile.displayName === undefined) {
+                data.profile.displayName = data.profile.display_name || '';
+            }
+
+            // Normalize visibility state (coerce boolean/number to 0/1)
+            const rawIsPublic = data.profile.is_public !== undefined ? data.profile.is_public : data.profile.isPublic;
+            if (rawIsPublic !== undefined) {
+                // If it's false or 0, it's 0 (Private). Otherwise it's 1 (Public).
+                const numericIsPublic = (rawIsPublic === 0 || rawIsPublic === false) ? 0 : 1;
+                data.profile.isPublic = numericIsPublic;
+                data.profile.is_public = numericIsPublic;
+            }
+        }
+
         this.setCache(cacheKey, data.profile);
         return data.profile;
     }
@@ -275,7 +295,12 @@ export class SocialService {
         const data = await this.request<{ success: boolean }>(`${API_URL}/api/social/profile`, {
             method: 'PUT',
             headers,
-            body: JSON.stringify({ displayName, username, isPublic }),
+            body: JSON.stringify({
+                displayName,
+                username,
+                isPublic,
+                is_public: isPublic // Send both to ensure backend handles it consistently
+            }),
         });
 
         // Emit event for real-time UI updates

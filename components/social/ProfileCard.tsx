@@ -216,13 +216,13 @@ export const ProfileCard = React.memo(({
                     {/* Profile Status & Action */}
                     <View style={styles.profileActionRow}>
                         <View style={styles.profileVisibilityBadge}>
-                            {profile.isPublic === 0 ? (
+                            {(profile.is_public === 0 || profile.is_public === false || profile.isPublic === 0 || profile.isPublic === false) ? (
                                 <LockIcon size={16} color={colors.textMuted} />
                             ) : (
                                 <Globe size={16} color={colors.primary.DEFAULT} />
                             )}
                             <Text style={styles.profileVisibilityText}>
-                                {profile.isPublic === 0 ? 'Perfil Privado' : 'Perfil Público'}
+                                {(profile.is_public === 0 || profile.is_public === false || profile.isPublic === 0 || profile.isPublic === false) ? 'Perfil Privado' : 'Perfil Público'}
                             </Text>
                         </View>
 
