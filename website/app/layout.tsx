@@ -1,7 +1,6 @@
 import { NeonAuthUIProvider } from '@neondatabase/auth/react';
 import type { Metadata } from 'next';
 
-import { headers } from 'next/headers';
 import { PHProvider } from '../src/components/PostHogProvider';
 import { authClient } from '../src/lib/auth/client';
 import { auth } from '../src/lib/auth/server';
