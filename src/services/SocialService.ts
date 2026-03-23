@@ -120,6 +120,7 @@ export interface SocialLeaderboardEntry {
         routines: number;
         shares: number;
         currentStreak: number;
+        streakWeeks: number;
         highestStreak: number;
     };
 }

@@ -777,7 +777,8 @@ export async function buildLeaderboard(userId: string) {
                 workoutsWeekly: Number(wWeekMap.get(id) || 0),
                 routines: 0,
                 shares: Number(p?.shareStats || 0),
-                currentStreak: Number(p?.streakWeeks || p?.currentStreak || 0),
+                currentStreak: Number(p?.currentStreak || 0),
+                streakWeeks: Number(p?.streakWeeks || 0),
                 highestStreak: Number(p?.highestStreak || 0),
             },
         };

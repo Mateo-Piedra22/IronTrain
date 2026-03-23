@@ -1629,6 +1629,23 @@ export const createSocialStyles = (colors: any) => StyleSheet.create({
     badgeSmall: {
         paddingHorizontal: 8,
     },
+    refreshBadgeBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        backgroundColor: colors.surfaceLighter,
+        borderRadius: 20,
+        alignSelf: 'center',
+        marginBottom: 16,
+    },
+    refreshBadgeText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: colors.primary.DEFAULT,
+    },
     // --- Thermal Aesthetic (Science-y / High contrast) ---
     thermalCard: {
         backgroundColor: '#050505',
