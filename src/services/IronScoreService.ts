@@ -1,5 +1,6 @@
 import { startOfWeek } from 'date-fns';
 import { useAuthStore } from '../store/authStore';
+import { useSocialStore } from '../store/useSocialStore';
 import { logger } from '../utils/logger';
 import { configService } from './ConfigService';
 import { dbService } from './DatabaseService';
@@ -29,6 +30,7 @@ const DEFAULT_SCORE_CONFIG: ScoreConfig = {
     tier3Multiplier: 1.25,
     tier4Multiplier: 1.5,
     coldThresholdC: 3,
+    heatThresholdC: 30,
     weatherBonusEnabled: 1,
 };
 
@@ -135,9 +137,21 @@ export class IronScoreService {
                     events.push(extra);
                 }
 
-                const weather = this.computeWeatherBonusEvent(workoutId, cfg);
-                if (weather) {
-                    events.push(weather);
+                const weatherBonus = this.computeWeatherBonusEvent(workoutId, cfg);
+                let weatherLogId: string | null = null;
+                const profile = useSocialStore.getState().profile;
+                const activeWeather = profile?.weatherBonus;
+
+                if (activeWeather) {
+                    try {
+                        weatherLogId = await SocialService.saveWeatherLog(activeWeather, workoutId);
+                    } catch (e) {
+                        logger.captureException(e, { scope: 'IronScoreService.awardForFinishedWorkout', message: 'Failed to save weather log' });
+                    }
+                }
+
+                if (weatherBonus) {
+                    events.push(weatherBonus);
                 }
 
                 for (const e of events) {
@@ -168,8 +182,9 @@ export class IronScoreService {
                             points_awarded,
                             streak_multiplier,
                             global_multiplier,
-                            workout_id
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`,
+                            workout_id,
+                            weather_id
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
                         [
                             id,
                             userId,
@@ -187,6 +202,7 @@ export class IronScoreService {
                             multipliers.streak_multiplier,
                             multipliers.global_multiplier,
                             workoutId,
+                            weatherLogId,
                         ]
                     );
 
@@ -208,6 +224,7 @@ export class IronScoreService {
                         streak_multiplier: multipliers.streak_multiplier,
                         global_multiplier: multipliers.global_multiplier,
                         workout_id: workoutId,
+                        weather_id: weatherLogId,
                     });
 
                     insertedEvents += 1;
@@ -456,7 +473,7 @@ export class IronScoreService {
     private static computeWeatherBonusEvent(workoutId: string, cfg: ScoreConfig): { event_type: ScoreEventTypeExt; event_key: string; reference_id?: string | null; points_base: number } | null {
         if (cfg.weatherBonusEnabled === 0) return null;
         const w = configService.get('cachedSocialWeatherBonus') as WeatherInfo | null;
-        if (!w || !w.isActive) return null;
+        if (!w || w.isActive !== true) return null;
         if (!(typeof cfg.adverseWeatherPoints === 'number' && Number.isFinite(cfg.adverseWeatherPoints) && cfg.adverseWeatherPoints > 0)) return null;
         return {
             event_type: 'weather_bonus',

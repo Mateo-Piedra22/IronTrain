@@ -51,7 +51,7 @@ export default function SocialTab() {
     const {
         profile, setProfile, leaderboard, friends, inbox, setInbox,
         loading, refreshingLocation, locationPermissionDenied, lastKnownLocation,
-        loadData, refreshLocation
+        loadData, refreshLocation, weatherHistory, loadWeatherHistory
     } = useSocialStore();
 
     const incomingFriendRequests = friends.filter(f => f.status === 'pending' && !f.isSender).length;
@@ -745,6 +745,8 @@ export default function SocialTab() {
                 profile={profile}
                 refreshingLocation={refreshingLocation}
                 onRefreshLocation={refreshLocation}
+                weatherHistory={weatherHistory}
+                onLoadHistory={loadWeatherHistory}
                 colors={colors}
                 styles={styles}
             />

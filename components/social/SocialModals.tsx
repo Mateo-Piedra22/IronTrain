@@ -1,6 +1,6 @@
 import { withAlpha } from '@/src/theme';
 import * as Clipboard from 'expo-clipboard';
-import { Award, CheckCircle, CloudRain, Copy, Flame, Info as InfoIcon, MapPin, RefreshCcw, Scale, TrendingUp, Trophy, UserMinus as UserMinusIcon, XCircle, X as XIcon, Zap } from 'lucide-react-native';
+import { Award, CheckCircle, CloudRain, Copy, Droplets, Flame, Info as InfoIcon, MapPin, RefreshCcw, Scale, Thermometer, TrendingUp, Trophy, UserMinus as UserMinusIcon, Wind, XCircle, X as XIcon, Zap } from 'lucide-react-native';
 import React from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -404,9 +404,16 @@ export const WeatherBonusModal = React.memo(({
     profile,
     refreshingLocation,
     onRefreshLocation,
+    weatherHistory = [],
+    onLoadHistory,
     colors,
     styles
 }: any) => {
+    React.useEffect(() => {
+        if (visible && onLoadHistory) {
+            onLoadHistory();
+        }
+    }, [visible]);
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
             <View style={styles.modalOverlay}>
@@ -467,6 +474,72 @@ export const WeatherBonusModal = React.memo(({
                             </Text>
                         </View>
                     </View>
+
+                    {weatherHistory && weatherHistory.length > 0 && (
+                        <View style={{ marginTop: 20, width: '100%' }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 12, opacity: 0.8 }}>
+                                DETECCIONES RECIENTES
+                            </Text>
+                            {weatherHistory.slice(0, 3).map((log: any, idx: number) => (
+                                <View key={log.id} style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    backgroundColor: withAlpha(colors.border, '15'),
+                                    borderRadius: 12,
+                                    padding: 10,
+                                    marginBottom: 8,
+                                    gap: 12
+                                }}>
+                                    <View style={{
+                                        width: 32,
+                                        height: 32,
+                                        borderRadius: 16,
+                                        backgroundColor: withAlpha(log.isAdverse ? colors.primary.DEFAULT : colors.textMuted, '15'),
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}>
+                                        {log.isAdverse ? (
+                                            <CloudRain size={16} color={colors.primary.DEFAULT} />
+                                        ) : (
+                                            <MapPin size={16} color={colors.textMuted} />
+                                        )}
+                                    </View>
+
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>
+                                            {log.isAdverse ? 'Bonus Detectado' : 'Chequeo Rutinario'}
+                                        </Text>
+                                        <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                                            {new Date(log.createdAt).toLocaleDateString()} • {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </Text>
+                                    </View>
+
+                                    <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                            <Thermometer size={10} color={colors.textMuted} />
+                                            <Text style={{ fontSize: 11, color: colors.textMuted }}>{Math.round(log.tempC || 0)}°C</Text>
+                                        </View>
+                                        {(log.windSpeed || log.humidity) && (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                {log.windSpeed && (
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                                        <Wind size={10} color={colors.textMuted} />
+                                                        <Text style={{ fontSize: 10, color: colors.textMuted }}>{Math.round(log.windSpeed)}km/h</Text>
+                                                    </View>
+                                                )}
+                                                {log.humidity && (
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                                        <Droplets size={10} color={colors.textMuted} />
+                                                        <Text style={{ fontSize: 10, color: colors.textMuted }}>{log.humidity}%</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    )}
 
                     <TouchableOpacity style={styles.detailCloseBtn} onPress={onClose}>
                         <Text style={styles.detailCloseText}>{profile?.weatherBonus?.isActive ? '¡A darle!' : 'Entendido'}</Text>

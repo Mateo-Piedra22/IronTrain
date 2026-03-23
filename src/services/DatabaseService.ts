@@ -306,7 +306,28 @@ export class DatabaseService {
         reference_id TEXT,
         metadata TEXT,
         created_at INTEGER NOT NULL,
-        deleted_at INTEGER
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER,
+        event_type TEXT,
+        event_key TEXT,
+        points_base INTEGER,
+        points_awarded INTEGER,
+        streak_multiplier REAL DEFAULT 1,
+        global_multiplier REAL DEFAULT 1,
+        workout_id TEXT,
+        weather_id TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS weather_logs (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        workout_id TEXT,
+        location TEXT,
+        temperature REAL,
+        condition TEXT,
+        humidity REAL,
+        wind_speed REAL,
+        created_at INTEGER NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS changelog_reactions (
@@ -1113,6 +1134,32 @@ export class DatabaseService {
             }
         } catch (e) {
             logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: '[Migration] Migration 24 failed (routine moderation)' });
+        }
+
+        // Migration 25: Weather Logging and Scoring Enhancement (Social 2.3.0)
+        try {
+            logger.info('[Migration 25] Creating weather_logs table and updating score_events');
+            await this.executeRaw(`
+                CREATE TABLE IF NOT EXISTS weather_logs (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    user_id TEXT NOT NULL,
+                    workout_id TEXT,
+                    location TEXT,
+                    temperature REAL,
+                    condition TEXT,
+                    humidity REAL,
+                    wind_speed REAL,
+                    created_at INTEGER NOT NULL
+                )
+            `);
+
+            const scoreInfo = await this.getAll<{ name: string }>("PRAGMA table_info('score_events')");
+            const scoreCols = scoreInfo.map(c => c.name);
+            if (!scoreCols.includes('weather_id')) {
+                await this.executeRaw('ALTER TABLE score_events ADD COLUMN weather_id TEXT');
+            }
+        } catch (e) {
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: '[Migration] Migration 25 failed (weather logging)' });
         }
     }
 

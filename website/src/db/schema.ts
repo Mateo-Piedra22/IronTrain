@@ -196,7 +196,7 @@ export const userProfiles = pgTable('user_profiles', {
     scoreLifetime: integer('score_lifetime').default(0).notNull(),
     streakWeeks: integer('streak_weeks').default(0).notNull(),
     streakMultiplier: real('streak_multiplier').default(1).notNull(),
-    streakWeekEvaluatedAt: text('streak_week_evaluated_at'),
+    streakWeekEvaluatedAt: text('streak_week_evaluated_at'), // Format: YYYY-MM-DD
     lastActiveDate: bigint('last_active_date', { mode: 'number' }), // Unix timestamp
     pushToken: text('push_token'), // For FCM
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -286,6 +286,7 @@ export const socialScoringConfig = pgTable('social_scoring_config', {
     tier3Multiplier: real('tier3_multiplier').default(1.25).notNull(),
     tier4Multiplier: real('tier4_multiplier').default(1.5).notNull(),
     coldThresholdC: real('cold_threshold_c').default(3).notNull(),
+    heatThresholdC: real('heat_threshold_c').default(30).notNull(),
     weatherBonusEnabled: boolean('weather_bonus_enabled').default(true).notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     updatedBy: text('updated_by'),
@@ -325,10 +326,25 @@ export const scoreEvents = pgTable('score_events', {
     streakMultiplier: real('streak_multiplier').default(1).notNull(),
     globalMultiplier: real('global_multiplier').default(1).notNull(),
     pointsAwarded: integer('points_awarded').notNull(),
+    weatherId: text('weather_id'),
     metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
+});
+
+export const weatherLogs = pgTable('weather_logs', {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    lat: real('lat').notNull(),
+    lon: real('lon').notNull(),
+    condition: text('condition'),
+    tempC: real('temp_c'),
+    windSpeed: real('wind_speed'),
+    humidity: integer('humidity'),
+    isAdverse: boolean('is_adverse').default(false),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    workoutId: text('workout_id'),
 });
 
 // --- RELATIONS FOR DRIZZLE QUERY API ---

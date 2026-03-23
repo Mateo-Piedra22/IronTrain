@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import { verifyAuth } from '../../../../src/lib/auth';
+import { logger } from '../../../../src/lib/logger';
 import { getOrCreateScoreConfig, isAdverseWeather } from '../../../../src/lib/social-scoring';
 
 export async function POST(req: NextRequest) {
@@ -8,16 +9,35 @@ export async function POST(req: NextRequest) {
         const userId = await verifyAuth(req);
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const body = await req.json();
-        const { lat, lon, city } = body;
+        const body = await req.json().catch(() => null);
+        if (!body || typeof body !== 'object') {
+            return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+        }
 
-        if (lat === undefined || lon === undefined) {
-            return NextResponse.json({ error: 'Faltan coordenadas' }, { status: 400 });
+        const lat = Number((body as any).lat);
+        const lon = Number((body as any).lon);
+        const city = (body as any).city;
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+            return NextResponse.json({ error: 'Coordenadas inválidas' }, { status: 400 });
+        }
+        if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+            return NextResponse.json({ error: 'Coordenadas fuera de rango' }, { status: 400 });
+        }
+        if (city !== undefined && city !== null && typeof city !== 'string') {
+            return NextResponse.json({ error: 'city inválido' }, { status: 400 });
         }
 
         // Usamos una transacción simple o simplemente el db ya que getOrCreateScoreConfig lo acepta
         const config = await getOrCreateScoreConfig(db);
-        const weather = await isAdverseWeather(lat, lon, config.coldThresholdC);
+        const weather = await isAdverseWeather(
+            db,
+            userId,
+            lat,
+            lon,
+            config.coldThresholdC,
+            config.heatThresholdC
+        );
 
         const weatherInfo = {
             location: city || 'Tu ubicación',
@@ -30,7 +50,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, weatherBonus: weatherInfo });
     } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Internal server error';
-        console.error('[Weather API] Error:', message);
+        logger.error('[Weather API] Error', { error: message });
         return NextResponse.json({ error: message }, { status: 500 });
     }
 }
@@ -41,6 +61,7 @@ function getConditionLabel(reason: string | null): string {
         case 'snow': return 'Nieve';
         case 'storm': return 'Tormenta';
         case 'cold': return 'Clima Gélido';
+        case 'heat': return 'Calor Extremo';
         default: return 'Clima Adverso';
     }
 }

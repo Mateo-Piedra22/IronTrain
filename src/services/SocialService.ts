@@ -3,6 +3,7 @@ import { Config } from '../constants/Config';
 import { useAuthStore } from '../store/authStore';
 import * as analytics from '../utils/analytics';
 import { logger } from '../utils/logger';
+import { uuidV4 } from '../utils/uuid';
 import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
 
@@ -22,6 +23,7 @@ export interface ScoreConfig {
     tier3Multiplier: number;
     tier4Multiplier: number;
     coldThresholdC: number;
+    heatThresholdC?: number;
     weatherBonusEnabled: number;
 }
 
@@ -59,6 +61,22 @@ export interface WeatherInfo {
     temperature: number;
     multiplier: number;
     isActive: boolean;
+    humidity?: number;
+    windSpeed?: number;
+}
+
+export interface WeatherLog {
+    id: string;
+    userId: string;
+    lat: number;
+    lon: number;
+    condition: string | null;
+    tempC: number | null;
+    windSpeed: number | null;
+    humidity: number | null;
+    isAdverse: boolean | null;
+    createdAt: string;
+    workoutId: string | null;
 }
 
 export interface SocialFriend {
@@ -200,6 +218,42 @@ export class SocialService {
             body: JSON.stringify({ lat, lon, city }),
         });
         return data.weatherBonus;
+    }
+
+    static async getWeatherHistory(): Promise<WeatherLog[]> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ history: WeatherLog[] }>(`${API_URL}/api/social/weather-bonus/history`, {
+            headers,
+        });
+        return data.history;
+    }
+
+    static async saveWeatherLog(weather: WeatherInfo, workoutId?: string) {
+        try {
+            const userId = useAuthStore.getState().user?.id;
+            if (!userId) return null;
+
+            const logId = uuidV4();
+            await dbService.run(
+                `INSERT INTO weather_logs (id, user_id, workout_id, location, temperature, condition, humidity, wind_speed, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    logId,
+                    userId,
+                    workoutId || null,
+                    weather.location,
+                    weather.temperature,
+                    weather.condition,
+                    weather.humidity || null,
+                    weather.windSpeed || null,
+                    Math.floor(Date.now() / 1000)
+                ]
+            );
+            return logId;
+        } catch (e) {
+            logger.captureException(e, { scope: 'SocialService.saveWeatherLog' });
+            return null;
+        }
     }
 
     // -- PROFILE --

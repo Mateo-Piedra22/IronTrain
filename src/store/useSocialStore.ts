@@ -10,6 +10,7 @@ interface SocialState {
     leaderboard: SocialLeaderboardEntry[];
     friends: SocialFriend[];
     inbox: SocialInboxItem[];
+    weatherHistory: any[];
     lastFetched: number;
     loading: boolean;
     refreshingLocation: boolean;
@@ -22,6 +23,7 @@ interface SocialState {
     setInbox: (inbox: SocialInboxItem[] | ((prev: SocialInboxItem[]) => SocialInboxItem[])) => void;
     setFriends: (friends: SocialFriend[] | ((prev: SocialFriend[]) => SocialFriend[])) => void;
     setLeaderboard: (leaderboard: SocialLeaderboardEntry[]) => void;
+    loadWeatherHistory: () => Promise<void>;
     clearData: () => void;
 }
 
@@ -32,6 +34,7 @@ export const useSocialStore = create<SocialState>((set, get) => ({
     leaderboard: [],
     friends: [],
     inbox: [],
+    weatherHistory: [],
     lastFetched: 0,
     loading: false,
     refreshingLocation: false,
@@ -143,5 +146,13 @@ export const useSocialStore = create<SocialState>((set, get) => ({
     setInbox: (inbox) => set((state) => ({ inbox: typeof inbox === 'function' ? inbox(state.inbox) : inbox })),
     setFriends: (friends) => set((state) => ({ friends: typeof friends === 'function' ? friends(state.friends) : friends })),
     setLeaderboard: (leaderboard) => set({ leaderboard }),
-    clearData: () => set({ profile: null, leaderboard: [], friends: [], inbox: [], lastFetched: 0, lastKnownLocation: null }),
+    loadWeatherHistory: async () => {
+        try {
+            const history = await SocialService.getWeatherHistory();
+            set({ weatherHistory: history });
+        } catch (err) {
+            logger.captureException(err, { scope: 'useSocialStore.loadWeatherHistory' });
+        }
+    },
+    clearData: () => set({ profile: null, leaderboard: [], friends: [], inbox: [], weatherHistory: [], lastFetched: 0, lastKnownLocation: null }),
 }));

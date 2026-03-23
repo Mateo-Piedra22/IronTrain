@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
+import { logger } from '../../../../src/lib/logger';
 import { validateDisplayName, validateUsername } from '../../../../src/lib/moderation';
 
 function toIsoSafe(value: unknown): string | null {
@@ -77,9 +78,7 @@ export async function PUT(req: NextRequest) {
         const requestedWith = req.headers.get('x-requested-with');
         const isFromOurApp = req.headers.get('user-agent')?.includes('IronTrain'); // Mobile app bypass
         if (!requestedWith && !isFromOurApp) {
-            // return NextResponse.json({ error: 'Falta header de seguridad (CSRF)' }, { status: 403 });
-            // Relaxed for now while testing, but documented.
-            console.warn('[Security] PUT request without X-Requested-With header from User:', userId);
+            logger.warn('[Security] PUT request without X-Requested-With header', { userId });
         }
 
         let sanitizedDisplayName: string | undefined;
@@ -198,7 +197,7 @@ export async function DELETE(req: NextRequest) {
         const userId = await verifyAuth(req);
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        console.log(`[API] Permanent account deletion requested for User:${userId}`);
+        logger.info('[API] Permanent account deletion requested', { userId });
 
         // Delete profile and related data
         // Note: Better Auth tables (user, account, session) are managed by Neon Auth.

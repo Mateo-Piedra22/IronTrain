@@ -1,7 +1,11 @@
 import { SocialProfile } from '@/src/services/SocialService';
-import { CalendarCheck, CalendarDays, ChevronDown, ChevronUp, CloudRain, Copy, Flame, Globe, Lock as LockIcon, MapPin, MapPinOff, Shield as ShieldIcon, Trophy, Zap } from 'lucide-react-native';
+import { CalendarCheck, CalendarDays, ChevronDown, ChevronUp, CloudRain, Copy, Flame, Globe, LayoutDashboard, Lock as LockIcon, MapPin, MapPinOff, Shield as ShieldIcon, Trophy, Zap } from 'lucide-react-native';
 import React from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, LayoutAnimation, Platform, Text, TouchableOpacity, UIManager, View } from 'react-native';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface ProfileCardProps {
     profile: SocialProfile | null;
@@ -46,8 +50,12 @@ export const ProfileCard = React.memo(({
 
     return (
         <View style={styles.profileCard}>
+            {/* Main Header / Trigger */}
             <TouchableOpacity
-                onPress={() => setIsProfileExpanded(!isProfileExpanded)}
+                onPress={() => {
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    setIsProfileExpanded(!isProfileExpanded);
+                }}
                 activeOpacity={0.9}
             >
                 <View style={[styles.profileHeader, isProfileExpanded && styles.profileHeaderExpanded]}>
@@ -94,84 +102,94 @@ export const ProfileCard = React.memo(({
                     </View>
                 </View>
 
-                {!isProfileExpanded ? (
+                {/* Collapsed Stats Summary */}
+                {!isProfileExpanded && (
                     <View style={styles.profileStatsRow}>
                         <View style={styles.statMiniItem}>
-                            <Trophy size={14} color={colors.yellow} fill={colors.yellow + '20'} />
+                            <Trophy size={14} color={colors.yellow} />
                             <Text style={styles.statMiniText}>{profile.scoreLifetime || 0}</Text>
                         </View>
                         <View style={styles.statMiniItem}>
-                            <Flame size={14} color={colors.red} fill={colors.red + '20'} />
+                            <Flame size={14} color={colors.red} />
                             <Text style={styles.statMiniText}>{profile.currentStreak || 0}</Text>
                         </View>
                         <View style={styles.statMiniItem}>
                             <CalendarCheck size={14} color={colors.primary.DEFAULT} />
-                            <Text style={styles.statMiniText}>{profile.streakWeeks || 0}w</Text>
+                            <Text style={styles.statMiniText}>{profile.streakWeeks || 0} sem</Text>
                         </View>
-                    </View>
-                ) : (
-                    <View style={styles.metaSummaryRow}>
-                        <CalendarDays size={14} color={colors.primary.DEFAULT} />
-                        <Text style={styles.metaSummaryText}>Meta: {trainingDays.length} días</Text>
                     </View>
                 )}
             </TouchableOpacity>
 
+            {/* Expanded Information */}
             {isProfileExpanded && (
                 <View style={styles.expandedDetails}>
-                    <View style={styles.statsGrid}>
-                        <View style={styles.statGridItem}>
-                            <Trophy size={20} color={colors.yellow} fill={colors.yellow + '20'} />
-                            <Text style={styles.statGridValue}>{profile.scoreLifetime || 0}</Text>
-                            <Text style={styles.statGridLabel}>IronScore</Text>
+                    {/* Primary Metrics (Cards) */}
+                    <View style={styles.statRow}>
+                        <View style={styles.statCard}>
+                            <Trophy size={22} color={colors.yellow} />
+                            <Text style={styles.statCardValue}>{profile.scoreLifetime || 0}</Text>
+                            <Text style={styles.statCardLabel}>IronScore</Text>
                         </View>
-                        <View style={styles.statGridItem}>
-                            <Flame size={20} color={colors.red} fill={colors.red + '20'} />
-                            <Text style={styles.statGridValue}>{profile.currentStreak || 0}</Text>
-                            <Text style={styles.statGridLabel}>Racha Días</Text>
+                        <View style={styles.statCard}>
+                            <Flame size={22} color={colors.red} />
+                            <Text style={styles.statCardValue}>{profile.currentStreak || 0}</Text>
+                            <Text style={styles.statCardLabel}>Días</Text>
                         </View>
-                        <View style={styles.statGridItem}>
-                            <CalendarCheck size={20} color={colors.primary.DEFAULT} />
-                            <Text style={styles.statGridValue}>{profile.streakWeeks || 0}</Text>
-                            <Text style={styles.statGridLabel}>Racha Semanas</Text>
+                        <View style={styles.statCard}>
+                            <CalendarCheck size={22} color={colors.primary.DEFAULT} />
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <Text style={styles.statCardValue}>{profile.streakWeeks || 0}</Text>
+                                {(profile.streakWeeks || 0) >= 2 && (
+                                    <View style={styles.multiplierBadge}>
+                                        <Text style={styles.multiplierText}>{Math.min(Math.floor((profile.streakWeeks || 0) / 2) + 1, 3)}x</Text>
+                                    </View>
+                                )}
+                            </View>
+                            <Text style={styles.statCardLabel}>Semanas</Text>
                         </View>
                     </View>
 
-                    <Text style={styles.profileStats}>Rutinas compartidas: {profile.shareStats || 0}</Text>
-                    <View style={styles.profileMetaRow}>
-                        <View style={styles.profileVisibilityBadge}>
-                            {profile.isPublic === 0 ? <LockIcon size={14} color={colors.textMuted} /> : <Globe size={14} color={colors.primary.DEFAULT} />}
-                            <Text style={styles.profileVisibilityText}>{profile.isPublic === 0 ? 'Perfil Privado' : 'Perfil Público'}</Text>
+                    {/* Secondary Metrics (Badges) */}
+                    <View style={styles.socialHighlightRow}>
+                        <View style={styles.infoBadge}>
+                            <LayoutDashboard size={14} color={colors.textMuted} />
+                            <Text style={styles.infoBadgeText}>{profile.shareStats || 0} rutinas</Text>
                         </View>
-                        <TouchableOpacity style={styles.profileEditBtn} onPress={onEditProfile}>
-                            <ShieldIcon size={14} color={colors.onPrimary} />
-                            <Text style={styles.profileEditBtnText}>Editar Perfil</Text>
-                        </TouchableOpacity>
+                        {profile.scoreConfig && (
+                            <View style={styles.infoBadge}>
+                                <Zap size={14} color={colors.textMuted} />
+                                <Text style={styles.infoBadgeText}>+{profile.scoreConfig.workoutCompletePoints} pts/ent</Text>
+                            </View>
+                        )}
                     </View>
 
-                    <TouchableOpacity style={styles.idBox} onPress={onCopyId}>
-                        <Text style={styles.idText} numberOfLines={1} ellipsizeMode="middle">ID: {profile.id}</Text>
-                        <Copy size={16} color={colors.textMuted} />
-                    </TouchableOpacity>
-
+                    {/* Weekly Meta Card */}
                     <TouchableOpacity
-                        style={styles.goalsTrigger}
-                        onPress={() => setIsGoalsExpanded(!isGoalsExpanded)}
+                        style={styles.goalCard}
+                        onPress={() => {
+                            LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
+                            setIsGoalsExpanded(!isGoalsExpanded);
+                        }}
+                        activeOpacity={0.8}
                     >
-                        <View style={styles.goalsTriggerLeft}>
-                            <CalendarDays size={18} color={colors.primary.DEFAULT} />
-                            <Text style={styles.goalsTriggerTitle}>Mi Meta Semanal</Text>
+                        <View style={styles.goalCardLeft}>
+                            <CalendarDays size={22} color={colors.primary.DEFAULT} />
+                            <View>
+                                <Text style={styles.goalTitle}>Mi Meta Semanal</Text>
+                                <Text style={styles.goalSubtitle}>{trainingDays.length} días seleccionados</Text>
+                            </View>
                         </View>
-                        <View style={styles.goalsTriggerRight}>
-                            <Text style={styles.goalsSummaryText}>{trainingDays.length} días</Text>
-                            {isGoalsExpanded ? <ChevronUp size={18} color={colors.textMuted} /> : <ChevronDown size={18} color={colors.textMuted} />}
+                        <View style={{ transform: [{ rotate: isGoalsExpanded ? '180deg' : '0deg' }] }}>
+                            <ChevronDown size={22} color={colors.textMuted} />
                         </View>
                     </TouchableOpacity>
 
+                    {/* Goal Editor expansion */}
                     {isGoalsExpanded && (
                         <View style={styles.goalsExpanded}>
                             <Text style={styles.goalsDesc}>
-                                Seleccioná los días que planeás entrenar. Los días no marcados como entrenamiento no cortarán tu racha de puntuación.
+                                Seleccioná los días que planeás entrenar. Los días no seleccionados no cortarán tu racha.
                             </Text>
                             <View style={styles.daysRow}>
                                 {[
@@ -194,11 +212,40 @@ export const ProfileCard = React.memo(({
                             </View>
                         </View>
                     )}
+
+                    {/* Profile Status & Action */}
+                    <View style={styles.profileActionRow}>
+                        <View style={styles.profileVisibilityBadge}>
+                            {profile.isPublic === 0 ? (
+                                <LockIcon size={16} color={colors.textMuted} />
+                            ) : (
+                                <Globe size={16} color={colors.primary.DEFAULT} />
+                            )}
+                            <Text style={styles.profileVisibilityText}>
+                                {profile.isPublic === 0 ? 'Perfil Privado' : 'Perfil Público'}
+                            </Text>
+                        </View>
+
+                        <TouchableOpacity style={styles.profileEditBtn} onPress={onEditProfile} activeOpacity={0.8}>
+                            <ShieldIcon size={18} color={colors.onPrimary} />
+                            <Text style={styles.profileEditBtnText}>Configurar Perfil</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Footer Utility */}
+                    <TouchableOpacity style={styles.idFooter} onPress={onCopyId} activeOpacity={0.6}>
+                        <Text style={styles.idFooterText}>ID: {profile.id.toUpperCase()}</Text>
+                        <Copy size={12} color={colors.textMuted} />
+                    </TouchableOpacity>
                 </View>
             )}
 
+            {/* Bottom Collapse Trigger */}
             <TouchableOpacity
-                onPress={() => setIsProfileExpanded(!isProfileExpanded)}
+                onPress={() => {
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    setIsProfileExpanded(!isProfileExpanded);
+                }}
                 activeOpacity={0.7}
                 style={styles.toggleCollapseWrapper}
             >

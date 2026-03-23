@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { db } from '../db';
 import * as schema from '../db/schema';
@@ -17,6 +18,7 @@ type ScoreConfig = {
     tier3Multiplier: number;
     tier4Multiplier: number;
     coldThresholdC: number;
+    heatThresholdC: number;
     weatherBonusEnabled: boolean;
 };
 
@@ -34,6 +36,7 @@ const DEFAULT_SCORE_CONFIG: ScoreConfig = {
     tier3Multiplier: 1.25,
     tier4Multiplier: 1.5,
     coldThresholdC: 3,
+    heatThresholdC: 30,
     weatherBonusEnabled: true,
 };
 
@@ -58,16 +61,15 @@ function weekKeyFromSeconds(epochTimestamp: number): string {
     return `${y}-${m}-${day}`;
 }
 
-function parseTrainingDays(raw: string | null | undefined): number {
-    if (!raw) return 3;
+function parseTrainingDays(raw: string | null | undefined): number[] {
+    if (!raw) return [1, 2, 3, 4, 5]; // Default workdays
     try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-            const valid = parsed.filter((x) => Number.isInteger(x) && x >= 0 && x <= 6);
-            return Math.max(1, valid.length);
+            return parsed.filter((x) => Number.isInteger(x) && x >= 0 && x <= 6);
         }
     } catch { }
-    return 3;
+    return [1, 2, 3, 4, 5];
 }
 
 function resolveStreakMultiplier(cfg: ScoreConfig, streakWeeks: number): number {
@@ -84,13 +86,65 @@ export async function getOrCreateScoreConfig(trx: any): Promise<ScoreConfig> {
     return DEFAULT_SCORE_CONFIG;
 }
 
-async function getWeeklyGoalDays(trx: any, userId: string): Promise<number> {
+async function getWeeklyGoalDays(trx: any, userId: string): Promise<number[]> {
     const [goalSetting] = await trx
         .select({ value: schema.settings.value })
         .from(schema.settings)
         .where(and(eq(schema.settings.userId, userId), eq(schema.settings.key, `${userId}:training_days`)))
         .limit(1);
     return parseTrainingDays(goalSetting?.value);
+}
+
+async function calculateDailyStreak(trx: any, userId: string, trainingDays: number[]): Promise<number> {
+    const workouts = await trx
+        .select({ date: schema.workouts.date })
+        .from(schema.workouts)
+        .where(and(
+            eq(schema.workouts.userId, userId),
+            eq(schema.workouts.status, 'completed'),
+            isNull(schema.workouts.deletedAt)
+        ))
+        .orderBy(desc(schema.workouts.date));
+
+    if (workouts.length === 0) return 0;
+
+    const uniqueDays = new Set<string>();
+    for (const w of workouts) {
+        const d = new Date(Number(w.date));
+        uniqueDays.add(d.toISOString().split('T')[0]);
+    }
+
+    const sortedDays = Array.from(uniqueDays).sort().reverse();
+    let streak = 0;
+    const now = new Date();
+    const checkDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // If today is NOT a training day AND doesn't have a workout, skip to yesterday to avoid breaking streak prematurely
+    const todayStr = checkDate.toISOString().split('T')[0];
+    const todayDay = checkDate.getUTCDay();
+    if (!uniqueDays.has(todayStr) && !trainingDays.includes(todayDay)) {
+        checkDate.setUTCDate(checkDate.getUTCDate() - 1);
+    }
+
+    const firstWorkoutDay = sortedDays[sortedDays.length - 1];
+
+    while (true) {
+        const dateStr = checkDate.toISOString().split('T')[0];
+        const dayOfWeek = checkDate.getUTCDay();
+
+        if (uniqueDays.has(dateStr)) {
+            streak++;
+        } else if (trainingDays.includes(dayOfWeek)) {
+            // Missed a planned training day
+            break;
+        }
+
+        checkDate.setUTCDate(checkDate.getUTCDate() - 1);
+        if (streak > 365) break;
+        if (dateStr < firstWorkoutDay) break;
+    }
+
+    return streak;
 }
 
 async function getActiveGlobalMultiplier(trx: any, now: Date): Promise<number> {
@@ -118,9 +172,38 @@ function isBigThreeExercise(name: string): boolean {
     return false;
 }
 
-export async function isAdverseWeather(lat: number, lon: number, coldThresholdC: number): Promise<{ adverse: boolean; reason: string | null; tempC: number | null }> {
+export async function isAdverseWeather(
+    trx: any,
+    userId: string,
+    lat: number,
+    lon: number,
+    coldThresholdC: number,
+    heatThresholdC: number
+): Promise<{ adverse: boolean; reason: string | null; tempC: number | null; windSpeed: number | null; humidity: number | null; logId: string | null }> {
+    // 1. Check for recent weather logs to avoid API calls and implement grace period
+    const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000);
+    const [recentLog] = await trx
+        .select()
+        .from(schema.weatherLogs)
+        .where(and(eq(schema.weatherLogs.userId, userId), gte(schema.weatherLogs.createdAt, twentyMinutesAgo)))
+        .orderBy(desc(schema.weatherLogs.createdAt))
+        .limit(1);
+
+    if (recentLog) {
+        return {
+            adverse: recentLog.isAdverse ?? false,
+            reason: recentLog.condition,
+            tempC: recentLog.tempC,
+            windSpeed: recentLog.windSpeed,
+            humidity: recentLog.humidity,
+            logId: recentLog.id,
+        };
+    }
+
+    // 2. No recent log found, call OpenWeather API
     const apiKey = process.env.OPENWEATHER_API_KEY;
-    if (!apiKey) return { adverse: false, reason: null, tempC: null };
+    if (!apiKey) return { adverse: false, reason: null, tempC: null, windSpeed: null, humidity: null, logId: null };
+
     try {
         const params = new URLSearchParams({
             lat: String(lat),
@@ -129,17 +212,65 @@ export async function isAdverseWeather(lat: number, lon: number, coldThresholdC:
             units: 'metric',
         });
         const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?${params.toString()}`, { cache: 'no-store' });
-        if (!res.ok) return { adverse: false, reason: null, tempC: null };
+        if (!res.ok) return { adverse: false, reason: null, tempC: null, windSpeed: null, humidity: null, logId: null };
         const data = await res.json();
         const weatherMain = String(data?.weather?.[0]?.main || '').toLowerCase();
         const tempC = Number(data?.main?.temp);
-        if (weatherMain.includes('rain')) return { adverse: true, reason: 'rain', tempC: Number.isFinite(tempC) ? tempC : null };
-        if (weatherMain.includes('snow')) return { adverse: true, reason: 'snow', tempC: Number.isFinite(tempC) ? tempC : null };
-        if (weatherMain.includes('thunderstorm')) return { adverse: true, reason: 'storm', tempC: Number.isFinite(tempC) ? tempC : null };
-        if (Number.isFinite(tempC) && tempC <= coldThresholdC) return { adverse: true, reason: 'cold', tempC };
-        return { adverse: false, reason: null, tempC: Number.isFinite(tempC) ? tempC : null };
-    } catch {
-        return { adverse: false, reason: null, tempC: null };
+        const windSpeed = Number(data?.wind?.speed);
+        const humidity = Number(data?.main?.humidity);
+
+        let adverse = false;
+        let reason: string | null = null;
+
+        if (weatherMain.includes('rain')) {
+            adverse = true;
+            reason = 'rain';
+        } else if (weatherMain.includes('snow')) {
+            adverse = true;
+            reason = 'snow';
+        } else if (weatherMain.includes('thunderstorm')) {
+            adverse = true;
+            reason = 'storm';
+        } else if (Number.isFinite(tempC) && tempC <= coldThresholdC) {
+            adverse = true;
+            reason = 'cold';
+        } else if (Number.isFinite(tempC) && tempC >= heatThresholdC) {
+            adverse = true;
+            reason = 'heat';
+        }
+
+        const logId = crypto.randomUUID();
+        const result = {
+            adverse,
+            reason,
+            tempC: Number.isFinite(tempC) ? tempC : null,
+            windSpeed: Number.isFinite(windSpeed) ? windSpeed : null,
+            humidity: Number.isFinite(humidity) ? humidity : null,
+            logId
+        };
+
+        // 3. Log the check to the database
+        await trx.insert(schema.weatherLogs).values({
+            id: logId,
+            userId,
+            lat,
+            lon,
+            condition: reason || weatherMain || 'clear',
+            tempC: result.tempC,
+            windSpeed: result.windSpeed,
+            humidity: result.humidity,
+            isAdverse: adverse,
+        });
+
+        // 4. Clean up old logs (older than 48 hours) to keep DB small
+        await cleanupWeatherLogs(trx).catch(err => {
+            logger.error('[Scoring] Cleanup error', { error: err instanceof Error ? err.message : String(err) });
+        });
+
+        return result;
+    } catch (e) {
+        logger.error('[Scoring] Weather API error', { error: e instanceof Error ? e.message : String(e), userId });
+        return { adverse: false, reason: null, tempC: null, windSpeed: null, humidity: null, logId: null };
     }
 }
 
@@ -160,6 +291,14 @@ async function ensureStreakState(trx: any, userId: string, workoutDateSeconds: n
     }
 
     const currentWeekKey = weekKeyFromSeconds(workoutDateSeconds);
+    const trainingDays = await getWeeklyGoalDays(trx, userId);
+    const currentStreak = await calculateDailyStreak(trx, userId, trainingDays);
+
+    // Always update currentStreak to ensure it stays fresh on every workout
+    await trx.update(schema.userProfiles).set({
+        currentStreak: currentStreak,
+        updatedAt: new Date(),
+    }).where(eq(schema.userProfiles.id, userId));
 
     // Legacy support: check if streakWeekEvaluatedAt is an old timestamp format
     let evalKey = profile.streakWeekEvaluatedAt;
@@ -178,7 +317,7 @@ async function ensureStreakState(trx: any, userId: string, workoutDateSeconds: n
 
     const previousWeekStart = weekStartUtcSeconds(workoutDateSeconds) - 7 * 86400;
     const previousWeekEnd = previousWeekStart + (7 * 86400) - 1;
-    const goalDays = await getWeeklyGoalDays(trx, userId);
+    const goalDays = Math.max(1, trainingDays.length);
 
     const [countRow] = await trx
         .select({ count: sql<number>`count(distinct(floor(${schema.workouts.date} / 86400000)))`.mapWith(Number) })
@@ -200,7 +339,7 @@ async function ensureStreakState(trx: any, userId: string, workoutDateSeconds: n
     await trx.update(schema.userProfiles).set({
         streakWeeks: nextWeeks,
         streakMultiplier: nextMultiplier,
-        currentStreak: nextWeeks,
+        currentStreak: currentStreak,
         highestStreak: nextHighest,
         streakWeekEvaluatedAt: currentWeekKey,
         updatedAt: new Date(),
@@ -218,19 +357,31 @@ type AwardArgs = {
     pointsBase: number;
     streakMultiplier: number;
     globalMultiplier: number;
+    weatherId?: string | null;
     metadata?: Record<string, unknown>;
 };
 
 async function awardEvent(args: AwardArgs): Promise<number> {
-    const [existing] = await args.trx.select().from(schema.scoreEvents).where(eq(schema.scoreEvents.eventKey, args.eventKey)).limit(1);
+    const [existingEvent] = await args.trx.select().from(schema.scoreEvents).where(eq(schema.scoreEvents.eventKey, args.eventKey)).limit(1);
 
-    if (existing) {
-        if (existing.deletedAt) {
-            // Revive soft-deleted event (e.g. if the client synced a deletion but now we are re-awarding)
-            await args.trx.update(schema.scoreEvents).set({ deletedAt: null, updatedAt: new Date() }).where(eq(schema.scoreEvents.id, existing.id));
-            return Number(existing.pointsAwarded || 0);
+    if (existingEvent) {
+        if (existingEvent.deletedAt) {
+            // Re-vivimos el evento (esto pasa si el usuario borró el entrenamiento y lo volvió a subir en el mismo minuto)
+            // IMPORTANTE: Al revivirlo hay que volver a sumar los puntos al perfil
+            const pointsToAward = Number(existingEvent.pointsAwarded || 0);
+            await args.trx.update(schema.scoreEvents).set({
+                deletedAt: null,
+                updatedAt: new Date(),
+            }).where(eq(schema.scoreEvents.id, existingEvent.id));
+
+            await args.trx.update(schema.userProfiles).set({
+                scoreLifetime: sql`${schema.userProfiles.scoreLifetime} + ${pointsToAward}`,
+                updatedAt: new Date(),
+            }).where(eq(schema.userProfiles.id, args.userId));
+
+            return pointsToAward;
         }
-        return 0;
+        return 0; // Event already exists and is active
     }
 
     const pointsAwarded = Math.max(0, Math.round(args.pointsBase * args.streakMultiplier * args.globalMultiplier));
@@ -249,6 +400,7 @@ async function awardEvent(args: AwardArgs): Promise<number> {
         streakMultiplier: args.streakMultiplier,
         globalMultiplier: args.globalMultiplier,
         pointsAwarded,
+        weatherId: args.weatherId ?? null,
         metadata: args.metadata ?? null,
     }).onConflictDoUpdate({
         target: schema.scoreEvents.eventKey,
@@ -299,12 +451,13 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
         logger.captureException(e, { scope: 'social-scoring.getActiveGlobalMultiplier', userId, workoutId });
     }
 
-    let goalDays = 3;
+    let trainingDays = [1, 2, 3, 4, 5];
     try {
-        goalDays = await getWeeklyGoalDays(trx, userId);
+        trainingDays = await getWeeklyGoalDays(trx, userId);
     } catch (e) {
         logger.captureException(e, { scope: 'social-scoring.getWeeklyGoalDays', userId, workoutId });
     }
+    const goalDays = Math.max(1, trainingDays.length);
     let totalAwarded = 0;
 
     totalAwarded += await awardEvent({
@@ -439,7 +592,7 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
 
     if (cfg.weatherBonusEnabled === true && Number.isFinite(workout.finishLat) && Number.isFinite(workout.finishLon)) {
         try {
-            const weather = await isAdverseWeather(Number(workout.finishLat), Number(workout.finishLon), cfg.coldThresholdC);
+            const weather = await isAdverseWeather(trx, userId, Number(workout.finishLat), Number(workout.finishLon), cfg.coldThresholdC, cfg.heatThresholdC);
             if (weather.adverse) {
                 totalAwarded += await awardEvent({
                     trx,
@@ -450,12 +603,15 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
                     pointsBase: cfg.adverseWeatherPoints,
                     streakMultiplier: streak.multiplier,
                     globalMultiplier,
+                    weatherId: weather.logId,
                     metadata: {
                         workoutId,
                         lat: Number(workout.finishLat),
                         lon: Number(workout.finishLon),
                         reason: weather.reason,
                         tempC: weather.tempC,
+                        windSpeed: weather.windSpeed,
+                        humidity: weather.humidity,
                     },
                 });
             }
@@ -629,4 +785,12 @@ export async function buildLeaderboard(userId: string) {
 
     leaderboard.sort((a, b) => b.scores.lifetime - a.scores.lifetime || b.stats.workoutsLifetime - a.stats.workoutsLifetime);
     return leaderboard;
+}
+
+export async function cleanupWeatherLogs(trx?: any): Promise<number> {
+    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const executor = trx || db;
+    await executor.delete(schema.weatherLogs).where(lte(schema.weatherLogs.createdAt, fortyEightHoursAgo));
+    logger.info('[Scoring] Cleaned up weather logs older than 48h');
+    return 0;
 }
