@@ -3,17 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
+import { toIsoSafe } from '../../../../src/lib/date-utils';
 import { logger } from '../../../../src/lib/logger';
 import { validateDisplayName, validateUsername } from '../../../../src/lib/moderation';
-
-function toIsoSafe(value: unknown): string | null {
-    if (value instanceof Date) return value.toISOString();
-    if (typeof value === 'string' && value.trim().length > 0) {
-        const parsed = new Date(value);
-        return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-    }
-    return null;
-}
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -78,7 +70,8 @@ export async function PUT(req: NextRequest) {
         const requestedWith = req.headers.get('x-requested-with');
         const isFromOurApp = req.headers.get('user-agent')?.includes('IronTrain'); // Mobile app bypass
         if (!requestedWith && !isFromOurApp) {
-            logger.warn('[Security] PUT request without X-Requested-With header', { userId });
+            logger.warn('[Security] PUT request without X-Requested-With header — rejected', { userId });
+            return NextResponse.json({ error: 'Forbidden: Missing X-Requested-With header' }, { status: 403 });
         }
 
         let sanitizedDisplayName: string | undefined;

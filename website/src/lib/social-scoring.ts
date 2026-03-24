@@ -111,33 +111,35 @@ async function calculateDailyStreak(trx: any, userId: string, trainingDays: numb
     const uniqueDays = new Set<string>();
     for (const w of workouts) {
         const d = new Date(Number(w.date));
+        // Use UTC date string to match how workout.date is stored (milliseconds UTC)
         uniqueDays.add(d.toISOString().split('T')[0]);
     }
 
     const sortedDays = Array.from(uniqueDays).sort().reverse();
     let streak = 0;
     const now = new Date();
-    // Use local coordinates for "today" to match user expectations
-    const checkDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // Use UTC coordinates to prevent off-by-one errors when server runs in UTC
+    // but users are in UTC-3 (Argentina) and train late at night.
+    const checkDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
-    // ALGORITHM: We go backwards from "today".
+    // ALGORITHM: We go backwards from "today" (UTC).
     // 1. If today has a workout, streak starts at 1.
     // 2. If today doesn't have a workout, but it's NOT a training day, we allow skipping it.
     // 3. We allow a 1-day "grace period" for ANY day to account for late-night workouts or travel.
 
     const todayStr = checkDate.toISOString().split('T')[0];
-    const todayDay = checkDate.getDay(); // 0-6 (Sun-Sat)
+    const todayDay = checkDate.getUTCDay(); // 0-6 (Sun-Sat) in UTC
 
     // Check if we should skip today in the loop
     if (!uniqueDays.has(todayStr) && !trainingDays.includes(todayDay)) {
-        checkDate.setDate(checkDate.getDate() - 1);
+        checkDate.setUTCDate(checkDate.getUTCDate() - 1);
     }
 
     const firstWorkoutDay = sortedDays[sortedDays.length - 1];
 
     while (true) {
         const dateStr = checkDate.toISOString().split('T')[0];
-        const dayOfWeek = checkDate.getDay();
+        const dayOfWeek = checkDate.getUTCDay(); // Use UTC day
 
         if (uniqueDays.has(dateStr)) {
             streak++;
@@ -149,7 +151,7 @@ async function calculateDailyStreak(trx: any, userId: string, trainingDays: numb
             // Not a training day and no workout. We just skip it without breaking.
         }
 
-        checkDate.setDate(checkDate.getDate() - 1);
+        checkDate.setUTCDate(checkDate.getUTCDate() - 1);
         if (streak > 365) break;
         if (dateStr < firstWorkoutDay) break;
     }
@@ -762,11 +764,11 @@ export async function buildLeaderboard(userId: string) {
         db.select({
             userId: schema.scoreEvents.userId,
             total: sql<number>`coalesce(sum(${schema.scoreEvents.pointsAwarded}), 0)`.mapWith(Number),
-        }).from(schema.scoreEvents).where(and(inArray(schema.scoreEvents.userId, userIds), gte(schema.scoreEvents.createdAt, monthAgo))).groupBy(schema.scoreEvents.userId),
+        }).from(schema.scoreEvents).where(and(inArray(schema.scoreEvents.userId, userIds), gte(schema.scoreEvents.createdAt, monthAgo), isNull(schema.scoreEvents.deletedAt))).groupBy(schema.scoreEvents.userId),
         db.select({
             userId: schema.scoreEvents.userId,
             total: sql<number>`coalesce(sum(${schema.scoreEvents.pointsAwarded}), 0)`.mapWith(Number),
-        }).from(schema.scoreEvents).where(and(inArray(schema.scoreEvents.userId, userIds), gte(schema.scoreEvents.createdAt, weekStart))).groupBy(schema.scoreEvents.userId),
+        }).from(schema.scoreEvents).where(and(inArray(schema.scoreEvents.userId, userIds), gte(schema.scoreEvents.createdAt, weekStart), isNull(schema.scoreEvents.deletedAt))).groupBy(schema.scoreEvents.userId),
         db.select({
             userId: schema.workouts.userId,
             total: sql<number>`count(*)`.mapWith(Number),

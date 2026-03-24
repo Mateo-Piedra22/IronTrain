@@ -41,9 +41,12 @@ async function proxy(request: Request, { params }: { params: Promise<{ path: str
 
         if (setCookies.length > 0) {
             newHeaders.delete('Set-Cookie');
+            // Read domain from env so staging/preview environments work correctly.
+            // Falls back to the production domain only if the env var is not set.
+            const cookieDomain = process.env.NEON_AUTH_COOKIE_DOMAIN || 'irontrain.motiona.xyz';
             setCookies.forEach((cookie: string) => {
                 // Reemplazamos cualquier dominio que venga de Neon por el dominio público de la app
-                const fixedCookie = cookie.replace(/Domain=[^;]+/i, 'Domain=irontrain.motiona.xyz');
+                const fixedCookie = cookie.replace(/Domain=[^;]+/i, `Domain=${cookieDomain}`);
                 newHeaders.append('Set-Cookie', fixedCookie);
             });
         }

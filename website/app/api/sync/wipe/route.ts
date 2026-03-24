@@ -95,6 +95,8 @@ export async function POST(req: NextRequest) {
             await trx.delete(schema.changelogReactions).where(eq(schema.changelogReactions.userId, userId));
             await trx.delete(schema.kudos).where(eq(schema.kudos.giverId, userId));
             await trx.delete(schema.activityFeed).where(eq(schema.activityFeed.userId, userId));
+            await trx.delete(schema.scoreEvents).where(eq(schema.scoreEvents.userId, userId));
+            await trx.delete(schema.userExercisePrs).where(eq(schema.userExercisePrs.userId, userId));
             await trx.delete(schema.userProfiles).where(eq(schema.userProfiles.id, userId));
             await trx.delete(schema.exercises).where(eq(schema.exercises.userId, userId));
             await trx.delete(schema.categories).where(eq(schema.categories.userId, userId));
