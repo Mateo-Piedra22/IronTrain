@@ -1,6 +1,5 @@
 'use client';
 
-import { useAuthData } from '@neondatabase/auth/react';
 import { LogIn, LogOut, Shield, User, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -16,7 +15,7 @@ const links = [
 ];
 
 export function Nav() {
-  const { data: session, isPending: loading } = useAuthData(authClient as any);
+  const { data: session, isPending: loading } = authClient.useSession();
   const pathname = usePathname();
 
   const user = (session as any)?.user;

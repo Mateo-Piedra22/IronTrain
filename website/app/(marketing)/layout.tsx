@@ -5,7 +5,7 @@
  * Identidad única: MotionA Brand Identity
  */
 
-import { useAuthData } from '@neondatabase/auth/react';
+
 import { Mail, MapPin, Menu, Phone, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -28,7 +28,7 @@ const primaryLinks = [
 
 export default function MarketingLayout({ children }: MarketingLayoutProps) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const { data: session, isPending: loading } = useAuthData(authClient as any);
+    const { data: session, isPending: loading } = authClient.useSession();
 
     const currentDate = new Date().toLocaleDateString('es-AR', {
         day: '2-digit',
