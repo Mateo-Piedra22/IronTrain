@@ -101,7 +101,8 @@ export default async function RootLayout({
             </head>
             <body className="min-h-screen antialiased bg-[#fff7f1]" data-brand="irontrain">
                 <PHProvider userId={user?.id} userEmail={user?.email}>
-                    <NeonAuthUIProvider authClient={authClient as any} redirectTo="/auth/bridge" emailOTP>
+                    {/* @ts-ignore */}
+                    <NeonAuthUIProvider authClient={authClient as any} initialSession={sessionData} redirectTo="/auth/bridge" emailOTP>
                         <MaintenanceGuard>
                             {children}
                         </MaintenanceGuard>
