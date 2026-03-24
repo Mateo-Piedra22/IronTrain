@@ -49,7 +49,7 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
         .where(
             and(
                 eq(schema.routines.isPublic, true),
-                eq(schema.userProfiles.isPublic, true),
+                or(eq(schema.userProfiles.isPublic, true), isNull(schema.userProfiles.id)),
                 isNull(schema.routines.deletedAt),
                 or(
                     eq(schema.routines.isModerated, false),
