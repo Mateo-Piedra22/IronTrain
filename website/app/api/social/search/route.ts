@@ -1,4 +1,4 @@
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq, ilike, or } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
@@ -20,6 +20,9 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Query too long' }, { status: 400 });
         }
 
+        // Sanitize: escape SQL wildcards in user input to prevent abuse
+        const sanitized = query.replace(/[%_\\]/g, (c) => `\\${c}`);
+
         const users = await db.select({
             id: schema.userProfiles.id,
             displayName: schema.userProfiles.displayName,
@@ -28,8 +31,10 @@ export async function GET(req: NextRequest) {
             and(
                 eq(schema.userProfiles.isPublic, true),
                 or(
+                    // Exact match by ID (for known user IDs from the app)
                     eq(schema.userProfiles.id, query),
-                    eq(schema.userProfiles.username, query.toLowerCase())
+                    // Partial case-insensitive match on username
+                    ilike(schema.userProfiles.username, `%${sanitized}%`)
                 )
             )
         ).limit(10);

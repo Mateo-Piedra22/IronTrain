@@ -45,12 +45,11 @@ export async function POST(req: NextRequest) {
 
         const jwt = await new jose.SignJWT({
             id: record.userId,
-            // Note: we might want to fetch email here if needed, 
-            // but the app store only really needs the ID to initialize the profile.
         })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuedAt()
             .setSubject(record.userId)
+            .setAudience('irontrain-mobile')
             .setExpirationTime('30d')
             .sign(secret);
 

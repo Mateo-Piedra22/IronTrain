@@ -73,7 +73,7 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
                         {session ? (
                             <div className="space-y-1">
                                 <Link
-                                    href={`/@${(session as any).user?.username || ''}`}
+                                    href="/user/me"
                                     className="group flex items-center gap-3 py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-current"
                                 >
                                     <div className="w-6 h-6 rounded-full bg-current/10 flex items-center justify-center overflow-hidden">
@@ -85,7 +85,7 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
                                     </div>
                                     <div className="flex-1 overflow-hidden">
                                         <div className="font-bold truncate text-xs">{(session as any).user?.name || 'MI_CUENTA'}</div>
-                                        <div className="text-[10px] opacity-40 truncate italic">Ver Perfil [099]</div>
+                                        <div className="text-[10px] opacity-40 truncate italic">Ver Perfil</div>
                                     </div>
                                 </Link>
                                 <Link href="/auth/sign-out" className="group flex items-center justify-between py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-red-600 text-red-600/70 hover:text-red-600">

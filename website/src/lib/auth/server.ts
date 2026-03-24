@@ -9,11 +9,11 @@ export const auth = createNeonAuth({
     baseUrl: process.env.NEON_AUTH_SERVICE_URL!,
     cookies: {
         secret: process.env.NEON_AUTH_COOKIE_SECRET!,
+        // Domain is set exclusively via NEON_AUTH_COOKIE_DOMAIN environment variable.
+        // Do NOT hardcode the domain here — set it in the deployment environment.
         ...(process.env.NEON_AUTH_COOKIE_DOMAIN
             ? { domain: process.env.NEON_AUTH_COOKIE_DOMAIN }
-            : process.env.NODE_ENV === 'production'
-                ? { domain: 'irontrain.motiona.xyz' }
-                : {}),
+            : {}),
     },
 });
 

@@ -13,8 +13,8 @@ import Link from 'next/link';
 import { AdoptButton } from '../../../components/marketplace/AdoptButton';
 import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
-import { verifyAuth } from '../../../src/lib/auth';
 import { MarketplaceResolver } from '../../../src/lib/marketplace';
+import { verifyAuthFromHeaders } from '../../../src/lib/server-auth';
 import { ExperimentWrapper } from '../../components/PostHogFeatures';
 
 
@@ -28,11 +28,7 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
     const isMarketplace = view === 'marketplace';
 
     const h = await headers();
-    const request = {
-        headers: h,
-        nextUrl: { searchParams: new URLSearchParams() },
-    } as any;
-    const currentUserId = await verifyAuth(request);
+    const currentUserId = await verifyAuthFromHeaders(h);
 
     // Fetch public routines with user profile usernames and scores
     const publicRoutinesData = await db.select({
@@ -91,11 +87,7 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
     async function handleAdoptAction(formData: FormData) {
         'use server';
         const h = await headers();
-        const request = {
-            headers: h,
-            nextUrl: { searchParams: new URLSearchParams() },
-        } as any;
-        const userId = await verifyAuth(request);
+        const userId = await verifyAuthFromHeaders(h);
         if (!userId) return;
 
         const exerciseId = formData.get('exerciseId') as string;

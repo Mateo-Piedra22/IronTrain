@@ -53,8 +53,9 @@ export async function POST(req: NextRequest) {
             'plate_inventory': schema.plateInventory,
             'settings': schema.settings,
             'user_profiles': schema.userProfiles,
-            'changelogs': schema.changelogs,
-            'changelog_reactions': schema.changelogReactions,
+            // NOTE: changelogs and changelog_reactions are READ-ONLY via pull.
+            // They are managed exclusively by admin actions and server-side triggers.
+            // Removing them from tableMap prevents client injection.
             'kudos': schema.kudos,
             'activity_feed': schema.activityFeed,
             'shares_inbox': schema.sharesInbox,
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
 
         const results: Array<{ id: string; status: string; reason?: string }> = [];
         let processedCount = 0;
+        let hasScoreImpact = false; // Only recalc lifetime score if workout-related ops were processed
 
         const knownBigIntColumns = new Set(['date', 'start_time', 'end_time', 'duration', 'time', 'order_index']);
         const knownBooleanColumns = new Set(['is_public', 'is_moderated', 'is_unreleased', 'weather_bonus_enabled', 'is_active', 'push_sent']);
@@ -397,6 +399,10 @@ export async function POST(req: NextRequest) {
 
                     results.push({ id: opId, status: 'success' });
                     processedCount++;
+                    // Track if any workout-related operation was processed for score recalc
+                    if (tableName === 'workouts' || tableName === 'workout_sets' || tableName === 'score_events') {
+                        hasScoreImpact = true;
+                    }
 
                 } else if (operation === 'DELETE') {
                     const recordId = op.recordId || rawPayload?.id;
@@ -471,19 +477,21 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Final Social Scoring Integrity Check: Recalculate lifetime score from events
-        // This fixes any past discrepancies and ensures the Profile total matches the Events sum.
-        await db.update(schema.userProfiles)
-            .set({
-                scoreLifetime: sql`(
-                    SELECT COALESCE(SUM(${schema.scoreEvents.pointsAwarded}), 0)
-                    FROM ${schema.scoreEvents}
-                    WHERE ${schema.scoreEvents.userId} = ${schema.userProfiles.id}
-                      AND ${schema.scoreEvents.deletedAt} IS NULL
-                )`,
-                updatedAt: new Date(),
-            })
-            .where(eq(schema.userProfiles.id, userId));
+        // Final Social Scoring Integrity Check: Recalculate lifetime score from events.
+        // Only runs when workout-related data changed to avoid unnecessary DB load.
+        if (hasScoreImpact) {
+            await db.update(schema.userProfiles)
+                .set({
+                    scoreLifetime: sql`(
+                        SELECT COALESCE(SUM(${schema.scoreEvents.pointsAwarded}), 0)
+                        FROM ${schema.scoreEvents}
+                        WHERE ${schema.scoreEvents.userId} = ${schema.userProfiles.id}
+                          AND ${schema.scoreEvents.deletedAt} IS NULL
+                    )`,
+                    updatedAt: new Date(),
+                })
+                .where(eq(schema.userProfiles.id, userId));
+        }
 
         return NextResponse.json({ success: true, processed: processedCount, results });
 

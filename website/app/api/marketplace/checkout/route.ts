@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Too many exercises per checkout (max 50)' }, { status: 413 });
         }
 
-        logger.info(`Marketplace Checkout: User ${userId} adopting ${exerciseIds.length} exercises`);
+        logger.info(`Marketplace Checkout: User ...${userId.slice(-8)} adopting ${exerciseIds.length} exercises`);
 
         const results = await MarketplaceResolver.checkoutExercises(userId, exerciseIds);
 

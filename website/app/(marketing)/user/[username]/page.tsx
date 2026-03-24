@@ -19,7 +19,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
-import { verifyAuth } from '../../../../src/lib/auth';
+import { verifyAuthFromHeaders } from '../../../../src/lib/server-auth';
 import { ExperimentWrapper } from '../../../components/PostHogFeatures';
 
 export const revalidate = 0;
@@ -44,11 +44,7 @@ export default async function UserProfilePage(props: {
     const offset = (page - 1) * pageSize;
 
     const h = await headers();
-    const request = {
-        headers: h,
-        nextUrl: { searchParams: new URLSearchParams() },
-    } as any;
-    const currentUserId = await verifyAuth(request);
+    const currentUserId = await verifyAuthFromHeaders(h);
 
     // Fetch User Profile
     const profile = await db.query.userProfiles.findFirst({

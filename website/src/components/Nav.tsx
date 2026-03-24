@@ -18,8 +18,8 @@ export function Nav() {
   const { data: session, isPending: loading } = authClient.useSession();
   const pathname = usePathname();
 
-  const user = (session as any)?.user;
-  const isAdmin = pathname.startsWith('/admin') || user?.isAdmin;
+  const user = session?.user;
+  const isAdmin = pathname.startsWith('/admin') || (user as any)?.isAdmin;
 
   return (
     <header className="sticky top-0 z-50 border-b border-iron-200 bg-white/80 backdrop-blur">
@@ -66,7 +66,7 @@ export function Nav() {
                 <div className="flex items-center gap-2 md:gap-4">
                   {/* User Profile Info */}
                   <Link
-                    href={`/@${user?.username || ''}`}
+                    href="/user/me"
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors group"
                   >
                     <div className="w-8 h-8 rounded-full bg-iron-100 border border-iron-200 flex items-center justify-center overflow-hidden">
@@ -78,7 +78,7 @@ export function Nav() {
                     </div>
                     <div className="hidden sm:block text-left">
                       <div className="text-xs font-black text-slate-900 leading-none">
-                        {user?.name || user?.displayName || 'Usuario'}
+                        {user?.name || 'Usuario'}
                       </div>
                       <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                         Ver Perfil

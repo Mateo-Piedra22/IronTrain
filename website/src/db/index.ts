@@ -22,10 +22,13 @@ function normalizeDbUrl(rawUrl: string): string {
     }
 }
 
+// NOTE: On serverless platforms (Vercel), each function invocation
+// may spin up a new pool instance. Keep max low to prevent exhausting
+// the Neon connection quota. Use Neon's serverless driver for edge routes.
 const dbUrl = normalizeDbUrl(process.env.DATABASE_URL || 'postgres://user:pass@host/db');
 const pool = new Pool({
     connectionString: dbUrl,
-    max: 10,
+    max: 5,                      // Reduced from 10 for serverless safety
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
 });

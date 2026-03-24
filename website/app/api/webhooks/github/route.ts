@@ -7,11 +7,9 @@ const GITHUB_WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET || '';
 
 function verifySignature(payload: string, signature: string): boolean {
     if (!GITHUB_WEBHOOK_SECRET) {
-        // If no secret is configured, we can't verify.
-        // In a production Zero Trust environment, we should probably fail here.
-        // For now, we log a warning.
-        console.warn('[GITHUB_WEBHOOK] No GITHUB_WEBHOOK_SECRET configured. Skipping verification.');
-        return true;
+        // Zero Trust: no secret = no access. Reject all unsigned requests.
+        console.error('[GITHUB_WEBHOOK] GITHUB_WEBHOOK_SECRET is not configured. Rejecting request.');
+        return false;
     }
 
     const hmac = crypto.createHmac('sha256', GITHUB_WEBHOOK_SECRET);
