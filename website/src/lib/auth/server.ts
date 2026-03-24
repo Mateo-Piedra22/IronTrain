@@ -9,8 +9,11 @@ export const auth = createNeonAuth({
     baseUrl: process.env.NEON_AUTH_SERVICE_URL!,
     cookies: {
         secret: process.env.NEON_AUTH_COOKIE_SECRET!,
-        // Dominio específico para asegurar que el navegador asocie bien la sesión
-        domain: 'irontrain.motiona.xyz',
+        ...(process.env.NEON_AUTH_COOKIE_DOMAIN
+            ? { domain: process.env.NEON_AUTH_COOKIE_DOMAIN }
+            : process.env.NODE_ENV === 'production'
+                ? { domain: 'irontrain.motiona.xyz' }
+                : {}),
     },
 });
 
