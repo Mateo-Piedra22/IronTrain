@@ -112,14 +112,177 @@ export class SyncService {
         return schemas;
     }
 
+    private async fetchAllTableRequiredColumns(): Promise<Map<string, Set<string>>> {
+        const requiredMap = new Map<string, Set<string>>();
+        const tables = Object.keys(SYNC_TABLES);
+
+        for (const table of tables) {
+            try {
+                const info = await dbService.getAll<{ name: string; notnull: number; dflt_value: string | null }>(
+                    `PRAGMA table_info('${table}')`
+                );
+                const required = new Set(
+                    info
+                        .filter((c) => c.notnull === 1 && c.dflt_value == null)
+                        .map((c) => c.name)
+                );
+                requiredMap.set(table, required);
+            } catch (e) {
+                logger.captureException(e, { scope: 'SyncService.fetchAllRequiredColumns', table });
+            }
+        }
+
+        return requiredMap;
+    }
+
+    private hasColumn(schemas: Map<string, Set<string>>, table: string, column: string): boolean {
+        return schemas.get(table)?.has(column) === true;
+    }
+
+    private readonly requiredFieldsByTable: Record<string, string[]> = {
+        exercises: ['id', 'category_id', 'name', 'type'],
+        workout_sets: ['id', 'workout_id', 'exercise_id'],
+        routine_days: ['id', 'routine_id', 'name'],
+        routine_exercises: ['id', 'routine_day_id', 'exercise_id'],
+        exercise_badges: ['id', 'exercise_id', 'badge_id'],
+        goals: ['id', 'title', 'type'],
+        settings: ['key', 'value'],
+        user_exercise_prs: ['id', 'user_id', 'exercise_id'],
+        activity_seen: ['id', 'activity_id', 'user_id']
+    };
+
+    private applyLegacyAliases(table: string, normalized: Record<string, any>): Record<string, any> {
+        const setIfMissing = (target: string, aliases: string[]) => {
+            if (normalized[target] !== undefined && normalized[target] !== null && normalized[target] !== '') return;
+            for (const alias of aliases) {
+                const value = normalized[alias];
+                if (value !== undefined && value !== null && value !== '') {
+                    normalized[target] = value;
+                    return;
+                }
+            }
+        };
+
+        if (table === 'exercises') {
+            setIfMissing('category_id', ['categoryId']);
+        }
+
+        if (table === 'workout_sets') {
+            setIfMissing('workout_id', ['workoutId']);
+            setIfMissing('exercise_id', ['exerciseId']);
+            setIfMissing('order_index', ['orderIndex']);
+        }
+
+        if (table === 'routine_days') {
+            setIfMissing('routine_id', ['routineId']);
+            setIfMissing('order_index', ['orderIndex']);
+        }
+
+        if (table === 'routine_exercises') {
+            setIfMissing('routine_day_id', ['routineDayId']);
+            setIfMissing('exercise_id', ['exerciseId']);
+            setIfMissing('order_index', ['orderIndex']);
+        }
+
+        if (table === 'exercise_badges') {
+            setIfMissing('exercise_id', ['exerciseId']);
+            setIfMissing('badge_id', ['badgeId']);
+        }
+
+        if (table === 'goals') {
+            setIfMissing('target_value', ['targetValue']);
+            setIfMissing('current_value', ['currentValue']);
+            setIfMissing('deadline', ['deadlineAt']);
+            setIfMissing('reference_id', ['referenceId']);
+        }
+
+        if (table === 'user_exercise_prs') {
+            setIfMissing('user_id', ['userId']);
+            setIfMissing('exercise_id', ['exerciseId']);
+            setIfMissing('workout_set_id', ['workoutSetId']);
+            setIfMissing('achieved_at', ['achievedAt', 'date']);
+        }
+
+        if (table === 'activity_seen') {
+            setIfMissing('activity_id', ['activityId']);
+            setIfMissing('user_id', ['userId']);
+        }
+
+        return normalized;
+    }
+
+    private normalizeForLocalInsert(
+        tableName: string,
+        row: Record<string, any>,
+        schemas: Map<string, Set<string>>,
+        requiredByTable?: Map<string, Set<string>>
+    ): Record<string, any> | null {
+        const validColumns = schemas.get(tableName) || new Set<string>();
+        const rawNorm = SyncMapper.mapObject(row, tableName, 'FROM_REMOTE');
+        if (!rawNorm) return null;
+
+        const schemaAliasedNorm: Record<string, any> = { ...rawNorm };
+        for (const [key, value] of Object.entries(rawNorm)) {
+            if (validColumns.has(key)) continue;
+            const snakeKey = SyncMapper.toSnakeCase(key);
+            if (validColumns.has(snakeKey) && (schemaAliasedNorm[snakeKey] === undefined || schemaAliasedNorm[snakeKey] === null)) {
+                schemaAliasedNorm[snakeKey] = value;
+            }
+        }
+
+        const normalized = this.applyBusinessRules(tableName, this.applyLegacyAliases(tableName, schemaAliasedNorm));
+        const safeNormalized = Object.fromEntries(
+            Object.entries(normalized).filter(([k]) => validColumns.has(k))
+        ) as Record<string, any>;
+
+        const authUserId = useAuthStore.getState().user?.id;
+        const now = Date.now();
+
+        if (validColumns.has('user_id') && (safeNormalized.user_id === undefined || safeNormalized.user_id === null || safeNormalized.user_id === '')) {
+            safeNormalized.user_id = authUserId || safeNormalized.user_id;
+        }
+        if (validColumns.has('updated_at') && (safeNormalized.updated_at === undefined || safeNormalized.updated_at === null || safeNormalized.updated_at === '')) {
+            safeNormalized.updated_at = now;
+        }
+        if (validColumns.has('created_at') && (safeNormalized.created_at === undefined || safeNormalized.created_at === null || safeNormalized.created_at === '')) {
+            safeNormalized.created_at = safeNormalized.updated_at ?? now;
+        }
+        if (validColumns.has('deleted_at') && safeNormalized.deleted_at === undefined) {
+            safeNormalized.deleted_at = null;
+        }
+
+        const requiredFields = new Set<string>([
+            ...(this.requiredFieldsByTable[tableName] || []),
+            ...Array.from(requiredByTable?.get(tableName) || [])
+        ]);
+        for (const field of requiredFields) {
+            const value = safeNormalized[field];
+            if (value === undefined || value === null) {
+                return null;
+            }
+        }
+
+        if (Object.keys(safeNormalized).length === 0) return null;
+        return safeNormalized;
+    }
+
     private normalizeIncomingRecord(tableName: string, payload: Record<string, any>): Record<string, any> {
         const rawNorm = SyncMapper.mapObject(payload, tableName, 'FROM_REMOTE');
         return this.applyBusinessRules(tableName, rawNorm);
     }
 
     private applyBusinessRules(table: string, normalized: Record<string, any>): Record<string, any> {
+        // 0.1 Normalize legacy soft-delete values (0/"0") to NULL
+        if (Object.prototype.hasOwnProperty.call(normalized, 'deleted_at')) {
+            const deletedAtValue = normalized.deleted_at;
+            const parsedDeletedAt = Number(deletedAtValue);
+            if (deletedAtValue === '' || deletedAtValue === '0' || (Number.isFinite(parsedDeletedAt) && parsedDeletedAt <= 0)) {
+                normalized.deleted_at = null;
+            }
+        }
+
         // 0. Scaling Seconds to Milliseconds for key timestamp fields (Legacy Support)
-        if (table === 'workouts' || table === 'routine_days' || table === 'body_metrics' || table === 'measurements') {
+        if (table === 'workouts' || table === 'routine_days' || table === 'body_metrics' || table === 'measurements' || table === 'goals') {
             const timeFields = ['date', 'start_time', 'end_time', 'achieved_at', 'occurred_at', 'deadline_at'];
             for (const field of timeFields) {
                 if (normalized[field] && typeof normalized[field] === 'number') {
@@ -138,6 +301,92 @@ export class SyncService {
             if (name === 'Sin categoría' || name === 'Uncategorized') {
                 normalized.id = 'uncategorized';
                 normalized.is_system = 1;
+            }
+        }
+
+        // 1.1 Exercises integrity (legacy remote rows may miss category_id)
+        if (table === 'exercises') {
+            if (!normalized.category_id && normalized.categoryId) {
+                normalized.category_id = normalized.categoryId;
+            }
+            const categoryId = typeof normalized.category_id === 'string' ? normalized.category_id.trim() : '';
+            if (!categoryId) {
+                normalized.category_id = 'uncategorized';
+            }
+        }
+
+        // 1.2 Workout sets integrity (legacy remote rows may come in camelCase)
+        if (table === 'workout_sets') {
+            if (!normalized.workout_id && normalized.workoutId) {
+                normalized.workout_id = normalized.workoutId;
+            }
+            if (!normalized.exercise_id && normalized.exerciseId) {
+                normalized.exercise_id = normalized.exerciseId;
+            }
+            if (!normalized.type || String(normalized.type).trim() === '') {
+                normalized.type = 'normal';
+            }
+            const parsedOrder = Number(normalized.order_index);
+            if (!Number.isFinite(parsedOrder)) {
+                normalized.order_index = 0;
+            }
+            if (normalized.completed === undefined || normalized.completed === null) {
+                normalized.completed = 0;
+            }
+        }
+
+        // 1.2.1 Workouts integrity (backend/status allows nullable status in legacy rows)
+        if (table === 'workouts') {
+            const parsedStart = Number(normalized.start_time);
+            const parsedDate = Number(normalized.date);
+            const parsedEnd = Number(normalized.end_time);
+
+            if (!Number.isFinite(parsedStart)) {
+                if (Number.isFinite(parsedDate)) normalized.start_time = parsedDate;
+                else normalized.start_time = Date.now();
+            }
+
+            if (!Number.isFinite(parsedDate)) {
+                const fallbackStart = Number(normalized.start_time);
+                normalized.date = Number.isFinite(fallbackStart) ? fallbackStart : Date.now();
+            }
+
+            if (!normalized.status || String(normalized.status).trim() === '') {
+                normalized.status = Number.isFinite(parsedEnd) && parsedEnd > 0 ? 'completed' : 'in_progress';
+            }
+        }
+
+        // 1.2.2 Routine integrity for required local fields
+        if (table === 'routine_days') {
+            if (!normalized.name || String(normalized.name).trim() === '') {
+                normalized.name = 'Día';
+            }
+            const parsedOrder = Number(normalized.order_index);
+            if (!Number.isFinite(parsedOrder)) {
+                normalized.order_index = 0;
+            }
+        }
+
+        if (table === 'routine_exercises') {
+            const parsedOrder = Number(normalized.order_index);
+            if (!Number.isFinite(parsedOrder)) {
+                normalized.order_index = 0;
+            }
+        }
+
+        // 1.3 Goals integrity (legacy rows may miss target_value)
+        if (table === 'goals') {
+            const parsedTarget = Number(normalized.target_value);
+            if (!Number.isFinite(parsedTarget)) {
+                const fallbackCurrent = Number(normalized.current_value);
+                normalized.target_value = Number.isFinite(fallbackCurrent) ? fallbackCurrent : 0;
+            }
+
+            if (!normalized.title || String(normalized.title).trim() === '') {
+                normalized.title = 'Goal';
+            }
+            if (!normalized.type || String(normalized.type).trim() === '') {
+                normalized.type = 'custom';
             }
         }
 
@@ -421,6 +670,7 @@ export class SyncService {
         let pullCompleted = true;
 
         const tableSchemas = schemas || await this.fetchAllTableSchemas();
+        const tableRequired = await this.fetchAllTableRequiredColumns();
         while (hasMore && loopCount < MAX_PULL_LOOPS) {
             loopCount++;
             const url = cursor && cursor.includes('-') ? `${API_BASE_URL}/pull?cursor=${encodeURIComponent(cursor)}` : `${API_BASE_URL}/pull?since=${cursor || 0}`;
@@ -453,6 +703,8 @@ export class SyncService {
                 if (byTable.has('settings')) settingsModified = true;
 
                 const applyForTable = async (table: string, tableChanges: any[]): Promise<void> => {
+                    const tableHasDeletedAt = this.hasColumn(tableSchemas, table, 'deleted_at');
+                    const validColumns = tableSchemas.get(table) || new Set<string>();
                     const pkField = table === 'settings' ? 'key' : 'id';
                     const ids = tableChanges.map((c) => {
                         const p = c?.payload;
@@ -481,9 +733,8 @@ export class SyncService {
                     const existingById = new Map(existingRows.map((r) => [r[pkField], r]));
 
                     for (const change of tableChanges) {
-                        const rawNorm = SyncMapper.mapObject(change.payload, table, 'FROM_REMOTE');
-                        if (!rawNorm) continue;
-                        const normalized = this.applyBusinessRules(table, rawNorm);
+                        const normalized = this.normalizeForLocalInsert(table, change.payload || {}, tableSchemas, tableRequired);
+                        if (!normalized) continue;
                         const recordId = table === 'settings' ? normalized.key : normalized.id;
                         if (!recordId) continue;
 
@@ -494,14 +745,16 @@ export class SyncService {
                         if (change.operation === 'INSERT' || change.operation === 'UPDATE') {
                             if (local && localUA >= remoteUA) continue;
                             const keys = Object.keys(normalized);
+                            if (keys.length === 0) continue;
                             if (local) {
                                 const uKeys = keys.filter(k => k !== pkField);
+                                if (uKeys.length === 0) continue;
                                 await dbService.run(`UPDATE ${table} SET ${uKeys.map(k => `${k}=?`).join(',')} WHERE ${pkField}=?`, [...uKeys.map(k => normalized[k]), recordId]);
                             } else {
                                 await dbService.run(`INSERT INTO ${table} (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`, Object.values(normalized));
                             }
                         } else if (change.operation === 'DELETE') {
-                            if (TABLES_WITH_SOFT_DELETE.has(table)) {
+                            if (TABLES_WITH_SOFT_DELETE.has(table) && tableHasDeletedAt) {
                                 await dbService.run(`UPDATE ${table} SET deleted_at=?, updated_at=? WHERE ${pkField}=?`, [remoteUA || Date.now(), remoteUA || Date.now(), recordId]);
                             } else await dbService.run(`DELETE FROM ${table} WHERE ${pkField}=?`, [recordId]);
                         }
@@ -581,17 +834,16 @@ export class SyncService {
 
     public async restoreDatabaseSnapshot(fileUri: string): Promise<void> {
         const snapshot = JSON.parse(await FileSystem.readAsStringAsync(fileUri));
+        const schemas = await this.fetchAllTableSchemas();
+        const requiredByTable = await this.fetchAllTableRequiredColumns();
         await dbService.executeRaw('PRAGMA foreign_keys = OFF;');
         try {
             await dbService.withTransaction(async () => {
                 for (const t of PULL_DELETE_ORDER) await dbService.run(`DELETE FROM ${t}`);
-                const schemas = await this.fetchAllTableSchemas();
                 for (const t of PULL_UPSERT_ORDER) {
                     const recs = snapshot[t] || [];
-                    const valid = schemas.get(t);
                     for (const r of recs) {
-                        const rawNorm = SyncMapper.mapObject(r, t, 'FROM_REMOTE');
-                        const norm = rawNorm ? this.applyBusinessRules(t, rawNorm) : null;
+                        const norm = this.normalizeForLocalInsert(t, r, schemas, requiredByTable);
                         if (norm) {
                             const keys = Object.keys(norm);
                             await dbService.run(`INSERT INTO ${t} (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`, Object.values(norm));
@@ -613,9 +865,11 @@ export class SyncService {
 
     public async checkLocalStatus(): Promise<SyncStatus> {
         const counts: Record<string, any> = {};
+        const schemas = await this.fetchAllTableSchemas();
         for (const t of ALLOWED_TABLES) {
-            const r = await dbService.getFirst<{ c: number }>(`SELECT COUNT(*) as c FROM ${t} ${TABLES_WITH_SOFT_DELETE.has(t) ? 'WHERE deleted_at IS NULL' : ''}`);
-            const d = TABLES_WITH_SOFT_DELETE.has(t) 
+            const supportsSoftDelete = TABLES_WITH_SOFT_DELETE.has(t) && this.hasColumn(schemas, t, 'deleted_at');
+            const r = await dbService.getFirst<{ c: number }>(`SELECT COUNT(*) as c FROM ${t} ${supportsSoftDelete ? 'WHERE deleted_at IS NULL' : ''}`);
+            const d = supportsSoftDelete
                 ? await dbService.getFirst<{ c: number }>(`SELECT COUNT(*) as c FROM ${t} WHERE deleted_at IS NOT NULL`)
                 : { c: 0 };
             
@@ -671,20 +925,54 @@ export class SyncService {
         const response = await this.requestWithRetry(`${API_BASE_URL}/snapshot`, { method: 'GET', headers: { 'Authorization': `Bearer ${token}` } });
         const data = await response.json();
         const snapshot: Record<string, any[]> = data?.snapshot || {};
+        const schemas = await this.fetchAllTableSchemas();
+        const requiredByTable = await this.fetchAllTableRequiredColumns();
+        const snapshotStats: Record<string, { source: number; inserted: number; skipped: number }> = {};
 
         await dbService.withTransaction(async () => {
-            for (const [tableName, rows] of Object.entries(snapshot)) {
+            for (const tableName of PULL_DELETE_ORDER) {
                 if (!ALLOWED_TABLES.includes(tableName)) continue;
                 await dbService.run(`DELETE FROM ${tableName}`);
+            }
+
+            for (const tableName of PULL_UPSERT_ORDER) {
+                if (!ALLOWED_TABLES.includes(tableName)) continue;
+                const rows = snapshot[tableName] || [];
+                let inserted = 0;
+                let skipped = 0;
                 for (const row of rows as any[]) {
-                    const keys = Object.keys(row);
+                    const normalized = this.normalizeForLocalInsert(tableName, row, schemas, requiredByTable);
+                    if (!normalized) {
+                        skipped++;
+                        continue;
+                    }
+                    const keys = Object.keys(normalized);
                     const placeholders = keys.map(() => '?').join(', ');
-                    const values = Object.values(row);
+                    const values = Object.values(normalized);
                     await dbService.run(`INSERT OR REPLACE INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders})`, values);
+                    inserted++;
                 }
+                snapshotStats[tableName] = {
+                    source: rows.length,
+                    inserted,
+                    skipped,
+                };
             }
         });
         await dbService.run('DELETE FROM sync_queue');
+
+        const skippedEntries = Object.entries(snapshotStats).filter(([, v]) => v.skipped > 0);
+        if (skippedEntries.length > 0) {
+            logger.warn('[Sync] Snapshot restore skipped rows', {
+                scope: 'SyncService.pullCloudSnapshot',
+                skippedByTable: Object.fromEntries(skippedEntries),
+            });
+        } else {
+            logger.info('[Sync] Snapshot restore completed without skipped rows', {
+                scope: 'SyncService.pullCloudSnapshot',
+                totalsByTable: snapshotStats,
+            });
+        }
     }
 
     public async wipeAllUserData(): Promise<void> {

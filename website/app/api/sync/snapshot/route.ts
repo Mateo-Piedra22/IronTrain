@@ -139,6 +139,8 @@ export async function GET(req: NextRequest) {
             exerciseBadges,
             changelogReactions,
             kudos,
+            userProfiles,
+            activityFeed,
         ] = await Promise.all([
             db.select().from(schema.categories).where(eq(schema.categories.userId, userId)),
             db.select().from(schema.exercises).where(eq(schema.exercises.userId, userId)),
@@ -156,6 +158,8 @@ export async function GET(req: NextRequest) {
             db.select().from(schema.exerciseBadges).where(eq(schema.exerciseBadges.userId, userId)),
             db.select().from(schema.changelogReactions).where(eq(schema.changelogReactions.userId, userId)),
             db.select().from(schema.kudos).where(eq(schema.kudos.giverId, userId)),
+            db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, userId)),
+            db.select().from(schema.activityFeed).where(eq(schema.activityFeed.userId, userId)),
         ]);
 
         snapshot.categories = categories;
@@ -179,6 +183,8 @@ export async function GET(req: NextRequest) {
         snapshot.exercise_badges = exerciseBadges;
         snapshot.changelog_reactions = changelogReactions;
         snapshot.kudos = kudos;
+        snapshot.user_profiles = userProfiles;
+        snapshot.activity_feed = activityFeed;
 
         return NextResponse.json({ success: true, snapshot });
     } catch (e) {

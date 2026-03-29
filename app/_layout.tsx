@@ -1,4 +1,5 @@
 import { ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
+import * as Clipboard from 'expo-clipboard';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
 import { Stack } from 'expo-router';
@@ -6,7 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { AlertTriangle, Download } from 'lucide-react-native';
 import { PostHogProvider, PostHogSurveyProvider } from 'posthog-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
@@ -39,6 +40,67 @@ import { notify } from '../src/utils/notify';
 
 SplashScreen.preventAutoHideAsync();
 
+type InitErrorInfo = {
+  title: string;
+  message: string;
+  detail?: string;
+  notifyTitle: string;
+  notifyMessage: string;
+};
+
+function classifyInitError(error: any): InitErrorInfo {
+  const raw = String(error?.message || error || '').trim();
+  const message = raw.toLowerCase();
+
+  if (message.includes('timeout') || message.includes('timed out')) {
+    return {
+      title: 'Inicio detenido',
+      message: 'La inicialización tardó más de lo esperado y parece haberse quedado colgada.',
+      detail: raw || undefined,
+      notifyTitle: 'Inicio en timeout',
+      notifyMessage: 'La app tardó demasiado en iniciar. Tocá Reintentar para relanzar la carga.'
+    };
+  }
+
+  if (message.includes('sqlite') || message.includes('sql') || message.includes('database') || message.includes('duplicate column')) {
+    return {
+      title: 'Error de base de datos',
+      message: 'La app no pudo inicializar la base local. Esto suele pasar por un cambio de esquema incompatible.',
+      detail: raw || undefined,
+      notifyTitle: 'Inicio fallido (DB)',
+      notifyMessage: 'No se pudo abrir/inicializar la base local. Tocá Reintentar o reinstalá si persiste.'
+    };
+  }
+
+  if (message.includes('permission') || message.includes('denied') || message.includes('notifee') || message.includes('location')) {
+    return {
+      title: 'Error de permisos',
+      message: 'Hubo un problema solicitando permisos del dispositivo durante el arranque.',
+      detail: raw || undefined,
+      notifyTitle: 'Inicio fallido (Permisos)',
+      notifyMessage: 'Revisá permisos de notificaciones/ubicación y tocá Reintentar.'
+    };
+  }
+
+  if (message.includes('securestore') || message.includes('auth') || message.includes('token')) {
+    return {
+      title: 'Error de sesión/configuración',
+      message: 'No se pudo restaurar la sesión o configuración local al iniciar.',
+      detail: raw || undefined,
+      notifyTitle: 'Inicio fallido (Sesión)',
+      notifyMessage: 'No se pudo restaurar sesión/configuración. Probá Reintentar.'
+    };
+  }
+
+  return {
+    title: 'Error al iniciar',
+    message: 'No se pudo completar el inicio de la app.',
+    detail: raw || undefined,
+    notifyTitle: 'Inicio fallido',
+    notifyMessage: 'La app no pudo iniciar correctamente. Tocá Reintentar.'
+  };
+}
+
 function GlobalConfirmModal() {
   const { visible, config, hide } = useConfirmStore();
   return (
@@ -56,7 +118,7 @@ function GlobalConfirmModal() {
   );
 }
 
-function MainAppContent({ dbInitialized, fontsLoaded, fontError, installedVersion, latestVersion, downloadUrl, notesUrl }: any) {
+function MainAppContent({ dbInitialized, fontsLoaded, fontError, installedVersion, latestVersion, downloadUrl, notesUrl, initError, onRetryInit }: any) {
   const { activeTheme, currentNavTheme, statusBarStyle } = useTheme();
   const updateStatus = useUpdateStore((state) => state.status);
   const { needsInitialSync, setNeedsInitialSync, token: authToken } = useAuthStore();
@@ -64,6 +126,24 @@ function MainAppContent({ dbInitialized, fontsLoaded, fontError, installedVersio
   const [syncDiagnostics, setSyncDiagnostics] = useState<SyncDiagnostics | null>(null);
   const [isSyncingInitial, setIsSyncingInitial] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+
+  const handleCopyDiagnostics = useCallback(async () => {
+    if (!initError) return;
+    const diagnosticText = [
+      '[IronTrain Init Error]',
+      `Title: ${initError.title}`,
+      `Message: ${initError.message}`,
+      `Detail: ${initError.detail || 'N/A'}`,
+      `Timestamp: ${new Date().toISOString()}`
+    ].join('\n');
+
+    try {
+      await Clipboard.setStringAsync(diagnosticText);
+      notify.success('Diagnóstico copiado', 'Ya podés pegarlo en el reporte.');
+    } catch {
+      notify.error('No se pudo copiar', 'Copiá manualmente el mensaje de error.');
+    }
+  }, [initError]);
 
   useEffect(() => {
     if (needsInitialSync && dbInitialized && authToken) {
@@ -103,6 +183,40 @@ function MainAppContent({ dbInitialized, fontsLoaded, fontError, installedVersio
       checkConflicts();
     }
   }, [needsInitialSync, dbInitialized, authToken]);
+
+  if (initError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: activeTheme.colors.background, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <StatusBar style={statusBarStyle} />
+        <View style={{ alignItems: 'center', marginBottom: 20 }}>
+          <AlertTriangle size={56} color={activeTheme.colors.red} />
+          <Text style={{ color: activeTheme.colors.text, fontSize: 20, fontWeight: '900', marginTop: 16, textAlign: 'center' }}>
+            {initError.title}
+          </Text>
+          <Text style={{ color: activeTheme.colors.textMuted, textAlign: 'center', marginTop: 8, lineHeight: 20 }}>
+            {initError.message}
+          </Text>
+          {!!initError.detail && (
+            <Text style={{ color: activeTheme.colors.textMuted, textAlign: 'center', marginTop: 10, fontSize: 12 }} numberOfLines={3}>
+              {initError.detail}
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity
+          onPress={onRetryInit}
+          style={{ backgroundColor: activeTheme.colors.primary.DEFAULT, width: '100%', paddingVertical: 14, borderRadius: 14, alignItems: 'center' }}
+        >
+          <Text style={{ color: activeTheme.colors.onPrimary, fontWeight: '900', fontSize: 16 }}>Reintentar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleCopyDiagnostics}
+          style={{ marginTop: 10, borderWidth: 1, borderColor: activeTheme.colors.primary.DEFAULT, width: '100%', paddingVertical: 14, borderRadius: 14, alignItems: 'center' }}
+        >
+          <Text style={{ color: activeTheme.colors.primary.DEFAULT, fontWeight: '900', fontSize: 16 }}>Copiar diagnóstico</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if ((!fontsLoaded && !fontError) || !dbInitialized) {
     return null;
@@ -190,6 +304,8 @@ function MainAppContent({ dbInitialized, fontsLoaded, fontError, installedVersio
 
 export default function RootLayout() {
   const [dbInitialized, setDbInitialized] = useState(false);
+  const [initError, setInitError] = useState<InitErrorInfo | null>(null);
+  const [initAttempt, setInitAttempt] = useState(0);
   const updatePromptShown = useRef(false);
   const authToken = useAuthStore((s) => s.token);
   const lastSyncedTokenRef = useRef<string | null>(null);
@@ -201,25 +317,53 @@ export default function RootLayout() {
   const downloadUrl = useUpdateStore((state) => state.downloadUrl);
   const notesUrl = useUpdateStore((state) => state.notesUrl);
 
-  useEffect(() => {
-    async function initInfo() {
-      try {
-        const { notificationPermissionsService } = await import('../src/services/NotificationPermissionsService');
-        const { locationPermissionsService } = await import('../src/services/LocationPermissionsService');
+  const initInfo = useCallback(async () => {
+    try {
+      setInitAttempt((n) => n + 1);
+      setInitError(null);
+      setDbInitialized(false);
 
-        await useAuthStore.getState().initialize();
-        await dbService.init();
-        await configService.init();
-        setDbInitialized(true);
-        await notificationPermissionsService.requestPermissionOnce(false);
-        await locationPermissionsService.requestWeatherBonusPermissionOnce();
-      } catch (e) {
-        logger.captureException(e, { scope: 'RootLayout.initInfo', message: 'Initialization failed' });
-        notify.error('Error', 'No se pudo iniciar la aplicación. Reiniciá e intentá de nuevo.');
-      }
+      const { notificationPermissionsService } = await import('../src/services/NotificationPermissionsService');
+      const { locationPermissionsService } = await import('../src/services/LocationPermissionsService');
+
+      await useAuthStore.getState().initialize();
+      await dbService.init();
+      await configService.init();
+      setDbInitialized(true);
+      await notificationPermissionsService.requestPermissionOnce(false);
+      await locationPermissionsService.requestWeatherBonusPermissionOnce();
+    } catch (e: any) {
+      const info = classifyInitError(e);
+      logger.captureException(e, {
+        scope: 'RootLayout.initInfo',
+        message: 'Initialization failed',
+        initErrorTitle: info.title,
+        initErrorMessage: info.message
+      });
+      setInitError(info);
+      notify.error(info.notifyTitle, info.notifyMessage);
     }
-    initInfo();
   }, []);
+
+  useEffect(() => {
+    initInfo();
+  }, [initInfo]);
+
+  useEffect(() => {
+    if (dbInitialized || initError || initAttempt === 0) return;
+
+    const timeoutId = setTimeout(() => {
+      const info = classifyInitError(new Error('Initialization timeout (> 15s)'));
+      logger.captureException(new Error('Initialization timeout (> 15s)'), {
+        scope: 'RootLayout.initWatchdog',
+        message: 'Initialization appears hung'
+      });
+      setInitError(info);
+      notify.error(info.notifyTitle, info.notifyMessage);
+    }, 15000);
+
+    return () => clearTimeout(timeoutId);
+  }, [dbInitialized, initError, initAttempt]);
 
   useEffect(() => {
     return () => {
@@ -261,12 +405,12 @@ export default function RootLayout() {
 
   useEffect(() => {
     async function hideSplash() {
-      if ((fontsLoaded || fontError) && dbInitialized) {
+      if ((fontsLoaded || fontError) && (dbInitialized || !!initError)) {
         await SplashScreen.hideAsync();
       }
     }
     hideSplash();
-  }, [fontsLoaded, fontError, dbInitialized]);
+  }, [fontsLoaded, fontError, dbInitialized, initError]);
 
   useEffect(() => {
     if (dbInitialized) {
@@ -303,6 +447,8 @@ export default function RootLayout() {
                 latestVersion={latestVersion}
                 downloadUrl={downloadUrl}
                 notesUrl={notesUrl}
+                initError={initError}
+                onRetryInit={initInfo}
               />
             </MaintenanceMode>
           </AppThemeProvider>

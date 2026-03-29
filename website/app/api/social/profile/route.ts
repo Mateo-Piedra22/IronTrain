@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, ne } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, lte, ne } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '../../../../src/db';
@@ -8,6 +8,7 @@ import { toIsoSafe } from '../../../../src/lib/date-utils';
 import { logger } from '../../../../src/lib/logger';
 import { validateDisplayName, validateUsername } from '../../../../src/lib/moderation';
 import { RATE_LIMITS } from '../../../../src/lib/rate-limit';
+import { reconcileStreakStateForUser } from '../../../../src/lib/social-scoring';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -17,6 +18,17 @@ const profileUpdateSchema = z.object({
     username: z.union([z.string(), z.null()]).optional(),
     isPublic: z.union([z.boolean(), z.literal(0), z.literal(1), z.literal('0'), z.literal('1'), z.literal('true'), z.literal('false')]).optional(),
 });
+
+function weatherConditionLabel(condition: string | null | undefined, isAdverse: boolean | null | undefined): string {
+    const value = String(condition || '').toLowerCase();
+    if (!isAdverse) return 'Cielo Despejado';
+    if (value.includes('rain')) return 'Lluvia';
+    if (value.includes('snow')) return 'Nieve';
+    if (value.includes('storm') || value.includes('thunder')) return 'Tormenta';
+    if (value.includes('cold')) return 'Clima Gélido';
+    if (value.includes('heat')) return 'Calor Extremo';
+    return 'Clima Adverso';
+}
 
 export async function GET(req: NextRequest) {
     try {
@@ -35,6 +47,10 @@ export async function GET(req: NextRequest) {
                 }
             );
         }
+
+        await reconcileStreakStateForUser(db, userId).catch((e) => {
+            logger.captureException(e, { scope: 'social.profile.reconcileStreakState', userId });
+        });
 
         let profiles = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, userId));
         const profile = profiles[0];
@@ -58,11 +74,34 @@ export async function GET(req: NextRequest) {
             .orderBy(desc(schema.globalEvents.multiplier))
             .limit(1);
 
+        const recentWeatherThreshold = new Date(Date.now() - (20 * 60 * 1000));
+        const [recentWeather] = await db.select()
+            .from(schema.weatherLogs)
+            .where(and(
+                eq(schema.weatherLogs.userId, userId),
+                gte(schema.weatherLogs.createdAt, recentWeatherThreshold),
+                isNull(schema.weatherLogs.deletedAt)
+            ))
+            .orderBy(desc(schema.weatherLogs.createdAt))
+            .limit(1);
+
+        const checkedAtMs = recentWeather?.createdAt ? recentWeather.createdAt.getTime() : null;
+        const weatherBonus = recentWeather ? {
+            location: recentWeather.location || 'Tu ubicación',
+            condition: weatherConditionLabel(recentWeather.condition, recentWeather.isAdverse),
+            temperature: Math.round(Number(recentWeather.tempC ?? recentWeather.temperature ?? 20)),
+            multiplier: 1,
+            isActive: Boolean(recentWeather.isAdverse),
+            checkedAtMs,
+            expiresAtMs: checkedAtMs ? checkedAtMs + (20 * 60 * 1000) : null,
+        } : null;
+
         return NextResponse.json({
             success: true,
             profile: {
                 ...profile,
                 scoreConfig: scoreConfig || null,
+                weatherBonus,
                 activeEvent: activeEvent ? {
                     id: activeEvent.id,
                     title: activeEvent.name,

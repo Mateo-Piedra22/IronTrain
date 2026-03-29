@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/social-integrity?limit=200",
+      "schedule": "*/30 * * * *"
+    }
+  ]
+}

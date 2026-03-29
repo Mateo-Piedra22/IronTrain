@@ -76,6 +76,11 @@ export class SyncMapper {
                 if (config.booleanColumns.includes(mappedKey)) {
                     mappedValue = (value === 1 || value === true || value === 'true') ? true : false;
                 } else if (config.bigIntColumns.includes(mappedKey)) {
+                    if (value === null || value === undefined || value === '') {
+                        mappedValue = null;
+                        mapped[mappedKey] = mappedValue;
+                        continue;
+                    }
                     mappedValue = typeof value === 'string' ? (parseInt(value, 10) || 0) : (Number(value) || 0);
                 }
                 mapped[mappedKey] = mappedValue;
@@ -85,6 +90,12 @@ export class SyncMapper {
                     // Local SQLite expects 1 or 0
                     mappedValue = (value === 1 || value === true || value === 'true') ? 1 : 0;
                 } else if (config.bigIntColumns.includes(mappedKey)) {
+                    if (value === null || value === undefined || value === '') {
+                        mappedValue = null;
+                        mapped[mappedKey] = mappedValue;
+                        continue;
+                    }
+
                     const timestampColumns = config.timestampColumns;
                     const isTimestamp = Array.isArray(timestampColumns)
                         ? timestampColumns.includes(mappedKey)

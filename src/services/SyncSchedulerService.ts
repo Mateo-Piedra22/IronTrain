@@ -219,10 +219,6 @@ export class SyncSchedulerService {
             this.backoffMs = 0;
             dataEventService.emit('SYNC_COMPLETED');
 
-            // Calculate any missing retroactively after we got the latest data
-            const { IronScoreService } = await import('./IronScoreService');
-            await IronScoreService.calculateMissingScoresRetroactively();
-
             // After a successful sync, if we just logged in or resumed, we double check if there's anything else pending
             // to fulfill the "automatic re-check" requirement.
             if (reason === 'manual' || reason === 'resume') {

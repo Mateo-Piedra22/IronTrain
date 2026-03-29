@@ -58,6 +58,8 @@ export async function POST(req: NextRequest) {
             temperature: weather.tempC !== null ? Math.round(weather.tempC) : 20,
             multiplier: 1.0, // El sistema usa +15 pts fijos según la UI, pero mantenemos el campo por compatibilidad
             isActive: weather.adverse,
+            checkedAtMs: weather.checkedAtMs ?? Date.now(),
+            expiresAtMs: (weather.checkedAtMs ?? Date.now()) + (20 * 60 * 1000),
         };
 
         return NextResponse.json({ success: true, weatherBonus: weatherInfo });

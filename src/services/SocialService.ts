@@ -65,6 +65,8 @@ export interface WeatherInfo {
     isActive: boolean;
     humidity?: number;
     windSpeed?: number;
+    checkedAtMs?: number | null;
+    expiresAtMs?: number | null;
 }
 
 export interface WeatherLog {
@@ -265,9 +267,10 @@ export class SocialService {
             if (!userId) return null;
 
             const logId = uuidV4();
+            const now = Date.now();
             await dbService.run(
-                `INSERT INTO weather_logs (id, user_id, workout_id, location, temperature, condition, humidity, wind_speed, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO weather_logs (id, user_id, workout_id, location, temperature, condition, humidity, wind_speed, is_adverse, created_at, updated_at, deleted_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
                 [
                     logId,
                     userId,
@@ -277,7 +280,9 @@ export class SocialService {
                     weather.condition,
                     weather.humidity || null,
                     weather.windSpeed || null,
-                    Math.floor(Date.now() / 1000)
+                    weather.isActive ? 1 : 0,
+                    now,
+                    now,
                 ]
             );
             return logId;

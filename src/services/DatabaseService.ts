@@ -250,7 +250,6 @@ export class DatabaseService {
         is_system INTEGER DEFAULT 0,
         updated_at INTEGER DEFAULT 0,
         deleted_at INTEGER,
-        user_id TEXT,
         FOREIGN KEY (exercise_id) REFERENCES exercises (id) ON DELETE CASCADE,
         FOREIGN KEY (badge_id) REFERENCES badges (id) ON DELETE CASCADE
       );
@@ -363,6 +362,7 @@ export class DatabaseService {
         metadata TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
+                deleted_at INTEGER,
         reaction_count INTEGER DEFAULT 0 NOT NULL
       );
 
@@ -459,7 +459,7 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_user_prs_sync ON user_exercise_prs(user_id, updated_at, deleted_at);
       CREATE INDEX IF NOT EXISTS idx_friendships_sync ON friendships(user_id, updated_at, deleted_at);
       CREATE INDEX IF NOT EXISTS idx_weather_logs_sync ON weather_logs(user_id, created_at);
-      CREATE INDEX IF NOT EXISTS idx_changelogs_sync ON changelogs(updated_at, deleted_at);
+            CREATE INDEX IF NOT EXISTS idx_changelogs_sync ON changelogs(updated_at);
     `;
 
         await this.executeRaw(schema);
@@ -1226,6 +1226,17 @@ export class DatabaseService {
             }
         } catch (e) {
             logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 28 failed' });
+        }
+
+        // Migration 29: Align changelogs soft-delete column for legacy schemas
+        try {
+            const changelogInfo = await this.getAll<{ name: string }>("PRAGMA table_info('changelogs')");
+            const changelogCols = changelogInfo.map(c => c.name);
+            if (!changelogCols.includes('deleted_at')) {
+                await this.executeRaw('ALTER TABLE changelogs ADD COLUMN deleted_at INTEGER');
+            }
+        } catch (e) {
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 29 failed (changelogs.deleted_at)' });
         }
     }
 

@@ -69,6 +69,50 @@ function weekKeyFromSeconds(epochTimestamp: number): string {
     return `${y}-${m}-${day}`;
 }
 
+function weekStartSecondsFromWeekKey(weekKey: string | null | undefined): number | null {
+    if (!weekKey || typeof weekKey !== 'string') return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(weekKey.trim());
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+
+    const ms = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
+    if (!Number.isFinite(ms)) return null;
+    return Math.floor(ms / 1000);
+}
+
+function previousWeekKey(weekKey: string): string {
+    const startSeconds = weekStartSecondsFromWeekKey(weekKey);
+    if (!Number.isFinite(startSeconds)) return weekKey;
+    return weekKeyFromSeconds((startSeconds as number) - (7 * 86400));
+}
+
+export function calculateConsecutiveWeeklyStreakFromMap(
+    weeklyCompletions: Record<string, number>,
+    goalDays: number,
+    currentWeekKey: string,
+    maxLookbackWeeks: number = 52
+): number {
+    const normalizedGoalDays = Math.max(1, Math.floor(goalDays));
+    const lookback = Math.max(1, Math.floor(maxLookbackWeeks));
+    let cursor = previousWeekKey(currentWeekKey);
+    let streakWeeks = 0;
+
+    for (let i = 0; i < lookback; i++) {
+        const completed = Number(weeklyCompletions[cursor] || 0);
+        if (completed >= normalizedGoalDays) {
+            streakWeeks += 1;
+            cursor = previousWeekKey(cursor);
+            continue;
+        }
+        break;
+    }
+
+    return streakWeeks;
+}
+
 function parseTrainingDays(raw: string | null | undefined): number[] {
     if (!raw) return [1, 2, 3, 4, 5]; // Default workdays
     try {
@@ -178,6 +222,279 @@ function isStreakBrokenBetween(startTsMs: number, endTsMs: number, trainingDays:
     return false;
 }
 
+export function isCurrentStreakStillValid(lastActiveDateMs: number | null | undefined, trainingDays: number[], nowMs: number = Date.now()): boolean {
+    if (!Number.isFinite(lastActiveDateMs) || Number(lastActiveDateMs) <= 0) return false;
+    const lastActive = Number(lastActiveDateMs);
+    if (nowMs <= lastActive) return true;
+
+    const lastStart = new Date(lastActive);
+    const nowStart = new Date(nowMs);
+    const lastStartUtc = Date.UTC(lastStart.getUTCFullYear(), lastStart.getUTCMonth(), lastStart.getUTCDate());
+    const nowStartUtc = Date.UTC(nowStart.getUTCFullYear(), nowStart.getUTCMonth(), nowStart.getUTCDate());
+
+    if (nowStartUtc <= lastStartUtc) return true;
+    return !isStreakBrokenBetween(lastStartUtc, nowStartUtc, trainingDays);
+}
+
+export async function reconcileCurrentStreakForUser(
+    trx: ScoreExecutor,
+    userId: string,
+    nowMs: number = Date.now()
+): Promise<number> {
+    const [profile] = await trx
+        .select()
+        .from(schema.userProfiles)
+        .where(eq(schema.userProfiles.id, userId))
+        .limit(1);
+
+    if (!profile) return 0;
+
+    const trainingDays = await getWeeklyGoalDays(trx, userId);
+    const computedCurrentStreak = await calculateDailyStreak(trx, userId, trainingDays);
+    const previousCurrentStreak = Number(profile.currentStreak || 0);
+    const previousHighestStreak = Number(profile.highestStreak || 0);
+    const nextHighestStreak = Math.max(previousHighestStreak, computedCurrentStreak);
+    const hasChanged = previousCurrentStreak !== computedCurrentStreak || previousHighestStreak !== nextHighestStreak;
+
+    if (hasChanged) {
+        await trx
+            .update(schema.userProfiles)
+            .set({
+                currentStreak: computedCurrentStreak,
+                highestStreak: nextHighestStreak,
+                updatedAt: new Date(nowMs),
+            })
+            .where(eq(schema.userProfiles.id, userId));
+    }
+
+    return computedCurrentStreak;
+}
+
+export async function reconcileWeeklyStreakForUser(
+    trx: ScoreExecutor,
+    userId: string,
+    nowMs: number = Date.now(),
+    lookbackWeeks: number = 52
+): Promise<{ streakWeeks: number; streakMultiplier: number }> {
+    const [profile] = await trx
+        .select()
+        .from(schema.userProfiles)
+        .where(eq(schema.userProfiles.id, userId))
+        .limit(1);
+
+    if (!profile) return { streakWeeks: 0, streakMultiplier: 1 };
+
+    const cfg = await getOrCreateScoreConfig(trx).catch(() => DEFAULT_SCORE_CONFIG);
+    const trainingDays = await getWeeklyGoalDays(trx, userId);
+    const goalDays = Math.max(1, trainingDays.length);
+
+    const currentWeekStartSeconds = weekStartUtcSeconds(Math.floor(nowMs / 1000));
+    const currentWeekKey = weekKeyFromSeconds(currentWeekStartSeconds);
+    const evaluatedWeekStartSeconds = weekStartSecondsFromWeekKey(profile.streakWeekEvaluatedAt ?? null);
+    if (evaluatedWeekStartSeconds === currentWeekStartSeconds) {
+        const existingWeeks = Math.max(0, Number(profile.streakWeeks || 0));
+        const existingMultiplier = Number(profile.streakMultiplier || resolveStreakMultiplier(cfg, existingWeeks) || 1);
+        return { streakWeeks: existingWeeks, streakMultiplier: existingMultiplier };
+    }
+
+    const lookbackStartMs = (currentWeekStartSeconds - (Math.max(1, Math.floor(lookbackWeeks)) * 7 * 86400)) * 1000;
+    const [weeklyRows] = await Promise.all([
+        trx
+            .select({
+                weekKey: sql<string>`to_char(date_trunc('week', to_timestamp(${schema.workouts.date} / 1000.0) at time zone 'UTC'), 'YYYY-MM-DD')`,
+                completedDays: sql<number>`count(distinct date_trunc('day', to_timestamp(${schema.workouts.date} / 1000.0) at time zone 'UTC'))`.mapWith(Number),
+            })
+            .from(schema.workouts)
+            .where(and(
+                eq(schema.workouts.userId, userId),
+                eq(schema.workouts.status, 'completed'),
+                isNull(schema.workouts.deletedAt),
+                gte(schema.workouts.date, lookbackStartMs),
+                lte(schema.workouts.date, currentWeekStartSeconds * 1000)
+            ))
+            .groupBy(sql`date_trunc('week', to_timestamp(${schema.workouts.date} / 1000.0) at time zone 'UTC')`),
+    ]);
+
+    const weeklyMap = Object.fromEntries(weeklyRows.map((row) => [String(row.weekKey), Number(row.completedDays || 0)]));
+    const nextWeeks = calculateConsecutiveWeeklyStreakFromMap(weeklyMap, goalDays, currentWeekKey, lookbackWeeks);
+    const nextMultiplier = resolveStreakMultiplier(cfg, nextWeeks);
+
+    const previousWeeks = Math.max(0, Number(profile.streakWeeks || 0));
+    const previousMultiplier = Number(profile.streakMultiplier || 1);
+    if (previousWeeks !== nextWeeks || previousMultiplier !== nextMultiplier || profile.streakWeekEvaluatedAt !== currentWeekKey) {
+        await trx
+            .update(schema.userProfiles)
+            .set({
+                streakWeeks: nextWeeks,
+                streakMultiplier: nextMultiplier,
+                streakWeekEvaluatedAt: currentWeekKey,
+                updatedAt: new Date(nowMs),
+            })
+            .where(eq(schema.userProfiles.id, userId));
+    }
+
+    return { streakWeeks: nextWeeks, streakMultiplier: nextMultiplier };
+}
+
+export async function reconcileStreakStateForUser(
+    trx: ScoreExecutor,
+    userId: string,
+    nowMs: number = Date.now()
+): Promise<void> {
+    await reconcileCurrentStreakForUser(trx, userId, nowMs);
+    await reconcileWeeklyStreakForUser(trx, userId, nowMs);
+}
+
+export async function reconcileScoreLifetimeForUser(
+    trx: ScoreExecutor,
+    userId: string,
+    nowMs: number = Date.now()
+): Promise<number> {
+    const [profile] = await trx
+        .select()
+        .from(schema.userProfiles)
+        .where(eq(schema.userProfiles.id, userId))
+        .limit(1);
+
+    if (!profile) return 0;
+
+    const [sumRow] = await trx
+        .select({
+            total: sql<number>`coalesce(sum(${schema.scoreEvents.pointsAwarded}), 0)`.mapWith(Number),
+        })
+        .from(schema.scoreEvents)
+        .where(and(
+            eq(schema.scoreEvents.userId, userId),
+            isNull(schema.scoreEvents.deletedAt)
+        ));
+
+    const canonicalScore = Math.max(0, Number(sumRow?.total || 0));
+    const currentScore = Math.max(0, Number(profile.scoreLifetime || 0));
+
+    if (canonicalScore !== currentScore) {
+        await trx
+            .update(schema.userProfiles)
+            .set({
+                scoreLifetime: canonicalScore,
+                updatedAt: new Date(nowMs),
+            })
+            .where(eq(schema.userProfiles.id, userId));
+    }
+
+    return canonicalScore;
+}
+
+export type SocialIntegrityAuditResult = {
+    userId: string;
+    hasProfile: boolean;
+    scoreLifetimeStored: number;
+    scoreLifetimeCanonical: number;
+    scoreLifetimeDrift: number;
+    streakPossiblyStale: boolean;
+    streakWeekNeedsRecalc: boolean;
+};
+
+export type SocialIntegrityReconcileResult = SocialIntegrityAuditResult & {
+    changed: boolean;
+    changedFields: Array<'scoreLifetime' | 'currentStreak' | 'highestStreak' | 'streakWeeks' | 'streakMultiplier' | 'streakWeekEvaluatedAt'>;
+};
+
+export async function auditSocialIntegrityForUser(
+    trx: ScoreExecutor,
+    userId: string,
+    nowMs: number = Date.now()
+): Promise<SocialIntegrityAuditResult> {
+    const [profile] = await trx
+        .select()
+        .from(schema.userProfiles)
+        .where(eq(schema.userProfiles.id, userId))
+        .limit(1);
+
+    if (!profile) {
+        return {
+            userId,
+            hasProfile: false,
+            scoreLifetimeStored: 0,
+            scoreLifetimeCanonical: 0,
+            scoreLifetimeDrift: 0,
+            streakPossiblyStale: false,
+            streakWeekNeedsRecalc: false,
+        };
+    }
+
+    const [sumRow] = await trx
+        .select({
+            total: sql<number>`coalesce(sum(${schema.scoreEvents.pointsAwarded}), 0)`.mapWith(Number),
+        })
+        .from(schema.scoreEvents)
+        .where(and(
+            eq(schema.scoreEvents.userId, userId),
+            isNull(schema.scoreEvents.deletedAt)
+        ));
+
+    const trainingDays = await getWeeklyGoalDays(trx, userId);
+    const storedScore = Math.max(0, Number(profile.scoreLifetime || 0));
+    const canonicalScore = Math.max(0, Number(sumRow?.total || 0));
+    const currentWeekKey = weekKeyFromSeconds(Math.floor(nowMs / 1000));
+    const lastActiveDate = Number(profile.lastActiveDate || 0);
+    const streakPossiblyStale = Number(profile.currentStreak || 0) > 0 && !isCurrentStreakStillValid(lastActiveDate > 0 ? lastActiveDate : null, trainingDays, nowMs);
+
+    return {
+        userId,
+        hasProfile: true,
+        scoreLifetimeStored: storedScore,
+        scoreLifetimeCanonical: canonicalScore,
+        scoreLifetimeDrift: canonicalScore - storedScore,
+        streakPossiblyStale,
+        streakWeekNeedsRecalc: (profile.streakWeekEvaluatedAt || null) !== currentWeekKey,
+    };
+}
+
+export async function auditAndReconcileSocialIntegrityForUser(
+    trx: ScoreExecutor,
+    userId: string,
+    nowMs: number = Date.now()
+): Promise<SocialIntegrityReconcileResult> {
+    const before = await auditSocialIntegrityForUser(trx, userId, nowMs);
+    if (!before.hasProfile) {
+        return {
+            ...before,
+            changed: false,
+            changedFields: [],
+        };
+    }
+
+    const [beforeProfile] = await trx
+        .select()
+        .from(schema.userProfiles)
+        .where(eq(schema.userProfiles.id, userId))
+        .limit(1);
+
+    await reconcileStreakStateForUser(trx, userId, nowMs);
+    await reconcileScoreLifetimeForUser(trx, userId, nowMs);
+
+    const after = await auditSocialIntegrityForUser(trx, userId, nowMs);
+    const [afterProfile] = await trx
+        .select()
+        .from(schema.userProfiles)
+        .where(eq(schema.userProfiles.id, userId))
+        .limit(1);
+
+    const changedFields: SocialIntegrityReconcileResult['changedFields'] = [];
+    if ((beforeProfile?.scoreLifetime || 0) !== (afterProfile?.scoreLifetime || 0)) changedFields.push('scoreLifetime');
+    if ((beforeProfile?.currentStreak || 0) !== (afterProfile?.currentStreak || 0)) changedFields.push('currentStreak');
+    if ((beforeProfile?.highestStreak || 0) !== (afterProfile?.highestStreak || 0)) changedFields.push('highestStreak');
+    if ((beforeProfile?.streakWeeks || 0) !== (afterProfile?.streakWeeks || 0)) changedFields.push('streakWeeks');
+    if ((beforeProfile?.streakMultiplier || 1) !== (afterProfile?.streakMultiplier || 1)) changedFields.push('streakMultiplier');
+    if ((beforeProfile?.streakWeekEvaluatedAt || null) !== (afterProfile?.streakWeekEvaluatedAt || null)) changedFields.push('streakWeekEvaluatedAt');
+
+    return {
+        ...after,
+        changed: changedFields.length > 0,
+        changedFields,
+    };
+}
+
 async function getActiveGlobalMultiplier(trx: ScoreExecutor, now: Date): Promise<number> {
     const [row] = await trx
         .select({ multiplier: schema.globalEvents.multiplier })
@@ -211,13 +528,13 @@ export async function isAdverseWeather(
     coldThresholdC: number,
     heatThresholdC: number,
     workoutId?: string
-): Promise<{ adverse: boolean; reason: string | null; tempC: number | null; windSpeed: number | null; humidity: number | null; logId: string | null }> {
+): Promise<{ adverse: boolean; reason: string | null; tempC: number | null; windSpeed: number | null; humidity: number | null; logId: string | null; checkedAtMs: number | null }> {
     // 1. Check for recent weather logs to avoid API calls and implement grace period
     const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000);
     const [recentLog] = await trx
         .select()
         .from(schema.weatherLogs)
-        .where(and(eq(schema.weatherLogs.userId, userId), gte(schema.weatherLogs.createdAt, twentyMinutesAgo)))
+        .where(and(eq(schema.weatherLogs.userId, userId), gte(schema.weatherLogs.createdAt, twentyMinutesAgo), isNull(schema.weatherLogs.deletedAt)))
         .orderBy(desc(schema.weatherLogs.createdAt))
         .limit(1);
 
@@ -229,12 +546,13 @@ export async function isAdverseWeather(
             windSpeed: recentLog.windSpeed,
             humidity: recentLog.humidity,
             logId: recentLog.id,
+            checkedAtMs: recentLog.createdAt ? recentLog.createdAt.getTime() : Date.now(),
         };
     }
 
     // 2. No recent log found, call OpenWeather API
     const apiKey = process.env.OPENWEATHER_API_KEY;
-    if (!apiKey) return { adverse: false, reason: null, tempC: null, windSpeed: null, humidity: null, logId: null };
+    if (!apiKey) return { adverse: false, reason: null, tempC: null, windSpeed: null, humidity: null, logId: null, checkedAtMs: null };
 
     try {
         const params = new URLSearchParams({
@@ -244,7 +562,7 @@ export async function isAdverseWeather(
             units: 'metric',
         });
         const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?${params.toString()}`, { cache: 'no-store' });
-        if (!res.ok) return { adverse: false, reason: null, tempC: null, windSpeed: null, humidity: null, logId: null };
+        if (!res.ok) return { adverse: false, reason: null, tempC: null, windSpeed: null, humidity: null, logId: null, checkedAtMs: null };
         const data = (await res.json()) as OpenWeatherResponse;
         const weatherMain = String(data?.weather?.[0]?.main || '').toLowerCase();
         const tempC = Number(data?.main?.temp);
@@ -278,7 +596,8 @@ export async function isAdverseWeather(
             tempC: Number.isFinite(tempC) ? tempC : null,
             windSpeed: Number.isFinite(windSpeed) ? windSpeed : null,
             humidity: Number.isFinite(humidity) ? humidity : null,
-            logId
+            logId,
+            checkedAtMs: Date.now(),
         };
 
         // 3. Log the check to the database
@@ -305,7 +624,7 @@ export async function isAdverseWeather(
         return result;
     } catch (e) {
         logger.error('[Scoring] Weather API error', { error: e instanceof Error ? e.message : String(e), userId });
-        return { adverse: false, reason: null, tempC: null, windSpeed: null, humidity: null, logId: null };
+        return { adverse: false, reason: null, tempC: null, windSpeed: null, humidity: null, logId: null, checkedAtMs: null };
     }
 }
 
@@ -785,6 +1104,8 @@ export async function buildLeaderboard(userId: string) {
     const friendIds = records.map((r) => r.userId === userId ? r.friendId : r.userId);
     const userIds = [...new Set([userId, ...friendIds])];
     if (userIds.length === 0) return [];
+
+    await Promise.all(userIds.map((id) => reconcileStreakStateForUser(db, id).catch(() => undefined)));
 
     const [profiles, monthScores, weekScores, workoutsLife, workoutsMonth, workoutsWeek] = await Promise.all([
         db.select().from(schema.userProfiles).where(inArray(schema.userProfiles.id, userIds)),

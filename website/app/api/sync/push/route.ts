@@ -7,7 +7,8 @@ import { verifyAuth } from '../../../../src/lib/auth';
 import { recordEndpointMetric } from '../../../../src/lib/endpoint-metrics';
 import { logger } from '../../../../src/lib/logger';
 import { RATE_LIMITS } from '../../../../src/lib/rate-limit';
-import { applyWorkoutScoring, revertWorkoutScoring } from '../../../../src/lib/social-scoring';
+import { applyWorkoutScoring, reconcileScoreLifetimeForUser, revertWorkoutScoring } from '../../../../src/lib/social-scoring';
+import { coalescePushOperations } from '../../../../src/lib/sync-push-coalesce';
 import { collectIncomingRecordIdsByTable, shouldDeferWorkoutSetUpsert, type PushOperation } from '../../../../src/lib/sync-push-defer';
 import { isClientSyncReadOnlyTable } from '../../../../src/lib/sync/sync-write-policy';
 import { SyncMapper } from '../../../../src/lib/sync/SyncMapper';
@@ -143,7 +144,16 @@ export async function POST(req: NextRequest) {
             })
             .filter((op): op is PushOperation => op !== null);
 
-        const incomingIdsByTable = collectIncomingRecordIdsByTable(normalizedIncomingOps);
+        const coalescedIncomingOps = coalescePushOperations(normalizedIncomingOps);
+        const operationsToProcess: IncomingPushOperation[] = coalescedIncomingOps.map((op) => ({
+            id: op.id,
+            table: op.table,
+            operation: op.operation,
+            recordId: op.recordId,
+            payload: op.payload,
+        }));
+
+        const incomingIdsByTable = collectIncomingRecordIdsByTable(coalescedIncomingOps);
         const incomingWorkouts = incomingIdsByTable.get('workouts') ?? new Set<string>();
         const deferredOps: IncomingPushOperation[] = [];
 
@@ -292,7 +302,7 @@ export async function POST(req: NextRequest) {
             };
 
             const results: Array<{ id: string; status: string; reason?: string }> = [];
-            for (const op of operations) {
+            for (const op of operationsToProcess) {
                 const res = await processOp(op);
                 if (res) results.push(res);
             }
@@ -314,6 +324,8 @@ export async function POST(req: NextRequest) {
                     })
                     .where(eq(schema.userProfiles.id, userId));
             }
+
+            await reconcileScoreLifetimeForUser(tx, userId);
 
             return results;
         });

@@ -98,6 +98,62 @@ El feed:
    - `GITHUB_RELEASES_REPO`
    - `GITHUB_RELEASES_TOKEN` (opcional)
 
+## Social Integrity Ops (scoring/streak/weather)
+
+Endpoints nuevos para auditoría y auto-reconciliación de integridad social:
+- Admin (audit/reconcile manual): `/api/admin/social-integrity`
+- Cron (reconcile programada): `/api/cron/social-integrity`
+
+### Variables de entorno requeridas
+- `ADMIN_USER_IDS` (ya existente): usuarios habilitados para endpoints admin.
+- `ADMIN_EDITOR_USER_IDS` / `ADMIN_MODERATOR_USER_IDS` / `ADMIN_SUPER_USER_IDS`: control de rol admin.
+- `SOCIAL_INTEGRITY_CRON_SECRET`: secreto compartido para el endpoint cron.
+
+### 1) Auditoría manual (solo lectura)
+Requiere sesión admin web válida (cookie de sesión) y usuario en lista admin.
+
+Ejemplo:
+- `curl "https://irontrain.motiona.xyz/api/admin/social-integrity?limit=200" -H "Cookie: <SESSION_COOKIE>"`
+
+Opcional (subset de usuarios):
+- `curl "https://irontrain.motiona.xyz/api/admin/social-integrity?users=userA,userB,userC&limit=50" -H "Cookie: <SESSION_COOKIE>"`
+
+### 2) Reconciliación manual (con escritura)
+`POST` con `reconcile=true` (si no, devuelve 400).
+
+Ejemplo:
+- `curl -X POST "https://irontrain.motiona.xyz/api/admin/social-integrity" -H "Content-Type: application/json" -H "Cookie: <SESSION_COOKIE>" --data "{\"reconcile\":true,\"limit\":200}"`
+
+Subset de usuarios:
+- `curl -X POST "https://irontrain.motiona.xyz/api/admin/social-integrity" -H "Content-Type: application/json" -H "Cookie: <SESSION_COOKIE>" --data "{\"reconcile\":true,\"userIds\":[\"userA\",\"userB\"]}"`
+
+### 3) Reconciliación programada (cron-like)
+Endpoint protegido por header `x-cron-secret`.
+
+Ejemplo:
+- `curl "https://irontrain.motiona.xyz/api/cron/social-integrity?limit=200" -H "x-cron-secret: $SOCIAL_INTEGRITY_CRON_SECRET"`
+
+Para Vercel Cron, el endpoint también acepta `Authorization: Bearer <secret>`.
+
+### 4) Vercel Cron (automático)
+En `website/vercel.json` quedó configurado:
+- path: `/api/cron/social-integrity?limit=200`
+- schedule: `*/30 * * * *` (cada 30 minutos)
+
+Configurar en Vercel:
+- `CRON_SECRET` (o `SOCIAL_INTEGRITY_CRON_SECRET`) con el mismo valor del scheduler.
+- Proyecto apuntando a `Root Directory = website`.
+
+### Cadencia recomendada
+- Producción: cada `15–30 min` con `limit=200` (ajustar según volumen).
+- Pico de tráfico o backlog: cada `10–15 min` temporalmente.
+- Mantenimiento puntual (post-incidente): ejecutar una pasada manual con `limit` alto y/o por `userIds` focalizados.
+
+### Guardrails operativos
+- Mantener `limit` entre `100` y `400` para evitar picos de carga innecesarios.
+- Monitorear `scoreDriftUsers`, `staleStreakUsers`, `weekRecalcUsers` y `reconciledUsers` en la respuesta.
+- Si hay drift recurrente alto, revisar primero `/api/sync/push` y colas de sincronización antes de subir frecuencia del cron.
+
 ## Vendor / Branding
 - Empresa desarrolladora: MotionA
 - Sitio oficial: https://motiona.xyz

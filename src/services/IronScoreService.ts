@@ -294,8 +294,7 @@ export class IronScoreService {
             }
 
             const cfg = prof?.scoreConfig ?? this.getScoreConfig();
-            const cachedWeather = configService.get('cachedSocialWeatherBonus') as WeatherInfo | null;
-            const shouldTryWeather = cfg.weatherBonusEnabled !== 0 && (!cachedWeather || cachedWeather.isActive !== true);
+            const shouldTryWeather = cfg.weatherBonusEnabled !== 0;
             if (shouldTryWeather) {
                 try {
                     const workout = await dbService.getWorkoutById(workoutId);
@@ -306,6 +305,7 @@ export class IronScoreService {
                         await configService.set('cachedSocialWeatherBonus', weather ?? null);
                     }
                 } catch {
+                    await configService.set('cachedSocialWeatherBonus', null);
                 }
             }
         } catch {
@@ -476,6 +476,10 @@ export class IronScoreService {
         if (cfg.weatherBonusEnabled === 0) return null;
         const w = configService.get('cachedSocialWeatherBonus') as WeatherInfo | null;
         if (!w || w.isActive !== true) return null;
+        const now = Date.now();
+        if (!Number.isFinite(w.checkedAtMs) || !Number.isFinite(w.expiresAtMs)) return null;
+        if (Number(w.checkedAtMs) > now) return null;
+        if (Number(w.expiresAtMs) <= now) return null;
         if (!(typeof cfg.adverseWeatherPoints === 'number' && Number.isFinite(cfg.adverseWeatherPoints) && cfg.adverseWeatherPoints > 0)) return null;
         return {
             event_type: 'weather_bonus',
