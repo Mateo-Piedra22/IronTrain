@@ -3,13 +3,17 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
-import { getAuthenticatedAdmin, getRedirectPath } from './shared';
+import { getRedirectPath, requireAdminAction, writeAdminAuditLog } from './shared';
 
 export async function handleScoringConfigAction(formData: FormData) {
     let redirectPath = '';
+    let adminUserId: string | null = null;
+    let adminRole: 'viewer' | 'editor' | 'moderator' | 'superadmin' = 'viewer';
     try {
-        const adminId = await getAuthenticatedAdmin();
-        if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
+        const admin = await requireAdminAction({ action: 'admin.system.scoring-config', requiredRole: 'superadmin' });
+        const adminId = admin.userId;
+        adminUserId = admin.userId;
+        adminRole = admin.role;
 
         const toInt = (name: string, fallback: number) => {
             const value = Number(formData.get(name));
@@ -56,10 +60,26 @@ export async function handleScoringConfigAction(formData: FormData) {
         revalidatePath('/admin');
         revalidatePath('/feed');
         redirectPath = await getRedirectPath(formData, 'social');
+
+        await writeAdminAuditLog({
+            adminUserId: admin.userId,
+            adminRole: admin.role,
+            action: 'admin.system.scoring-config',
+            status: 'success',
+        });
     } catch (error: any) {
         console.error('Scoring Config Action Error:', error);
         revalidatePath('/admin');
         redirectPath = '/admin?tab=social&section=config&error=config_failed';
+        if (adminUserId) {
+            await writeAdminAuditLog({
+                adminUserId,
+                adminRole,
+                action: 'admin.system.scoring-config',
+                status: 'error',
+                message: error?.message || 'unknown_error',
+            });
+        }
     }
     if (redirectPath) redirect(redirectPath);
 }

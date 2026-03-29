@@ -3,28 +3,14 @@ import { applyUserReactions } from './feed';
 import type { BroadcastItem } from './types';
 
 describe('applyUserReactions', () => {
-    test('sets userReacted for announcement + changelog, leaves others unchanged', () => {
+    test('sets userReacted for changelog, leaves others unchanged', () => {
         const items: BroadcastItem[] = [
-            {
-                id: 'n1',
-                kind: 'announcement',
-                uiType: 'toast',
-                title: 't',
-                body: 'b',
-                priority: 10,
-                displayMode: 'once',
-                actionUrl: null,
-                targeting: { platform: null, version: null, segment: null },
-                lifecycle: { startsAt: null, endsAt: null, isActive: true },
-                engagement: { reactionCount: 1, userReacted: null },
-                createdAt: new Date('2026-01-01T00:00:00Z'),
-            },
             {
                 id: 'c1',
                 kind: 'changelog',
                 uiType: null,
-                title: 'v',
-                body: 'x',
+                title: 'v1.0.0',
+                body: 'Changes',
                 priority: 10,
                 displayMode: null,
                 actionUrl: null,
@@ -50,12 +36,10 @@ describe('applyUserReactions', () => {
         ];
 
         const out = applyUserReactions(items, {
-            reactedAnnouncementIds: new Set(['n1']),
-            reactedChangelogIds: new Set([]),
+            reactedChangelogIds: new Set(['c1']),
         });
 
         expect(out[0].engagement.userReacted).toBe(true);
-        expect(out[1].engagement.userReacted).toBe(false);
-        expect(out[2].engagement.userReacted).toBe(null);
+        expect(out[1].engagement.userReacted).toBe(null);
     });
 });

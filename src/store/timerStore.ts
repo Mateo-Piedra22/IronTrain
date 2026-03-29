@@ -61,7 +61,14 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     }),
     tick: () => {
         const { isRunning, endAtMs } = get();
-        if (!isRunning || !endAtMs) return;
+        if (!isRunning) {
+            return;
+        }
+        if (!endAtMs) {
+            console.error('[TimerStore] Inconsistent state: timer is running but endAtMs is null/undefined. Stopping timer.');
+            get().stopTimer();
+            return;
+        }
         const now = Date.now();
         const left = Math.max(0, Math.ceil((endAtMs - now) / 1000));
         if (left <= 0) {
@@ -69,10 +76,9 @@ export const useTimerStore = create<TimerState>((set, get) => ({
             if (prefs.sounds.restTimer) {
                 feedbackService.restTimerExpired();
             } else {
-                // Still provide haptic even if sound for rest timer is off
                 feedbackService.timerComplete();
             }
-            set({ timeLeft: 0, isRunning: false, endAtMs: null });
+            get().stopTimer();
         } else {
             set({ timeLeft: left });
         }
@@ -90,3 +96,20 @@ export const useTimerStore = create<TimerState>((set, get) => ({
         return { timeLeft: state.timeLeft + s };
     }),
 }));
+
+// Internal interval management for the store
+let _timerInterval: any = null;
+useTimerStore.subscribe(
+    (state) => {
+        const isRunning = state.isRunning;
+        if (isRunning && !_timerInterval) {
+            _timerInterval = setInterval(() => {
+                useTimerStore.getState().tick();
+            }, 1000);
+        } else if (!isRunning && _timerInterval) {
+            clearInterval(_timerInterval);
+            _timerInterval = null;
+        }
+    }
+);
+

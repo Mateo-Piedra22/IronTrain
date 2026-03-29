@@ -92,6 +92,23 @@ export class AppNotificationService {
         }
     }
 
+    static async unregisterPushToken(): Promise<void> {
+        const { user, token } = useAuthStore.getState();
+        if (!user?.id) return;
+
+        try {
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            await fetch(`${BACKEND_URL}/api/notifications/register-token`, {
+                method: 'DELETE',
+                headers,
+            });
+        } catch (e) {
+            logger.captureException(e, { scope: 'AppNotificationService.unregisterPushToken' });
+        }
+    }
+
     static async toggleReaction(notificationId: string): Promise<'added' | 'removed' | 'error'> {
         const { token } = useAuthStore.getState();
         if (!token) return 'error';

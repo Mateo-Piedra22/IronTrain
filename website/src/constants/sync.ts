@@ -22,4 +22,5 @@ export const SYNC_TABLES: ReadonlyArray<string> = [
     'score_events',
     'user_exercise_prs',
     'friendships',
+    'notification_reactions',
 ];

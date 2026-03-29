@@ -1,7 +1,8 @@
 import { db } from '../db';
 import { logger } from './logger';
 
-type TransactionRunner = <T>(fn: (trx: any) => Promise<T>) => Promise<T>;
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type DbTransactionClient = typeof db | DbTransaction;
 let transactionSupportCache: boolean | null = null;
 let transactionSupportCheckedAt = 0;
 let lastTransactionBootstrapErrorMessage: string | null = null;
@@ -34,7 +35,7 @@ async function detectTransactionSupport(): Promise<boolean> {
     try {
         // Attempt to run a dummy transaction to check for support
         // We use db.transaction directly to ensure 'this' context
-        await db.transaction(async (trx: any) => {
+        await db.transaction(async () => {
             // Lightest possible operation: no-op is often enough to verify method contract
         });
         transactionSupportCache = true;
@@ -75,7 +76,7 @@ export async function getDbTransactionDiagnostics() {
     };
 }
 
-export async function runDbTransaction<T>(fn: (trx: any) => Promise<T>): Promise<T> {
+export async function runDbTransaction<T>(fn: (trx: DbTransactionClient) => Promise<T>): Promise<T> {
     const hasTransactionMethod = typeof db.transaction === 'function';
     if (!hasTransactionMethod) {
         rememberBootstrapError(new Error('Database transaction method unavailable'));

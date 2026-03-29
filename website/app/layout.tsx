@@ -99,7 +99,7 @@ export default async function RootLayout({
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
             </head>
-            <body className="min-h-screen antialiased bg-[#fff7f1]" data-brand="irontrain">
+            <body className="min-h-screen antialiased bg-iron-50" data-brand="irontrain">
                 <PHProvider userId={user?.id} userEmail={user?.email}>
                     {/* @ts-ignore */}
                     <NeonAuthUIProvider authClient={authClient as any} initialSession={sessionData} redirectTo="/auth/bridge" emailOTP>

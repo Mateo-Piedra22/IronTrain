@@ -4,16 +4,19 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
-import { getAuthenticatedAdmin, getRedirectPath } from './shared';
+import { getRedirectPath, requireAdminAction, writeAdminAuditLog } from './shared';
 
 export async function handleRoutineAction(formData: FormData) {
     let redirectPath = '';
+    let adminUserId: string | null = null;
+    let adminRole: 'viewer' | 'editor' | 'moderator' | 'superadmin' = 'viewer';
+    const id = String(formData.get('id') || '').trim() || null;
+    const intent = String(formData.get('intent') || '').trim();
     try {
-        const adminId = await getAuthenticatedAdmin();
-        if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
+        const admin = await requireAdminAction({ action: 'admin.moderation.routine', requiredRole: 'moderator' });
+        adminUserId = admin.userId;
+        adminRole = admin.role;
 
-        const id = String(formData.get('id') || '').trim();
-        const intent = String(formData.get('intent') || '').trim();
         const currentModerated = formData.get('currentModerated') === '1';
         const message = String(formData.get('message') || '').trim();
 
@@ -44,10 +47,32 @@ export async function handleRoutineAction(formData: FormData) {
         revalidatePath('/admin');
         revalidatePath('/feed');
         redirectPath = await getRedirectPath(formData, 'social');
+
+        await writeAdminAuditLog({
+            adminUserId: admin.userId,
+            adminRole: admin.role,
+            action: 'admin.moderation.routine',
+            status: 'success',
+            targetType: 'routine',
+            targetId: id,
+            metadata: { intent },
+        });
     } catch (error: any) {
         console.error('Routine Moderation Action Error:', error);
         revalidatePath('/admin');
         redirectPath = '/admin?tab=social&section=moderation&error=routine_failed';
+        if (adminUserId) {
+            await writeAdminAuditLog({
+                adminUserId,
+                adminRole,
+                action: 'admin.moderation.routine',
+                status: 'error',
+                message: error?.message || 'unknown_error',
+                targetType: 'routine',
+                targetId: id,
+                metadata: { intent },
+            });
+        }
     }
     if (redirectPath) redirect(redirectPath);
 }

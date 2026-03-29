@@ -46,7 +46,12 @@ export const exercises = pgTable('exercises', {
     isSystem: integer('is_system').default(0),
     originId: text('origin_id'), // Para deduping social P2P
     ...commonFields,
-});
+}, (table) => ({
+    userUpdatedIdx: index('exercises_user_updated_idx').on(table.userId, table.updatedAt),
+    userNameIdx: index('exercises_user_name_idx').on(table.userId, table.name),
+    userOriginIdx: index('exercises_user_origin_idx').on(table.userId, table.originId),
+    systemNameIdx: index('exercises_system_name_idx').on(table.isSystem, table.name),
+}));
 
 export const workouts = pgTable('workouts', {
     id: text('id').primaryKey(),
@@ -61,7 +66,12 @@ export const workouts = pgTable('workouts', {
     duration: bigint('duration', { mode: 'number' }),
     isTemplate: integer('is_template').default(0),
     ...commonFields,
-});
+}, (table) => ({
+    userUpdatedIdx: index('workouts_user_updated_idx').on(table.userId, table.updatedAt),
+    dateIdx: index('workouts_date_idx').on(table.date),
+    userStatusDateIdx: index('workouts_user_status_date_idx').on(table.userId, table.status, table.date),
+    userStatusDeletedIdx: index('workouts_user_status_deleted_idx').on(table.userId, table.status, table.deletedAt),
+}));
 
 export const workoutSets = pgTable('workout_sets', {
     id: text('id').primaryKey(),
@@ -78,7 +88,11 @@ export const workoutSets = pgTable('workout_sets', {
     notes: text('notes'),
     supersetId: text('superset_id'),
     ...commonFields,
-});
+}, (table) => ({
+    workoutIdx: index('workout_sets_workout_idx').on(table.workoutId),
+    exerciseIdx: index('workout_sets_exercise_idx').on(table.exerciseId),
+    userUpdatedIdx: index('workout_sets_user_updated_idx').on(table.userId, table.updatedAt),
+}));
 
 export const routines = pgTable('routines', {
     id: text('id').primaryKey(),
@@ -88,7 +102,10 @@ export const routines = pgTable('routines', {
     isModerated: boolean('is_moderated').default(false), // Moderación de administración
     moderationMessage: text('moderation_message'), // Mensaje para el usuario si se modera
     ...commonFields,
-});
+}, (table) => ({
+    userUpdatedIdx: index('routines_user_updated_idx').on(table.userId, table.updatedAt),
+    userPublicIdx: index('routines_user_public_idx').on(table.userId, table.isPublic),
+}));
 
 export const routineDays = pgTable('routine_days', {
     id: text('id').primaryKey(),
@@ -96,7 +113,10 @@ export const routineDays = pgTable('routine_days', {
     name: text('name').notNull(),
     orderIndex: integer('order_index').notNull(),
     ...commonFields,
-});
+}, (table) => ({
+    routineOrderIdx: index('routine_days_routine_order_idx').on(table.routineId, table.orderIndex),
+    routineDeletedIdx: index('routine_days_routine_deleted_idx').on(table.routineId, table.deletedAt),
+}));
 
 export const routineExercises = pgTable('routine_exercises', {
     id: text('id').primaryKey(),
@@ -105,7 +125,10 @@ export const routineExercises = pgTable('routine_exercises', {
     orderIndex: integer('order_index').notNull(),
     notes: text('notes'),
     ...commonFields,
-});
+}, (table) => ({
+    dayOrderIdx: index('routine_exercises_day_order_idx').on(table.routineDayId, table.orderIndex),
+    dayDeletedIdx: index('routine_exercises_day_deleted_idx').on(table.routineDayId, table.deletedAt),
+}));
 
 export const measurements = pgTable('measurements', {
     id: text('id').primaryKey(),
@@ -149,6 +172,7 @@ export const plateInventory = pgTable('plate_inventory', {
     color: text('color'),
     userId: text('user_id').notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
 });
 
 export const settings = pgTable('settings', {
@@ -157,7 +181,11 @@ export const settings = pgTable('settings', {
     description: text('description'),
     userId: text('user_id').notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+    deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+    userKeyIdx: index('settings_user_key_idx').on(table.userId, table.key),
+    userUpdatedIdx: index('settings_user_updated_idx').on(table.userId, table.updatedAt),
+}));
 
 export const wipeAudit = pgTable('wipe_audit', {
     id: text('id').primaryKey(),
@@ -176,6 +204,22 @@ export const syncRateLimits = pgTable('sync_rate_limits', {
     windowStartAt: timestamp('window_start_at').defaultNow().notNull(),
     count: integer('count').default(0).notNull(),
 });
+
+export const adminAuditLogs = pgTable('admin_audit_logs', {
+    id: text('id').primaryKey(),
+    adminUserId: text('admin_user_id').notNull(),
+    adminRole: text('admin_role').notNull(),
+    action: text('action').notNull(),
+    targetType: text('target_type'),
+    targetId: text('target_id'),
+    status: text('status').notNull(),
+    message: text('message'),
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+    adminCreatedIdx: index('admin_audit_logs_admin_created_idx').on(table.adminUserId, table.createdAt),
+    actionCreatedIdx: index('admin_audit_logs_action_created_idx').on(table.action, table.createdAt),
+}));
 
 export const authCodes = pgTable('auth_codes', {
     code: text('code').primaryKey(),
@@ -201,8 +245,13 @@ export const userProfiles = pgTable('user_profiles', {
     pushToken: text('push_token'), // For FCM
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
     lastUsernameChangeAt: timestamp('last_username_change_at'),
-});
+}, (table) => ({
+    userNameIdx: index('profile_username_idx').on(table.username),
+    publicIdx: index('profile_public_idx').on(table.isPublic),
+    activeDateIdx: index('profile_active_date_idx').on(table.lastActiveDate),
+}));
 
 export const friendships = pgTable('friendships', {
     id: text('id').primaryKey(),
@@ -211,7 +260,12 @@ export const friendships = pgTable('friendships', {
     status: text('status').notNull().default('pending'), // 'pending', 'accepted', 'blocked'
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
-});
+}, (table) => ({
+    usersIdx: index('friendships_users_idx').on(table.userId, table.friendId),
+    statusIdx: index('friendships_status_idx').on(table.status),
+    userStatusDeletedIdx: index('friendships_user_status_deleted_idx').on(table.userId, table.status, table.deletedAt),
+    friendStatusDeletedIdx: index('friendships_friend_status_deleted_idx').on(table.friendId, table.status, table.deletedAt),
+}));
 
 export const sharesInbox = pgTable('shares_inbox', {
     id: text('id').primaryKey(),
@@ -223,7 +277,11 @@ export const sharesInbox = pgTable('shares_inbox', {
     seenAt: timestamp('seen_at'),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
-});
+}, (table) => ({
+    receiverUpdatedIdx: index('shares_inbox_receiver_updated_idx').on(table.receiverId, table.updatedAt),
+    receiverDeletedUpdatedIdx: index('shares_inbox_receiver_deleted_updated_idx').on(table.receiverId, table.deletedAt, table.updatedAt),
+    senderUpdatedIdx: index('shares_inbox_sender_updated_idx').on(table.senderId, table.updatedAt),
+}));
 
 export const activityFeed = pgTable('activity_feed', {
     id: text('id').primaryKey(),
@@ -236,7 +294,11 @@ export const activityFeed = pgTable('activity_feed', {
     deletedAt: timestamp('deleted_at'),
     seenAt: timestamp('seen_at'), // Backwards compatibility for personal-only views
     kudoCount: integer('kudo_count').default(0).notNull(),
-});
+}, (table) => ({
+    userTimeIdx: index('feed_user_time_idx').on(table.userId, table.createdAt),
+    actionIdx: index('feed_action_idx').on(table.actionType),
+    userDeletedCreatedIdx: index('feed_user_deleted_created_idx').on(table.userId, table.deletedAt, table.createdAt),
+}));
 
 export const kudos = pgTable('kudos', {
     id: text('id').primaryKey(),
@@ -245,7 +307,12 @@ export const kudos = pgTable('kudos', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
-});
+}, (table) => ({
+    feedIdx: index('kudos_feed_idx').on(table.feedId),
+    giverIdx: index('kudos_giver_idx').on(table.giverId),
+    feedDeletedGiverIdx: index('kudos_feed_deleted_giver_idx').on(table.feedId, table.deletedAt, table.giverId),
+}));
+
 
 // --- ADMIN & METRICS ---
 // --- CHANGELOG SYSTEM ---
@@ -258,6 +325,7 @@ export const changelogs = pgTable('changelogs', {
     metadata: jsonb('metadata'), // JSON: icon, bannerImage, etc.
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
     reactionCount: integer('reaction_count').default(0).notNull(),
 });
 
@@ -269,7 +337,10 @@ export const changelogReactions = pgTable('changelog_reactions', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
-});
+}, (table) => ({
+    changelogDeletedIdx: index('changelog_reactions_changelog_deleted_idx').on(table.changelogId, table.deletedAt),
+    userChangelogDeletedIdx: index('changelog_reactions_user_changelog_deleted_idx').on(table.userId, table.changelogId, table.deletedAt),
+}));
 
 export const socialScoringConfig = pgTable('social_scoring_config', {
     id: text('id').primaryKey(),
@@ -311,6 +382,8 @@ export const userExercisePrs = pgTable('user_exercise_prs', {
     exerciseId: text('exercise_id').notNull(),
     exerciseName: text('exercise_name').notNull(),
     best1RmKg: real('best_1rm_kg').notNull(),
+    workoutSetId: text('workout_set_id'), // Reference to the set that achieved this PR
+    achievedAt: timestamp('achieved_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
@@ -331,22 +404,53 @@ export const scoreEvents = pgTable('score_events', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
-});
+}, (table) => ({
+    userTimeIdx: index('score_user_time_idx').on(table.userId, table.createdAt),
+    typeIdx: index('score_type_idx').on(table.eventType),
+    userDeletedCreatedIdx: index('score_user_deleted_created_idx').on(table.userId, table.deletedAt, table.createdAt),
+    userWorkoutIdx: index('score_user_workout_idx').on(table.userId, table.workoutId),
+}));
 
 export const weatherLogs = pgTable('weather_logs', {
     id: text('id').primaryKey(),
     userId: text('user_id').notNull(),
-    lat: real('lat').notNull(),
-    lon: real('lon').notNull(),
+    workoutId: text('workout_id'),
+    location: text('location'),
+    lat: real('lat'),
+    lon: real('lon'),
     condition: text('condition'),
-    tempC: real('temp_c'),
+    temperature: real('temperature'),
+    tempC: real('temp_c'), // Legacy compatibility
     windSpeed: real('wind_speed'),
     humidity: integer('humidity'),
     isAdverse: boolean('is_adverse').default(false),
     createdAt: timestamp('created_at').defaultNow().notNull(),
-    workoutId: text('workout_id'),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
 }, (table) => ({
     userTimeIdx: index('weather_user_time_idx').on(table.userId, table.createdAt),
+}));
+
+export const notificationReactions = pgTable('notification_reactions', {
+    id: text('id').primaryKey(),
+    notificationId: text('notification_id').notNull(),
+    userId: text('user_id').notNull(),
+    type: text('type').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+});
+
+export const activitySeen = pgTable('activity_seen', {
+    id: text('id').primaryKey(),
+    activityId: text('activity_id').notNull(),
+    userId: text('user_id').notNull(),
+    seenAt: timestamp('seen_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+    activityUserIdx: index('activity_seen_activity_user_idx').on(table.activityId, table.userId),
+    userSeenIdx: index('activity_seen_user_seen_idx').on(table.userId, table.seenAt),
 }));
 
 // --- RELATIONS FOR DRIZZLE QUERY API ---

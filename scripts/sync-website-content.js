@@ -21,6 +21,14 @@ function syncWebsiteContent(repoRoot) {
       src: path.join(repoRoot, 'docs', 'DOWNLOADS.json'),
       dst: path.join(repoRoot, 'website', 'content', 'DOWNLOADS.json'),
     },
+    {
+      src: path.join(repoRoot, 'src', 'services', 'SyncProtocol.ts'),
+      dst: path.join(repoRoot, 'website', 'src', 'lib', 'sync', 'SyncProtocol.ts'),
+    },
+    {
+      src: path.join(repoRoot, 'src', 'services', 'SyncMapper.ts'),
+      dst: path.join(repoRoot, 'website', 'src', 'lib', 'sync', 'SyncMapper.ts'),
+    },
   ];
 
   for (const p of pairs) copyFile(p.src, p.dst);

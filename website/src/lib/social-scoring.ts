@@ -40,6 +40,14 @@ const DEFAULT_SCORE_CONFIG: ScoreConfig = {
     weatherBonusEnabled: true,
 };
 
+type ScoreExecutor = Pick<typeof db, 'select' | 'insert' | 'update' | 'delete'>;
+
+type OpenWeatherResponse = {
+    weather?: Array<{ main?: unknown }>;
+    main?: { temp?: unknown; humidity?: unknown };
+    wind?: { speed?: unknown };
+};
+
 function weekStartUtcSeconds(epochTimestamp: number): number {
     // Robustly handle both seconds and milliseconds (if > year 2286 in seconds, assume ms)
     const epochSeconds = epochTimestamp > 10000000000 ? Math.floor(epochTimestamp / 1000) : epochTimestamp;
@@ -79,14 +87,14 @@ function resolveStreakMultiplier(cfg: ScoreConfig, streakWeeks: number): number 
     return 1;
 }
 
-export async function getOrCreateScoreConfig(trx: any): Promise<ScoreConfig> {
+export async function getOrCreateScoreConfig(trx: ScoreExecutor): Promise<ScoreConfig> {
     const [row] = await trx.select().from(schema.socialScoringConfig).where(eq(schema.socialScoringConfig.id, 'default')).limit(1);
     if (row) return row as ScoreConfig;
     await trx.insert(schema.socialScoringConfig).values({ id: 'default' });
     return DEFAULT_SCORE_CONFIG;
 }
 
-async function getWeeklyGoalDays(trx: any, userId: string): Promise<number[]> {
+async function getWeeklyGoalDays(trx: ScoreExecutor, userId: string): Promise<number[]> {
     const [goalSetting] = await trx
         .select({ value: schema.settings.value })
         .from(schema.settings)
@@ -95,71 +103,82 @@ async function getWeeklyGoalDays(trx: any, userId: string): Promise<number[]> {
     return parseTrainingDays(goalSetting?.value);
 }
 
-async function calculateDailyStreak(trx: any, userId: string, trainingDays: number[]): Promise<number> {
-    const workouts = await trx
-        .select({ date: schema.workouts.date })
+async function calculateDailyStreak(trx: ScoreExecutor, userId: string, trainingDays: number[], limit: number = 365): Promise<number> {
+    // OPTIMIZATION: Instead of fetching all workouts and processing in JS,
+    // we use SQL to get unique training days in descending order.
+    const workoutDays = await trx
+        .select({ 
+            dateStr: sql<string>`to_char(date_trunc('day', to_timestamp(${schema.workouts.date} / 1000.0)), 'YYYY-MM-DD')`
+        })
         .from(schema.workouts)
         .where(and(
             eq(schema.workouts.userId, userId),
             eq(schema.workouts.status, 'completed'),
             isNull(schema.workouts.deletedAt)
         ))
-        .orderBy(desc(schema.workouts.date));
+        .groupBy(sql`date_trunc('day', to_timestamp(${schema.workouts.date} / 1000.0))`)
+        .orderBy(desc(schema.workouts.date))
+        .limit(limit);
 
-    if (workouts.length === 0) return 0;
+    if (workoutDays.length === 0) return 0;
 
-    const uniqueDays = new Set<string>();
-    for (const w of workouts) {
-        const d = new Date(Number(w.date));
-        // Use UTC date string to match how workout.date is stored (milliseconds UTC)
-        uniqueDays.add(d.toISOString().split('T')[0]);
-    }
-
-    const sortedDays = Array.from(uniqueDays).sort().reverse();
+    const uniqueDays = new Set(workoutDays.map((w) => w.dateStr));
+    const sortedDays = workoutDays.map((w) => w.dateStr);
+    
     let streak = 0;
     const now = new Date();
-    // Use UTC coordinates to prevent off-by-one errors when server runs in UTC
-    // but users are in UTC-3 (Argentina) and train late at night.
-    const checkDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const todayStr = now.toISOString().split('T')[0];
+    const latestWorkoutStr = sortedDays[0];
 
-    // ALGORITHM: We go backwards from "today" (UTC).
-    // 1. If today has a workout, streak starts at 1.
-    // 2. If today doesn't have a workout, but it's NOT a training day, we allow skipping it.
-    // 3. We allow a 1-day "grace period" for ANY day to account for late-night workouts or travel.
-
-    const todayStr = checkDate.toISOString().split('T')[0];
-    const todayDay = checkDate.getUTCDay(); // 0-6 (Sun-Sat) in UTC
-
-    // Check if we should skip today in the loop
-    if (!uniqueDays.has(todayStr) && !trainingDays.includes(todayDay)) {
-        checkDate.setUTCDate(checkDate.getUTCDate() - 1);
+    // If the latest workout wasn't today, check if the streak is already broken
+    if (latestWorkoutStr < todayStr) {
+        const check = new Date(todayStr + 'T12:00:00Z');
+        check.setUTCDate(check.getUTCDate() - 1);
+        while (check.toISOString().split('T')[0] > latestWorkoutStr) {
+            if (trainingDays.includes(check.getUTCDay())) {
+                return 0; // Streak broken because a training day was missed
+            }
+            check.setUTCDate(check.getUTCDate() - 1);
+        }
     }
 
-    const firstWorkoutDay = sortedDays[sortedDays.length - 1];
-
-    while (true) {
+    const checkDate = new Date(latestWorkoutStr + 'T12:00:00Z');
+    while (streak < limit) {
         const dateStr = checkDate.toISOString().split('T')[0];
-        const dayOfWeek = checkDate.getUTCDay(); // Use UTC day
+        const dayOfWeek = checkDate.getUTCDay();
 
         if (uniqueDays.has(dateStr)) {
             streak++;
         } else if (trainingDays.includes(dayOfWeek)) {
-            // It was a training day but no workout found.
-            // BREAK the streak as it's a missed goal day.
-            break;
-        } else {
-            // Not a training day and no workout. We just skip it without breaking.
+            break; // Training day missed, streak ends here
         }
 
         checkDate.setUTCDate(checkDate.getUTCDate() - 1);
-        if (streak > 365) break;
-        if (dateStr < firstWorkoutDay) break;
     }
 
     return streak;
 }
 
-async function getActiveGlobalMultiplier(trx: any, now: Date): Promise<number> {
+/**
+ * Checks if a streak is broken between two dates relative to training days.
+ * Returns true if at least one training day was missed between start and end.
+ */
+function isStreakBrokenBetween(startTsMs: number, endTsMs: number, trainingDays: number[]): boolean {
+    const startDate = new Date(startTsMs);
+    const endDate = new Date(endTsMs);
+    
+    // Start checking from the day after startDate
+    const current = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate() + 1));
+    const target = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate()));
+    
+    while (current < target) {
+        if (trainingDays.includes(current.getUTCDay())) return true;
+        current.setUTCDate(current.getUTCDate() + 1);
+    }
+    return false;
+}
+
+async function getActiveGlobalMultiplier(trx: ScoreExecutor, now: Date): Promise<number> {
     const [row] = await trx
         .select({ multiplier: schema.globalEvents.multiplier })
         .from(schema.globalEvents)
@@ -185,7 +204,7 @@ function isBigThreeExercise(name: string): boolean {
 }
 
 export async function isAdverseWeather(
-    trx: any,
+    trx: ScoreExecutor,
     userId: string,
     lat: number,
     lon: number,
@@ -226,7 +245,7 @@ export async function isAdverseWeather(
         });
         const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?${params.toString()}`, { cache: 'no-store' });
         if (!res.ok) return { adverse: false, reason: null, tempC: null, windSpeed: null, humidity: null, logId: null };
-        const data = await res.json();
+        const data = (await res.json()) as OpenWeatherResponse;
         const weatherMain = String(data?.weather?.[0]?.main || '').toLowerCase();
         const tempC = Number(data?.main?.temp);
         const windSpeed = Number(data?.wind?.speed);
@@ -269,11 +288,13 @@ export async function isAdverseWeather(
             lat,
             lon,
             condition: reason || weatherMain || 'clear',
+            temperature: result.tempC,
             tempC: result.tempC,
             windSpeed: result.windSpeed,
             humidity: result.humidity,
             isAdverse: adverse,
             workoutId,
+            createdAt: new Date(),
         });
 
         // 4. Clean up old logs (older than 48 hours) to keep DB small
@@ -288,69 +309,81 @@ export async function isAdverseWeather(
     }
 }
 
-async function ensureStreakState(trx: any, userId: string, workoutDateSeconds: number, cfg: ScoreConfig): Promise<{ streakWeeks: number; multiplier: number }> {
+async function ensureStreakState(trx: ScoreExecutor, userId: string, workoutDateSeconds: number, cfg: ScoreConfig): Promise<{ streakWeeks: number; multiplier: number }> {
     const [profile] = await trx.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, userId)).limit(1);
+    
+    const workoutMs = workoutDateSeconds > 10000000000 ? workoutDateSeconds : workoutDateSeconds * 1000;
+    const trainingDays = await getWeeklyGoalDays(trx, userId);
+    const currentWeekKey = weekKeyFromSeconds(workoutDateSeconds);
+
     if (!profile) {
+        const initialStreak = await calculateDailyStreak(trx, userId, trainingDays);
         await trx.insert(schema.userProfiles).values({
             id: userId,
             scoreLifetime: 0,
             streakWeeks: 0,
             streakMultiplier: 1,
-            currentStreak: 0,
-            highestStreak: 0,
-            streakWeekEvaluatedAt: weekKeyFromSeconds(workoutDateSeconds),
+            currentStreak: initialStreak,
+            highestStreak: initialStreak,
+            lastActiveDate: workoutMs,
+            streakWeekEvaluatedAt: currentWeekKey,
             updatedAt: new Date(),
         });
         return { streakWeeks: 0, multiplier: 1 };
     }
 
-    const currentWeekKey = weekKeyFromSeconds(workoutDateSeconds);
-    const trainingDays = await getWeeklyGoalDays(trx, userId);
-    const calculatedStreak = await calculateDailyStreak(trx, userId, trainingDays);
+    let finalCurrentStreak = Number(profile.currentStreak || 0);
+    const lastActive = Number(profile.lastActiveDate || 0);
 
-    // Protection: If the new calculated streak is 0, but the profile has a high streak,
-    // we only overwrite it if the last update was a long time ago (e.g. 1 week).
-    // This prevents accidental wipes due to logic changes or timezone edge cases.
-    let finalCurrentStreak = calculatedStreak;
-    if (calculatedStreak === 0 && (profile.currentStreak || 0) > 3) {
-        const lastUpdate = profile.updatedAt ? new Date(profile.updatedAt).getTime() : 0;
-        const oneWeekAgo = Date.now() - 7 * 86400000;
-        if (lastUpdate > oneWeekAgo) {
-            // Keep the old streak for now to be safe
-            finalCurrentStreak = Number(profile.currentStreak);
+    if (lastActive === 0) {
+        finalCurrentStreak = await calculateDailyStreak(trx, userId, trainingDays);
+    } else {
+        const lastDateStr = new Date(lastActive).toISOString().split('T')[0];
+        const newDateStr = new Date(workoutMs).toISOString().split('T')[0];
+
+        if (newDateStr === lastDateStr) {
+            // Same day, streak doesn't change
+            finalCurrentStreak = Number(profile.currentStreak || 0);
+        } else if (workoutMs < lastActive) {
+            // Out-of-order/Historical workout: Recalculate to be safe
+            finalCurrentStreak = await calculateDailyStreak(trx, userId, trainingDays);
+        } else {
+            // Forward workout: Incremental check
+            const isBroken = isStreakBrokenBetween(lastActive, workoutMs, trainingDays);
+            finalCurrentStreak = isBroken ? 1 : Number(profile.currentStreak || 0) + 1;
         }
     }
 
     const nextHighest = Math.max(Number(profile.highestStreak || 0), finalCurrentStreak);
 
-    // Always update currentStreak and highestStreak to ensure they stay fresh on every workout
-    await trx.update(schema.userProfiles).set({
-        currentStreak: finalCurrentStreak,
-        highestStreak: nextHighest,
-        updatedAt: new Date(),
-    }).where(eq(schema.userProfiles.id, userId));
-
     // Legacy support: check if streakWeekEvaluatedAt is an old timestamp format
     let evalKey = profile.streakWeekEvaluatedAt;
     if (evalKey && !evalKey.includes('-')) {
         const parsedMs = parseInt(evalKey, 10);
-        if (!isNaN(parsedMs)) {
-            evalKey = weekKeyFromSeconds(parsedMs);
-        }
+        if (!isNaN(parsedMs)) evalKey = weekKeyFromSeconds(parsedMs);
     }
 
     if (evalKey === currentWeekKey) {
+        // Already evaluated this week, just update daily stats
+        await trx.update(schema.userProfiles).set({
+            currentStreak: finalCurrentStreak,
+            highestStreak: nextHighest,
+            lastActiveDate: Math.max(lastActive, workoutMs),
+            updatedAt: new Date(),
+        }).where(eq(schema.userProfiles.id, userId));
+
         const weeks = Number(profile.streakWeeks || 0);
         const multiplier = Number(profile.streakMultiplier || resolveStreakMultiplier(cfg, weeks) || 1);
         return { streakWeeks: weeks, multiplier };
     }
 
+    // Weekly Evaluation
     const previousWeekStart = weekStartUtcSeconds(workoutDateSeconds) - 7 * 86400;
     const previousWeekEnd = previousWeekStart + (7 * 86400) - 1;
     const goalDays = Math.max(1, trainingDays.length);
 
     const [countRow] = await trx
-        .select({ count: sql<number>`count(distinct(floor(${schema.workouts.date} / 86400000)))`.mapWith(Number) })
+        .select({ count: sql<number>`count(distinct date_trunc('day', to_timestamp(${schema.workouts.date} / 1000.0)))`.mapWith(Number) })
         .from(schema.workouts)
         .where(and(
             eq(schema.workouts.userId, userId),
@@ -370,6 +403,7 @@ async function ensureStreakState(trx: any, userId: string, workoutDateSeconds: n
         streakMultiplier: nextMultiplier,
         currentStreak: finalCurrentStreak,
         highestStreak: nextHighest,
+        lastActiveDate: Math.max(lastActive, workoutMs),
         streakWeekEvaluatedAt: currentWeekKey,
         updatedAt: new Date(),
     }).where(eq(schema.userProfiles.id, userId));
@@ -378,7 +412,7 @@ async function ensureStreakState(trx: any, userId: string, workoutDateSeconds: n
 }
 
 type AwardArgs = {
-    trx: any;
+    trx: ScoreExecutor;
     userId: string;
     workoutId: string | null;
     eventType: string;
@@ -402,11 +436,6 @@ async function awardEvent(args: AwardArgs): Promise<number> {
                 deletedAt: null,
                 updatedAt: new Date(),
             }).where(eq(schema.scoreEvents.id, existingEvent.id));
-
-            await args.trx.update(schema.userProfiles).set({
-                scoreLifetime: sql`${schema.userProfiles.scoreLifetime} + ${pointsToAward}`,
-                updatedAt: new Date(),
-            }).where(eq(schema.userProfiles.id, args.userId));
 
             return pointsToAward;
         }
@@ -439,18 +468,10 @@ async function awardEvent(args: AwardArgs): Promise<number> {
         }
     });
 
-    await args.trx
-        .update(schema.userProfiles)
-        .set({
-            scoreLifetime: sql`${schema.userProfiles.scoreLifetime} + ${pointsAwarded}`,
-            updatedAt: new Date(),
-        })
-        .where(eq(schema.userProfiles.id, args.userId));
-
     return pointsAwarded;
 }
 
-export async function applyWorkoutScoring(trx: any, userId: string, workoutId: string): Promise<{ totalAwarded: number }> {
+export async function applyWorkoutScoring(trx: ScoreExecutor, userId: string, workoutId: string): Promise<{ totalAwarded: number }> {
     const [workout] = await trx
         .select()
         .from(schema.workouts)
@@ -505,7 +526,7 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
     const weekEnd = weekStart + (7 * 86400) - 1;
 
     const [weekCountRow] = await trx
-        .select({ count: sql<number>`count(distinct(floor(${schema.workouts.date} / 86400000)))`.mapWith(Number) })
+        .select({ count: sql<number>`count(distinct date_trunc('day', to_timestamp(${schema.workouts.date} / 1000.0)))`.mapWith(Number) })
         .from(schema.workouts)
         .where(and(
             eq(schema.workouts.userId, userId),
@@ -522,7 +543,8 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
             eq(schema.scoreEvents.userId, userId),
             eq(schema.scoreEvents.eventType, 'extra_day'),
             gte(schema.scoreEvents.createdAt, new Date(weekStart * 1000)),
-            lte(schema.scoreEvents.createdAt, new Date(weekEnd * 1000))
+            lte(schema.scoreEvents.createdAt, new Date(weekEnd * 1000)),
+            isNull(schema.scoreEvents.deletedAt)
         ));
 
     const completedThisWeek = Number(weekCountRow?.count || 0);
@@ -542,12 +564,11 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
         });
     }
 
-    const setRows = await trx
+    const bestSetsQuery = await trx
         .select({
             exerciseId: schema.workoutSets.exerciseId,
             exerciseName: schema.exercises.name,
-            weight: schema.workoutSets.weight,
-            reps: schema.workoutSets.reps,
+            maxOneRm: sql<number>`MAX(${schema.workoutSets.weight} * (1.0 + (${schema.workoutSets.reps} / 30.0)))`.mapWith(Number),
         })
         .from(schema.workoutSets)
         .innerJoin(schema.exercises, eq(schema.exercises.id, schema.workoutSets.exerciseId))
@@ -559,33 +580,29 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
             gte(schema.workoutSets.reps, 1),
             or(isNull(schema.workoutSets.type), sql`${schema.workoutSets.type} != 'warmup'`),
             isNull(schema.workoutSets.deletedAt)
-        ));
+        ))
+        .groupBy(schema.workoutSets.exerciseId, schema.exercises.name);
 
-    const bestByExercise = new Map<string, { exerciseName: string; oneRmKg: number }>();
-    for (const row of setRows) {
-        const exerciseId = String(row.exerciseId);
-        const exerciseName = String(row.exerciseName || 'Exercise');
-        const weight = Number(row.weight);
-        const reps = Number(row.reps);
-        if (!Number.isFinite(weight) || !Number.isFinite(reps) || weight <= 0 || reps <= 0) continue;
-        const oneRmKg = weight * (1 + (reps / 30));
+    for (const set of bestSetsQuery) {
+        const exerciseId = String(set.exerciseId);
+        const exerciseName = String(set.exerciseName || 'Exercise');
+        const oneRmKg = Number(set.maxOneRm);
+        
         if (!Number.isFinite(oneRmKg) || oneRmKg <= 0) continue;
-        const prev = bestByExercise.get(exerciseId);
-        if (!prev || oneRmKg > prev.oneRmKg) {
-            bestByExercise.set(exerciseId, { exerciseName, oneRmKg });
-        }
-    }
 
-    for (const [exerciseId, cur] of bestByExercise.entries()) {
         const prId = `${userId}:${exerciseId}`;
         const [existingPr] = await trx.select().from(schema.userExercisePrs).where(eq(schema.userExercisePrs.id, prId)).limit(1);
         const oldOneRm = Number(existingPr?.best1RmKg || 0);
-        if (cur.oneRmKg <= oldOneRm) continue;
+        
+        if (oneRmKg <= oldOneRm) continue;
 
         if (existingPr) {
             await trx.update(schema.userExercisePrs).set({
-                exerciseName: cur.exerciseName,
-                best1RmKg: cur.oneRmKg,
+                exerciseName: exerciseName,
+                best1RmKg: oneRmKg,
+                workoutSetId: workoutId, // Note: For batch, we just reference workout since we don't have the specific set ID easily here. 
+                                         // But ideally we'd join and get the set ID.
+                achievedAt: new Date(Number(workout.date)),
                 updatedAt: new Date(),
             }).where(eq(schema.userExercisePrs.id, prId));
         } else {
@@ -593,12 +610,14 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
                 id: prId,
                 userId,
                 exerciseId,
-                exerciseName: cur.exerciseName,
-                best1RmKg: cur.oneRmKg,
+                exerciseName: exerciseName,
+                best1RmKg: oneRmKg,
+                workoutSetId: workoutId,
+                achievedAt: new Date(Number(workout.date)),
             });
         }
 
-        const pointsBase = isBigThreeExercise(cur.exerciseName) ? cfg.prBig3Points : cfg.prNormalPoints;
+        const pointsBase = isBigThreeExercise(exerciseName) ? cfg.prBig3Points : cfg.prNormalPoints;
         totalAwarded += await awardEvent({
             trx,
             userId,
@@ -611,9 +630,9 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
             metadata: {
                 workoutId,
                 exerciseId,
-                exerciseName: cur.exerciseName,
+                exerciseName: exerciseName,
                 oldOneRmKg: oldOneRm,
-                newOneRmKg: cur.oneRmKg,
+                newOneRmKg: oneRmKg,
                 isBig3: pointsBase === cfg.prBig3Points,
             },
         });
@@ -652,7 +671,7 @@ export async function applyWorkoutScoring(trx: any, userId: string, workoutId: s
     return { totalAwarded };
 }
 
-export async function revertWorkoutScoring(trx: any, userId: string, workoutId: string): Promise<{ totalReverted: number }> {
+export async function revertWorkoutScoring(trx: ScoreExecutor, userId: string, workoutId: string): Promise<{ totalReverted: number }> {
     logger.info('[Scoring] Reverting score', { userId, workoutId });
 
     // 1. Find all score events for this workout
@@ -671,66 +690,63 @@ export async function revertWorkoutScoring(trx: any, userId: string, workoutId: 
 
     if (events.length === 0) return { totalReverted: 0 };
 
-    const totalPoints = events.reduce((sum: number, e: any) => sum + (e.pointsAwarded || 0), 0);
+    const totalPoints = events.reduce((sum, e) => sum + Number(e.pointsAwarded || 0), 0);
 
-    // 2. Subtract from user profile (ensure we don't go below 0)
-    await trx
-        .update(schema.userProfiles)
-        .set({
-            scoreLifetime: sql`GREATEST(0, ${schema.userProfiles.scoreLifetime} - ${totalPoints})`,
-            updatedAt: new Date(),
-        })
-        .where(eq(schema.userProfiles.id, userId));
+    // 2. Revert PR records if necessary
+    const prEvents = events.filter((e) => e.eventType === 'pr_broken');
+    if (prEvents.length > 0) {
+        const exerciseIds = prEvents
+            .map((e) => e.eventKey?.split(':')?.[2])
+            .filter((value): value is string => Boolean(value));
 
-    // 3. Revert PR records if necessary
-    const prEvents = events.filter((e: any) => e.eventType === 'pr_broken');
-    for (const event of prEvents) {
-        // eventKey format: pr_broken:${workoutId}:${exerciseId}
-        const parts = (event as any).eventKey?.split(':');
-        const exerciseId = parts?.[2];
-        if (!exerciseId) continue;
-
-        const prId = `${userId}:${exerciseId}`;
-
-        // Find the next best 1RM (excluding this workout)
-        const [nextBest] = await trx
-            .select({
-                oneRm: sql<number>`${schema.workoutSets.weight} * (1.0 + (${schema.workoutSets.reps} / 30.0))`.mapWith(Number),
-                exerciseName: schema.exercises.name
-            })
-            .from(schema.workoutSets)
-            .innerJoin(schema.workouts, eq(schema.workouts.id, schema.workoutSets.workoutId))
-            .innerJoin(schema.exercises, eq(schema.exercises.id, schema.workoutSets.exerciseId))
-            .where(and(
-                eq(schema.workoutSets.userId, userId),
-                eq(schema.workoutSets.exerciseId, exerciseId),
-                eq(schema.workoutSets.completed, 1),
-                eq(schema.workouts.status, 'completed'),
-                isNull(schema.workouts.deletedAt),
-                isNull(schema.workoutSets.deletedAt),
-                sql`${schema.workouts.id} != ${workoutId}`,
-                sql`${schema.workoutSets.weight} > 0`,
-                sql`${schema.workoutSets.reps} > 0`,
-                or(isNull(schema.workoutSets.type), sql`${schema.workoutSets.type} != 'warmup'`)
-            ))
-            .orderBy(desc(sql`${schema.workoutSets.weight} * (1.0 + (${schema.workoutSets.reps} / 30.0))`))
-            .limit(1);
-
-        if (nextBest) {
-            await trx.update(schema.userExercisePrs)
-                .set({
-                    best1RmKg: nextBest.oneRm,
-                    exerciseName: nextBest.exerciseName,
-                    updatedAt: new Date(),
+        if (exerciseIds.length > 0) {
+            // OPTIMIZATION: Use a single query to find the next best for ALL exercises in the batch
+            const nextBests = await trx
+                .select({
+                    exerciseId: schema.workoutSets.exerciseId,
+                    oneRm: sql<number>`MAX(${schema.workoutSets.weight} * (1.0 + (${schema.workoutSets.reps} / 30.0)))`.mapWith(Number),
+                    exerciseName: sql<string>`MAX(${schema.exercises.name})`
                 })
-                .where(eq(schema.userExercisePrs.id, prId));
-        } else {
-            // No other PRs for this exercise, delete the PR record
-            await trx.delete(schema.userExercisePrs).where(eq(schema.userExercisePrs.id, prId));
+                .from(schema.workoutSets)
+                .innerJoin(schema.workouts, eq(schema.workouts.id, schema.workoutSets.workoutId))
+                .innerJoin(schema.exercises, eq(schema.exercises.id, schema.workoutSets.exerciseId))
+                .where(and(
+                    eq(schema.workoutSets.userId, userId),
+                    inArray(schema.workoutSets.exerciseId, exerciseIds),
+                    eq(schema.workoutSets.completed, 1),
+                    eq(schema.workouts.status, 'completed'),
+                    isNull(schema.workouts.deletedAt),
+                    isNull(schema.workoutSets.deletedAt),
+                    sql`${schema.workouts.id} != ${workoutId}`,
+                    sql`${schema.workoutSets.weight} > 0`,
+                    sql`${schema.workoutSets.reps} > 0`,
+                    or(isNull(schema.workoutSets.type), sql`${schema.workoutSets.type} != 'warmup'`)
+                ))
+                .groupBy(schema.workoutSets.exerciseId);
+
+            const nextBestMap = new Map(nextBests.map((nb) => [String(nb.exerciseId), nb]));
+
+            for (const exerciseId of exerciseIds) {
+                const prId = String(`${userId}:${exerciseId}`);
+                const nb = nextBestMap.get(exerciseId);
+
+                if (nb) {
+                    await trx.update(schema.userExercisePrs)
+                        .set({
+                            best1RmKg: nb.oneRm,
+                            exerciseName: nb.exerciseName,
+                            updatedAt: new Date(),
+                        })
+                        .where(eq(schema.userExercisePrs.id, prId));
+                } else {
+                    // No other PRs for this exercise, delete the PR record
+                    await trx.delete(schema.userExercisePrs).where(eq(schema.userExercisePrs.id, prId));
+                }
+            }
         }
     }
 
-    // 4. Delete the score events to allow re-awarding later
+    // 3. Delete the score events to allow re-awarding later
     await trx
         .delete(schema.scoreEvents)
         .where(and(
@@ -747,13 +763,24 @@ export async function buildLeaderboard(userId: string) {
     const weekStart = new Date(mondayStartSeconds * 1000);
     const monthAgo = new Date(now.getTime() - 30 * 86400000);
 
-    const records = await db.select().from(schema.friendships).where(
-        and(
-            or(eq(schema.friendships.userId, userId), eq(schema.friendships.friendId, userId)),
-            eq(schema.friendships.status, 'accepted'),
-            isNull(schema.friendships.deletedAt)
-        )
-    );
+    const [outboundRecords, inboundRecords] = await Promise.all([
+        db.select().from(schema.friendships).where(
+            and(
+                eq(schema.friendships.userId, userId),
+                eq(schema.friendships.status, 'accepted'),
+                isNull(schema.friendships.deletedAt)
+            )
+        ),
+        db.select().from(schema.friendships).where(
+            and(
+                eq(schema.friendships.friendId, userId),
+                eq(schema.friendships.status, 'accepted'),
+                isNull(schema.friendships.deletedAt)
+            )
+        ),
+    ]);
+
+    const records = [...outboundRecords, ...inboundRecords];
 
     const friendIds = records.map((r) => r.userId === userId ? r.friendId : r.userId);
     const userIds = [...new Set([userId, ...friendIds])];
@@ -819,7 +846,7 @@ export async function buildLeaderboard(userId: string) {
     return leaderboard;
 }
 
-export async function cleanupWeatherLogs(trx?: any): Promise<number> {
+export async function cleanupWeatherLogs(trx?: ScoreExecutor): Promise<number> {
     const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
     const executor = trx || db;
     await executor.delete(schema.weatherLogs).where(lte(schema.weatherLogs.createdAt, fortyEightHoursAgo));

@@ -1,7 +1,7 @@
 import { format, isSameMonth, subDays, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar, Clock, Dumbbell, History, Search, Trash2, X } from 'lucide-react-native';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
@@ -25,6 +25,162 @@ interface WorkoutHistoryModalProps {
     visible: boolean;
     onClose: () => void;
 }
+
+const WorkoutHistoryCard = React.memo(({
+    item,
+    isEditing,
+    colors,
+    styles,
+    editName,
+    setEditName,
+    editNotes,
+    editHours,
+    setEditHours,
+    editMinutes,
+    setEditMinutes,
+    editSeconds,
+    setEditSeconds,
+    saving,
+    onEdit,
+    onSave,
+    onCancel,
+    onDelete
+}: any) => {
+    const duration = Number(item.duration) || 0;
+    const statusConfig = item.status === 'completed'
+        ? { label: 'Completado', color: colors.green, bg: withAlpha(colors.green, '15') }
+        : { label: 'En progreso', color: colors.primary.DEFAULT, bg: withAlpha(colors.primary.DEFAULT, '15') };
+
+    return (
+        <View style={styles.card}>
+            <View style={styles.cardHeader}>
+                {isEditing ? (
+                    <TextInput
+                        style={styles.editInput}
+                        value={editName}
+                        onChangeText={setEditName}
+                        placeholder="Nombre del entrenamiento"
+                        placeholderTextColor={colors.textMuted}
+                        autoFocus
+                    />
+                ) : (
+                    <Text style={styles.workoutName}>{item.name || 'Entrenamiento sin nombre'}</Text>
+                )}
+
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {isEditing ? (
+                        <>
+                            <TouchableOpacity onPress={onCancel}>
+                                <Text style={styles.cancelText}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.saveBtn}
+                                onPress={() => onSave(item.id)}
+                                disabled={saving}
+                            >
+                                <Text style={styles.saveText}>{saving ? '...' : 'Guardar'}</Text>
+                            </TouchableOpacity>
+                        </>
+                    ) : (
+                        <>
+                            <TouchableOpacity
+                                style={styles.editBtn}
+                                onPress={() => onEdit(item)}
+                            >
+                                <View style={{ opacity: 0.7 }}>
+                                    <Search size={14} color={colors.primary.DEFAULT} />
+                                </View>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.deleteBtn}
+                                onPress={() => onDelete(item.id, item.name)}
+                            >
+                                <Trash2 size={16} color={colors.red} />
+                            </TouchableOpacity>
+                        </>
+                    )}
+                </View>
+            </View>
+
+            {isEditing ? (
+                <View style={{ marginBottom: 12 }}>
+                    <Text style={[styles.infoText, { marginBottom: 6 }]}>Duración</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ flex: 1 }}>
+                            <TextInput
+                                style={styles.editInput}
+                                value={editHours}
+                                onChangeText={setEditHours}
+                                keyboardType="numeric"
+                                placeholder="HH"
+                            />
+                            <Text style={{ fontSize: 10, color: colors.textMuted, textAlign: 'center' }}>Horas</Text>
+                        </View>
+                        <Text style={{ fontWeight: 'bold', color: colors.text }}>:</Text>
+                        <View style={{ flex: 1 }}>
+                            <TextInput
+                                style={styles.editInput}
+                                value={editMinutes}
+                                onChangeText={(v) => {
+                                    const n = parseInt(v) || 0;
+                                    setEditMinutes(n > 59 ? '59' : v);
+                                }}
+                                keyboardType="numeric"
+                                placeholder="MM"
+                            />
+                            <Text style={{ fontSize: 10, color: colors.textMuted, textAlign: 'center' }}>Min</Text>
+                        </View>
+                        <Text style={{ fontWeight: 'bold', color: colors.text }}>:</Text>
+                        <View style={{ flex: 1 }}>
+                            <TextInput
+                                style={styles.editInput}
+                                value={editSeconds}
+                                onChangeText={(v) => {
+                                    const n = parseInt(v) || 0;
+                                    setEditSeconds(n > 59 ? '59' : v);
+                                }}
+                                keyboardType="numeric"
+                                placeholder="SS"
+                            />
+                            <Text style={{ fontSize: 10, color: colors.textMuted, textAlign: 'center' }}>Seg</Text>
+                        </View>
+                    </View>
+                </View>
+            ) : (
+                item.notes && (
+                    <View style={styles.notesContainer}>
+                        <Text style={styles.notesText} numberOfLines={3}>{item.notes}</Text>
+                    </View>
+                )
+            )}
+
+            <View style={styles.cardInfo}>
+                <View style={styles.infoItem}>
+                    <Calendar size={14} color={colors.textMuted} />
+                    <Text style={styles.infoText}>
+                        {format(new Date(item.date), 'd MMM, yyyy', { locale: es })}
+                    </Text>
+                </View>
+
+                {duration > 0 && (
+                    <View style={styles.infoItem}>
+                        <Clock size={14} color={colors.textMuted} />
+                        <Text style={styles.infoText}>{formatTimeSeconds(duration)}</Text>
+                    </View>
+                )}
+
+                <View style={styles.infoItem}>
+                    <Dumbbell size={14} color={colors.textMuted} />
+                    <Text style={styles.infoText}>{item.exercise_count} ej. / {item.set_count} sets</Text>
+                </View>
+            </View>
+
+            <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
+                <Text style={[styles.statusText, { color: statusConfig.color }]}>{statusConfig.label}</Text>
+            </View>
+        </View>
+    );
+});
 
 export function WorkoutHistoryModal({ visible, onClose }: WorkoutHistoryModalProps) {
     const colors = useColors();
@@ -60,7 +216,7 @@ export function WorkoutHistoryModal({ visible, onClose }: WorkoutHistoryModalPro
         }
     };
 
-    const handleEdit = (workout: any) => {
+    const handleEdit = useCallback((workout: any) => {
         setEditingId(workout.id);
         setEditName(workout.name || '');
         setEditNotes(workout.notes || '');
@@ -73,9 +229,9 @@ export function WorkoutHistoryModal({ visible, onClose }: WorkoutHistoryModalPro
         setEditHours(h.toString());
         setEditMinutes(m.toString());
         setEditSeconds(s.toString());
-    };
+    }, []);
 
-    const handleSave = async (id: string) => {
+    const handleSave = useCallback(async (id: string) => {
         if (!id) return;
         setSaving(true);
         try {
@@ -96,9 +252,9 @@ export function WorkoutHistoryModal({ visible, onClose }: WorkoutHistoryModalPro
         } finally {
             setSaving(false);
         }
-    };
+    }, [editHours, editMinutes, editSeconds, editName, editNotes]);
 
-    const handleDelete = (workoutId: string, name: string) => {
+    const handleDelete = useCallback((workoutId: string, name: string) => {
         confirm.custom({
             title: '¿Eliminar entrenamiento?',
             message: `Vas a eliminar "${name || 'Entrenamiento'}". \n\n⚠️ ESTA ACCIÓN REVERTIRÁ: \n• Puntos IronScore obtenidos \n• Récords (PRs) de esta sesión \n• Estadísticas de volumen y tiempo`,
@@ -120,7 +276,11 @@ export function WorkoutHistoryModal({ visible, onClose }: WorkoutHistoryModalPro
                 }
             ]
         });
-    };
+    }, []);
+
+    const handleCancelEdit = useCallback(() => {
+        setEditingId(null);
+    }, []);
 
     const filteredHistory = useMemo(() => {
         let list = history;
@@ -392,144 +552,32 @@ export function WorkoutHistoryModal({ visible, onClose }: WorkoutHistoryModalPro
         },
     }), [colors]);
 
-    const renderItem = ({ item }: { item: any }) => {
-        const duration = Number(item.duration) || 0;
-        const statusConfig = item.status === 'completed'
-            ? { label: 'Completado', color: colors.green, bg: withAlpha(colors.green, '15') }
-            : { label: 'En progreso', color: colors.primary.DEFAULT, bg: withAlpha(colors.primary.DEFAULT, '15') };
-
-        const isEditing = editingId === item.id;
-
-        return (
-            <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                    {isEditing ? (
-                        <TextInput
-                            style={styles.editInput}
-                            value={editName}
-                            onChangeText={setEditName}
-                            placeholder="Nombre del entrenamiento"
-                            placeholderTextColor={colors.textMuted}
-                            autoFocus
-                        />
-                    ) : (
-                        <Text style={styles.workoutName}>{item.name || 'Entrenamiento sin nombre'}</Text>
-                    )}
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        {isEditing ? (
-                            <>
-                                <TouchableOpacity onPress={() => setEditingId(null)}>
-                                    <Text style={styles.cancelText}>Cancelar</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.saveBtn}
-                                    onPress={() => handleSave(item.id)}
-                                    disabled={saving}
-                                >
-                                    <Text style={styles.saveText}>{saving ? '...' : 'Guardar'}</Text>
-                                </TouchableOpacity>
-                            </>
-                        ) : (
-                            <>
-                                <TouchableOpacity
-                                    style={styles.editBtn}
-                                    onPress={() => handleEdit(item)}
-                                >
-                                    <View style={{ opacity: 0.7 }}>
-                                        <Search size={14} color={colors.primary.DEFAULT} />
-                                    </View>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.deleteBtn}
-                                    onPress={() => handleDelete(item.id, item.name)}
-                                >
-                                    <Trash2 size={16} color={colors.red} />
-                                </TouchableOpacity>
-                            </>
-                        )}
-                    </View>
-                </View>
-
-                {isEditing ? (
-                    <View style={{ marginBottom: 12 }}>
-                        <Text style={[styles.infoText, { marginBottom: 6 }]}>Duración</Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <View style={{ flex: 1 }}>
-                                <TextInput
-                                    style={styles.editInput}
-                                    value={editHours}
-                                    onChangeText={setEditHours}
-                                    keyboardType="numeric"
-                                    placeholder="HH"
-                                />
-                                <Text style={{ fontSize: 10, color: colors.textMuted, textAlign: 'center' }}>Horas</Text>
-                            </View>
-                            <Text style={{ fontWeight: 'bold', color: colors.text }}>:</Text>
-                            <View style={{ flex: 1 }}>
-                                <TextInput
-                                    style={styles.editInput}
-                                    value={editMinutes}
-                                    onChangeText={(v) => {
-                                        const n = parseInt(v) || 0;
-                                        setEditMinutes(n > 59 ? '59' : v);
-                                    }}
-                                    keyboardType="numeric"
-                                    placeholder="MM"
-                                />
-                                <Text style={{ fontSize: 10, color: colors.textMuted, textAlign: 'center' }}>Min</Text>
-                            </View>
-                            <Text style={{ fontWeight: 'bold', color: colors.text }}>:</Text>
-                            <View style={{ flex: 1 }}>
-                                <TextInput
-                                    style={styles.editInput}
-                                    value={editSeconds}
-                                    onChangeText={(v) => {
-                                        const n = parseInt(v) || 0;
-                                        setEditSeconds(n > 59 ? '59' : v);
-                                    }}
-                                    keyboardType="numeric"
-                                    placeholder="SS"
-                                />
-                                <Text style={{ fontSize: 10, color: colors.textMuted, textAlign: 'center' }}>Seg</Text>
-                            </View>
-                        </View>
-                    </View>
-                ) : (
-                    item.notes && (
-                        <View style={styles.notesContainer}>
-                            <Text style={styles.notesText} numberOfLines={3}>{item.notes}</Text>
-                        </View>
-                    )
-                )}
-
-                <View style={styles.cardInfo}>
-                    <View style={styles.infoItem}>
-                        <Calendar size={14} color={colors.textMuted} />
-                        <Text style={styles.infoText}>
-                            {format(new Date(item.date), 'd MMM, yyyy', { locale: es })}
-                        </Text>
-                    </View>
-
-                    {duration > 0 && (
-                        <View style={styles.infoItem}>
-                            <Clock size={14} color={colors.textMuted} />
-                            <Text style={styles.infoText}>{formatTimeSeconds(duration)}</Text>
-                        </View>
-                    )}
-
-                    <View style={styles.infoItem}>
-                        <Dumbbell size={14} color={colors.textMuted} />
-                        <Text style={styles.infoText}>{item.exercise_count} ej. / {item.set_count} sets</Text>
-                    </View>
-                </View>
-
-                <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
-                    <Text style={[styles.statusText, { color: statusConfig.color }]}>{statusConfig.label}</Text>
-                </View>
-            </View>
-        );
-    };
+    const renderItem = useCallback(({ item }: { item: any }) => (
+        <WorkoutHistoryCard
+            item={item}
+            isEditing={editingId === item.id}
+            colors={colors}
+            styles={styles}
+            editName={editName}
+            setEditName={setEditName}
+            editNotes={editNotes}
+            editHours={editHours}
+            setEditHours={setEditHours}
+            editMinutes={editMinutes}
+            setEditMinutes={setEditMinutes}
+            editSeconds={editSeconds}
+            setEditSeconds={setEditSeconds}
+            saving={saving}
+            onEdit={handleEdit}
+            onSave={handleSave}
+            onCancel={handleCancelEdit}
+            onDelete={handleDelete}
+        />
+    ), [
+        editingId, styles,
+        editName, editNotes, editHours, editMinutes, editSeconds, saving,
+        handleEdit, handleSave, handleCancelEdit, handleDelete
+    ]);
 
     return (
         <Modal

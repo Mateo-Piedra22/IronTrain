@@ -1,24 +1,42 @@
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '../../../../../src/db';
 import * as schema from '../../../../../src/db/schema';
 import { verifyAuth } from '../../../../../src/lib/auth';
 import { runDbTransaction } from '../../../../../src/lib/db-transaction';
+import { RATE_LIMITS } from '../../../../../src/lib/rate-limit';
 import { formatActorName, getUserBrief, notifyUserById } from '../../../../../src/lib/social-notifications';
+
+const kudoPayloadSchema = z.object({
+    feedId: z.string().trim().min(1).max(255),
+});
 
 export async function POST(req: NextRequest) {
     try {
         const userId = await verifyAuth(req);
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const body = await req.json();
-        const { feedId } = body;
-
-        if (!feedId || typeof feedId !== 'string' || feedId.trim().length === 0) {
-            return NextResponse.json({ error: 'Invalid feed ID' }, { status: 400 });
+        const rateLimit = await RATE_LIMITS.SOCIAL_FEED_KUDOS(userId);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
         }
 
-        const normalizedFeedId = feedId.trim();
+        const body = await req.json().catch(() => null);
+        const parsed = kudoPayloadSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({ error: 'Invalid request body', details: parsed.error.flatten() }, { status: 400 });
+        }
+
+        const normalizedFeedId = parsed.data.feedId;
 
         const feedItems = await db
             .select({

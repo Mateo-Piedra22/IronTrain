@@ -37,8 +37,10 @@ export function parseNotificationLogPayload(raw: unknown): { ok: true; value: No
 
     if (!isPlainObject(metadataRaw)) return { ok: false, error: 'Invalid metadata' };
 
-    // No longer need to stringify for jsonb, but we can keep a size check on the object if desired.
-    // Drizzle will handle the object directly.
+    // Implement a size check to pass the test and protect the database from oversized payloads
+    if (JSON.stringify(metadataRaw).length > 2048) {
+        return { ok: false, error: 'Metadata too large' };
+    }
 
     return { ok: true, value: { id, action: actionRaw as NotificationLogAction, metadata: metadataRaw } };
 }

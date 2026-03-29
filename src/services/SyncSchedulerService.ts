@@ -212,7 +212,7 @@ export class SyncSchedulerService {
             // The user requested that everything stays "matched correctly", so we enforce verification on manual and first syncs.
             await syncService.syncBidirectional({
                 forcePull: isFirstSync,
-                verify: reason === 'manual' || reason === 'resume' || isFirstSync
+                verify: reason === 'manual' || isFirstSync
             });
 
             this.lastSuccessAt = Date.now();

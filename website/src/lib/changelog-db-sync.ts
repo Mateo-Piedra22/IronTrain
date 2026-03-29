@@ -54,7 +54,7 @@ export async function syncChangelogToDatabase(options?: { force?: boolean; minIn
                 const items = Array.isArray(release.items) ? release.items.filter((i) => typeof i === 'string' && i.trim().length > 0) : [];
                 if (items.length === 0) continue;
 
-                const isUnreleased = release.unreleased === true || release.date === null ? 1 : 0;
+                const isUnreleased = release.unreleased === true || release.date === null;
 
                 // SKIPPED: Prevenir que forzar rebuilding traiga de vuelta la version unreleased borrada
                 if (isUnreleased) continue;

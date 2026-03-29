@@ -27,7 +27,7 @@ const getPlateColor = (weight: number, unit: string, type?: PlateType, colors?: 
 };
 
 const getPlateGeometry = (weight: number, unit: string, type?: PlateType) => {
-    const val = unit === 'kg' ? weight : weight * 2.20462;
+    const val = unit === 'kg' ? weight : weight / 2.20462;
 
     if (type === 'bumper') {
         const height = Math.min(60, 30 + (val * 0.8));

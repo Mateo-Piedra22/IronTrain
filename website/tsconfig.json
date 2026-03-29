@@ -20,6 +20,12 @@
       "node"
     ],
     "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "src/*"
+      ]
+    },
     "plugins": [
       {
         "name": "next"

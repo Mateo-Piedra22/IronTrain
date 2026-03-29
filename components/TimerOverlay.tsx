@@ -92,9 +92,7 @@ export function TimerOverlay() {
     }), [colors]);
 
     useEffect(() => {
-        let interval: any;
-        if (isRunning) { tick(); interval = setInterval(tick, 1000); }
-        return () => clearInterval(interval);
+        if (isRunning) { tick(); }
     }, [isRunning, tick]);
 
     useEffect(() => {

@@ -2,6 +2,12 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../../src/db';
 import * as schema from '../../../../../src/db/schema';
+import { RATE_LIMITS } from '../../../../../src/lib/rate-limit';
+
+const getClientIp = (request: NextRequest): string => {
+    const forwardedFor = request.headers.get('x-forwarded-for') ?? 'unknown';
+    return forwardedFor.split(',')[0]?.trim() || 'unknown';
+};
 
 const toSnakeCase = (camelObj: Record<string, unknown>): Record<string, unknown> => {
     if (!camelObj || typeof camelObj !== 'object') return camelObj;
@@ -24,6 +30,20 @@ export async function GET(
     context: { params: Promise<{ id: string }> }
 ) {
     const { id } = await context.params;
+
+    const clientIp = getClientIp(req);
+    const rateLimit = await RATE_LIMITS.SHARE_ROUTINE(`anon:${clientIp}`);
+    if (!rateLimit.ok) {
+        return NextResponse.json(
+            { error: 'Too many requests. Please try again later.' },
+            {
+                status: 429,
+                headers: {
+                    'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                },
+            }
+        );
+    }
 
     if (!id || typeof id !== 'string' || id.trim().length === 0) {
         return NextResponse.json({ error: 'Invalid routine ID' }, { status: 400 });
@@ -76,29 +96,35 @@ export async function GET(
         }
 
         const categoryIds = [...new Set(exercises.map(ex => ex.categoryId))];
-        let categories: typeof schema.categories.$inferSelect[] = [];
-        if (categoryIds.length > 0) {
-            categories = await db.select()
-                .from(schema.categories)
-                .where(
-                    and(
-                        inArray(schema.categories.id, categoryIds),
-                        isNull(schema.categories.deletedAt)
-                    )
-                );
-        }
 
         // 5. Fetch Exercise Badges
         let exBadges: typeof schema.exerciseBadges.$inferSelect[] = [];
-        if (exerciseIds.length > 0) {
-            exBadges = await db.select()
-                .from(schema.exerciseBadges)
-                .where(
-                    and(
-                        inArray(schema.exerciseBadges.exerciseId, exerciseIds),
-                        isNull(schema.exerciseBadges.deletedAt)
-                    )
-                );
+        let categories: typeof schema.categories.$inferSelect[] = [];
+        if (exerciseIds.length > 0 || categoryIds.length > 0) {
+            const [categoryRows, exBadgeRows] = await Promise.all([
+                categoryIds.length > 0
+                    ? db.select()
+                        .from(schema.categories)
+                        .where(
+                            and(
+                                inArray(schema.categories.id, categoryIds),
+                                isNull(schema.categories.deletedAt)
+                            )
+                        )
+                    : Promise.resolve([]),
+                exerciseIds.length > 0
+                    ? db.select()
+                        .from(schema.exerciseBadges)
+                        .where(
+                            and(
+                                inArray(schema.exerciseBadges.exerciseId, exerciseIds),
+                                isNull(schema.exerciseBadges.deletedAt)
+                            )
+                        )
+                    : Promise.resolve([]),
+            ]);
+            categories = categoryRows;
+            exBadges = exBadgeRows;
         }
 
         // 6. Fetch Badges metadata

@@ -34,6 +34,8 @@ const DEFAULT_SCORE_CONFIG: ScoreConfig = {
     weatherBonusEnabled: 1,
 };
 
+const EPLEY_FORMULA_DIVISOR = 30;
+
 function normalizeName(s: string): string {
     return String(s ?? '').toLowerCase().trim();
 }
@@ -127,7 +129,7 @@ export class IronScoreService {
                     points_base: cfg.workoutCompletePoints,
                 });
 
-                const prEvents = await this.computePrEvents(userId, workoutId);
+                const prEvents = await this.computePrEvents(userId, workoutId, finishedAtMs);
                 for (const pr of prEvents) {
                     events.push(pr);
                 }
@@ -489,9 +491,14 @@ export class IronScoreService {
         return { streak_multiplier: streak.streakMultiplier, global_multiplier };
     }
 
-    private static async computePrEvents(userId: string, workoutId: string): Promise<Array<{ event_type: ScoreEventTypeExt; event_key: string; reference_id?: string | null; points_base: number }>> {
-        const workoutSets = await dbService.getAll<{ exercise_id: string; exercise_name: string; weight: number; reps: number }>(
+    private static async computePrEvents(
+        userId: string,
+        workoutId: string,
+        finishedAtMs: number
+    ): Promise<Array<{ event_type: ScoreEventTypeExt; event_key: string; reference_id?: string | null; points_base: number }>> {
+        const workoutSets = await dbService.getAll<{ id: string; exercise_id: string; exercise_name: string; weight: number; reps: number }>(
             `SELECT
+                s.id as id,
                 s.exercise_id as exercise_id,
                 e.name as exercise_name,
                 s.weight as weight,
@@ -507,37 +514,36 @@ export class IronScoreService {
             [workoutId]
         );
 
-        const bestByExercise = new Map<string, { exerciseName: string; oneRm: number }>();
+        if (workoutSets.length === 0) return [];
+
+        const bestByExercise = new Map<string, { exerciseName: string; oneRm: number; setId: string }>();
         for (const set of workoutSets) {
-            const oneRm = set.weight * (1 + set.reps / 30);
+            // Epley 1RM estimate is considered reliable up to ~10 reps, so we cap reps at 10.
+            // Sets with more than 10 reps are treated as 10-rep sets for 1RM calculation.
+            const effectiveReps = Math.min(set.reps, 10);
+            const oneRm = set.weight * (1 + effectiveReps / EPLEY_FORMULA_DIVISOR);
             const prev = bestByExercise.get(set.exercise_id);
             if (!prev || oneRm > prev.oneRm) {
-                bestByExercise.set(set.exercise_id, { exerciseName: set.exercise_name, oneRm });
+                bestByExercise.set(set.exercise_id, { exerciseName: set.exercise_name, oneRm, setId: set.id });
             }
         }
 
         const result: Array<{ event_type: ScoreEventTypeExt; event_key: string; reference_id?: string | null; points_base: number }> = [];
 
         for (const [exerciseId, cur] of bestByExercise.entries()) {
-            const previousMax = await dbService.getFirst<{ max_1rm: number | null }>(
-                `SELECT MAX(s.weight * (1.0 + (s.reps / 30.0))) as max_1rm
-                 FROM workout_sets s
-                 JOIN workouts w ON w.id = s.workout_id
-                 WHERE s.exercise_id = ?
-                   AND s.workout_id != ?
-                   AND s.completed = 1
-                   AND s.weight > 0
-                   AND s.reps > 0
-                   AND (s.type IS NULL OR s.type != 'warmup')
-                   AND s.deleted_at IS NULL
-                   AND w.deleted_at IS NULL
-                   AND w.status = 'completed'`,
-                [exerciseId, workoutId]
+            // OPTIMIZATION: Query user_exercise_prs instead of scanning workout_sets history
+            const previousPr = await dbService.getFirst<{ best_1rm_kg: number | null }>(
+                'SELECT best_1rm_kg FROM user_exercise_prs WHERE user_id = ? AND exercise_id = ? AND deleted_at IS NULL',
+                [userId, exerciseId]
             );
-            const oldOneRm = Number(previousMax?.max_1rm || 0);
+
+            const oldOneRm = Number(previousPr?.best_1rm_kg || 0);
             if (cur.oneRm <= oldOneRm) continue;
 
             const isBig3 = isBig3ExerciseName(cur.exerciseName);
+
+            // Update user_exercise_prs table as the new source of truth
+            await this.updateExercisePr(userId, exerciseId, cur.oneRm, cur.setId, finishedAtMs);
 
             result.push({
                 event_type: 'pr_broken',
@@ -548,6 +554,54 @@ export class IronScoreService {
         }
 
         return result;
+    }
+
+    private static async updateExercisePr(
+        userId: string,
+        exerciseId: string,
+        oneRm: number,
+        setId: string,
+        atMs: number
+    ): Promise<void> {
+        const id = `pr:${userId}:${exerciseId}`;
+        const existing = await dbService.getFirst<{ id: string }>(
+            'SELECT id FROM user_exercise_prs WHERE id = ?',
+            [id]
+        );
+
+        const payload = {
+            id,
+            user_id: userId,
+            exercise_id: exerciseId,
+            workout_set_id: setId,
+            best_1rm_kg: oneRm,
+            achieved_at: atMs,
+            updated_at: atMs,
+            deleted_at: null,
+        };
+
+        if (existing) {
+            await dbService.run(
+                'UPDATE user_exercise_prs SET workout_set_id = ?, best_1rm_kg = ?, achieved_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ?',
+                [setId, oneRm, atMs, atMs, id]
+            );
+            await dbService.queueSyncMutation('user_exercise_prs', id, 'UPDATE', payload);
+        } else {
+            const now = Date.now();
+            const exercise = await dbService.getExerciseById(exerciseId);
+            const record = {
+                ...payload,
+                exercise_name: exercise?.name || 'Unknown',
+                created_at: now,
+                updated_at: now
+            };
+
+            await dbService.run(
+                'INSERT INTO user_exercise_prs (id, user_id, exercise_id, exercise_name, workout_set_id, best_1rm_kg, achieved_at, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
+                [id, userId, exerciseId, record.exercise_name, setId, oneRm, atMs, now, now]
+            );
+            await dbService.queueSyncMutation('user_exercise_prs', id, 'INSERT', record);
+        }
     }
 
     private static async computeExtraDayEvent(

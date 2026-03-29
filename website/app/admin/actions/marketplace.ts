@@ -5,16 +5,21 @@ import { redirect } from 'next/navigation';
 import { randomUUID } from 'node:crypto';
 import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
-import { getAuthenticatedAdmin, getRedirectPath } from './shared';
+import { getRedirectPath, requireAdminAction, writeAdminAuditLog } from './shared';
 
 export async function handleMarketplaceEntityAction(formData: FormData) {
     let redirectPath = '';
+    let adminUserId: string | null = null;
+    let adminRole: 'viewer' | 'editor' | 'moderator' | 'superadmin' = 'viewer';
+    const table = formData.get('table') as 'exercises' | 'categories' | 'badges';
+    const intent = String(formData.get('intent') || '');
+    const targetId = String(formData.get('id') || '').trim() || null;
     try {
-        const adminId = await getAuthenticatedAdmin();
-        if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
+        const admin = await requireAdminAction({ action: 'admin.marketplace.entity', requiredRole: 'editor' });
+        const adminId = admin.userId;
+        adminUserId = admin.userId;
+        adminRole = admin.role;
 
-        const table = formData.get('table') as 'exercises' | 'categories' | 'badges';
-        const intent = String(formData.get('intent') || '');
         const id = String(formData.get('id') || '').trim() || randomUUID();
 
         if (intent === 'delete') {
@@ -124,10 +129,32 @@ export async function handleMarketplaceEntityAction(formData: FormData) {
         }
         revalidatePath('/admin');
         revalidatePath('/feed');
+
+        await writeAdminAuditLog({
+            adminUserId: admin.userId,
+            adminRole: admin.role,
+            action: 'admin.marketplace.entity',
+            status: 'success',
+            targetType: table,
+            targetId: id,
+            metadata: { intent },
+        });
     } catch (error: any) {
         console.error('Marketplace Entity Action Error:', error);
         revalidatePath('/admin');
         redirectPath = '/admin?tab=marketplace&section=exercises&error=action_failed';
+        if (adminUserId) {
+            await writeAdminAuditLog({
+                adminUserId,
+                adminRole,
+                action: 'admin.marketplace.entity',
+                status: 'error',
+                message: error?.message || 'unknown_error',
+                targetType: table,
+                targetId,
+                metadata: { intent },
+            });
+        }
     }
     if (redirectPath) redirect(redirectPath);
 }

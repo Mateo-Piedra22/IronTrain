@@ -4,10 +4,16 @@ import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { compareSemverDesc, type ChangelogRelease } from '../../../src/lib/changelog';
 import { syncChangelogToDatabase } from '../../../src/lib/changelog-db-sync';
+import { RATE_LIMITS } from '../../../src/lib/rate-limit';
 
 export const revalidate = 60; // Cache for 1 minute
 export const dynamic = 'force-dynamic';
 type ApiRelease = ChangelogRelease & { id: string; metadata: unknown };
+
+function getClientIp(request: NextRequest): string {
+    const forwardedFor = request.headers.get('x-forwarded-for') ?? 'unknown';
+    return forwardedFor.split(',')[0]?.trim() || 'unknown';
+}
 
 function toIsoSafe(value: unknown): string | null {
     if (value instanceof Date) return value.toISOString();
@@ -20,6 +26,20 @@ function toIsoSafe(value: unknown): string | null {
 
 export async function GET(request: NextRequest) {
     try {
+        const clientIp = getClientIp(request);
+        const rateLimit = await RATE_LIMITS.CHANGELOG_LIST(`anon:${clientIp}`);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
+        }
+
         const includeUnreleasedParam = new URL(request.url).searchParams.get('includeUnreleased');
         const includeUnreleased = includeUnreleasedParam === '1' || includeUnreleasedParam === 'true';
 
@@ -32,10 +52,10 @@ export async function GET(request: NextRequest) {
         const releases = data.map((c) => ({
             id: c.id,
             version: c.version,
-            date: toIsoSafe((c as any)?.date),
+            date: toIsoSafe(c.date),
             items: (c.items as string[]) || [],
             unreleased: c.isUnreleased === true,
-            metadata: (c.metadata as any) || null,
+            metadata: c.metadata || null,
             reactionCount: c.reactionCount
         }))
             .filter((r) => includeUnreleased || r.unreleased !== true)

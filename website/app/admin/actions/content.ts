@@ -8,15 +8,19 @@ import * as schema from '../../../src/db/schema';
 import { syncChangelogToDatabase } from '../../../src/lib/changelog-db-sync';
 import { sendSegmentedPush } from '../../../src/lib/firebase-admin';
 import { changelogSchema, globalEventSchema } from './schemas';
-import { getAuthenticatedAdmin, getRedirectPath } from './shared';
+import { getRedirectPath, requireAdminAction, writeAdminAuditLog } from './shared';
 
 export async function handleChangelogAction(formData: FormData) {
     let redirectPath = '';
+    let adminUserId: string | null = null;
+    let adminRole: 'viewer' | 'editor' | 'moderator' | 'superadmin' = 'viewer';
+    const intent = String(formData.get('intent') || '');
+    const targetId = String(formData.get('id') || '').trim() || null;
     try {
-        const adminId = await getAuthenticatedAdmin();
-        if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
-
-        const intent = String(formData.get('intent') || '');
+        const admin = await requireAdminAction({ action: 'admin.content.changelog', requiredRole: 'editor' });
+        const adminId = admin.userId;
+        adminUserId = admin.userId;
+        adminRole = admin.role;
         const id = String(formData.get('id') || '').trim() || randomUUID();
 
         if (intent === 'delete') {
@@ -69,21 +73,48 @@ export async function handleChangelogAction(formData: FormData) {
             redirectPath = await getRedirectPath(formData, 'changelog');
         }
         revalidatePath('/admin');
+
+        await writeAdminAuditLog({
+            adminUserId: adminId,
+            adminRole: admin.role,
+            action: 'admin.content.changelog',
+            status: 'success',
+            targetType: 'changelog',
+            targetId: id,
+            metadata: { intent },
+        });
     } catch (error: any) {
         console.error('Changelog Action Error:', error);
         revalidatePath('/admin');
         redirectPath = '/admin?tab=content&section=changelog&error=action_failed';
+        if (adminUserId) {
+            await writeAdminAuditLog({
+                adminUserId,
+                adminRole,
+                action: 'admin.content.changelog',
+                status: 'error',
+                message: error?.message || 'unknown_error',
+                targetType: 'changelog',
+                targetId,
+                metadata: { intent },
+            });
+        }
     }
     if (redirectPath) redirect(redirectPath);
 }
 
 export async function handleGlobalEventAction(formData: FormData) {
     let redirectPath = '';
+    let adminUserId: string | null = null;
+    let adminRole: 'viewer' | 'editor' | 'moderator' | 'superadmin' = 'viewer';
+    const intent = String(formData.get('intent') || '');
+    const targetId = String(formData.get('id') || '').trim() || null;
     try {
-        const adminId = await getAuthenticatedAdmin();
-        if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
+        const admin = await requireAdminAction({ action: 'admin.content.global-event', requiredRole: 'editor' });
+        const adminId = admin.userId;
+        adminUserId = admin.userId;
+        adminRole = admin.role;
 
-        const intent = String(formData.get('intent') || '');
         const id = String(formData.get('id') || '').trim() || randomUUID();
 
         if (intent === 'delete') {
@@ -143,19 +174,45 @@ export async function handleGlobalEventAction(formData: FormData) {
             revalidatePath('/feed');
             redirectPath = await getRedirectPath(formData, 'events');
         }
+
+        await writeAdminAuditLog({
+            adminUserId: admin.userId,
+            adminRole: admin.role,
+            action: 'admin.content.global-event',
+            status: 'success',
+            targetType: 'global_event',
+            targetId: id,
+            metadata: { intent },
+        });
     } catch (error: any) {
         console.error('Global Event Action Error:', error);
         revalidatePath('/admin');
         redirectPath = '/admin?tab=content&section=events&error=action_failed';
+        if (adminUserId) {
+            await writeAdminAuditLog({
+                adminUserId,
+                adminRole,
+                action: 'admin.content.global-event',
+                status: 'error',
+                message: error?.message || 'unknown_error',
+                targetType: 'global_event',
+                targetId,
+                metadata: { intent },
+            });
+        }
     }
     if (redirectPath) redirect(redirectPath);
 }
 
 export async function handleChangelogPublishAction(formData: FormData) {
     let redirectPath = '';
+    let adminUserId: string | null = null;
+    let adminRole: 'viewer' | 'editor' | 'moderator' | 'superadmin' = 'viewer';
+    const targetId = String(formData.get('id') || '').trim() || null;
     try {
-        const adminId = await getAuthenticatedAdmin();
-        if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
+        const admin = await requireAdminAction({ action: 'admin.content.publish-changelog', requiredRole: 'editor' });
+        adminUserId = admin.userId;
+        adminRole = admin.role;
 
         const id = String(formData.get('id') || '').trim();
         if (!id) throw new Error('MISSING_CHANGELOG_ID');
@@ -174,19 +231,43 @@ export async function handleChangelogPublishAction(formData: FormData) {
 
         revalidatePath('/admin');
         redirectPath = '/admin?tab=content&section=changelog&success=published';
+
+        await writeAdminAuditLog({
+            adminUserId: admin.userId,
+            adminRole: admin.role,
+            action: 'admin.content.publish-changelog',
+            status: 'success',
+            targetType: 'changelog',
+            targetId: id,
+        });
     } catch (error: any) {
         console.error('Changelog Publish Action Error:', error);
         revalidatePath('/admin');
         redirectPath = '/admin?tab=content&section=changelog&error=publish_failed';
+        if (adminUserId) {
+            await writeAdminAuditLog({
+                adminUserId,
+                adminRole,
+                action: 'admin.content.publish-changelog',
+                status: 'error',
+                message: error?.message || 'unknown_error',
+                targetType: 'changelog',
+                targetId,
+            });
+        }
     }
     if (redirectPath) redirect(redirectPath);
 }
 
 export async function handleGlobalEventDeriveAnnouncementAction(formData: FormData) {
     let redirectPath = '';
+    let adminUserId: string | null = null;
+    let adminRole: 'viewer' | 'editor' | 'moderator' | 'superadmin' = 'viewer';
+    const targetId = String(formData.get('id') || '').trim() || null;
     try {
-        const adminId = await getAuthenticatedAdmin();
-        if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
+        const admin = await requireAdminAction({ action: 'admin.content.derive-event-announcement', requiredRole: 'editor' });
+        adminUserId = admin.userId;
+        adminRole = admin.role;
 
         const id = String(formData.get('id') || '').trim();
         if (!id) throw new Error('MISSING_EVENT_ID');
@@ -203,19 +284,42 @@ export async function handleGlobalEventDeriveAnnouncementAction(formData: FormDa
 
         revalidatePath('/admin');
         redirectPath = `/admin?tab=content&section=broadcast&success=derived`;
+
+        await writeAdminAuditLog({
+            adminUserId: admin.userId,
+            adminRole: admin.role,
+            action: 'admin.content.derive-event-announcement',
+            status: 'success',
+            targetType: 'global_event',
+            targetId: id,
+        });
     } catch (error: any) {
         console.error('Global Event Derive Action Error:', error);
         revalidatePath('/admin');
         redirectPath = '/admin?tab=content&section=events&error=derive_failed';
+        if (adminUserId) {
+            await writeAdminAuditLog({
+                adminUserId,
+                adminRole,
+                action: 'admin.content.derive-event-announcement',
+                status: 'error',
+                message: error?.message || 'unknown_error',
+                targetType: 'global_event',
+                targetId,
+            });
+        }
     }
     if (redirectPath) redirect(redirectPath);
 }
 
 export async function handleChangelogSyncAction() {
     let redirectPath = '';
+    let adminUserId: string | null = null;
+    let adminRole: 'viewer' | 'editor' | 'moderator' | 'superadmin' = 'viewer';
     try {
-        const adminId = await getAuthenticatedAdmin();
-        if (!adminId) throw new Error('UNAUTHORIZED_ADMIN_ACCESS');
+        const admin = await requireAdminAction({ action: 'admin.content.sync-changelog', requiredRole: 'editor' });
+        adminUserId = admin.userId;
+        adminRole = admin.role;
 
         const result = await syncChangelogToDatabase({ force: true, minIntervalMs: 0 });
         revalidatePath('/admin');
@@ -226,10 +330,31 @@ export async function handleChangelogSyncAction() {
         query.set('changelogSource', String(result.sourceCount));
         query.set('changelogSyncedAt', result.syncedAt);
         redirectPath = `/admin?tab=content&section=changelog&${query.toString()}`;
+
+        await writeAdminAuditLog({
+            adminUserId: admin.userId,
+            adminRole: admin.role,
+            action: 'admin.content.sync-changelog',
+            status: 'success',
+            metadata: {
+                reason: result.reason,
+                upsertedCount: result.upsertedCount,
+                sourceCount: result.sourceCount,
+            },
+        });
     } catch (error: any) {
         console.error('Changelog Sync Error:', error);
         revalidatePath('/admin');
         redirectPath = '/admin?tab=content&section=changelog&error=sync_failed';
+        if (adminUserId) {
+            await writeAdminAuditLog({
+                adminUserId,
+                adminRole,
+                action: 'admin.content.sync-changelog',
+                status: 'error',
+                message: error?.message || 'unknown_error',
+            });
+        }
     }
     if (redirectPath) redirect(redirectPath);
 }

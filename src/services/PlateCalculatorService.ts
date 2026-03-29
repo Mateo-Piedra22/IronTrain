@@ -15,6 +15,10 @@ export interface PlateCalculationResult {
 }
 
 const SCALE = 100;
+// Safety cap for DP search width; each slot uses ~12 bytes across dp + trace arrays.
+// Memory usage ≈ MAX_DP_SEARCH_UNITS * 12 bytes.
+// For MAX_DP_SEARCH_UNITS = 500_000 this is 500_000 * 12 ≈ 6_000_000 bytes (~5.7 MiB).
+const MAX_DP_SEARCH_UNITS = 500_000;
 
 function toInt(weight: number): number {
     return Math.round(weight * SCALE);
@@ -54,10 +58,7 @@ function buildLoadout(chosen: Map<number, number>, barInt: number, metadataMap: 
     };
 }
 
-function scoreFewerPlates(loadout: PlateLoadout): number {
-    const totalPairs = loadout.perSide.reduce((acc, p) => acc + p.pairs, 0);
-    return totalPairs;
-}
+
 
 export class PlateCalculatorService {
     static calculate(options: {
@@ -67,9 +68,6 @@ export class PlateCalculatorService {
         maxSolutions?: number;
         preferFewerPlates?: boolean;
     }): PlateCalculationResult {
-        const maxSolutions = Math.max(1, Math.min(options.maxSolutions ?? 6, 20));
-        const preferFewerPlates = options.preferFewerPlates ?? true;
-
         const target = Number.isFinite(options.targetWeight) ? options.targetWeight : 0;
         const bar = Number.isFinite(options.barWeight) ? options.barWeight : 0;
 
@@ -85,77 +83,103 @@ export class PlateCalculatorService {
         const metadataMap = new Map<number, { color?: string; type?: PlateType }>();
         items.forEach(item => metadataMap.set(item.weightInt, { color: item.color, type: item.type }));
 
-        const chosen = new Map<number, number>();
+        // Phase 1: Bounded Knapsack Dynamic Programming
+        // dp[w] = minimum plates required to hit weight w per side
+        const maxPlateWeight = items.length > 0 ? items[0].weightInt : 0;
+        const reachableSideMax = items.reduce((acc, item) => acc + item.weightInt * item.pairs, 0);
+        const desiredSearchW = sideTargetInt + maxPlateWeight * 2; // Buffer for closestAbove
+        const maxSearchW = Math.min(desiredSearchW, reachableSideMax, MAX_DP_SEARCH_UNITS);
+        
+        const INF = 1000000;
+        const dp = new Int32Array(maxSearchW + 1);
+        dp.fill(INF);
+        dp[0] = 0;
+
+        // Traceback matrices to reconstruct the optimal loadout
+        const traceItemIdx = new Int16Array(maxSearchW + 1);
+        const traceCount = new Int16Array(maxSearchW + 1);
+        const tracePrevW = new Int32Array(maxSearchW + 1);
+        traceItemIdx.fill(-1);
+        traceCount.fill(0);
+        tracePrevW.fill(-1);
+
+        for (let idx = 0; idx < items.length; idx++) {
+            const item = items[idx];
+            const w = item.weightInt;
+            const count = item.pairs;
+
+            // Traverse backwards to properly consume items as a bounded knapsack
+            for (let currentW = maxSearchW; currentW >= 0; currentW--) {
+                if (dp[currentW] === INF) continue;
+
+                for (let k = 1; k <= count; k++) {
+                    const nextW = currentW + k * w;
+                    if (nextW <= maxSearchW) {
+                        const newPlatesCount = dp[currentW] + k;
+                        // For equal plate counts, prefer heavier plates (which occurs naturally due to item sorting, 
+                        // but < strictly enforces minimum plates)
+                        if (newPlatesCount < dp[nextW]) {
+                            dp[nextW] = newPlatesCount;
+                            traceItemIdx[nextW] = idx;
+                            traceCount[nextW] = k;
+                            tracePrevW[nextW] = currentW;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Helper to reconstruct loadout from DP traces
+        const reconstruct = (w: number): PlateLoadout | null => {
+            if (dp[w] === INF) return null;
+            const chosen = new Map<number, number>();
+            let current = w;
+            
+            while (current > 0) {
+                const idx = traceItemIdx[current];
+                if (idx === -1) break; 
+                
+                const k = traceCount[current];
+                const item = items[idx];
+                
+                // DP might trace multiple sets of the same plate if our algorithm branched, 
+                // but bounded backwards loop ensures distinct items per trace edge
+                chosen.set(item.weightInt, (chosen.get(item.weightInt) || 0) + k);
+                current = tracePrevW[current];
+            }
+            return buildLoadout(chosen, barInt, metadataMap);
+        };
+
         const exact: PlateLoadout[] = [];
-        let bestBelowDiff = Number.POSITIVE_INFINITY;
-        let bestAboveDiff = Number.POSITIVE_INFINITY;
         let bestBelowLoadout: PlateLoadout | null = null;
         let bestAboveLoadout: PlateLoadout | null = null;
 
-        const dfs = (idx: number, remaining: number) => {
-            if (exact.length >= maxSolutions && bestBelowLoadout && bestAboveLoadout) return;
+        // 1. Find Exact Target Math
+        if (sideTargetInt <= maxSearchW && dp[sideTargetInt] !== INF) {
+            const loadout = reconstruct(sideTargetInt);
+            if (loadout) exact.push(loadout);
+        }
 
-            if (idx >= items.length) {
-                const sideSumInt = Array.from(chosen.entries()).reduce((acc, [w, k]) => acc + (w * k), 0);
-                const loadout = buildLoadout(chosen, barInt, metadataMap);
-                const diff = sideTargetInt - sideSumInt;
-
-                if (diff === 0) {
-                    exact.push(loadout);
-                } else if (diff > 0) {
-                    if (diff < bestBelowDiff) {
-                        bestBelowDiff = diff;
-                        bestBelowLoadout = loadout;
-                    }
-                } else {
-                    const over = Math.abs(diff);
-                    if (over < bestAboveDiff) {
-                        bestAboveDiff = over;
-                        bestAboveLoadout = loadout;
-                    }
-                }
-                return;
+        // 2. Find Closest Below
+        for (let w = Math.min(sideTargetInt - 1, maxSearchW); w > 0; w--) {
+            if (dp[w] !== INF) {
+                bestBelowLoadout = reconstruct(w);
+                break;
             }
+        }
 
-            const item = items[idx];
-            const maxPairs = item.pairs;
-            const w = item.weightInt;
-
-            const maxK = Math.min(maxPairs, Math.floor(remaining / w) + 4);
-            for (let k = maxK; k >= 0; k--) {
-                if (k > 0) chosen.set(w, k);
-                else chosen.delete(w);
-
-                const nextRemaining = remaining - (k * w);
-                if (nextRemaining < 0) {
-                    dfs(idx + 1, nextRemaining);
-                    continue;
-                }
-
-                dfs(idx + 1, nextRemaining);
-
-                if (exact.length >= maxSolutions && preferFewerPlates) {
-                    const last = exact[exact.length - 1];
-                    if (last && scoreFewerPlates(last) <= 2) break;
+        // 3. Find Closest Above
+        if (sideTargetInt < maxSearchW) {
+            for (let w = sideTargetInt + 1; w <= maxSearchW; w++) {
+                if (dp[w] !== INF) {
+                    bestAboveLoadout = reconstruct(w);
+                    break;
                 }
             }
-        };
-
-        dfs(0, sideTargetInt);
-
-        const uniqueKey = (l: PlateLoadout) => l.perSide.map((p) => `${p.plate}x${p.pairs}`).join('|');
-        const uniqueExact = new Map<string, PlateLoadout>();
-        for (const l of exact) uniqueExact.set(uniqueKey(l), l);
-
-        const sortedExact = Array.from(uniqueExact.values()).sort((a, b) => {
-            const sa = scoreFewerPlates(a);
-            const sb = scoreFewerPlates(b);
-            if (preferFewerPlates && sa !== sb) return sa - sb;
-            return b.totalWeight - a.totalWeight;
-        });
+        }
 
         return {
-            exact: sortedExact.slice(0, maxSolutions),
+            exact,
             closestBelow: bestBelowLoadout,
             closestAbove: bestAboveLoadout,
             targetWeight: target,

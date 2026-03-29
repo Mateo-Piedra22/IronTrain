@@ -26,6 +26,7 @@ export class PushRegistrationService {
 
             if (finalStatus !== 'granted') {
                 logger.warn('Failed to get push token for push notification!');
+                await AppNotificationService.unregisterPushToken();
                 return null;
             }
 

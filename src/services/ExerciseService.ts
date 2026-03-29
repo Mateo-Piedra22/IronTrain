@@ -1,6 +1,5 @@
 import { Exercise, ExerciseType } from '../types/db';
 import { capitalizeWords } from '../utils/text';
-import { uuidV4 } from '../utils/uuid';
 import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
 export { Exercise };
@@ -67,13 +66,15 @@ export class ExerciseService {
     }
 
     static async create(data: Omit<Exercise, 'id' | 'is_system'>): Promise<string> {
-        const id = uuidV4();
         const name = capitalizeWords(data.name);
-        await dbService.run(
-            'INSERT INTO exercises (id, category_id, name, type, notes) VALUES (?, ?, ?, ?, ?)',
-            [id, data.category_id, name, data.type, data.notes ?? null]
-        );
-        await dbService.queueSyncMutation('exercises', id, 'INSERT', { id, category_id: data.category_id, name, type: data.type, notes: data.notes ?? null, is_system: 0 });
+        const id = await dbService.insert('exercises', {
+            category_id: data.category_id,
+            name,
+            type: data.type,
+            notes: data.notes ?? null,
+            is_system: 0,
+            default_increment: data.default_increment ?? 2.5
+        } as Partial<Exercise>);
 
         // Emit for real-time UI updates
         dataEventService.emit('DATA_UPDATED');
@@ -85,17 +86,13 @@ export class ExerciseService {
         const existing = await dbService.getFirst<Pick<Exercise, 'type'>>('SELECT type FROM exercises WHERE id = ?', [id]);
         if (!existing) throw new Error('Exercise not found');
 
-        const updates: string[] = [];
-        const values: any[] = [];
+        const updates: Partial<Exercise> = {};
+        if (data.name !== undefined) updates.name = capitalizeWords(data.name);
+        if (data.category_id !== undefined) updates.category_id = data.category_id;
+        if (data.type !== undefined) updates.type = data.type;
+        if (data.notes !== undefined) updates.notes = data.notes;
 
-        const normalizedName = data.name !== undefined ? capitalizeWords(data.name) : undefined;
-
-        if (normalizedName !== undefined) { updates.push('name = ?'); values.push(normalizedName); }
-        if (data.category_id !== undefined) { updates.push('category_id = ?'); values.push(data.category_id); }
-        if (data.type !== undefined) { updates.push('type = ?'); values.push(data.type); }
-        if (data.notes !== undefined) { updates.push('notes = ?'); values.push(data.notes); }
-
-        if (updates.length === 0) return;
+        if (Object.keys(updates).length === 0) return;
 
         const nextType: ExerciseType = (data.type as ExerciseType) ?? (existing.type as ExerciseType);
         const prevType: ExerciseType = existing.type as ExerciseType;
@@ -103,8 +100,7 @@ export class ExerciseService {
 
         try {
             await dbService.withTransaction(async () => {
-                values.push(id);
-                await dbService.run(`UPDATE exercises SET ${updates.join(', ')} WHERE id = ?`, values);
+                await dbService.update('exercises', id, updates);
 
                 if (typeChanged) {
                     if (nextType === 'distance_time') {
@@ -150,7 +146,6 @@ export class ExerciseService {
                     }
                 }
             });
-            await dbService.queueSyncMutation('exercises', id, 'UPDATE', data);
 
             // Emit for real-time UI updates
             dataEventService.emit('DATA_UPDATED');
@@ -174,21 +169,16 @@ export class ExerciseService {
             throw new Error('Cannot delete exercise with existing history');
         }
 
-        const linkedRoutineExercises = await dbService.getAll<{ id: string }>(
-            'SELECT id FROM routine_exercises WHERE exercise_id = ? AND deleted_at IS NULL',
-            [id]
-        );
-
         await dbService.withTransaction(async () => {
-            await dbService.run('DELETE FROM routine_exercises WHERE exercise_id = ?', [id]);
-            await dbService.run('DELETE FROM exercises WHERE id = ?', [id]);
+            const linkedRoutineExercises = await dbService.getAll<{ id: string }>(
+                'SELECT id FROM routine_exercises WHERE exercise_id = ?',
+                [id]
+            );
+            for (const row of linkedRoutineExercises) {
+                await dbService.delete('routine_exercises', row.id);
+            }
+            await dbService.delete('exercises', id);
         });
-
-        for (const row of linkedRoutineExercises) {
-            await dbService.queueSyncMutation('routine_exercises', row.id, 'DELETE');
-        }
-
-        await dbService.queueSyncMutation('exercises', id, 'DELETE');
 
         // Emit for real-time UI updates
         dataEventService.emit('DATA_UPDATED');

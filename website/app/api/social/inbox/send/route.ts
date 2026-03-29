@@ -1,32 +1,56 @@
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '../../../../../src/db';
 import * as schema from '../../../../../src/db/schema';
 import { verifyAuth } from '../../../../../src/lib/auth';
 import { runDbTransaction } from '../../../../../src/lib/db-transaction';
+import { recordEndpointMetric } from '../../../../../src/lib/endpoint-metrics';
+import { logger } from '../../../../../src/lib/logger';
+import { RATE_LIMITS } from '../../../../../src/lib/rate-limit';
 import { formatActorName, getUserBrief, notifyUserById } from '../../../../../src/lib/social-notifications';
 
 const MAX_PAYLOAD_SIZE = 1_000_000; // 1MB max payload
 
+const inboxSendSchema = z.object({
+    friendId: z.string().trim().min(1),
+    type: z.literal('routine'),
+    payload: z.record(z.string(), z.unknown()),
+});
+
 export async function POST(req: NextRequest) {
     try {
         const userId = await verifyAuth(req);
-        if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-        const body = await req.json();
-        const { friendId, payload, type } = body;
-
-        if (!friendId || typeof friendId !== 'string') {
-            return NextResponse.json({ error: 'Invalid friendId' }, { status: 400 });
+        if (!userId) {
+            recordEndpointMetric({ endpoint: 'social.inbox.send', outcome: 'error', statusCode: 401, event: 'unauthorized' });
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        const rateLimit = await RATE_LIMITS.SOCIAL_INBOX_SEND(userId);
+        if (!rateLimit.ok) {
+            recordEndpointMetric({ endpoint: 'social.inbox.send', outcome: 'error', statusCode: 429, event: 'rate_limited' });
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
+        }
+
+        const body = await req.json().catch(() => null);
+        const parsed = inboxSendSchema.safeParse(body);
+        if (!parsed.success) {
+            recordEndpointMetric({ endpoint: 'social.inbox.send', outcome: 'error', statusCode: 400, event: 'invalid_body' });
+            return NextResponse.json({ error: 'Invalid request body', details: parsed.error.flatten() }, { status: 400 });
+        }
+        const { friendId, payload, type } = parsed.data;
+
         if (userId === friendId) {
+            recordEndpointMetric({ endpoint: 'social.inbox.send', outcome: 'error', statusCode: 400, event: 'self_target' });
             return NextResponse.json({ error: 'Cannot send to yourself' }, { status: 400 });
-        }
-        if (!payload || typeof payload !== 'object') {
-            return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
-        }
-        if (!type || typeof type !== 'string' || !['routine'].includes(type)) {
-            return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
         }
 
         // Verify accepted friendship exists
@@ -44,13 +68,50 @@ export async function POST(req: NextRequest) {
             );
 
         if (existing.length === 0) {
+            recordEndpointMetric({ endpoint: 'social.inbox.send', outcome: 'error', statusCode: 403, event: 'friendship_required' });
             return NextResponse.json({ error: 'You must be friends to send routines' }, { status: 403 });
         }
 
         // Serialize and validate payload size
         const payloadStr = JSON.stringify(payload);
         if (payloadStr.length > MAX_PAYLOAD_SIZE) {
+            recordEndpointMetric({ endpoint: 'social.inbox.send', outcome: 'error', statusCode: 413, event: 'payload_too_large' });
             return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+        }
+
+        const dedupWindowMs = 60_000;
+        const dedupThreshold = new Date(Date.now() - dedupWindowMs);
+        const [recentDuplicate] = await db.select({ id: schema.sharesInbox.id })
+            .from(schema.sharesInbox)
+            .where(and(
+                eq(schema.sharesInbox.senderId, userId),
+                eq(schema.sharesInbox.receiverId, friendId),
+                eq(schema.sharesInbox.type, type),
+                eq(schema.sharesInbox.status, 'pending'),
+                isNull(schema.sharesInbox.deletedAt),
+                sql`${schema.sharesInbox.updatedAt} >= ${dedupThreshold}`,
+                sql`${schema.sharesInbox.payload} = ${payloadStr}::jsonb`
+            ))
+            .limit(1);
+
+        if (recentDuplicate?.id) {
+            logger.infoSampled('[Social/InboxSend] Deduplicated repeated share', {
+                sampleRate: 0.2,
+                sampleKey: `${userId}:${friendId}:${type}`,
+                context: {
+                    userId,
+                    friendId,
+                    inboxId: recentDuplicate.id,
+                    type,
+                },
+            });
+            recordEndpointMetric({ endpoint: 'social.inbox.send', outcome: 'conflict', statusCode: 200, event: 'deduplicated' });
+            return NextResponse.json({
+                success: true,
+                deduplicated: true,
+                inboxId: recentDuplicate.id,
+                message: 'Already sent recently',
+            });
         }
 
         const newId = crypto.randomUUID();
@@ -100,9 +161,11 @@ export async function POST(req: NextRequest) {
             }
         );
 
+        recordEndpointMetric({ endpoint: 'social.inbox.send', outcome: 'success', statusCode: 200, event: 'created' });
         return NextResponse.json({ success: true, message: 'Sent to inbox' });
     } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Internal server error';
+        recordEndpointMetric({ endpoint: 'social.inbox.send', outcome: 'error', statusCode: 500, event: 'internal_error' });
         return NextResponse.json({ error: message }, { status: 500 });
     }
 }

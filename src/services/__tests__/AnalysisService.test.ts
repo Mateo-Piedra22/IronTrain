@@ -146,8 +146,7 @@ describe('AnalysisService', () => {
       const mid = cutoff + Math.floor((now - cutoff) / 2);
 
       (dbService.getAll as jest.Mock).mockResolvedValueOnce([
-        { exerciseId: 'e1', exerciseName: 'Bench', weight: 80, reps: 5, date: mid - 1000 },
-        { exerciseId: 'e1', exerciseName: 'Bench', weight: 90, reps: 5, date: mid + 1000 },
+        { exerciseId: 'e1', exerciseName: 'Bench', start1RM: 93, end1RM: 105, dateFirst: mid - 1000, dateLast: mid + 1000 },
       ]);
 
       const rows = await AnalysisService.getTop1RMProgress(30, 6);

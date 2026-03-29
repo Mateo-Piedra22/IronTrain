@@ -1,19 +1,40 @@
 import { and, desc, eq, gte, lte, ne } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
 import { toIsoSafe } from '../../../../src/lib/date-utils';
 import { logger } from '../../../../src/lib/logger';
 import { validateDisplayName, validateUsername } from '../../../../src/lib/moderation';
+import { RATE_LIMITS } from '../../../../src/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+const profileUpdateSchema = z.object({
+    displayName: z.string().optional(),
+    username: z.union([z.string(), z.null()]).optional(),
+    isPublic: z.union([z.boolean(), z.literal(0), z.literal(1), z.literal('0'), z.literal('1'), z.literal('true'), z.literal('false')]).optional(),
+});
 
 export async function GET(req: NextRequest) {
     try {
         const userId = await verifyAuth(req);
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+        const rateLimit = await RATE_LIMITS.SOCIAL_PROFILE_READ(userId);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
+        }
 
         let profiles = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, userId));
         const profile = profiles[0];
@@ -46,7 +67,7 @@ export async function GET(req: NextRequest) {
                     id: activeEvent.id,
                     title: activeEvent.name,
                     multiplier: activeEvent.multiplier,
-                    endDate: toIsoSafe((activeEvent as any)?.endDate),
+                    endDate: toIsoSafe(activeEvent.endDate),
                 } : null
             }
         });
@@ -61,10 +82,25 @@ export async function PUT(req: NextRequest) {
         const userId = await verifyAuth(req);
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const body = await req.json();
-        if (!body || typeof body !== 'object') {
-            return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+        const rateLimit = await RATE_LIMITS.SOCIAL_PROFILE_UPDATE(userId);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
         }
+
+        const body = await req.json().catch(() => null);
+        const parsed = profileUpdateSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({ error: 'Invalid payload', details: parsed.error.flatten() }, { status: 400 });
+        }
+        const payload = parsed.data;
 
         // Basic CSRF Protection: Require custom header for non-GET requests
         const requestedWith = req.headers.get('x-requested-with');
@@ -75,24 +111,20 @@ export async function PUT(req: NextRequest) {
         }
 
         let sanitizedDisplayName: string | undefined;
-        if (body.displayName !== undefined) {
-            if (typeof body.displayName !== 'string') {
-                return NextResponse.json({ error: 'displayName must be a string' }, { status: 400 });
-            }
-
-            const validation = validateDisplayName(body.displayName);
+        if (payload.displayName !== undefined) {
+            const validation = validateDisplayName(payload.displayName);
             if (!validation.valid) {
                 return NextResponse.json({ error: validation.error }, { status: 400 });
             }
-            sanitizedDisplayName = body.displayName.trim();
+            sanitizedDisplayName = payload.displayName.trim();
         }
 
         let sanitizedUsername: string | null | undefined;
-        if (body.username !== undefined) {
-            if (body.username === null) {
+        if (payload.username !== undefined) {
+            if (payload.username === null) {
                 sanitizedUsername = null;
-            } else if (typeof body.username === 'string') {
-                const normalized = body.username.trim().toLowerCase();
+            } else if (typeof payload.username === 'string') {
+                const normalized = payload.username.trim().toLowerCase();
                 if (normalized.length === 0) {
                     sanitizedUsername = null;
                 } else {
@@ -115,8 +147,8 @@ export async function PUT(req: NextRequest) {
         }
 
         let normalizedIsPublic: boolean | undefined;
-        if (body.isPublic !== undefined) {
-            const raw = body.isPublic;
+        if (payload.isPublic !== undefined) {
+            const raw = payload.isPublic;
             if (raw === 1 || raw === true || raw === '1' || raw === 'true') normalizedIsPublic = true;
             else if (raw === 0 || raw === false || raw === '0' || raw === 'false') normalizedIsPublic = false;
             else return NextResponse.json({ error: 'isPublic inválido' }, { status: 400 });
@@ -176,8 +208,8 @@ export async function PUT(req: NextRequest) {
 
         return NextResponse.json({ success: true });
     } catch (e: unknown) {
-        const error = e as any;
-        if (error.code === '23505') { // Postgres Unique Violation
+        const errorCode = typeof e === 'object' && e !== null && 'code' in e ? String((e as { code?: unknown }).code) : undefined;
+        if (errorCode === '23505') { // Postgres Unique Violation
             return NextResponse.json({ error: 'Este nombre de usuario ya está en uso' }, { status: 409 });
         }
         const message = e instanceof Error ? e.message : 'Internal server error';
@@ -189,6 +221,19 @@ export async function DELETE(req: NextRequest) {
     try {
         const userId = await verifyAuth(req);
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+        const rateLimit = await RATE_LIMITS.SOCIAL_PROFILE_UPDATE(userId);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
+        }
 
         logger.info('[API] Permanent account deletion requested', { userId });
 

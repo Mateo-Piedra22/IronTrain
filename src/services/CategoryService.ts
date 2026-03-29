@@ -1,6 +1,5 @@
 import { Category } from '../types/db';
 import { capitalizeWords } from '../utils/text';
-import { uuidV4 } from '../utils/uuid';
 import { dbService } from './DatabaseService';
 export { Category };
 
@@ -48,10 +47,12 @@ export class CategoryService {
 
     static async create(name: string, color: string = '#3b82f6'): Promise<string> {
         const normalizedName = capitalizeWords(name);
-        const id = uuidV4();
-        await dbService.run('INSERT INTO categories (id, name, color, is_system) VALUES (?, ?, ?, 0)', [id, normalizedName, color]);
-        await dbService.queueSyncMutation('categories', id, 'INSERT', { id, name: normalizedName, color, is_system: 0 });
-        return id;
+        return await dbService.insert('categories', {
+            name: normalizedName,
+            color,
+            is_system: 0,
+            sort_order: 0
+        } as Partial<Category>);
     }
 
     static async update(id: string, name: string, color?: string): Promise<void> {
@@ -68,13 +69,10 @@ export class CategoryService {
             throw new Error('Cannot edit uncategorized category');
         }
 
-        if (color) {
-            await dbService.run('UPDATE categories SET name = ?, color = ? WHERE id = ?', [normalizedName, color, id]);
-            await dbService.queueSyncMutation('categories', id, 'UPDATE', { name: normalizedName, color });
-        } else {
-            await dbService.run('UPDATE categories SET name = ? WHERE id = ?', [normalizedName, id]);
-            await dbService.queueSyncMutation('categories', id, 'UPDATE', { name: normalizedName });
-        }
+        const updates: any = { name: normalizedName };
+        if (color) updates.color = color;
+
+        await dbService.update('categories', id, updates);
     }
 
     static async delete(id: string): Promise<void> {
@@ -90,8 +88,7 @@ export class CategoryService {
             throw new Error('Cannot delete category with existing exercises');
         }
 
-        await dbService.run('DELETE FROM categories WHERE id = ?', [id]);
-        await dbService.queueSyncMutation('categories', id, 'DELETE');
+        await dbService.delete('categories', id);
     }
 
     static async deleteAndReassignExercises(id: string, targetCategoryId?: string): Promise<void> {
@@ -112,13 +109,12 @@ export class CategoryService {
 
         try {
             await dbService.withTransaction(async () => {
-                await dbService.run('UPDATE exercises SET category_id = ? WHERE category_id = ?', [toCategoryId, id]);
+                const exercisesToReassign = await dbService.getAll<{ id: string }>('SELECT id FROM exercises WHERE category_id = ?', [id]);
+                for (const ex of exercisesToReassign) {
+                    await dbService.update('exercises', ex.id, { category_id: toCategoryId });
+                }
 
-                // Queue exercise category updates
-                const updatedExercises = await dbService.getAll<{ id: string }>('SELECT id FROM exercises WHERE category_id = ?', [toCategoryId]);
-
-                await dbService.run('DELETE FROM categories WHERE id = ?', [id]);
-                await dbService.queueSyncMutation('categories', id, 'DELETE');
+                await dbService.delete('categories', id);
             });
         } catch (e) {
             throw e;

@@ -10,6 +10,7 @@ jest.mock('../DatabaseService', () => ({
     getFirst: jest.fn(async () => null),
     getAll: jest.fn(async () => []),
     getWorkoutById: jest.fn(async () => ({ finish_lat: null, finish_lon: null })),
+    getExerciseById: jest.fn(async () => ({ id: 'e1', name: 'Bench Press' })),
     queueSyncMutation: jest.fn(async () => undefined),
   },
 }));
@@ -108,8 +109,8 @@ describe('IronScoreService', () => {
         if (existingEventKeys.has(key)) return { id: 'existing' };
         return null;
       }
-      if (sql.includes('MAX(s.weight') && sql.includes('max_1rm')) {
-        return { max_1rm: 0 };
+      if (sql.includes('MAX(s.weight') && sql.includes('best_1rm_kg')) {
+        return { best_1rm_kg: 0 };
       }
       if (sql.includes('COUNT(*) as count FROM workouts')) {
         return { count: 2 };

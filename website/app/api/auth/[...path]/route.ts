@@ -1,6 +1,7 @@
 import { auth } from '../../../../src/lib/auth/server';
 
 const handlers = auth.handler();
+type AuthProxyHandler = (request: Request, context: { params: Promise<{ path: string[] }> }) => Promise<Response>;
 
 /**
  * Proxy de Autenticación con Enforzamiento de Dominio
@@ -23,17 +24,18 @@ async function proxy(request: Request, { params }: { params: Promise<{ path: str
         headers: request.headers,
         body: request.body,
         duplex: 'half'
-    } as any);
+    } as RequestInit & { duplex: 'half' });
 
     const method = request.method as keyof typeof handlers;
-    const handler = handlers[method];
+    const maybeHandler = handlers[method];
 
-    if (typeof handler !== 'function') {
+    if (typeof maybeHandler !== 'function') {
         return new Response('Method not allowed', { status: 405 });
     }
+    const handler = maybeHandler as AuthProxyHandler;
 
     try {
-        const response = await (handler as any)(proxiedRequest, { params: Promise.resolve({ path }) });
+        const response = await handler(proxiedRequest, { params: Promise.resolve({ path }) });
 
         // --- LOGICA DE RESCATE: Enforzamos el dominio de las cookies ---
         const newHeaders = new Headers(response.headers);

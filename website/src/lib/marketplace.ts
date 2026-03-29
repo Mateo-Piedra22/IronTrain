@@ -1,8 +1,14 @@
 import crypto from 'crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../db';
 import * as schema from '../db/schema';
 import { logger } from './logger';
+
+type CheckoutExercisesResult = {
+    adopted: number;
+    skipped: number;
+    errors: string[];
+};
 
 /**
  * Enterprise-grade Marketplace Resolver
@@ -10,17 +16,25 @@ import { logger } from './logger';
  * Zero-Trust: Protects existing user customizations while aligning with the official catalog.
  */
 export class MarketplaceResolver {
+    private static createCheckoutResult(): CheckoutExercisesResult {
+        return {
+            adopted: 0,
+            skipped: 0,
+            errors: [],
+        };
+    }
+
     /**
      * Adopts a list of exercises into a user's local library.
      * Implements 3-tier resolution logic for deduplication and deep-sync.
      */
-    static async checkoutExercises(userId: string, masterIds: string[]) {
+    static async checkoutExercises(userId: string, masterIds: string[]): Promise<CheckoutExercisesResult> {
+        if (masterIds.length === 0) {
+            return this.createCheckoutResult();
+        }
+
         return await db.transaction(async (tx: any) => {
-            const results = {
-                adopted: 0,
-                skipped: 0,
-                errors: [] as string[],
-            };
+            const results = this.createCheckoutResult();
 
             // 1. Fetch official master exercises
             const officialExercises = await tx.select()
@@ -28,7 +42,7 @@ export class MarketplaceResolver {
                 .where(
                     and(
                         eq(schema.exercises.isSystem, 1),
-                        sql`${schema.exercises.id} IN ${masterIds}`
+                        inArray(schema.exercises.id, masterIds)
                     )
                 );
 

@@ -1,19 +1,18 @@
 'use server';
-import { auth } from '../../../src/lib/auth/server';
+import { AdminRole, enforceAdminAction, getAdminContext, writeAdminAuditLog } from '../../../src/lib/admin-security';
 
-const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
+export { writeAdminAuditLog };
 
 export async function getAuthenticatedAdmin(): Promise<string | null> {
-    try {
-        const { data: session } = await auth.getSession();
-        const userId = session?.user?.id;
-        if (!userId) return null;
-        if (ADMIN_USER_IDS.length === 0) return null;
-        if (ADMIN_USER_IDS.includes(userId)) return userId;
-        return null;
-    } catch {
-        return null;
-    }
+    const admin = await getAdminContext();
+    return admin?.userId ?? null;
+}
+
+export async function requireAdminAction(params: {
+    action: string;
+    requiredRole?: AdminRole;
+}) {
+    return enforceAdminAction(params);
 }
 
 export async function getRedirectPath(formData: FormData, defaultSection?: string) {

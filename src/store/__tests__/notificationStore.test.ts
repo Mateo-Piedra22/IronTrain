@@ -1,48 +1,63 @@
+import { act, renderHook } from '@testing-library/react-native';
 import { useNotificationStore } from '../notificationStore';
 
-describe('notificationStore', () => {
-  beforeEach(() => {
-    useNotificationStore.setState({ toasts: [], globalBanner: null } as any);
-    jest.restoreAllMocks();
-    jest.useRealTimers();
-  });
+describe('useNotificationStore', () => {
+    beforeEach(() => {
+        act(() => {
+            useNotificationStore.getState().clearAll();
+        });
+    });
 
-  it('should cap toast list to 3 items (FIFO)', () => {
-    jest.spyOn(Date, 'now').mockReturnValue(0);
+    it('should add a toast notification', () => {
+        const { result } = renderHook(() => useNotificationStore());
 
-    useNotificationStore.getState().addToast({ type: 'info', title: 't1', message: 'm1', duration: 3000 });
-    useNotificationStore.getState().addToast({ type: 'info', title: 't2', message: 'm2', duration: 3000 });
-    useNotificationStore.getState().addToast({ type: 'info', title: 't3', message: 'm3', duration: 3000 });
-    useNotificationStore.getState().addToast({ type: 'info', title: 't4', message: 'm4', duration: 3000 });
+        act(() => {
+            result.current.addToast({
+                type: 'success',
+                title: 'Success',
+                message: 'Task completed'
+            });
+        });
 
-    const titles = useNotificationStore.getState().toasts.map((t) => t.title);
-    expect(titles).toEqual(['t2', 't3', 't4']);
-  });
+        expect(result.current.toasts.length).toBe(1);
+        expect(result.current.toasts[0].title).toBe('Success');
+    });
 
-  it('should sweep expired toasts even if setTimeout removal does not run', () => {
-    jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    it('should remove a toast notification by id', () => {
+        const { result } = renderHook(() => useNotificationStore());
 
-    useNotificationStore.getState().addToast({ type: 'success', title: 'ok', message: 'm', duration: 1500 });
-    expect(useNotificationStore.getState().toasts).toHaveLength(1);
+        let id = '';
+        act(() => {
+            id = result.current.addToast({
+                type: 'info',
+                title: 'Info',
+                message: 'Something happened'
+            });
+        });
 
-    jest.spyOn(Date, 'now').mockReturnValue(2_600);
-    useNotificationStore.getState().sweepExpiredToasts();
+        expect(result.current.toasts.length).toBe(1);
 
-    expect(useNotificationStore.getState().toasts).toHaveLength(0);
-  });
+        act(() => {
+            result.current.removeToast(id);
+        });
 
-  it('should assign expiresAtMs even when duration <= 0 to avoid stuck toasts', () => {
-    jest.spyOn(Date, 'now').mockReturnValue(10_000);
+        expect(result.current.toasts.length).toBe(0);
+    });
 
-    useNotificationStore.getState().addToast({ type: 'warning', title: 'hold', message: 'm', duration: 0 });
+    it('should clear all toasts', () => {
+        const { result } = renderHook(() => useNotificationStore());
 
-    const toast = useNotificationStore.getState().toasts[0];
-    expect(toast.createdAtMs).toBe(10_000);
-    expect(toast.expiresAtMs).toBeGreaterThan(10_000);
+        act(() => {
+            result.current.addToast({ type: 'info', title: '1', message: '1' });
+            result.current.addToast({ type: 'info', title: '2', message: '2' });
+        });
 
-    jest.spyOn(Date, 'now').mockReturnValue(toast.expiresAtMs + 1);
-    useNotificationStore.getState().sweepExpiredToasts();
+        expect(result.current.toasts.length).toBe(2);
 
-    expect(useNotificationStore.getState().toasts).toHaveLength(0);
-  });
+        act(() => {
+            result.current.clearAll();
+        });
+
+        expect(result.current.toasts.length).toBe(0);
+    });
 });

@@ -1,16 +1,65 @@
-import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
+import { RATE_LIMITS } from '../../../../src/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+type ActivityInboxItem = {
+    id: string;
+    feedType: 'activity_log';
+    senderId: string;
+    senderName: string;
+    senderUsername: string | null;
+    actionType: string;
+    metadata: unknown;
+    kudosCount: number;
+    hasKudoed: boolean;
+    createdAt: Date | null;
+    seenAt: Date | null;
+};
+
+type DirectShareInboxItem = {
+    id: string;
+    feedType: 'direct_share';
+    senderId: string;
+    senderName: string;
+    senderUsername: string | null;
+    type: string;
+    payload: unknown;
+    status: string;
+    createdAt: Date | null;
+    seenAt: Date | null;
+};
+
+type InboxItem = ActivityInboxItem | DirectShareInboxItem;
+
+const markSeenSchema = z.object({
+    id: z.string().trim().min(1).max(255),
+    feedType: z.enum(['direct_share', 'activity_log']),
+});
 
 export async function GET(req: NextRequest) {
     try {
         const userId = await verifyAuth(req);
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+        const rateLimit = await RATE_LIMITS.SOCIAL_INBOX_READ(userId);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
+        }
 
         // 1. Fetch direct shares (Inbox)
         const shareRecords = await db.select()
@@ -25,26 +74,52 @@ export async function GET(req: NextRequest) {
             .limit(50);
 
         // 2. Fetch accepted friends to get their activity
-        const friends = await db.select().from(schema.friendships).where(
-            and(
-                or(eq(schema.friendships.userId, userId), eq(schema.friendships.friendId, userId)),
-                eq(schema.friendships.status, 'accepted'),
-                isNull(schema.friendships.deletedAt)
-            )
-        );
+        const [outboundFriends, inboundFriends] = await Promise.all([
+            db.select()
+                .from(schema.friendships)
+                .where(
+                    and(
+                        eq(schema.friendships.userId, userId),
+                        eq(schema.friendships.status, 'accepted'),
+                        isNull(schema.friendships.deletedAt)
+                    )
+                ),
+            db.select()
+                .from(schema.friendships)
+                .where(
+                    and(
+                        eq(schema.friendships.friendId, userId),
+                        eq(schema.friendships.status, 'accepted'),
+                        isNull(schema.friendships.deletedAt)
+                    )
+                ),
+        ]);
+        const friends = [...outboundFriends, ...inboundFriends];
         const friendIds = friends.map(r => r.userId === userId ? r.friendId : r.userId);
         const feedUsers = [userId, ...friendIds];
 
-        // 3. Fetch Activity Feed for these users
-        let activityRecords: { activity: typeof schema.activityFeed.$inferSelect }[] = [];
-        let kudosCounts: any[] = [];
-        let userKudos: any[] = [];
+        // 3. Fetch Activity Feed with optimized single query (joins and subqueries)
+        let uniqueList: InboxItem[] = [];
 
         if (feedUsers.length > 0) {
-            activityRecords = await db.select({
-                activity: schema.activityFeed
+            const activityRecords = await db.select({
+                id: schema.activityFeed.id,
+                userId: schema.activityFeed.userId,
+                actionType: schema.activityFeed.actionType,
+                metadata: schema.activityFeed.metadata,
+                createdAt: schema.activityFeed.createdAt,
+                seenAt: schema.activitySeen.seenAt, // Join from activity_seen
+                senderName: schema.userProfiles.displayName,
+                senderUsername: schema.userProfiles.username,
             })
                 .from(schema.activityFeed)
+                .leftJoin(schema.userProfiles, eq(schema.activityFeed.userId, schema.userProfiles.id))
+                .leftJoin(schema.activitySeen, 
+                    and(
+                        eq(schema.activityFeed.id, schema.activitySeen.activityId),
+                        eq(schema.activitySeen.userId, userId)
+                    )
+                )
                 .where(
                     and(
                         inArray(schema.activityFeed.userId, feedUsers),
@@ -52,103 +127,93 @@ export async function GET(req: NextRequest) {
                     )
                 )
                 .orderBy(desc(schema.activityFeed.createdAt))
-                .limit(50); // Get latest 50 activities overall
+                .limit(50);
 
-            const activityIds = activityRecords.map(a => a.activity.id);
+            const activityIds = activityRecords.map(r => r.id);
+            
+            // Batch fetch kudos metadata to avoid N+1 queries
+            const kudosMetadataMap = new Map<string, { count: number, hasKudoed: boolean }>();
             if (activityIds.length > 0) {
-                // Get total kudos per activity
-                kudosCounts = await db.select({
+                const kudosData = await db.select({
                     feedId: schema.kudos.feedId,
-                    count: sql<number>`count(${schema.kudos.id})`.mapWith(Number),
+                    count: sql<number>`count(*)`.mapWith(Number),
+                    userKudo: sql<boolean>`max(case when ${schema.kudos.giverId} = ${userId} then 1 else 0 end) = 1`
                 })
-                    .from(schema.kudos)
-                    .where(and(
+                .from(schema.kudos)
+                .where(
+                    and(
                         inArray(schema.kudos.feedId, activityIds),
                         isNull(schema.kudos.deletedAt)
-                    ))
-                    .groupBy(schema.kudos.feedId);
+                    )
+                )
+                .groupBy(schema.kudos.feedId);
 
-                // Determine if THIS user gave kudos
-                userKudos = await db.select({ feedId: schema.kudos.feedId })
-                    .from(schema.kudos)
-                    .where(and(
-                        inArray(schema.kudos.feedId, activityIds),
-                        eq(schema.kudos.giverId, userId),
-                        isNull(schema.kudos.deletedAt)
-                    ));
+                kudosData.forEach(kd => {
+                    if (kd.feedId) kudosMetadataMap.set(kd.feedId, { count: kd.count, hasKudoed: kd.userKudo });
+                });
             }
-        }
 
-        // Fetch display names for everyone
-        const allUserIds = [...new Set([
-            ...shareRecords.map(r => r.senderId),
-            ...activityRecords.map(a => a.activity.userId)
-        ])];
+            const activityItems = activityRecords.map(a => {
+                const meta = kudosMetadataMap.get(a.id) || { count: 0, hasKudoed: false };
+                return {
+                    id: a.id,
+                    feedType: 'activity_log' as const,
+                    senderId: a.userId,
+                    senderName: a.senderName || 'Unknown',
+                    senderUsername: a.senderUsername,
+                    actionType: a.actionType,
+                    metadata: a.metadata,
+                    kudosCount: meta.count,
+                    hasKudoed: meta.hasKudoed,
+                    createdAt: a.createdAt,
+                    seenAt: a.seenAt,
+                };
+            });
 
-        const profilesMap = new Map<string, { name: string, username: string | null }>();
+            // Fetch Profiles for shares (usually fewer records)
+            const senderIds = [...new Set(shareRecords.map(r => r.senderId))];
+            const profilesMap = new Map<string, { name: string, username: string | null }>();
+            
+            if (senderIds.length > 0) {
+                const shareProfiles = await db.select({
+                    id: schema.userProfiles.id,
+                    name: schema.userProfiles.displayName,
+                    username: schema.userProfiles.username
+                }).from(schema.userProfiles).where(inArray(schema.userProfiles.id, senderIds));
+                
+                shareProfiles.forEach(p => profilesMap.set(p.id, { name: p.name || 'Unknown', username: p.username }));
+            }
 
-        if (allUserIds.length > 0) {
-            const allProfiles = await db.select({
-                id: schema.userProfiles.id,
-                displayName: schema.userProfiles.displayName,
-                username: schema.userProfiles.username,
-            }).from(schema.userProfiles).where(
-                inArray(schema.userProfiles.id, allUserIds)
-            );
-            allProfiles.forEach(p => profilesMap.set(p.id, {
-                name: p.displayName || 'Unknown',
-                username: p.username
-            }));
-        }
-
-        const kudoCountMap = new Map(kudosCounts.map(k => [k.feedId, k.count]));
-        const userKudosSet = new Set(userKudos.map(k => k.feedId));
-
-        const list = [
-            ...shareRecords.map(r => ({
+            const shareItems = shareRecords.map(r => ({
                 id: r.id,
-                feedType: 'direct_share',
+                feedType: 'direct_share' as const,
                 senderId: r.senderId,
                 senderName: profilesMap.get(r.senderId)?.name || 'Unknown',
-                senderUsername: profilesMap.get(r.senderId)?.username,
+                senderUsername: profilesMap.get(r.senderId)?.username ?? null,
                 type: r.type,
                 payload: r.payload,
                 status: r.status,
                 createdAt: r.updatedAt,
                 seenAt: r.seenAt,
-            })),
-            ...activityRecords.map(a => ({
-                id: a.activity.id,
-                feedType: 'activity_log',
-                senderId: a.activity.userId,
-                senderName: profilesMap.get(a.activity.userId)?.name || 'Unknown',
-                senderUsername: profilesMap.get(a.activity.userId)?.username,
-                actionType: a.activity.actionType,
-                metadata: a.activity.metadata,
-                kudosCount: kudoCountMap.get(a.activity.id) || 0,
-                hasKudoed: userKudosSet.has(a.activity.id),
-                createdAt: a.activity.createdAt,
-                seenAt: a.activity.seenAt,
-            }))
-        ];
+            }));
 
-        // Sort combined list by date descending before deduplication
-        list.sort((a, b) => {
-            const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt as string).getTime();
-            const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt as string).getTime();
-            return dateB - dateA;
-        });
+            uniqueList = [...shareItems, ...activityItems].sort((a, b) => {
+                const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : 0;
+                const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : 0;
+                return dateB - dateA;
+            });
+        }
 
         // Deduplicate by composite key to avoid collisions between different feed types
         const seenKeys = new Set<string>();
-        const uniqueList = list.filter(item => {
+        const finalUniqueList = uniqueList.filter(item => {
             const key = `${item.feedType || 'direct_share'}:${item.id}`;
             if (seenKeys.has(key)) return false;
             seenKeys.add(key);
             return true;
         });
 
-        return NextResponse.json({ success: true, items: uniqueList });
+        return NextResponse.json({ success: true, items: finalUniqueList.slice(0, 100) });
     } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Internal server error';
         return NextResponse.json({ error: message }, { status: 500 });
@@ -160,22 +225,48 @@ export async function POST(req: NextRequest) {
         const userId = await verifyAuth(req);
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const body = await req.json();
-        const { id, feedType } = body;
-
-        if (!id || !feedType) {
-            return NextResponse.json({ error: 'Missing id or feedType' }, { status: 400 });
+        const rateLimit = await RATE_LIMITS.SOCIAL_INBOX_MARK_SEEN(userId);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
         }
+
+        const body = await req.json().catch(() => null);
+        const parsed = markSeenSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({ error: 'Invalid request body', details: parsed.error.flatten() }, { status: 400 });
+        }
+        const { id, feedType } = parsed.data;
 
         if (feedType === 'direct_share') {
             await db.update(schema.sharesInbox)
                 .set({ seenAt: new Date(), updatedAt: new Date() })
                 .where(and(eq(schema.sharesInbox.id, id), eq(schema.sharesInbox.receiverId, userId)));
         } else if (feedType === 'activity_log') {
-            // Only update status if the user is the owner of the activity
-            await db.update(schema.activityFeed)
-                .set({ seenAt: new Date(), updatedAt: new Date() })
-                .where(and(eq(schema.activityFeed.id, id), eq(schema.activityFeed.userId, userId)));
+            const existing = await db.select().from(schema.activitySeen)
+                .where(and(eq(schema.activitySeen.activityId, id), eq(schema.activitySeen.userId, userId)))
+                .limit(1);
+
+            if (existing.length > 0) {
+                await db.update(schema.activitySeen)
+                    .set({ seenAt: new Date(), updatedAt: new Date() })
+                    .where(eq(schema.activitySeen.id, existing[0].id));
+            } else {
+                await db.insert(schema.activitySeen).values({
+                    id: `seen:${userId}:${id}`,
+                    userId: userId,
+                    activityId: id,
+                    seenAt: new Date(),
+                    updatedAt: new Date()
+                });
+            }
         }
 
         return NextResponse.json({ success: true });

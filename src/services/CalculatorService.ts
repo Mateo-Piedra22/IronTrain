@@ -7,10 +7,35 @@ export interface WarmupSuggestion {
 }
 
 export class CalculatorService {
+    private static countDecimalPlaces(value: number): number {
+        if (!Number.isFinite(value)) return 0;
+        const asString = value.toString().toLowerCase();
+        if (asString.includes('e-')) {
+            const [, exponent] = asString.split('e-');
+            return Number(exponent) || 0;
+        }
+        const [, decimals = ''] = asString.split('.');
+        return decimals.length;
+    }
+
     static roundToIncrement(value: number, increment: number): number {
         if (!Number.isFinite(value)) return 0;
         if (!Number.isFinite(increment) || increment <= 0) return Math.round(value);
-        return Math.round(value / increment) * increment;
+
+        const precision = Math.min(
+            8,
+            Math.max(
+                CalculatorService.countDecimalPlaces(value),
+                CalculatorService.countDecimalPlaces(increment),
+                4
+            )
+        );
+        const factor = Math.pow(10, precision);
+        const scaledValue = Math.round(value * factor);
+        const scaledIncrement = Math.max(1, Math.round(increment * factor));
+
+        const roundedScaled = Math.round(scaledValue / scaledIncrement) * scaledIncrement;
+        return roundedScaled / factor;
     }
 
     static estimate1RM(formula: OneRMFormula, weight: number, reps: number): number {

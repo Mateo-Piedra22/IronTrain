@@ -165,59 +165,45 @@ export class AnalysisService {
             const cutoff = days ? Date.now() - (days * 86400 * 1000) : null;
 
             const results = await dbService.getAll<any>(`
-            SELECT 
-                s.exercise_id as exerciseId, 
-                e.name as exerciseName, 
-                s.weight, 
-                s.reps, 
-                w.date,
-                (SELECT GROUP_CONCAT(b.name || '|' || b.color || '|' || COALESCE(b.icon, '')) 
-                 FROM badges b 
-                 JOIN exercise_badges eb ON b.id = eb.badge_id 
-                 WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL) as badges_csv
-            FROM workout_sets s
-            JOIN exercises e ON s.exercise_id = e.id
-            JOIN workouts w ON s.workout_id = w.id
-            WHERE s.completed = 1 AND s.weight > 0 AND s.reps > 0 AND s.type != 'warmup'
-            ${cutoff ? 'AND w.date > ?' : ''}
-            ORDER BY s.weight DESC
-        `, cutoff ? [cutoff] : []);
+            SELECT * FROM (
+                SELECT 
+                    s.exercise_id as exerciseId, 
+                    e.name as exerciseName, 
+                    s.weight, 
+                    s.reps, 
+                    w.date,
+                    ROUND(s.weight * (1.0 + s.reps / 30.0)) as estimated1RM,
+                    (SELECT GROUP_CONCAT(b.name || '|' || b.color || '|' || COALESCE(b.icon, '')) 
+                     FROM badges b 
+                     JOIN exercise_badges eb ON b.id = eb.badge_id 
+                     WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL) as badges_csv,
+                     ROW_NUMBER() OVER(PARTITION BY s.exercise_id ORDER BY (s.weight * (1.0 + s.reps / 30.0)) DESC, w.date DESC) as rn
+                FROM workout_sets s
+                JOIN exercises e ON s.exercise_id = e.id
+                JOIN workouts w ON s.workout_id = w.id
+                WHERE s.completed = 1 AND s.weight > 0 AND s.reps > 0 AND s.type != 'warmup'
+                ${cutoff ? 'AND w.date > ?' : ''}
+            ) WHERE rn = 1
+            ORDER BY estimated1RM DESC
+            LIMIT ?
+            `, cutoff ? [cutoff, limit] : [limit]);
 
-            // Process in JS to find max 1RM per exercise
-            const maxes: Record<string, OneRepMax & { badges: any[] }> = {};
+            const result = results.map(r => ({
+                exerciseId: String(r.exerciseId),
+                exerciseName: String(r.exerciseName),
+                weight: Number(r.weight),
+                reps: Number(r.reps),
+                estimated1RM: Number(r.estimated1RM),
+                date: Number(r.date),
+                badges: r.badges_csv ? String(r.badges_csv).split(',').map((s: string) => {
+                    const [name, color, icon] = s.split('|');
+                    return { name, color, icon: icon || undefined };
+                }) : []
+            }));
 
-            results.forEach(raw => {
-                const r: any = raw;
-                const eNameStr = String(r.exerciseName || r.exercisename || r.name);
-                const eIdStr = String(r.exerciseId || r.exercise_id);
-                // Epley: weight * (1 + reps/30)
-                const epley = Math.round(r.weight * (1 + r.reps / 30));
-
-                // If we don't have this exercise or this set provides a higher 1RM
-                // Keying by Exercise ID is more precise than Name
-                if (!maxes[eIdStr] || epley > maxes[eIdStr].estimated1RM) {
-                    const badges = r.badges_csv ? r.badges_csv.split(',').map((s: string) => {
-                        const [name, color, icon] = s.split('|');
-                        return { name, color, icon: icon || undefined };
-                    }) : [];
-
-                    maxes[eIdStr] = {
-                        exerciseId: eIdStr,
-                        exerciseName: eNameStr,
-                        weight: r.weight,
-                        reps: r.reps,
-                        estimated1RM: epley,
-                        date: r.date,
-                        badges
-                    };
-                }
-            });
-
-            const result = Object.values(maxes).sort((a, b) => b.estimated1RM - a.estimated1RM).slice(0, limit);
             this.setCache(cacheKey, result);
             return result;
         } catch (error) {
-
             logger.captureException(error, { scope: 'AnalysisService.getTop1RMs', message: 'Error calculating 1RMs' });
             return [];
         }
@@ -765,16 +751,14 @@ export class AnalysisService {
         if (cached) return cached;
         const now = Date.now();
         const cutoffMs = now - (days * 86400 * 1000);
-        const midMs = cutoffMs + Math.floor((now - cutoffMs) / 2);
 
-        const rows = await dbService.getAll<{ exerciseId: string; exerciseName: string; weight: number; reps: number; date: number }>(
-            `
-                SELECT
-                    e.id as exerciseId,
+        const rows = await dbService.getAll<any>(`
+            WITH DailyMax AS (
+                SELECT 
+                    s.exercise_id as exerciseId,
                     e.name as exerciseName,
-                    s.weight as weight,
-                    s.reps as reps,
-                    w.date as date,
+                    w.date,
+                    ROUND(s.weight * (1.0 + s.reps / 30.0)) as estimated1RM,
                     (SELECT GROUP_CONCAT(b.name || '|' || b.color || '|' || COALESCE(b.icon, '')) 
                      FROM badges b 
                      JOIN exercise_badges eb ON b.id = eb.badge_id 
@@ -788,67 +772,46 @@ export class AnalysisService {
                 AND s.type != 'warmup'
                 AND s.weight > 0
                 AND s.reps > 0
-            `,
-            [cutoffMs]
-        );
+            ),
+            MaxPerDay AS (
+                SELECT exerciseId, exerciseName, date, MAX(estimated1RM) as daily1RM, MAX(badges_csv) as badges_csv
+                FROM DailyMax
+                GROUP BY exerciseId, exerciseName, date
+            ),
+            FirstLast AS (
+                SELECT 
+                    exerciseId,
+                    exerciseName,
+                    badges_csv,
+                    FIRST_VALUE(daily1RM) OVER (PARTITION BY exerciseId ORDER BY date ASC) as start1RM,
+                    FIRST_VALUE(daily1RM) OVER (PARTITION BY exerciseId ORDER BY date DESC) as end1RM,
+                    MIN(date) OVER (PARTITION BY exerciseId) as dateFirst,
+                    MAX(date) OVER (PARTITION BY exerciseId) as dateLast
+                FROM MaxPerDay
+            )
+            SELECT DISTINCT * FROM FirstLast 
+            WHERE dateFirst != dateLast 
+            AND end1RM > start1RM
+            ORDER BY (end1RM - start1RM) DESC
+            LIMIT ?
+        `, [cutoffMs, limit]);
 
-        const map = new Map<string, { exerciseId: string; exerciseName: string; first: number; last: number; dateFirst: number; dateLast: number; badges: any[] }>();
-        for (const r of rows as any[]) {
-            const epley = Math.round(r.weight * (1 + r.reps / 30));
-            if (!Number.isFinite(epley) || epley <= 0) continue;
-
-            if (!map.has(r.exerciseId)) {
-                const badges = r.badges_csv ? r.badges_csv.split(',').map((s: string) => {
+        const finalResult = rows.map((r: any) => {
+            const delta = r.end1RM - r.start1RM;
+            return {
+                exerciseId: String(r.exerciseId),
+                exerciseName: String(r.exerciseName),
+                start1RM: Number(r.start1RM),
+                end1RM: Number(r.end1RM),
+                delta,
+                deltaPct: r.start1RM > 0 ? Math.round((delta / r.start1RM) * 100) : null,
+                badges: r.badges_csv ? String(r.badges_csv).split(',').map((s: string) => {
                     const [name, color, icon] = s.split('|');
                     return { name, color, icon: icon || undefined };
-                }) : [];
-                map.set(r.exerciseId, {
-                    exerciseId: r.exerciseId,
-                    exerciseName: r.exerciseName,
-                    first: epley,
-                    last: epley,
-                    dateFirst: r.date,
-                    dateLast: r.date,
-                    badges
-                });
-            } else {
-                const cur = map.get(r.exerciseId)!;
-                // Update first if earlier, last if later
-                if (r.date < cur.dateFirst) {
-                    cur.dateFirst = r.date;
-                    cur.first = epley;
-                }
-                if (r.date > cur.dateLast) {
-                    cur.dateLast = r.date;
-                    cur.last = epley;
-                } else if (r.date === cur.dateLast) {
-                    // Same session/day, take the best
-                    if (epley > cur.last) cur.last = epley;
-                }
-                if (r.date === cur.dateFirst) {
-                    if (epley > cur.first) cur.first = epley;
-                }
-            }
-        }
-
-        const result: OneRMProgressRow[] = [];
-        map.forEach((v) => {
-            if (v.first <= 0 || v.last <= 0 || v.dateFirst === v.dateLast) return;
-            const delta = v.last - v.first;
-            if (delta <= 0) return;
-            const deltaPct = v.first > 0 ? Math.round((delta / v.first) * 100) : null;
-            result.push({
-                exerciseId: v.exerciseId,
-                exerciseName: v.exerciseName,
-                start1RM: v.first,
-                end1RM: v.last,
-                delta,
-                deltaPct,
-                badges: v.badges
-            });
+                }) : []
+            };
         });
 
-        const finalResult = result.sort((a, b) => b.delta - a.delta).slice(0, limit);
         this.setCache(cacheKey, finalResult);
         return finalResult;
     }

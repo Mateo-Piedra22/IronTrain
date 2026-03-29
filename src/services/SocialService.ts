@@ -147,6 +147,8 @@ export class SocialService {
     private static cache = new Map<string, { value: any; timestamp: number }>();
     private static CACHE_TTL = 60000; // 60 seconds
     private static isSubscribed = false;
+    private static REQUEST_TIMEOUT_MS =
+        ((Config as any).SOCIAL_REQUEST_TIMEOUT_MS as number | undefined) || 15000;
 
     private static init() {
         if (this.isSubscribed) return;
@@ -190,14 +192,33 @@ export class SocialService {
     }
 
     private static async request<T>(url: string, options: RequestInit = {}): Promise<T> {
-        const res = await fetch(url, options);
-        const text = await res.text();
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT_MS);
+
+        let res: Response;
+        let text = '';
+
+        try {
+            res = await fetch(url, {
+                ...options,
+                signal: options.signal ?? controller.signal,
+            });
+            text = await res.text();
+        } catch (error: unknown) {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                throw new Error('La solicitud tardó demasiado. Verificá tu conexión e intentá nuevamente.');
+            }
+
+            throw new Error('No se pudo conectar con el servidor. Verificá tu conexión e intentá nuevamente.');
+        } finally {
+            clearTimeout(timeout);
+        }
 
         // Try to parse JSON safely
-        let data: any;
+        let data: unknown;
         try {
             data = JSON.parse(text);
-        } catch (e) {
+        } catch {
             logger.error('[SocialService] Failed to parse JSON response', {
                 url,
                 status: res.status,
@@ -206,11 +227,18 @@ export class SocialService {
             throw new Error(`Error del servidor (Código ${res.status}). La respuesta no es válida.`);
         }
 
+        const responsePayload = (data && typeof data === 'object') ? data as Record<string, unknown> : {};
+
         if (!res.ok) {
-            throw new Error(data.error || data.message || `Error en la solicitud (${res.status})`);
+            const errorMessage = typeof responsePayload.error === 'string'
+                ? responsePayload.error
+                : typeof responsePayload.message === 'string'
+                    ? responsePayload.message
+                    : `Error en la solicitud (${res.status})`;
+            throw new Error(errorMessage);
         }
 
-        return data;
+        return data as T;
     }
 
     static async updateWeatherBonus(lat: number, lon: number, city?: string | null): Promise<WeatherInfo> {
@@ -421,8 +449,21 @@ export class SocialService {
             if (feedType === 'activity_log') {
                 // Personal seenAt (Your own activity)
                 await dbService.run('UPDATE activity_feed SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
-                await dbService.queueSyncMutation('activity_feed', id, 'UPDATE', { seen_at: now, updated_at: now });
-
+                
+                // New: Local activity_seen entry for per-user status (Server parity)
+                const seenId = `seen:${userId}:${id}`;
+                await dbService.run(
+                    'INSERT OR REPLACE INTO activity_seen (id, user_id, activity_id, seen_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+                    [seenId, userId, id, now, now]
+                );
+                
+                // Project as a separate sync event for the new table
+                await dbService.queueSyncMutation('activity_seen', seenId, 'INSERT', { 
+                    user_id: userId, 
+                    activity_id: id, 
+                    seen_at: now, 
+                    updated_at: now 
+                });
 
             } else {
                 await dbService.run('UPDATE shares_inbox SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
@@ -432,7 +473,7 @@ export class SocialService {
                 });
             }
         } catch (e) {
-            logger.warn('[SocialService] Local markAsSeen failed (record may not be in local DB)', { id, feedType });
+            logger.warn('[SocialService] Local markAsSeen failed', { id, feedType, error: e });
         }
 
         // Track server update status
@@ -477,8 +518,19 @@ export class SocialService {
 
                     if (feedType === 'activity_log') {
                         await dbService.run('UPDATE activity_feed SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
-                        await dbService.queueSyncMutation('activity_feed', id, 'UPDATE', { seen_at: now, updated_at: now });
-
+                        
+                        const seenId = `seen:${userId}:${id}`;
+                        await dbService.run(
+                            'INSERT OR REPLACE INTO activity_seen (id, user_id, activity_id, seen_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+                            [seenId, userId, id, now, now]
+                        );
+                        
+                        await dbService.queueSyncMutation('activity_seen', seenId, 'INSERT', { 
+                            user_id: userId, 
+                            activity_id: id, 
+                            seen_at: now, 
+                            updated_at: now 
+                        });
 
                     } else {
                         await dbService.run('UPDATE shares_inbox SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);

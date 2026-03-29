@@ -63,3 +63,10 @@ jest_out.txt
 tmp/
 website/tmp/
 src/changelog_incremental.md
+QWEN.md
+.mcp.json
+PROJECT_INVENTORY_BY_SYSTEM.md
+IRONTRAIN_AUDIT_PROMPT_V9.md
+.gemini/settings.json
+.vscode/mcp.json
+docs/CHANGELOG_2.x.x_TEMP.md

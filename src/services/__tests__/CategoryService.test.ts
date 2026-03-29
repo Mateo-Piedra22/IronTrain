@@ -6,6 +6,9 @@ jest.mock('../DatabaseService', () => ({
     run: jest.fn(),
     getAll: jest.fn(),
     getFirst: jest.fn(),
+    insert: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
     queueSyncMutation: jest.fn(),
     withTransaction: jest.fn(async (cb: () => Promise<void>) => { await cb(); }),
   },
@@ -23,27 +26,23 @@ describe('CategoryService', () => {
       await expect(CategoryService.deleteAndReassignExercises('c1'))
         .rejects.toThrow('Cannot delete system category');
 
-      expect(dbService.run).not.toHaveBeenCalledWith('DELETE FROM categories WHERE id = ?', expect.anything());
+      expect(dbService.delete).not.toHaveBeenCalled();
     });
 
     it('should reassign exercises to uncategorized and delete category in a transaction', async () => {
       (dbService.getFirst as jest.Mock)
-        .mockResolvedValueOnce({ id: 'c1', name: 'Custom', is_system: 0, sort_order: 0 })
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
+        .mockResolvedValueOnce({ id: 'c1', name: 'Custom', is_system: 0, sort_order: 0 }) // getById
+        .mockResolvedValueOnce({ id: 'uncategorized' }); // checkUncategorized (byId)
 
+      (dbService.getAll as jest.Mock).mockResolvedValueOnce([]);
       await CategoryService.deleteAndReassignExercises('c1');
 
-      expect(dbService.run).toHaveBeenCalledWith(
-        'INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, ?, ?)',
-        ['uncategorized', 'Sin categoría', 9999, '#94a3b8']
-      );
       expect(dbService.withTransaction).toHaveBeenCalled();
-      expect(dbService.run).toHaveBeenCalledWith(
-        'UPDATE exercises SET category_id = ? WHERE category_id = ?',
-        ['uncategorized', 'c1']
+      expect(dbService.getAll).toHaveBeenCalledWith(
+        'SELECT id FROM exercises WHERE category_id = ?',
+        ['c1']
       );
-      expect(dbService.run).toHaveBeenCalledWith('DELETE FROM categories WHERE id = ?', ['c1']);
+      expect(dbService.delete).toHaveBeenCalledWith('categories', 'c1');
     });
   });
 
@@ -66,9 +65,10 @@ describe('CategoryService', () => {
 
       await CategoryService.update('c1', 'pecho (editado)', '#123456');
 
-      expect(dbService.run).toHaveBeenCalledWith(
-        'UPDATE categories SET name = ?, color = ? WHERE id = ?',
-        ['Pecho (Editado)', '#123456', 'c1']
+      expect(dbService.update).toHaveBeenCalledWith(
+        'categories',
+        'c1',
+        { name: 'Pecho (Editado)', color: '#123456' }
       );
     });
   });
@@ -77,9 +77,9 @@ describe('CategoryService', () => {
     it('should Title Case category name on create', async () => {
       await CategoryService.create('press de banca', '#ffffff');
 
-      expect(dbService.run).toHaveBeenCalledWith(
-        'INSERT INTO categories (id, name, color, is_system) VALUES (?, ?, ?, 0)',
-        expect.arrayContaining(['Press de Banca', '#ffffff'])
+      expect(dbService.insert).toHaveBeenCalledWith(
+        'categories',
+        expect.objectContaining({ name: 'Press de Banca', color: '#ffffff' })
       );
     });
   });

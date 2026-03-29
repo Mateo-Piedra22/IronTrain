@@ -21,6 +21,7 @@
     "babel.config.js",
     "metro.config.js",
     "jest.config.js",
-    "_backup_web"
+    "_backup_web",
+    "website"
   ]
 }

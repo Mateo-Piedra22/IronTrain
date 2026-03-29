@@ -1,11 +1,19 @@
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
 import { runDbTransaction } from '../../../../src/lib/db-transaction';
+import { RATE_LIMITS } from '../../../../src/lib/rate-limit';
 
 export const runtime = 'nodejs';
+
+const snapshotEnvelopeSchema = z.object({
+    snapshot: z.record(z.string(), z.unknown()),
+});
+
+const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 
 const toCamelCaseKey = (key: string): string => key.replace(/_([a-z])/g, (_, ch: string) => ch.toUpperCase());
 const scopeSettingsKey = (userId: string, key: string): string => {
@@ -98,32 +106,79 @@ export async function GET(req: NextRequest) {
         const userId = await verifyAuth(req);
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+        const rateLimit = await RATE_LIMITS.SYNC_SNAPSHOT(userId);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
+        }
+
         // Retrieve full cloud state for user
-        const snapshot: Record<string, any[]> = {};
+        const snapshot: Record<string, unknown[]> = {};
 
-        snapshot.categories = await db.select().from(schema.categories).where(eq(schema.categories.userId, userId));
-        snapshot.exercises = await db.select().from(schema.exercises).where(eq(schema.exercises.userId, userId));
-        snapshot.workouts = await db.select().from(schema.workouts).where(eq(schema.workouts.userId, userId));
-        const workoutIds = new Set((snapshot.workouts ?? []).map((w: any) => w?.id).filter((id: any) => typeof id === 'string' && id.length > 0));
+        const [
+            categories,
+            exercises,
+            workouts,
+            rawWorkoutSets,
+            routines,
+            routineDays,
+            routineExercises,
+            measurements,
+            goals,
+            bodyMetrics,
+            plateInventory,
+            settingsRows,
+            badges,
+            exerciseBadges,
+            changelogReactions,
+            kudos,
+        ] = await Promise.all([
+            db.select().from(schema.categories).where(eq(schema.categories.userId, userId)),
+            db.select().from(schema.exercises).where(eq(schema.exercises.userId, userId)),
+            db.select().from(schema.workouts).where(eq(schema.workouts.userId, userId)),
+            db.select().from(schema.workoutSets).where(eq(schema.workoutSets.userId, userId)),
+            db.select().from(schema.routines).where(eq(schema.routines.userId, userId)),
+            db.select().from(schema.routineDays).where(eq(schema.routineDays.userId, userId)),
+            db.select().from(schema.routineExercises).where(eq(schema.routineExercises.userId, userId)),
+            db.select().from(schema.measurements).where(eq(schema.measurements.userId, userId)),
+            db.select().from(schema.goals).where(eq(schema.goals.userId, userId)),
+            db.select().from(schema.bodyMetrics).where(eq(schema.bodyMetrics.userId, userId)),
+            db.select().from(schema.plateInventory).where(eq(schema.plateInventory.userId, userId)),
+            db.select().from(schema.settings).where(eq(schema.settings.userId, userId)),
+            db.select().from(schema.badges).where(eq(schema.badges.userId, userId)),
+            db.select().from(schema.exerciseBadges).where(eq(schema.exerciseBadges.userId, userId)),
+            db.select().from(schema.changelogReactions).where(eq(schema.changelogReactions.userId, userId)),
+            db.select().from(schema.kudos).where(eq(schema.kudos.giverId, userId)),
+        ]);
 
-        const rawWorkoutSets = await db.select().from(schema.workoutSets).where(eq(schema.workoutSets.userId, userId));
-        snapshot.workout_sets = (rawWorkoutSets ?? []).filter((s: any) => {
-            const wid = s?.workoutId;
-            return typeof wid === 'string' && workoutIds.has(wid);
+        snapshot.categories = categories;
+        snapshot.exercises = exercises;
+        snapshot.workouts = workouts;
+        const workoutIds = new Set(workouts.map((w) => w.id).filter(isNonEmptyString));
+
+        snapshot.workout_sets = (rawWorkoutSets ?? []).filter((s) => {
+            const wid = s.workoutId;
+            return isNonEmptyString(wid) && workoutIds.has(wid);
         });
-        snapshot.routines = await db.select().from(schema.routines).where(eq(schema.routines.userId, userId));
-        snapshot.routine_days = await db.select().from(schema.routineDays).where(eq(schema.routineDays.userId, userId));
-        snapshot.routine_exercises = await db.select().from(schema.routineExercises).where(eq(schema.routineExercises.userId, userId));
-        snapshot.measurements = await db.select().from(schema.measurements).where(eq(schema.measurements.userId, userId));
-        snapshot.goals = await db.select().from(schema.goals).where(eq(schema.goals.userId, userId));
-        snapshot.body_metrics = await db.select().from(schema.bodyMetrics).where(eq(schema.bodyMetrics.userId, userId));
-        snapshot.plate_inventory = await db.select().from(schema.plateInventory).where(eq(schema.plateInventory.userId, userId));
-        const settingsRows = await db.select().from(schema.settings).where(eq(schema.settings.userId, userId));
+        snapshot.routines = routines;
+        snapshot.routine_days = routineDays;
+        snapshot.routine_exercises = routineExercises;
+        snapshot.measurements = measurements;
+        snapshot.goals = goals;
+        snapshot.body_metrics = bodyMetrics;
+        snapshot.plate_inventory = plateInventory;
         snapshot.settings = settingsRows.map((row) => ({ ...row, key: unscopedSettingsKey(userId, row.key) }));
-        snapshot.badges = await db.select().from(schema.badges).where(eq(schema.badges.userId, userId));
-        snapshot.exercise_badges = await db.select().from(schema.exerciseBadges).where(eq(schema.exerciseBadges.userId, userId));
-        snapshot.changelog_reactions = await db.select().from(schema.changelogReactions).where(eq(schema.changelogReactions.userId, userId));
-        snapshot.kudos = await db.select().from(schema.kudos).where(eq(schema.kudos.giverId, userId));
+        snapshot.badges = badges;
+        snapshot.exercise_badges = exerciseBadges;
+        snapshot.changelog_reactions = changelogReactions;
+        snapshot.kudos = kudos;
 
         return NextResponse.json({ success: true, snapshot });
     } catch (e) {
@@ -137,12 +192,25 @@ export async function POST(req: NextRequest) {
         const userId = await verifyAuth(req);
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const body = await req.json();
-        const { snapshot } = body;
-
-        if (!snapshot || typeof snapshot !== 'object') {
-            return NextResponse.json({ error: 'Invalid snapshot payload' }, { status: 400 });
+        const rateLimit = await RATE_LIMITS.SYNC_SNAPSHOT(userId);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
         }
+
+        const body = await req.json().catch(() => null);
+        const parsed = snapshotEnvelopeSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({ error: 'Invalid snapshot payload', details: parsed.error.flatten() }, { status: 400 });
+        }
+        const { snapshot } = parsed.data;
 
         type CategoryInsert = typeof schema.categories.$inferInsert;
         type ExerciseInsert = typeof schema.exercises.$inferInsert;
@@ -169,13 +237,13 @@ export async function POST(req: NextRequest) {
         const workouts = normalizeSnapshotArray<WorkoutInsert>(snapshot.workouts, userId, ['id', 'userId', 'date', 'startTime']);
         const workoutSets = normalizeSnapshotArray<WorkoutSetInsert>(snapshot.workout_sets, userId, ['id', 'userId', 'workoutId', 'exerciseId']);
 
-        const workoutIdSet = new Set(workouts.map((w) => String((w as any).id || '')).filter((id) => id.length > 0));
-        const exerciseIdSet = new Set(exercises.map((e) => String((e as any).id || '')).filter((id) => id.length > 0));
+        const workoutIdSet = new Set(workouts.map((w) => w.id).filter(isNonEmptyString));
+        const exerciseIdSet = new Set(exercises.map((e) => e.id).filter(isNonEmptyString));
 
         const invalidWorkoutSets = workoutSets.filter((s) => {
-            const wid = String((s as any).workoutId || '');
-            const eid = String((s as any).exerciseId || '');
-            if (!wid || !eid) return true;
+            const wid = s.workoutId;
+            const eid = s.exerciseId;
+            if (!isNonEmptyString(wid) || !isNonEmptyString(eid)) return true;
             if (!workoutIdSet.has(wid)) return true;
             if (!exerciseIdSet.has(eid)) return true;
             return false;

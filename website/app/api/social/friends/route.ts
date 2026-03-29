@@ -1,8 +1,9 @@
-import { and, eq, inArray, isNull, or } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
+import { RATE_LIMITS } from '../../../../src/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -12,17 +13,40 @@ export async function GET(req: NextRequest) {
         const userId = await verifyAuth(req);
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const records = await db.select()
-            .from(schema.friendships)
-            .where(
-                and(
-                    or(
-                        eq(schema.friendships.userId, userId),
-                        eq(schema.friendships.friendId, userId)
-                    ),
-                    isNull(schema.friendships.deletedAt)
-                )
+        // Rate limiting
+        const rateLimit = await RATE_LIMITS.SOCIAL_SEARCH(userId);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                { 
+                    status: 429,
+                    headers: { 
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    }
+                }
             );
+        }
+
+        const [outboundRecords, inboundRecords] = await Promise.all([
+            db.select()
+                .from(schema.friendships)
+                .where(
+                    and(
+                        eq(schema.friendships.userId, userId),
+                        isNull(schema.friendships.deletedAt)
+                    )
+                ),
+            db.select()
+                .from(schema.friendships)
+                .where(
+                    and(
+                        eq(schema.friendships.friendId, userId),
+                        isNull(schema.friendships.deletedAt)
+                    )
+                ),
+        ]);
+
+        const records = [...outboundRecords, ...inboundRecords];
 
         // Collect unique friend IDs
         const userIdsToFetch = new Set<string>();

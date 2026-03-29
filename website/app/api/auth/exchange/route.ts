@@ -1,18 +1,40 @@
 import { and, eq, gt } from 'drizzle-orm';
 import * as jose from 'jose';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '../../../../src/db';
 import { authCodes } from '../../../../src/db/schema';
+import { RATE_LIMITS } from '../../../../src/lib/rate-limit';
 
 export const runtime = 'nodejs'; // Using nodejs for crypto/jose support if needed, though edge works too
 
+const exchangePayloadSchema = z.object({
+    code: z.string().trim().min(1).max(512),
+});
+
 export async function POST(req: NextRequest) {
     try {
-        const { code } = await req.json();
-
-        if (!code) {
-            return NextResponse.json({ error: 'Code is required' }, { status: 400 });
+        const forwardedFor = req.headers.get('x-forwarded-for') ?? 'unknown';
+        const clientIp = forwardedFor.split(',')[0]?.trim() || 'unknown';
+        const rateLimit = await RATE_LIMITS.AUTH_EXCHANGE(`anon:${clientIp}`);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
         }
+
+        const body = await req.json().catch(() => null);
+        const parsed = exchangePayloadSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({ error: 'Invalid request body', details: parsed.error.flatten() }, { status: 400 });
+        }
+        const code = parsed.data.code;
 
         // 1. Find the code and ensure it's not expired
         const now = new Date();

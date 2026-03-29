@@ -1,32 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '../../../../src/db';
 import { verifyAuth } from '../../../../src/lib/auth';
 import { logger } from '../../../../src/lib/logger';
+import { RATE_LIMITS } from '../../../../src/lib/rate-limit';
 import { getOrCreateScoreConfig, isAdverseWeather } from '../../../../src/lib/social-scoring';
+
+const weatherBonusPayloadSchema = z.object({
+    lat: z.number().finite().min(-90).max(90),
+    lon: z.number().finite().min(-180).max(180),
+    city: z.string().trim().min(1).max(120).optional().nullable(),
+});
 
 export async function POST(req: NextRequest) {
     try {
         const userId = await verifyAuth(req);
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+        const rateLimit = await RATE_LIMITS.SOCIAL_WEATHER_BONUS(userId);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
+        }
+
         const body = await req.json().catch(() => null);
-        if (!body || typeof body !== 'object') {
-            return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+        const parsed = weatherBonusPayloadSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({
+                error: 'Invalid payload',
+                details: parsed.error.issues.map((issue) => ({ path: issue.path.join('.'), code: issue.code })),
+            }, { status: 400 });
         }
 
-        const lat = Number((body as any).lat);
-        const lon = Number((body as any).lon);
-        const city = (body as any).city;
-
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-            return NextResponse.json({ error: 'Coordenadas inválidas' }, { status: 400 });
-        }
-        if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-            return NextResponse.json({ error: 'Coordenadas fuera de rango' }, { status: 400 });
-        }
-        if (city !== undefined && city !== null && typeof city !== 'string') {
-            return NextResponse.json({ error: 'city inválido' }, { status: 400 });
-        }
+        const { lat, lon, city } = parsed.data;
 
         // Usamos una transacción simple o simplemente el db ya que getOrCreateScoreConfig lo acepta
         const config = await getOrCreateScoreConfig(db);

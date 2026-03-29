@@ -13,11 +13,22 @@ const UNCATEGORIZED_ID = 'uncategorized';
 const UNCATEGORIZED_NAME = 'Sin categoría';
 const LEGACY_UNCATEGORIZED_ID = 'sys-cat-1';
 
+const ALLOWED_TABLES = new Set([
+    'categories', 'exercises', 'workouts', 'workout_sets',
+    'routines', 'routine_days', 'routine_exercises',
+    'measurements', 'goals', 'body_metrics', 'plate_inventory',
+    'settings', 'badges', 'exercise_badges', 'user_profiles',
+    'activity_feed', 'changelog_reactions', 'kudos', 'friendships',
+    'shares_inbox', 'score_events', 'user_exercise_prs', 'sync_queue',
+    'weather_logs', 'notification_reactions', 'changelogs', 'activity_seen'
+]);
 
 export class DatabaseService {
     private db: SQLite.SQLiteDatabase | null = null;
     private isInitialized = false;
     private initPromise: Promise<void> | null = null;
+    private currentBatchId: string | null = null;
+    private batchIdStack: string[] = [];
 
     public async init(): Promise<void> {
         if (this.isInitialized) return;
@@ -29,15 +40,11 @@ export class DatabaseService {
             try {
                 this.db = await SQLite.openDatabaseAsync(DB_NAME);
 
-                // Enable foreign keys, set busy timeout and use WAL mode for better concurrency
                 await this.db.execAsync('PRAGMA foreign_keys = ON;');
                 await this.db.execAsync('PRAGMA busy_timeout = 10000;');
                 await this.db.execAsync('PRAGMA journal_mode = WAL;');
 
-                // Create Schema (calls runMigrations internally)
                 await this.createTables();
-
-                // Seed if empty
                 await this.seedDatabase();
 
                 this.isInitialized = true;
@@ -51,23 +58,11 @@ export class DatabaseService {
         await this.initPromise;
     }
 
-    /**
-     * Internal check to ensure DB is initialized before any non-init query.
-     */
     private async ensureInitialized(): Promise<void> {
         if (this.isInitialized) return;
-
-        // If the DB is already open and we are in the middle of initialization,
-        // allow the call (likely an internal recursive call from init -> createTables -> run).
-        if (this.db && this.initPromise) {
-            return;
-        }
-
-        if (this.initPromise) {
-            await this.initPromise;
-        } else {
-            await this.init();
-        }
+        if (this.db && this.initPromise) return;
+        if (this.initPromise) await this.initPromise;
+        else await this.init();
     }
 
     private async createTables(): Promise<void> {
@@ -82,7 +77,8 @@ export class DatabaseService {
         color TEXT,
         updated_at INTEGER DEFAULT 0,
         deleted_at INTEGER,
-        origin_id TEXT
+        origin_id TEXT,
+        user_id TEXT
       );
 
       CREATE TABLE IF NOT EXISTS exercises (
@@ -96,6 +92,7 @@ export class DatabaseService {
         origin_id TEXT,
         updated_at INTEGER DEFAULT 0,
         deleted_at INTEGER,
+        user_id TEXT,
         FOREIGN KEY (category_id) REFERENCES categories (id)
       );
 
@@ -112,7 +109,8 @@ export class DatabaseService {
         is_template INTEGER DEFAULT 0,
         duration INTEGER DEFAULT 0,
         updated_at INTEGER DEFAULT 0,
-        deleted_at INTEGER
+        deleted_at INTEGER,
+        user_id TEXT
       );
 
       CREATE TABLE IF NOT EXISTS workout_sets (
@@ -131,6 +129,7 @@ export class DatabaseService {
         superset_id TEXT,
         updated_at INTEGER DEFAULT 0,
         deleted_at INTEGER,
+        user_id TEXT,
         FOREIGN KEY (workout_id) REFERENCES workouts (id) ON DELETE CASCADE,
         FOREIGN KEY (exercise_id) REFERENCES exercises (id)
       );
@@ -139,7 +138,8 @@ export class DatabaseService {
         key TEXT PRIMARY KEY NOT NULL,
         value TEXT NOT NULL,
         description TEXT,
-        updated_at INTEGER DEFAULT 0
+        updated_at INTEGER DEFAULT 0,
+        user_id TEXT
       );
 
       CREATE TABLE IF NOT EXISTS goals (
@@ -153,7 +153,8 @@ export class DatabaseService {
         completed INTEGER DEFAULT 0,
         coop_user_id TEXT,
         updated_at INTEGER DEFAULT 0,
-        deleted_at INTEGER
+        deleted_at INTEGER,
+        user_id TEXT
       );
 
       CREATE TABLE IF NOT EXISTS measurements (
@@ -164,7 +165,8 @@ export class DatabaseService {
         unit TEXT NOT NULL,
         notes TEXT,
         updated_at INTEGER DEFAULT 0,
-        deleted_at INTEGER
+        deleted_at INTEGER,
+        user_id TEXT
       );
 
       CREATE TABLE IF NOT EXISTS body_metrics (
@@ -173,8 +175,10 @@ export class DatabaseService {
         weight REAL,
         body_fat REAL,
         notes TEXT,
+        created_at INTEGER DEFAULT 0,
         updated_at INTEGER DEFAULT 0,
-        deleted_at INTEGER
+        deleted_at INTEGER,
+        user_id TEXT
       );
 
       CREATE TABLE IF NOT EXISTS plate_inventory (
@@ -185,7 +189,20 @@ export class DatabaseService {
         type TEXT DEFAULT 'standard',
         unit TEXT NOT NULL,
         color TEXT,
-        updated_at INTEGER DEFAULT 0
+        updated_at INTEGER DEFAULT 0,
+        user_id TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS routines (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        is_public INTEGER DEFAULT 0,
+        is_moderated INTEGER DEFAULT 0,
+        moderation_message TEXT,
+        updated_at INTEGER DEFAULT 0,
+        deleted_at INTEGER,
+        user_id TEXT
       );
 
       CREATE TABLE IF NOT EXISTS routine_days (
@@ -195,6 +212,7 @@ export class DatabaseService {
         order_index INTEGER NOT NULL,
         updated_at INTEGER DEFAULT 0,
         deleted_at INTEGER,
+        user_id TEXT,
         FOREIGN KEY (routine_id) REFERENCES routines (id) ON DELETE CASCADE
       );
 
@@ -206,6 +224,7 @@ export class DatabaseService {
         notes TEXT,
         updated_at INTEGER DEFAULT 0,
         deleted_at INTEGER,
+        user_id TEXT,
         FOREIGN KEY (routine_day_id) REFERENCES routine_days (id) ON DELETE CASCADE,
         FOREIGN KEY (exercise_id) REFERENCES exercises (id)
       );
@@ -219,7 +238,8 @@ export class DatabaseService {
         is_system INTEGER DEFAULT 0,
         updated_at INTEGER DEFAULT 0,
         deleted_at INTEGER,
-        origin_id TEXT
+        origin_id TEXT,
+        user_id TEXT
       );
 
       CREATE TABLE IF NOT EXISTS exercise_badges (
@@ -230,22 +250,9 @@ export class DatabaseService {
         is_system INTEGER DEFAULT 0,
         updated_at INTEGER DEFAULT 0,
         deleted_at INTEGER,
+        user_id TEXT,
         FOREIGN KEY (exercise_id) REFERENCES exercises (id) ON DELETE CASCADE,
         FOREIGN KEY (badge_id) REFERENCES badges (id) ON DELETE CASCADE
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_eb_exercise ON exercise_badges(exercise_id);
-
-
-      CREATE TABLE IF NOT EXISTS routines (
-        id TEXT PRIMARY KEY NOT NULL,
-        name TEXT NOT NULL,
-        description TEXT,
-        is_public INTEGER DEFAULT 0,
-        is_moderated INTEGER DEFAULT 0,
-        moderation_message TEXT,
-        updated_at INTEGER DEFAULT 0,
-        deleted_at INTEGER
       );
 
       CREATE TABLE IF NOT EXISTS sync_queue (
@@ -257,15 +264,9 @@ export class DatabaseService {
         created_at INTEGER NOT NULL,
         synced_at INTEGER,
         status TEXT DEFAULT 'pending',
-        retry_count INTEGER DEFAULT 0
+        retry_count INTEGER DEFAULT 0,
+        batch_id TEXT
       );
-
-      CREATE INDEX IF NOT EXISTS idx_exercises_category ON exercises(category_id);
-      CREATE INDEX IF NOT EXISTS idx_sets_exercise ON workout_sets(exercise_id);
-      CREATE INDEX IF NOT EXISTS idx_sets_workout ON workout_sets(workout_id);
-      CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
-      CREATE INDEX IF NOT EXISTS idx_routine_days_routine ON routine_days(routine_id);
-      CREATE INDEX IF NOT EXISTS idx_routine_exercises_day ON routine_exercises(routine_day_id);
 
       CREATE TABLE IF NOT EXISTS user_profiles (
         id TEXT PRIMARY KEY NOT NULL,
@@ -289,10 +290,13 @@ export class DatabaseService {
         id TEXT PRIMARY KEY NOT NULL,
         user_id TEXT NOT NULL,
         exercise_id TEXT NOT NULL,
+        exercise_name TEXT,
+        workout_set_id TEXT,
         weight REAL,
         reps INTEGER,
-        one_rep_max REAL,
+        best_1rm_kg REAL,
         date INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         deleted_at INTEGER
       );
@@ -327,7 +331,10 @@ export class DatabaseService {
         condition TEXT,
         humidity REAL,
         wind_speed REAL,
-        created_at INTEGER NOT NULL
+        is_adverse INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER
       );
 
       CREATE TABLE IF NOT EXISTS changelog_reactions (
@@ -380,8 +387,6 @@ export class DatabaseService {
         deleted_at INTEGER
       );
 
-
-
       CREATE TABLE IF NOT EXISTS notification_reactions (
         id TEXT PRIMARY KEY NOT NULL,
         notification_id TEXT NOT NULL,
@@ -404,41 +409,67 @@ export class DatabaseService {
         kudo_count INTEGER DEFAULT 0 NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS activity_seen (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        activity_id TEXT NOT NULL,
+        seen_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_exercises_category ON exercises(category_id);
+      CREATE INDEX IF NOT EXISTS idx_sets_exercise ON workout_sets(exercise_id);
+      CREATE INDEX IF NOT EXISTS idx_sets_workout ON workout_sets(workout_id);
+      CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
+      CREATE INDEX IF NOT EXISTS idx_routine_days_routine ON routine_days(routine_id);
+      CREATE INDEX IF NOT EXISTS idx_routine_exercises_day ON routine_exercises(routine_day_id);
+      CREATE INDEX IF NOT EXISTS idx_eb_exercise ON exercise_badges(exercise_id);
+      CREATE INDEX IF NOT EXISTS idx_workouts_status_date ON workouts(status, date, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_workout_sets_completed ON workout_sets(workout_id, completed, deleted_at);
+    CREATE INDEX IF NOT EXISTS idx_workout_sets_1rm ON workout_sets(exercise_id, completed, workout_id, weight, reps);
+      CREATE INDEX IF NOT EXISTS idx_score_events_user ON score_events(user_id, event_type, date, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, retry_count, created_at);
       CREATE INDEX IF NOT EXISTS idx_friendships_user ON friendships(user_id);
       CREATE INDEX IF NOT EXISTS idx_friendships_friend ON friendships(friend_id);
+      CREATE INDEX IF NOT EXISTS idx_friendships_user_friend ON friendships(user_id, friend_id);
       CREATE INDEX IF NOT EXISTS idx_activity_feed_user ON activity_feed(user_id);
-
+      CREATE INDEX IF NOT EXISTS idx_activity_seen_user ON activity_seen(user_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_seen_activity ON activity_seen(activity_id);
       CREATE INDEX IF NOT EXISTS idx_shares_receiver ON shares_inbox(receiver_id);
+      CREATE INDEX IF NOT EXISTS idx_notif_reactions_notif ON notification_reactions (notification_id);
+      CREATE INDEX IF NOT EXISTS idx_notif_reactions_user ON notification_reactions (user_id);
+
+      -- SYNC PERFORMANCE INDICES
+      CREATE INDEX IF NOT EXISTS idx_categories_sync ON categories(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_exercises_sync ON exercises(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_workouts_sync ON workouts(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_workout_sets_sync ON workout_sets(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_routines_sync ON routines(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_routine_days_sync ON routine_days(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_routine_exercises_sync ON routine_exercises(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_measurements_sync ON measurements(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_goals_sync ON goals(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_body_metrics_sync ON body_metrics(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_plate_inventory_sync ON plate_inventory(user_id, updated_at);
+      CREATE INDEX IF NOT EXISTS idx_badges_sync ON badges(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_exercise_badges_sync ON exercise_badges(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_settings_sync ON settings(user_id, updated_at);
+      CREATE INDEX IF NOT EXISTS idx_activity_feed_sync ON activity_feed(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_score_events_sync ON score_events(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_user_prs_sync ON user_exercise_prs(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_friendships_sync ON friendships(user_id, updated_at, deleted_at);
+      CREATE INDEX IF NOT EXISTS idx_weather_logs_sync ON weather_logs(user_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_changelogs_sync ON changelogs(updated_at, deleted_at);
     `;
 
         await this.executeRaw(schema);
-
-        // Safety check for settings table - ensure IT EXISTS
-        try {
-            const check = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='settings'");
-            if (!check || check.count === 0) {
-                await this.executeRaw(`
-                    CREATE TABLE IF NOT EXISTS settings (
-                        key TEXT PRIMARY KEY NOT NULL,
-                        value TEXT NOT NULL,
-                        description TEXT,
-                        updated_at INTEGER DEFAULT 0
-                    );
-                 `);
-            }
-        } catch (e) {
-            logger.captureException(e, { scope: 'DatabaseService.createTables', message: 'Settings table check failed' });
-        }
-
         await this.runMigrations();
     }
 
     private async runMigrations(): Promise<void> {
         // Migration 0: Migrate any legacy numeric IDs to UUIDs (Critical Task 1)
         try {
-            // Check if we need to migrate first to avoid taking a lock if unnecessary
             const hasLegacy = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM categories WHERE length(id) < 15");
-
             if (hasLegacy && hasLegacy.count > 0) {
                 logger.info('Running Critical Migration: Converting numeric IDs to UUIDs');
                 await this.executeRaw('PRAGMA foreign_keys = OFF;');
@@ -578,12 +609,6 @@ export class DatabaseService {
                 await this.executeRaw('ALTER TABLE exercises ADD COLUMN is_system INTEGER DEFAULT 0');
             }
 
-            const resultExOr = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('exercises') WHERE name='origin_id'");
-            if (resultExOr && resultExOr.count === 0) {
-                logger.info('Running Migration: Adding origin_id to exercises');
-                await this.executeRaw('ALTER TABLE exercises ADD COLUMN origin_id TEXT');
-            }
-
             const resultEB = await this.getFirst<{ count: number }>("SELECT count(*) as count FROM pragma_table_info('exercise_badges') WHERE name='user_id'");
             if (resultEB && resultEB.count === 0) {
                 logger.info('Running Migration: Adding user_id to exercise_badges');
@@ -625,9 +650,7 @@ export class DatabaseService {
                 await this.executeRaw("ALTER TABLE plate_inventory ADD COLUMN unit TEXT DEFAULT 'kg'");
             }
 
-            const createSql = await this.getAll<{ sql: string | null }>(
-                "SELECT sql FROM sqlite_master WHERE type='table' AND name='plate_inventory'"
-            );
+            const createSql = await this.getAll<{ sql: string | null }>("SELECT sql FROM sqlite_master WHERE type='table' AND name='plate_inventory'");
             const sqlText = createSql?.[0]?.sql ?? '';
             const pkHasUnit = /PRIMARY KEY\s*\(\s*weight\s*,\s*type\s*,\s*unit\s*\)/i.test(sqlText);
 
@@ -889,10 +912,13 @@ export class DatabaseService {
                     id TEXT PRIMARY KEY NOT NULL,
                     user_id TEXT NOT NULL,
                     exercise_id TEXT NOT NULL,
+                    exercise_name TEXT,
+                    workout_set_id TEXT,
                     weight REAL,
                     reps INTEGER,
-                    one_rep_max REAL,
+                    best_1rm_kg REAL,
                     date INTEGER NOT NULL,
+                    created_at INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL,
                     deleted_at INTEGER
                 )
@@ -1161,16 +1187,537 @@ export class DatabaseService {
         } catch (e) {
             logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: '[Migration] Migration 25 failed (weather logging)' });
         }
+
+        // Migration 27: Add missing friendship index
+        try {
+            await this.executeRaw('CREATE INDEX IF NOT EXISTS idx_friendships_user_friend ON friendships(user_id, friend_id)');
+        } catch (e) {
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 27 failed' });
+        }
+
+        // Migration 28: Align schemas for user_exercise_prs and weather_logs
+        try {
+            logger.info('[Migration] Running Migration 28: Schema Alignment');
+            
+            // user_exercise_prs alignment
+            const prInfo = await this.getAll<{ name: string }>("PRAGMA table_info('user_exercise_prs')");
+            const prCols = prInfo.map(c => c.name);
+            if (!prCols.includes('workout_set_id')) {
+                await this.executeRaw('ALTER TABLE user_exercise_prs ADD COLUMN workout_set_id TEXT');
+            }
+            if (!prCols.includes('achieved_at')) {
+                await this.executeRaw('ALTER TABLE user_exercise_prs ADD COLUMN achieved_at INTEGER');
+            }
+
+            // weather_logs alignment
+            const weatherInfo = await this.getAll<{ name: string }>("PRAGMA table_info('weather_logs')");
+            const weatherCols = weatherInfo.map(c => c.name);
+            if (!weatherCols.includes('lat')) {
+                await this.executeRaw('ALTER TABLE weather_logs ADD COLUMN lat REAL');
+            }
+            if (!weatherCols.includes('lon')) {
+                await this.executeRaw('ALTER TABLE weather_logs ADD COLUMN lon REAL');
+            }
+            if (!weatherCols.includes('is_adverse')) {
+                await this.executeRaw('ALTER TABLE weather_logs ADD COLUMN is_adverse INTEGER DEFAULT 0');
+            }
+            if (!weatherCols.includes('temp_c')) {
+                await this.executeRaw('ALTER TABLE weather_logs ADD COLUMN temp_c REAL');
+            }
+        } catch (e) {
+            logger.captureException(e, { scope: 'DatabaseService.runMigrations', message: 'Migration 28 failed' });
+        }
     }
 
-    /**
-     * Public method to deduplicate categories, exercises, and badges.
-     * Can be called during migrations OR after a sync pull to ensure zero duplicates.
-     */
+    private validateTable(tableName: string) {
+        if (!ALLOWED_TABLES.has(tableName)) {
+            throw new Error(`Invalid table name: ${tableName}`);
+        }
+    }
+
+    // ==================== GENERIC CRUD WRAPPERS ====================
+
+    public async insert<T extends { id?: string }>(tableName: string, data: T): Promise<string> {
+        this.validateTable(tableName);
+        const id = data.id || this.generateId();
+        const now = Date.now();
+        const userId = useAuthStore.getState().user?.id;
+        const record = { ...data, id, updated_at: now, user_id: userId || (data as any).user_id || null };
+        const keys = Object.keys(record);
+        const placeholders = keys.map(() => '?').join(', ');
+        const values = Object.values(record);
+        await this.run(`INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders})`, values);
+        await this.queueSyncMutation(tableName, id, 'INSERT', record);
+        return id;
+    }
+
+    public async update<T>(tableName: string, id: string, updates: Partial<T>): Promise<void> {
+        this.validateTable(tableName);
+        const now = Date.now();
+        const fields = Object.keys(updates);
+        if (fields.length === 0) return;
+        const setClause = fields.map(f => `${f} = ?`).join(', ');
+        const values = Object.values(updates);
+        await this.run(`UPDATE ${tableName} SET ${setClause}, updated_at = ? WHERE id = ?`, [...values, now, id]);
+        await this.queueSyncMutation(tableName, id, 'UPDATE', { ...updates, updated_at: now });
+    }
+
+    public async upsert<T extends { id: string }>(tableName: string, data: T): Promise<void> {
+        this.validateTable(tableName);
+        const now = Date.now();
+        const userId = useAuthStore.getState().user?.id;
+        const record = { ...data, updated_at: now, user_id: userId || (data as any).user_id || null };
+        const keys = Object.keys(record);
+        const placeholders = keys.map(() => '?').join(', ');
+        const values = Object.values(record);
+        await this.run(`INSERT OR REPLACE INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders})`, values);
+        await this.queueSyncMutation(tableName, data.id, 'UPDATE', record);
+    }
+
+    public async delete(tableName: string, id: string): Promise<void> {
+        this.validateTable(tableName);
+        await this.run(`DELETE FROM ${tableName} WHERE id = ?`, [id]);
+        await this.queueSyncMutation(tableName, id, 'DELETE');
+    }
+
+    public async softDelete(tableName: string, id: string): Promise<void> {
+        this.validateTable(tableName);
+        const now = Date.now();
+        try {
+            const info = await this.getAll<{ name: string }>(`PRAGMA table_info('${tableName}')`);
+            const hasDeletedAt = info.some(c => c.name === 'deleted_at');
+            if (hasDeletedAt) {
+                await this.run(`UPDATE ${tableName} SET deleted_at = ?, updated_at = ? WHERE id = ?`, [now, now, id]);
+                await this.queueSyncMutation(tableName, id, 'UPDATE', { deleted_at: now, updated_at: now });
+            } else {
+                await this.delete(tableName, id);
+            }
+        } catch (e) {
+            logger.captureException(e, { scope: 'DatabaseService.softDelete', tableName, id });
+            throw e;
+        }
+    }
+
+    // ==================== TRANSACTION HELPERS ====================
+
+    public async withTransaction(callback: () => Promise<void>): Promise<void> {
+        await this.ensureInitialized();
+        return await this.executeWithRetry(async () => {
+            this.batchIdStack.push(this.currentBatchId || '');
+            this.currentBatchId = this.generateId();
+            try {
+                return await this.db!.withTransactionAsync(callback);
+            } catch (e: any) {
+                const msg = e?.message || '';
+                if (msg.includes('no transaction is active') || msg.includes('cannot rollback')) return;
+                throw e;
+            } finally {
+                const prev = this.batchIdStack.pop();
+                this.currentBatchId = prev || null;
+            }
+        });
+    }
+
+    public async withTransactionAsync(callback: (db: SQLite.SQLiteDatabase) => Promise<void>): Promise<void> {
+        await this.ensureInitialized();
+        return await this.executeWithRetry(async () => {
+            this.batchIdStack.push(this.currentBatchId || '');
+            this.currentBatchId = this.generateId();
+            try {
+                return await this.db!.withTransactionAsync(() => callback(this.db!));
+            } catch (e: any) {
+                const msg = e?.message || '';
+                if (msg.includes('no transaction is active') || msg.includes('cannot rollback')) return;
+                throw e;
+            } finally {
+                const prev = this.batchIdStack.pop();
+                this.currentBatchId = prev || null;
+            }
+        });
+    }
+
+    // ==================== SYNC QUEUE ====================
+
+    public async queueSyncMutation(tableName: string, recordId: string, operation: 'INSERT' | 'UPDATE' | 'DELETE', payload?: any): Promise<void> {
+        if (!this.db) return;
+        try {
+            let finalPayload = payload;
+            if (operation !== 'DELETE' && payload && typeof payload === 'object') {
+                const userId = useAuthStore.getState().user?.id;
+                if (userId && !payload.user_id && !payload.userId) {
+                    finalPayload = { ...payload, user_id: userId };
+                }
+            }
+            await this.run(
+                `INSERT INTO sync_queue (id, table_name, record_id, operation, payload, created_at, status, retry_count, batch_id)
+                 VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?)`,
+                [this.generateId(), tableName, recordId, operation, finalPayload ? JSON.stringify(finalPayload) : null, Date.now(), this.currentBatchId]
+            );
+            dataEventService.emit('SYNC_QUEUE_ENQUEUED', { tableName, recordId, operation });
+        } catch (e) {
+            logger.captureException(e, { scope: 'DatabaseService.queueSyncMutation' });
+        }
+    }
+
+    // ==================== CORE DATABASE METHODS ====================
+
+    public async run(sql: string, params: any[] = []): Promise<SQLite.SQLiteRunResult> {
+        await this.ensureInitialized();
+        return await this.executeWithRetry(async () => {
+            return await this.db!.runAsync(sql, ...this.normalizeParams(params));
+        });
+    }
+
+    public async executeRaw(sql: string): Promise<void> {
+        await this.ensureInitialized();
+        return await this.executeWithRetry(async () => {
+            await this.db!.execAsync(sql);
+        });
+    }
+
+    public async getAll<T>(sql: string, params: any[] = []): Promise<T[]> {
+        await this.ensureInitialized();
+        return await this.executeWithRetry(async () => {
+            return await this.db!.getAllAsync(sql, ...this.normalizeParams(params)) as T[];
+        });
+    }
+
+    public async getFirst<T>(sql: string, params: any[] = []): Promise<T | null> {
+        await this.ensureInitialized();
+        return await this.executeWithRetry(async () => {
+            return await this.db!.getFirstAsync(sql, ...this.normalizeParams(params)) as T | null;
+        });
+    }
+
+    private async executeWithRetry<T>(operation: () => Promise<T>, retries = 3, delay = 150): Promise<T> {
+        let lastError: any;
+        for (let i = 0; i < retries; i++) {
+            try { return await operation(); } catch (error: any) {
+                lastError = error;
+                if (error?.message?.includes('database is locked') || error?.code === 'SQLITE_BUSY') {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    continue;
+                }
+                throw error;
+            }
+        }
+        throw lastError;
+    }
+
+    private generateId(): string { return uuidV4(); }
+    private normalizeParams(params: any[] = []): any[] { return params.map((p) => (p === undefined ? null : p)); }
+
+    // ==================== MIGRATIONS (COMPLETE) ====================
+
+    private async seedDatabase(): Promise<void> {
+        const seedDisabled = await SecureStore.getItemAsync(SEED_DISABLED_KEY);
+        if (seedDisabled === '1') return;
+        await this.run('INSERT OR IGNORE INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, 999, "#64748b")', [UNCATEGORIZED_ID, UNCATEGORIZED_NAME]);
+    }
+
+    private async seedBadges(): Promise<void> {
+        // No longer seeding system badges as user builds their own.
+    }
+
+    // ==================== CATEGORIES ====================
+
+    public async getCategories(): Promise<Category[]> {
+        return await this.getAll<Category>('SELECT * FROM categories WHERE deleted_at IS NULL ORDER BY sort_order ASC');
+    }
+
+    // ==================== EXERCISES ====================
+
+    public async searchExercises(query: string, categoryId?: string): Promise<(Exercise & { category_name: string; category_color: string })[]> {
+        let sql = `
+            SELECT e.*, c.name as category_name, c.color as category_color      
+            FROM exercises e
+            LEFT JOIN categories c ON e.category_id = c.id
+            WHERE 1=1
+        `;
+        const params: any[] = [];
+
+        if (query) {
+            sql += ` AND e.name LIKE ?`;
+            params.push(`%${query}%`);
+        }
+
+        if (categoryId && categoryId !== 'all') {
+            sql += ` AND e.category_id = ?`;
+            params.push(categoryId);
+        }
+
+        sql += ` ORDER BY e.name ASC`;
+
+        return await this.getAll(sql, params);
+    }
+
+    public async getExercises(): Promise<Exercise[]> {
+        return this.getAll<Exercise>(`
+      SELECT e.*, c.name as category_name
+      FROM exercises e
+      LEFT JOIN categories c ON e.category_id = c.id
+      ORDER BY e.name ASC
+    `);
+    }
+
+    public async getExerciseById(id: string): Promise<Exercise | null> {        
+        return this.getFirst<Exercise>('SELECT * FROM exercises WHERE id = ?', [id]);
+    }
+
+    public async createExercise(exercise: Partial<Exercise>): Promise<string> { 
+        const id = this.generateId();
+        const now = Date.now();
+        const userId = useAuthStore.getState().user?.id;
+        await this.run(
+            `INSERT INTO exercises (id, category_id, name, type, default_increment, notes, is_system, updated_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id,
+                exercise.category_id,
+                exercise.name,
+                exercise.type,
+                exercise.default_increment ?? 2.5,
+                exercise.notes ?? null,
+                0,
+                now,
+                userId || null
+            ]
+        );
+        await this.queueSyncMutation('exercises', id, 'INSERT', { ...exercise, id, is_system: 0, updated_at: now, deleted_at: null, user_id: userId || null });
+        return id;
+    }
+
+    public async updateExercise(id: string, updates: Partial<Exercise>): Promise<void> {
+        const fields: string[] = [];
+        const values: any[] = [];
+        const now = Date.now();
+
+        Object.entries(updates).forEach(([key, value]) => {
+            if (key !== 'id' && value !== undefined) {
+                fields.push(`${key} = ?`);
+                values.push(value);
+            }
+        });
+
+        if (fields.length === 0) return;
+
+        fields.push('updated_at = ?');
+        values.push(now);
+        values.push(id);
+        await this.run(`UPDATE exercises SET ${fields.join(', ')} WHERE id = ?`, values);
+        await this.queueSyncMutation('exercises', id, 'UPDATE', { ...updates, updated_at: now });
+    }
+
+    // ==================== WORKOUTS ====================
+
+    public async getWorkoutsByDate(dateStart: number, dateEnd: number): Promise<Workout[]> {
+        const sql = `
+            SELECT w.*,
+                   (SELECT COUNT(*) FROM workout_sets ws WHERE ws.workout_id = w.id AND ws.deleted_at IS NULL) as set_count
+            FROM workouts w
+            WHERE date >= ? AND date < ?
+              AND deleted_at IS NULL
+              AND is_template = 0
+            ORDER BY date DESC, start_time DESC, set_count DESC
+        `;
+        return await this.getAll<Workout>(sql, [dateStart, dateEnd]);
+    }
+
+    public async getWorkoutByDate(dateStart: number, dateEnd: number): Promise<Workout | null> {
+        const sql = `
+            SELECT w.*,
+                   (SELECT COUNT(*) FROM workout_sets ws WHERE ws.workout_id = w.id AND ws.deleted_at IS NULL) as set_count
+            FROM workouts w
+            WHERE date >= ? AND date < ?
+              AND deleted_at IS NULL
+              AND is_template = 0
+            ORDER BY set_count DESC, start_time DESC, date DESC
+            LIMIT 1
+        `;
+        return await this.getFirst<Workout>(sql, [dateStart, dateEnd]);
+    }
+
+    public async getWorkoutById(id: string): Promise<Workout | null> {
+        return await this.getFirst<Workout>('SELECT * FROM workouts WHERE id = ?', [id]);
+    }
+
+    public async updateWorkout(id: string, updates: Partial<Workout>): Promise<void> {
+        const fields = Object.keys(updates);
+        if (fields.length === 0) return;
+
+        const setClause = fields.map(f => `${f} = ?`).join(', ');
+        const values = Object.values(updates);
+        const now = Date.now();
+
+        await this.run(
+            `UPDATE workouts SET ${setClause}, updated_at = ? WHERE id = ?`,    
+            [...values, now, id]
+        );
+
+        await this.queueSyncMutation('workouts', id, 'UPDATE', { ...updates, updated_at: now });
+    }
+
+    public async createWorkout(date: number): Promise<string> {
+        const id = this.generateId();
+        const now = Date.now();
+        const userId = useAuthStore.getState().user?.id;
+        await this.run(
+            'INSERT INTO workouts (id, date, start_time, status, is_template, updated_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [id, date, now, 'in_progress', 0, now, userId || null]
+        );
+        await this.queueSyncMutation('workouts', id, 'INSERT', { id, date, start_time: now, status: 'in_progress', is_template: 0, updated_at: now, deleted_at: null, user_id: userId || null });
+        return id;
+    }
+
+    // ==================== SETS ====================
+
+    public async getSetsForWorkout(workoutId: string): Promise<(WorkoutSet & { exercise_name: string; category_color: string; exercise_type: ExerciseType; badges: any[] })[]> {
+        const rows = await this.getAll<any>(
+            `SELECT ws.*, e.name as exercise_name, e.type as exercise_type, c.color as category_color,
+            (SELECT GROUP_CONCAT(b.name || '|' || b.color || '|' || COALESCE(b.icon, ''))
+             FROM badges b
+             JOIN exercise_badges eb ON b.id = eb.badge_id
+             WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL) as badges_csv
+        FROM workout_sets ws
+        JOIN exercises e ON ws.exercise_id = e.id
+        LEFT JOIN categories c ON e.category_id = c.id
+        WHERE ws.workout_id = ?
+        ORDER BY ws.order_index ASC`,
+            [workoutId]
+        );
+
+        return rows.map(row => {
+            const badges = row.badges_csv ? row.badges_csv.split(',').map((s: string) => {
+                const [name, color, icon] = s.split('|');
+                return { name, color, icon: icon || undefined };
+            }) : [];
+            return { ...row, badges };
+        });
+    }
+
+    public async addSet(set: Partial<WorkoutSet> & { workout_id: string; exercise_id: string; order_index: number; type: string }): Promise<string> {
+        const id = this.generateId();
+        const now = Date.now();
+        const userId = useAuthStore.getState().user?.id;
+        await this.run(
+            `INSERT INTO workout_sets (id, workout_id, exercise_id, type, weight, reps, distance, time, rpe, order_index, completed, notes, superset_id, updated_at, user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id,
+                set.workout_id,
+                set.exercise_id,
+                set.type,
+                set.weight ?? null,
+                set.reps ?? null,
+                set.distance ?? null,
+                set.time ?? null,
+                set.rpe ?? null,
+                set.order_index,
+                set.completed ?? 0,
+                set.notes ?? null,
+                set.superset_id ?? null,
+                now,
+                userId || null
+            ]
+        );
+        await this.queueSyncMutation('workout_sets', id, 'INSERT', { ...set, id, updated_at: now, deleted_at: null, user_id: userId || null });
+        return id;
+    }
+
+    public async updateSet(id: string, updates: Partial<WorkoutSet>): Promise<void> {
+        const fields: string[] = [];
+        const values: any[] = [];
+        const now = Date.now();
+
+        Object.entries(updates).forEach(([key, value]) => {
+            if (key !== 'id' && value !== undefined) {
+                fields.push(`${key} = ?`);
+                values.push(value);
+            }
+        });
+
+        if (fields.length === 0) return;
+
+        fields.push('updated_at = ?');
+        values.push(now);
+        values.push(id);
+        await this.run(`UPDATE workout_sets SET ${fields.join(', ')} WHERE id = ?`, values);
+        await this.queueSyncMutation('workout_sets', id, 'UPDATE', { ...updates, updated_at: now });
+    }
+
+    public async deleteSet(id: string): Promise<void> {
+        await this.run('DELETE FROM workout_sets WHERE id = ?', [id]);
+        await this.queueSyncMutation('workout_sets', id, 'DELETE');
+    }
+
+    public async getSetById(id: string): Promise<WorkoutSet | null> {
+        return await this.getFirst<WorkoutSet>('SELECT * FROM workout_sets WHERE id = ?', [id]);
+    }
+
+    // ==================== GHOST VALUES / HISTORY ====================
+
+    public async getLastSetForExercise(exerciseId: string): Promise<WorkoutSet | null> {
+        return await this.getFirst<WorkoutSet>(
+            `SELECT * FROM workout_sets
+       WHERE exercise_id = ? AND completed = 1
+       ORDER BY rowid DESC LIMIT 1`,
+            [exerciseId]
+        );
+    }
+
+    // ==================== FACTORY RESET ====================
+
+    public async factoryReset(): Promise<void> {
+        await this.executeRaw('PRAGMA foreign_keys = OFF;');
+        try {
+            await this.withTransaction(async () => {
+                await this.run('DELETE FROM workout_sets');
+                await this.run('DELETE FROM workouts');
+
+                await this.run('DELETE FROM measurements');
+                await this.run('DELETE FROM goals');
+                await this.run('DELETE FROM body_metrics');
+                await this.run('DELETE FROM plate_inventory');
+
+                await this.run('DELETE FROM routine_exercises');
+                await this.run('DELETE FROM routine_days');
+                await this.run('DELETE FROM routines');
+
+                await this.run('DELETE FROM exercises');
+                await this.run('DELETE FROM categories');
+                await this.run("INSERT OR IGNORE INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, 999, '#64748b')", [UNCATEGORIZED_ID, UNCATEGORIZED_NAME]);
+
+                await this.run('DELETE FROM exercise_badges');
+                await this.run('DELETE FROM badges');
+
+                await this.run('DELETE FROM sync_queue');
+                await this.run('DELETE FROM settings');
+            });
+        } finally {
+            await this.executeRaw('PRAGMA foreign_keys = ON;');
+        }
+
+        const fkIssues = await this.getAll<{ table: string; rowid: number; parent: string; fkid: number }>('PRAGMA foreign_key_check;');
+        if (fkIssues.length > 0) {
+            const first = fkIssues[0];
+            throw new Error(`Factory reset integrity check failed (foreign_key_check). First issue: table=${first.table} rowid=${first.rowid} parent=${first.parent} fkid=${first.fkid}`);
+        }
+
+        await SecureStore.setItemAsync(SEED_DISABLED_KEY, '1');
+    }
+
+    // ==================== HELPER UTILS ====================
+
+    public getDatabase(): SQLite.SQLiteDatabase {
+        if (!this.db) {
+            throw new Error('Database not initialized. Call init() first.');
+        }
+        return this.db;
+    }
+
+    // ==================== DATA CONSISTENCY REPAIR ====================
+
     public async repairDataConsistency(injectedUserId?: string): Promise<void> {
         const userId = injectedUserId || useAuthStore.getState().user?.id;
-        // If no user is logged in, we skip most user-specific repairs to avoid cross-contamination.
-        // Some system-level repairs (like uncategorized) can still run.
 
         await this.executeRaw('PRAGMA foreign_keys = OFF;');
 
@@ -1209,7 +1756,7 @@ export class DatabaseService {
             });
 
             if (!userId) {
-                return; // Everything below requires a user context to be safe
+                return;
             }
 
             // 2. Generic Category Deduplication (User Aware)
@@ -1307,11 +1854,11 @@ export class DatabaseService {
             // 5. Workout Sets Deduplication (User Aware)
             await safeStep('workoutSets', async () => {
                 const dupeSets = await this.getAll<{ id: string }>(`
-                    SELECT id FROM workout_sets 
+                    SELECT id FROM workout_sets
                     WHERE user_id = ? AND id NOT IN (
                         SELECT id FROM (
                             SELECT id, ROW_NUMBER() OVER (
-                                PARTITION BY workout_id, order_index, exercise_id 
+                                PARTITION BY workout_id, order_index, exercise_id
                                 ORDER BY completed DESC, weight DESC, updated_at DESC
                             ) as rn
                             FROM workout_sets
@@ -1329,7 +1876,7 @@ export class DatabaseService {
             // 6. Routine Day Deduplication (User Aware)
             await safeStep('routineDays', async () => {
                 const dupeDays = await this.getAll<{ id: string }>(`
-                    SELECT id FROM routine_days 
+                    SELECT id FROM routine_days
                     WHERE user_id = ? AND rowid NOT IN (
                         SELECT MIN(rowid) FROM routine_days WHERE user_id = ? GROUP BY routine_id, order_index
                     )
@@ -1368,7 +1915,7 @@ export class DatabaseService {
                 await this.run("UPDATE measurements SET unit = 'kg' WHERE user_id = ? AND type = 'weight' AND (unit IS NULL OR unit = 'cm')", [userId]);
                 await this.run("UPDATE measurements SET unit = '%' WHERE user_id = ? AND type = 'body_fat' AND (unit IS NULL OR unit = 'cm')", [userId]);
                 await this.run(`
-                    UPDATE user_exercise_prs 
+                    UPDATE user_exercise_prs
                     SET exercise_name = (SELECT name FROM exercises WHERE exercises.id = user_exercise_prs.exercise_id)
                     WHERE user_id = ? AND (exercise_name IS NULL OR exercise_name = '')
                 `, [userId]);
@@ -1400,9 +1947,8 @@ export class DatabaseService {
 
             // 12. Junction Table Cleanup (User Aware)
             await safeStep('junctions', async () => {
-                // exercise_badges doesn't have its own user_id usually, but it's linked via exercise_id
                 await this.run(`
-                    DELETE FROM exercise_badges 
+                    DELETE FROM exercise_badges
                     WHERE exercise_id IN (SELECT id FROM exercises WHERE user_id = ?)
                     AND rowid NOT IN (
                         SELECT MIN(rowid) FROM exercise_badges GROUP BY exercise_id, badge_id
@@ -1410,7 +1956,7 @@ export class DatabaseService {
                 `, [userId]);
 
                 await this.run(`
-                    DELETE FROM routine_exercises 
+                    DELETE FROM routine_exercises
                     WHERE routine_day_id IN (SELECT id FROM routine_days WHERE user_id = ?)
                     AND rowid NOT IN (
                         SELECT MIN(rowid) FROM routine_exercises GROUP BY routine_day_id, exercise_id, order_index
@@ -1434,7 +1980,6 @@ export class DatabaseService {
                         const info = await this.getAll<{ name: string }>(`PRAGMA table_info('${table}')`);
                         const cols = info.map(c => c.name);
                         if (cols.includes('user_id')) {
-                            // Only backfill if NULL or empty, effectively claiming orphaned data for the current user
                             await this.run(`UPDATE ${table} SET user_id = ? WHERE user_id IS NULL OR user_id = ''`, [userId]);
                         } else if (table === 'kudos' && cols.includes('giver_id')) {
                             await this.run(`UPDATE kudos SET giver_id = ? WHERE giver_id IS NULL OR giver_id = ''`, [userId]);
@@ -1444,486 +1989,9 @@ export class DatabaseService {
                     }
                 }
             });
-
-            // IMPORTANT: Destructive workout-by-date deduplication (Step 4.5 and 14) has been REMOVED.
-            // It was causing data loss for multiple sessions per day and triggering sync rollback loops.
-            // If we need to deduplicate workouts in the future, it must be based on globally unique IDs or content hash,
-            // NOT just the calendar date.
         } finally {
             try { await this.executeRaw('PRAGMA foreign_keys = ON;'); } catch (e) { /* safety */ }
         }
-    }
-
-    private async seedDatabase(): Promise<void> {
-        const seedDisabled = await SecureStore.getItemAsync(SEED_DISABLED_KEY);
-        if (seedDisabled === '1') {
-            return;
-        }
-
-        // Just ensure Sin categoría exists. No other system data.
-        const uncategorized = await this.getFirst('SELECT id FROM categories WHERE id = ? OR name = ?', [UNCATEGORIZED_ID, UNCATEGORIZED_NAME]);
-        if (!uncategorized) {
-            await this.run(
-                'INSERT INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, 999, "#64748b")',
-                [UNCATEGORIZED_ID, UNCATEGORIZED_NAME]
-            );
-        }
-    }
-
-    private async seedBadges(): Promise<void> {
-        // No longer seeding system badges as user builds their own.
-    }
-
-
-    // --- CATEGORIES ---
-
-    public async getCategories(): Promise<Category[]> {
-        return await this.getAll<Category>('SELECT * FROM categories ORDER BY sort_order ASC');
-    }
-
-    // --- EXERCISES ---
-
-    /**
-     * Search exercises by name (case insensitive usually via LIKE)
-     * Optional category filtering.
-     */
-    public async searchExercises(query: string, categoryId?: string): Promise<(Exercise & { category_name: string; category_color: string })[]> {
-        let sql = `
-            SELECT e.*, c.name as category_name, c.color as category_color
-            FROM exercises e
-            LEFT JOIN categories c ON e.category_id = c.id
-            WHERE 1=1
-        `;
-        const params: any[] = [];
-
-        if (query) {
-            sql += ` AND e.name LIKE ?`;
-            params.push(`%${query}%`);
-        }
-
-        if (categoryId && categoryId !== 'all') {
-            sql += ` AND e.category_id = ?`;
-            params.push(categoryId);
-        }
-
-        sql += ` ORDER BY e.name ASC`;
-
-        return await this.getAll(sql, params);
-    }
-
-    public async getExercises(): Promise<Exercise[]> {
-        return this.getAll<Exercise>(`
-      SELECT e.*, c.name as category_name 
-      FROM exercises e 
-      LEFT JOIN categories c ON e.category_id = c.id
-      ORDER BY e.name ASC
-    `);
-    }
-
-    public async getExerciseById(id: string): Promise<Exercise | null> {
-        return this.getFirst<Exercise>('SELECT * FROM exercises WHERE id = ?', [id]);
-    }
-
-    public async createExercise(exercise: Partial<Exercise>): Promise<string> {
-        const id = this.generateId();
-        const now = Date.now();
-        await this.run(
-            `INSERT INTO exercises (id, category_id, name, type, default_increment, notes, is_system, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                id,
-                exercise.category_id,
-                exercise.name,
-                exercise.type,
-                exercise.default_increment ?? 2.5,
-                exercise.notes ?? null,
-                0, // User created
-                now
-            ]
-        );
-        await this.queueSyncMutation('exercises', id, 'INSERT', { ...exercise, id, is_system: 0, updated_at: now, deleted_at: null });
-        return id;
-    }
-
-    public async updateExercise(id: string, updates: Partial<Exercise>): Promise<void> {
-        const fields: string[] = [];
-        const values: any[] = [];
-
-        const now = Date.now();
-
-        Object.entries(updates).forEach(([key, value]) => {
-            if (key !== 'id' && value !== undefined) {
-                fields.push(`${key} = ?`);
-                values.push(value);
-            }
-        });
-
-        if (fields.length === 0) return;
-
-        fields.push('updated_at = ?');
-        values.push(now);
-
-        values.push(id);
-        await this.run(`UPDATE exercises SET ${fields.join(', ')} WHERE id = ?`, values);
-        await this.queueSyncMutation('exercises', id, 'UPDATE', { ...updates, updated_at: now });
-    }
-
-    // --- WORKOUTS ---
-
-    public async getWorkoutsByDate(dateStart: number, dateEnd: number): Promise<Workout[]> {
-        const sql = `
-            SELECT w.*, 
-                   (SELECT COUNT(*) FROM workout_sets ws WHERE ws.workout_id = w.id AND ws.deleted_at IS NULL) as set_count
-            FROM workouts w
-            WHERE date >= ? AND date < ? 
-              AND deleted_at IS NULL
-              AND is_template = 0
-            ORDER BY date DESC, start_time DESC, set_count DESC
-        `;
-        return await this.getAll<Workout>(sql, [dateStart, dateEnd]);
-    }
-
-    public async getWorkoutByDate(dateStart: number, dateEnd: number): Promise<Workout | null> {
-        // Prioritize workouts that have sets and are not deleted.
-        // This handles cases where a sync might create a duplicate workout record for the same day.
-        const sql = `
-            SELECT w.*, 
-                   (SELECT COUNT(*) FROM workout_sets ws WHERE ws.workout_id = w.id AND ws.deleted_at IS NULL) as set_count
-            FROM workouts w
-            WHERE date >= ? AND date < ? 
-              AND deleted_at IS NULL
-              AND is_template = 0
-            ORDER BY set_count DESC, start_time DESC, date DESC 
-            LIMIT 1
-        `;
-        return await this.getFirst<Workout>(sql, [dateStart, dateEnd]);
-    }
-
-    public async getWorkoutById(id: string): Promise<Workout | null> {
-        return await this.getFirst<Workout>('SELECT * FROM workouts WHERE id = ?', [id]);
-    }
-
-    public async updateWorkout(id: string, updates: Partial<Workout>): Promise<void> {
-        const fields = Object.keys(updates);
-        if (fields.length === 0) return;
-
-        const setClause = fields.map(f => `${f} = ?`).join(', ');
-        const values = Object.values(updates);
-        const now = Date.now();
-
-        await this.run(
-            `UPDATE workouts SET ${setClause}, updated_at = ? WHERE id = ?`,
-            [...values, now, id]
-        );
-
-        // Queue sync mutation
-        await this.queueSyncMutation('workouts', id, 'UPDATE', { ...updates, updated_at: now });
-    }
-
-    public async createWorkout(date: number): Promise<string> {
-        const id = this.generateId();
-        const now = Date.now();
-        await this.run(
-            'INSERT INTO workouts (id, date, start_time, status, is_template, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [id, date, now, 'in_progress', 0, now]
-        );
-        await this.queueSyncMutation('workouts', id, 'INSERT', { id, date, start_time: now, status: 'in_progress', is_template: 0, updated_at: now, deleted_at: null });
-        return id;
-    }
-
-    // --- SETS ---
-
-    public async getSetsForWorkout(workoutId: string): Promise<(WorkoutSet & { exercise_name: string; category_color: string; exercise_type: ExerciseType; badges: any[] })[]> {
-        // Join with exercises to get names for the UI, and subquery for badges
-        const rows = await this.getAll<any>(
-            `SELECT ws.*, e.name as exercise_name, e.type as exercise_type, c.color as category_color,
-            (SELECT GROUP_CONCAT(b.name || '|' || b.color || '|' || COALESCE(b.icon, '')) 
-             FROM badges b 
-             JOIN exercise_badges eb ON b.id = eb.badge_id 
-             WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL) as badges_csv
-        FROM workout_sets ws
-        JOIN exercises e ON ws.exercise_id = e.id
-        LEFT JOIN categories c ON e.category_id = c.id
-        WHERE ws.workout_id = ? 
-        ORDER BY ws.order_index ASC`,
-            [workoutId]
-        );
-
-        return rows.map(row => {
-            const badges = row.badges_csv ? row.badges_csv.split(',').map((s: string) => {
-                const [name, color, icon] = s.split('|');
-                return { name, color, icon: icon || undefined };
-            }) : [];
-            return { ...row, badges };
-        });
-    }
-
-    public async addSet(set: Partial<WorkoutSet> & { workout_id: string; exercise_id: string; order_index: number; type: string }): Promise<string> {
-        const id = this.generateId();
-        const now = Date.now();
-        await this.run(
-            `INSERT INTO workout_sets (id, workout_id, exercise_id, type, weight, reps, distance, time, rpe, order_index, completed, notes, superset_id, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                id,
-                set.workout_id,
-                set.exercise_id,
-                set.type,
-                set.weight ?? null,
-                set.reps ?? null,
-                set.distance ?? null,
-                set.time ?? null,
-                set.rpe ?? null,
-                set.order_index,
-                set.completed ?? 0,
-                set.notes ?? null,
-                set.superset_id ?? null,
-                now
-            ]
-        );
-        await this.queueSyncMutation('workout_sets', id, 'INSERT', { ...set, id, updated_at: now, deleted_at: null });
-        return id;
-    }
-
-    public async updateSet(id: string, updates: Partial<WorkoutSet>): Promise<void> {
-        const fields: string[] = [];
-        const values: any[] = [];
-
-        const now = Date.now();
-
-        Object.entries(updates).forEach(([key, value]) => {
-            if (key !== 'id' && value !== undefined) {
-                fields.push(`${key} = ?`);
-                values.push(value);
-            }
-        });
-
-        if (fields.length === 0) return;
-
-        fields.push('updated_at = ?');
-        values.push(now);
-
-        values.push(id);
-        await this.run(`UPDATE workout_sets SET ${fields.join(', ')} WHERE id = ?`, values);
-        await this.queueSyncMutation('workout_sets', id, 'UPDATE', { ...updates, updated_at: now });
-    }
-
-    public async deleteSet(id: string): Promise<void> {
-        await this.run('DELETE FROM workout_sets WHERE id = ?', [id]);
-        await this.queueSyncMutation('workout_sets', id, 'DELETE');
-    }
-
-    public async getSetById(id: string): Promise<WorkoutSet | null> {
-        return await this.getFirst<WorkoutSet>('SELECT * FROM workout_sets WHERE id = ?', [id]);
-    }
-
-    public async factoryReset(): Promise<void> {
-        await this.executeRaw('PRAGMA foreign_keys = OFF;');
-        try {
-            await this.withTransaction(async () => {
-                await this.run('DELETE FROM workout_sets');
-                await this.run('DELETE FROM workouts');
-
-                await this.run('DELETE FROM measurements');
-                await this.run('DELETE FROM goals');
-                await this.run('DELETE FROM body_metrics');
-                await this.run('DELETE FROM plate_inventory');
-
-                await this.run('DELETE FROM routine_exercises');
-                await this.run('DELETE FROM routine_days');
-                await this.run('DELETE FROM routines');
-
-                await this.run('DELETE FROM exercises');
-                await this.run('DELETE FROM categories');
-                await this.run("INSERT OR IGNORE INTO categories (id, name, is_system, sort_order, color) VALUES (?, ?, 1, 999, '#64748b')", [UNCATEGORIZED_ID, UNCATEGORIZED_NAME]);
-
-                await this.run('DELETE FROM exercise_badges');
-                await this.run('DELETE FROM badges');
-
-                await this.run('DELETE FROM sync_queue');
-                await this.run('DELETE FROM settings');
-            });
-        } finally {
-            await this.executeRaw('PRAGMA foreign_keys = ON;');
-        }
-
-        const fkIssues = await this.getAll<{ table: string; rowid: number; parent: string; fkid: number }>('PRAGMA foreign_key_check;');
-        if (fkIssues.length > 0) {
-            const first = fkIssues[0];
-            throw new Error(`Factory reset integrity check failed (foreign_key_check). First issue: table=${first.table} rowid=${first.rowid} parent=${first.parent} fkid=${first.fkid}`);
-        }
-
-        await SecureStore.setItemAsync(SEED_DISABLED_KEY, '1');
-    }
-
-    // --- GHOST VALUES / HISTORY ---
-
-    /**
-     * Findings the most recent completed set for a specific exercise to use as ghost values.
-     * Excluding current workout if possible, or just strict history.
-     */
-    public async getLastSetForExercise(exerciseId: string): Promise<WorkoutSet | null> {
-        return await this.getFirst<WorkoutSet>(
-            `SELECT * FROM workout_sets 
-       WHERE exercise_id = ? AND completed = 1 
-       ORDER BY rowid DESC LIMIT 1`,
-            [exerciseId]
-        );
-    }
-
-    // --- SYNC QUEUE HELPERS (OFFLINE FIRST) ---
-    /**
-     * Enqueues a mutation representing a locally performed operation.
-     * This ensures any offline changes are eventually synced to the server.
-     */
-    public async queueSyncMutation(
-        tableName: string,
-        recordId: string,
-        operation: 'INSERT' | 'UPDATE' | 'DELETE',
-        payload?: any
-    ): Promise<void> {
-        if (!this.db) return;
-        try {
-            // --- Zero Trust: Automatic user_id injection for sync payloads ---
-            let finalPayload = payload;
-            if (operation !== 'DELETE' && payload && typeof payload === 'object') {
-                const userId = useAuthStore.getState().user?.id;
-                if (userId && !payload.user_id && !payload.userId) {
-                    finalPayload = { ...payload, user_id: userId };
-                }
-            }
-
-            await this.run(
-                `INSERT INTO sync_queue (id, table_name, record_id, operation, payload, created_at, status, retry_count)
-                 VALUES (?, ?, ?, ?, ?, ?, 'pending', 0)`,
-                [
-                    this.generateId(),
-                    tableName,
-                    recordId,
-                    operation,
-                    finalPayload ? JSON.stringify(finalPayload) : null,
-                    Date.now()
-                ]
-            );
-
-            dataEventService.emit('SYNC_QUEUE_ENQUEUED', { tableName, recordId, operation });
-        } catch (e) {
-            logger.captureException(e, { scope: 'DatabaseService.queueSyncMutation', message: '[SyncQueue] Failed to enqueue mutation' });
-        }
-    }
-
-    // Helper Utils
-    public getDatabase(): SQLite.SQLiteDatabase {
-        if (!this.db) {
-            throw new Error('Database not initialized. Call init() first.');
-        }
-        return this.db;
-    }
-
-    private generateId(): string {
-        return uuidV4();
-    }
-
-    private normalizeParams(params: any[] = []): any[] {
-        if (!Array.isArray(params)) return [];
-        return params.map((p) => (p === undefined ? null : p));
-    }
-
-    // --- UTILITIES ---
-
-    private async executeWithRetry<T>(operation: () => Promise<T>, retries = 3, delay = 150): Promise<T> {
-        let lastError: any;
-        for (let i = 0; i < retries; i++) {
-            try {
-                return await operation();
-            } catch (error: any) {
-                lastError = error;
-                const msg = error?.message || '';
-                const isForeignKey = msg.includes('FOREIGN KEY constraint failed');
-                const isUnique = msg.includes('UNIQUE constraint failed');
-                const isLocked = (
-                    msg.includes('database is locked')
-                    || error?.code === 'SQLITE_BUSY'
-                    // finalizeAsync rejection can happen if the bridge is flooded or a previous error wasn't cleared.
-                    // If it's a UNIQUE error or FK error, we don't retry by default unless explicitly safe.
-                    || (msg.includes('finalizeAsync') && !isForeignKey && !isUnique)
-                );
-
-                if (isLocked) {
-                    logger.warn(`[Database] Busy/Locked/Race (attempt ${i + 1}/${retries}). Retrying...`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    continue;
-                }
-
-                // If it's a UNIQUE error, we log it with more context but DON'T retry usually
-                // because it's a logic error, NOT a transient database state.
-                if (isUnique) {
-                    logger.error(`[Database] UNIQUE constraint failed. msg=${msg}`);
-                }
-
-                throw error;
-            }
-        }
-        throw lastError;
-    }
-
-    public async run(sql: string, params: any[] = []): Promise<SQLite.SQLiteRunResult> {
-        await this.ensureInitialized();
-        return await this.executeWithRetry(async () => {
-            return await this.db!.runAsync(sql, ...this.normalizeParams(params));
-        });
-    }
-
-    public async executeRaw(sql: string): Promise<void> {
-        await this.ensureInitialized();
-        return await this.executeWithRetry(async () => {
-            await this.db!.execAsync(sql);
-        });
-    }
-
-    public async withTransaction(callback: () => Promise<void>): Promise<void> {
-        await this.ensureInitialized();
-        return await this.executeWithRetry(async () => {
-            try {
-                return await this.db!.withTransactionAsync(callback);
-            } catch (e: any) {
-                const msg = e?.message || '';
-                if (msg.includes('no transaction is active') || msg.includes('cannot rollback')) {
-                    logger.warn('[Database] Transaction auto-rolled back by driver or already closed.');
-                    return;
-                }
-                throw e;
-            }
-        });
-    }
-
-    public async withTransactionAsync(callback: (db: SQLite.SQLiteDatabase) => Promise<void>): Promise<void> {
-        await this.ensureInitialized();
-        return await this.executeWithRetry(async () => {
-            try {
-                return await this.db!.withTransactionAsync(() => callback(this.db!));
-            } catch (e: any) {
-                const msg = e?.message || '';
-                if (msg.includes('no transaction is active') || msg.includes('cannot rollback')) {
-                    logger.warn('[Database] Async transaction auto-rolled back by driver or already closed.');
-                    return;
-                }
-                throw e;
-            }
-        });
-    }
-
-    public async getAll<T>(sql: string, params: any[] = []): Promise<T[]> {
-        await this.ensureInitialized();
-        return await this.executeWithRetry(async () => {
-            return await this.db!.getAllAsync(sql, ...this.normalizeParams(params)) as T[];
-        });
-    }
-
-    public async getFirst<T>(sql: string, params: any[] = []): Promise<T | null> {
-        await this.ensureInitialized();
-        return await this.executeWithRetry(async () => {
-            return await this.db!.getFirstAsync(sql, ...this.normalizeParams(params)) as T | null;
-        });
     }
 }
 

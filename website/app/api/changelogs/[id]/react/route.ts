@@ -1,37 +1,57 @@
 import { and, count, eq, isNull, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '../../../../../src/db';
 import * as schema from '../../../../../src/db/schema';
 import { verifyAuth } from '../../../../../src/lib/auth';
 import { runDbTransaction } from '../../../../../src/lib/db-transaction';
+import { RATE_LIMITS } from '../../../../../src/lib/rate-limit';
+
+const reactionPayloadSchema = z.object({
+    type: z.string().trim().min(1).max(64).optional(),
+});
+
+const getClientIp = (request: NextRequest): string => {
+    const forwardedFor = request.headers.get('x-forwarded-for') ?? 'unknown';
+    return forwardedFor.split(',')[0]?.trim() || 'unknown';
+};
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
+        const clientIp = getClientIp(request);
         const userId = await verifyAuth(request);
 
-        const totalResult = await db.select({ value: count() })
+        const rateKey = userId ? userId : `anon:${clientIp}`;
+        const rateLimit = await RATE_LIMITS.CHANGELOG_REACT(rateKey);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
+        }
+
+        const [aggregate] = await db
+            .select({
+                total: count(),
+                userReacted: userId
+                    ? sql<boolean>`bool_or(${schema.changelogReactions.userId} = ${userId})`
+                    : sql<boolean>`false`,
+            })
             .from(schema.changelogReactions)
             .where(and(
                 eq(schema.changelogReactions.changelogId, id),
                 isNull(schema.changelogReactions.deletedAt)
             ));
 
-        let userReacted = false;
-        if (userId) {
-            const userResult = await db.select()
-                .from(schema.changelogReactions)
-                .where(and(
-                    eq(schema.changelogReactions.changelogId, id),
-                    eq(schema.changelogReactions.userId, userId),
-                    isNull(schema.changelogReactions.deletedAt)
-                ));
-            userReacted = userResult.length > 0;
-        }
-
         return NextResponse.json({
-            total: totalResult[0].value,
-            userReacted
+            total: Number(aggregate?.total || 0),
+            userReacted: Boolean(aggregate?.userReacted),
         });
     } catch (e) {
         return NextResponse.json({ error: 'Failed to fetch reactions' }, { status: 500 });
@@ -43,8 +63,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const authedUserId = await verifyAuth(request);
         if (!authedUserId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+        const rateLimit = await RATE_LIMITS.CHANGELOG_REACT(authedUserId);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
+        }
+
         const { id } = await params;
-        const { type = 'kudos' } = await request.json();
+        const body = await request.json().catch(() => null);
+        const parsed = reactionPayloadSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({ error: 'Invalid request body', details: parsed.error.flatten() }, { status: 400 });
+        }
+
+        const type = parsed.data.type ?? 'kudos';
 
         const reactionId = `${id}-${authedUserId}`;
         const now = new Date();
@@ -96,7 +135,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         });
 
         return NextResponse.json({ status });
-    } catch (e) {
-        return NextResponse.json({ error: 'Failed to react' }, { status: 500 });
+    } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : 'Failed to react';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

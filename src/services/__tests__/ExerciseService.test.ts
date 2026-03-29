@@ -7,6 +7,9 @@ jest.mock('../DatabaseService', () => ({
     run: jest.fn(),
     getAll: jest.fn(),
     getFirst: jest.fn(),
+    insert: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
     withTransaction: jest.fn(async (cb: () => Promise<void>) => { await cb(); }),
     queueSyncMutation: jest.fn(),
   },
@@ -25,7 +28,7 @@ describe('ExerciseService', () => {
       await expect(ExerciseService.delete('ex1'))
         .rejects.toThrow('Cannot delete system exercise');
 
-      expect(dbService.run).not.toHaveBeenCalledWith(expect.stringContaining('DELETE FROM exercises'), expect.anything());
+      expect(dbService.delete).not.toHaveBeenCalled();
     });
 
     it('should throw error if exercise has existing history (Integrity Check)', async () => {
@@ -37,7 +40,7 @@ describe('ExerciseService', () => {
       await expect(ExerciseService.delete('ex1'))
         .rejects.toThrow('Cannot delete exercise with existing history');
 
-      expect(dbService.run).not.toHaveBeenCalledWith(expect.stringContaining('DELETE FROM exercises'), expect.anything());
+      expect(dbService.delete).not.toHaveBeenCalled();
     });
 
     it('should delete exercise if no history exists', async () => {
@@ -46,20 +49,17 @@ describe('ExerciseService', () => {
         .mockResolvedValueOnce({ is_system: 0 })
         .mockResolvedValueOnce({ count: 0 });
 
-      (dbService.getAll as jest.Mock).mockResolvedValueOnce([]);
-
+      (dbService.getAll as jest.Mock).mockResolvedValueOnce([{ id: 're1' }]);
       await ExerciseService.delete('ex1');
 
-      expect(dbService.run).toHaveBeenCalledWith(
-        'DELETE FROM routine_exercises WHERE exercise_id = ?',
-        ['ex1']
+      expect(dbService.delete).toHaveBeenCalledWith(
+        'routine_exercises',
+        're1'
       );
-      expect(dbService.run).toHaveBeenCalledWith(
-        'DELETE FROM exercises WHERE id = ?',
-        ['ex1']
+      expect(dbService.delete).toHaveBeenCalledWith(
+        'exercises',
+        'ex1'
       );
-
-      expect(dbService.queueSyncMutation).toHaveBeenCalledWith('exercises', 'ex1', 'DELETE');
     });
 
     it('should auto-unlink routine references before deleting exercise (transactional)', async () => {
@@ -72,18 +72,18 @@ describe('ExerciseService', () => {
       await ExerciseService.delete('ex1');
 
       expect(dbService.withTransaction).toHaveBeenCalledTimes(1);
-      expect(dbService.run).toHaveBeenCalledWith(
-        'DELETE FROM routine_exercises WHERE exercise_id = ?',
-        ['ex1']
+      expect(dbService.delete).toHaveBeenCalledWith(
+        'routine_exercises',
+        're1'
       );
-      expect(dbService.run).toHaveBeenCalledWith(
-        'DELETE FROM exercises WHERE id = ?',
-        ['ex1']
+      expect(dbService.delete).toHaveBeenCalledWith(
+        'routine_exercises',
+        're2'
       );
-
-      expect(dbService.queueSyncMutation).toHaveBeenCalledWith('routine_exercises', 're1', 'DELETE');
-      expect(dbService.queueSyncMutation).toHaveBeenCalledWith('routine_exercises', 're2', 'DELETE');
-      expect(dbService.queueSyncMutation).toHaveBeenCalledWith('exercises', 'ex1', 'DELETE');
+      expect(dbService.delete).toHaveBeenCalledWith(
+        'exercises',
+        'ex1'
+      );
     });
   });
 
@@ -95,17 +95,12 @@ describe('ExerciseService', () => {
         type: 'weight_reps'
       });
 
-      expect(dbService.run).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO exercises'),
-        expect.arrayContaining(['c1', 'New Exercise'])
+      expect(dbService.insert).toHaveBeenCalledWith(
+        'exercises',
+        expect.objectContaining({ category_id: 'c1', name: 'New Exercise' })
       );
 
-      expect(dbService.queueSyncMutation).toHaveBeenCalledWith(
-        'exercises',
-        expect.any(String),
-        'INSERT',
-        expect.objectContaining({ name: 'New Exercise' })
-      );
+
     });
   });
 });

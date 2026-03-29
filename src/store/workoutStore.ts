@@ -166,8 +166,16 @@ export const useWorkoutStore = create<ActiveWorkoutState>((set, get) => ({
             lastTickAtMs: last + (deltaSec * 1000)
         });
 
-        // Persist to DB periodically (every ~10s) or if it's the first tick
-        if (newTime % 10 < deltaSec || workoutTimer === 0) {
+        // Persist to DB periodically or if it's the first tick.
+        // NOTE: The persistence interval trades off fewer DB writes vs. potentially losing
+        // up to that many seconds of timer data if the app crashes. It is configurable
+        // via `workoutTimerPersistIntervalSeconds` (defaults to 60 seconds).
+        const rawPersistInterval = configService.get('workoutTimerPersistIntervalSeconds');
+        const persistIntervalSec =
+            typeof rawPersistInterval === 'number' && isFinite(rawPersistInterval) && rawPersistInterval > 0
+                ? rawPersistInterval
+                : 60;
+        if (newTime % persistIntervalSec < deltaSec || workoutTimer === 0) {
             workoutService.update(activeWorkout.id, { duration: newTime });
             // Also sync to global config for StatusBar recovery
             configService.setGeneric(`runningWorkoutTimerBaseSeconds_${activeWorkout.id}`, newTime);

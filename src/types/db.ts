@@ -162,10 +162,13 @@ export interface UserExercisePR {
     id: string;
     user_id: string;
     exercise_id: string;
+    exercise_name?: string;
     weight?: number;
     reps?: number;
-    one_rep_max?: number;
+    best_1rm_kg?: number;
+    workout_set_id?: string;
     date: number;
+    created_at: number;
     updated_at: number;
     deleted_at?: number;
 }

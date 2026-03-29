@@ -244,6 +244,11 @@ export default function SocialTab() {
         try {
             await configService.set('training_days', newDays);
             await useSettingsStore.getState().setTrainingDays(newDays);
+            try {
+                await SocialService.updateTrainingDays(newDays);
+            } catch (networkError) {
+                logger.captureException(networkError, { scope: 'SocialTab.updateTrainingDaysRemote' });
+            }
         } catch (err) {
             logger.captureException(err, { scope: 'SocialTab.updateTrainingDays' });
             addToast({ type: 'error', title: 'Meta semanal', message: 'No se pudo guardar tu configuración.' });

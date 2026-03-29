@@ -11,6 +11,27 @@ export interface BodyMetric {
 }
 
 export class BodyService {
+    private dateStringToLocalTimestamp(dateStr: string): number {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+        if (!match) {
+            return new Date(dateStr).getTime();
+        }
+        const year = Number(match[1]);
+        const month = Number(match[2]);
+        const day = Number(match[3]);
+        return new Date(year, month - 1, day).getTime();
+    }
+
+    private getLocalDayRange(dateStr: string): { start: number; end: number } {
+        const baseTimestamp = this.dateStringToLocalTimestamp(dateStr);
+        const baseDate = new Date(baseTimestamp);
+        const year = baseDate.getFullYear();
+        const month = baseDate.getMonth();
+        const day = baseDate.getDate();
+        const start = new Date(year, month, day, 0, 0, 0, 0).getTime();
+        const end = new Date(year, month, day, 23, 59, 59, 999).getTime();
+        return { start, end };
+    }
 
     public async getAll(): Promise<BodyMetric[]> {
         const measurements = await dbService.getAll<Measurement>('SELECT * FROM measurements ORDER BY date DESC');
@@ -30,7 +51,7 @@ export class BodyService {
     }
 
     public async add(dateStr: string, weight: number, fat: number): Promise<void> {
-        const date = new Date(dateStr).getTime();
+        const date = this.dateStringToLocalTimestamp(dateStr);
         if (weight) await this.addMeasurement('weight', weight, 'kg', date);
         if (fat) await this.addMeasurement('body_fat', fat, '%', date);
     }
@@ -68,8 +89,7 @@ export class BodyService {
         // Timestamps vary.
         // For simplicity in this logic, we assume we want to delete ALL measurements on that day.
         // We'll filter measurements by range.
-        const start = new Date(dateStr).setHours(0, 0, 0, 0);
-        const end = new Date(dateStr).setHours(23, 59, 59, 999);
+        const { start, end } = this.getLocalDayRange(dateStr);
         const toDelete = await dbService.getAll<{ id: string }>('SELECT id FROM measurements WHERE date >= ? AND date <= ?', [start, end]);
         for (const m of toDelete) {
             await dbService.queueSyncMutation('measurements', m.id, 'DELETE');

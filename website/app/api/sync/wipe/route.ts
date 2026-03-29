@@ -12,6 +12,15 @@ const RATE_ACTION = 'wipe';
 const WINDOW_MS = 60 * 60 * 1000;
 const MAX_PER_WINDOW = 2;
 
+const parseDateToMs = (value: unknown): number => {
+    if (value instanceof Date) return value.getTime();
+    if (typeof value === 'string' || typeof value === 'number') {
+        const ms = new Date(value).getTime();
+        return Number.isFinite(ms) ? ms : 0;
+    }
+    return 0;
+};
+
 const hashIp = (ip: string): string => createHash('sha256').update(ip).digest('hex');
 
 const getIp = (req: NextRequest): string => {
@@ -39,7 +48,7 @@ export async function POST(req: NextRequest) {
         const row = existing[0];
 
         const now = Date.now();
-        const windowStart = row?.windowStartAt instanceof Date ? row.windowStartAt.getTime() : row?.windowStartAt ? new Date(row.windowStartAt as any).getTime() : 0;
+        const windowStart = parseDateToMs(row?.windowStartAt);
         const inWindow = windowStart > 0 && now - windowStart < WINDOW_MS;
         const nextCount = inWindow ? (row?.count ?? 0) + 1 : 1;
 

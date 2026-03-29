@@ -33,6 +33,7 @@ export interface NotificationState {
 
     setGlobalBanner: (banner: Omit<BannerMessage, 'id' | 'dismissible'> & { dismissible?: boolean } | null) => void;
     clearGlobalBanner: () => void;
+    clearAll: () => void;
 }
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
@@ -94,5 +95,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
     clearGlobalBanner: () => {
         set({ globalBanner: null });
+    },
+    clearAll: () => {
+        set({ toasts: [], globalBanner: null });
     },
 }));

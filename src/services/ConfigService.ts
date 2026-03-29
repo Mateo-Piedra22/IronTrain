@@ -47,6 +47,7 @@ export interface AppConfig {
     runningWorkoutTimerWorkoutId: string | null;
     runningWorkoutTimerStartTimestamp: number | null;
     runningWorkoutTimerBaseSeconds: number;
+    workoutTimerPersistIntervalSeconds: number;
     ignoredDuplicateKeys: string[];
 
     hapticFeedbackEnabled: boolean;
@@ -89,6 +90,7 @@ const DEFAULT_CONFIG: AppConfig = {
     runningWorkoutTimerWorkoutId: null,
     runningWorkoutTimerStartTimestamp: null,
     runningWorkoutTimerBaseSeconds: 0,
+    workoutTimerPersistIntervalSeconds: 60,
     ignoredDuplicateKeys: [],
 
     hapticFeedbackEnabled: true,
@@ -180,6 +182,7 @@ class ConfigService {
                         s.key === 'analyticsDefaultRangeDays' ||
                         s.key === 'plateCalculatorDefaultBarWeightKg' ||
                         s.key === 'plateCalculatorDefaultBarWeightLbs' ||
+                        s.key === 'workoutTimerPersistIntervalSeconds' ||
                         s.key === 'calculatorsRoundingKg' ||
                         s.key === 'calculatorsRoundingLbs'
                     ) loadedConfig[s.key] = parseFloat(s.value);
@@ -227,6 +230,7 @@ class ConfigService {
             };
 
             loadedConfig.defaultRestTimer = Math.max(0, Math.round(sanitizeNumber(loadedConfig.defaultRestTimer, DEFAULT_CONFIG.defaultRestTimer)));
+            loadedConfig.workoutTimerPersistIntervalSeconds = Math.max(1, Math.round(sanitizeNumber(loadedConfig.workoutTimerPersistIntervalSeconds, DEFAULT_CONFIG.workoutTimerPersistIntervalSeconds)));
             loadedConfig.plateCalculatorDefaultBarWeightKg = Math.max(0, sanitizeNumber(loadedConfig.plateCalculatorDefaultBarWeightKg, DEFAULT_CONFIG.plateCalculatorDefaultBarWeightKg));
             loadedConfig.plateCalculatorDefaultBarWeightLbs = Math.max(0, sanitizeNumber(loadedConfig.plateCalculatorDefaultBarWeightLbs, DEFAULT_CONFIG.plateCalculatorDefaultBarWeightLbs));
             loadedConfig.calculatorsRoundingKg = Math.max(0.25, sanitizeNumber(loadedConfig.calculatorsRoundingKg, DEFAULT_CONFIG.calculatorsRoundingKg));

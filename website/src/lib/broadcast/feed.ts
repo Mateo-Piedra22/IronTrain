@@ -86,15 +86,27 @@ export async function buildBroadcastFeed(params: {
 }): Promise<{ items: BroadcastItem[] }> {
     const now = params.now ?? new Date();
 
-    const changelogRows = await params.db.select().from(schema.changelogs).orderBy(desc(schema.changelogs.date), desc(schema.changelogs.version));
+    const changelogLimit = params.query.isFeed ? 120 : 60;
+    const globalEventLimit = params.query.isFeed ? 40 : 20;
+
+    const [changelogRows, globalEventRows] = await Promise.all([
+        params.db.select()
+            .from(schema.changelogs)
+            .orderBy(desc(schema.changelogs.date), desc(schema.changelogs.version))
+            .limit(changelogLimit),
+        params.db.select()
+            .from(schema.globalEvents)
+            .orderBy(desc(schema.globalEvents.updatedAt))
+            .limit(globalEventLimit),
+    ]);
+
     const changelogItems = changelogRows
         .filter((c) => params.query.includeUnreleased || c.isUnreleased !== true)
         .map((c) => buildChangelogItem(c));
-
-    const globalEventRows = await params.db.select().from(schema.globalEvents).orderBy(desc(schema.globalEvents.updatedAt));
     const globalEventItems = globalEventRows.map((e) => buildGlobalEventItem(e, now));
 
-    let items = sortBroadcastItems([...changelogItems, ...globalEventItems]);
+    const maxItems = params.query.isFeed ? 100 : 40;
+    let items = sortBroadcastItems([...changelogItems, ...globalEventItems]).slice(0, maxItems);
 
     if (params.userId) {
         const changelogIds = changelogItems.map(i => i.id);

@@ -139,6 +139,14 @@ export const useAuthStore = create<AuthState>((set) => ({
             // Reset PostHog user state
             analytics.reset();
 
+            // Clear social cache to prevent data leakage between users
+            const { SocialService } = require('../services/SocialService');
+            SocialService.clearCache();
+
+            // Perform full database factory reset for complete data isolation
+            const { dbService } = require('../services/DatabaseService');
+            await dbService.factoryReset();
+
             set({ token: null, user: null, isLoading: false });
         } catch (e: unknown) {
             set({ isLoading: false, error: getErrorMessage(e, 'Error desconocido') });

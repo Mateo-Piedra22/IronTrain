@@ -14,12 +14,21 @@ const links = [
   { href: '/donate', label: 'Donar' },
 ];
 
+type SessionUserWithAdmin = {
+  isAdmin?: boolean;
+};
+
+function isAdminUser(user: unknown): boolean {
+  if (!user || typeof user !== 'object') return false;
+  return Boolean((user as SessionUserWithAdmin).isAdmin);
+}
+
 export function Nav() {
   const { data: session, isPending: loading } = authClient.useSession();
   const pathname = usePathname();
 
   const user = session?.user;
-  const isAdmin = pathname.startsWith('/admin') || (user as any)?.isAdmin;
+  const isAdmin = pathname.startsWith('/admin') || isAdminUser(user);
 
   return (
     <header className="sticky top-0 z-50 border-b border-iron-200 bg-white/80 backdrop-blur">
@@ -121,7 +130,7 @@ export function Nav() {
 
           <Link
             href="/downloads"
-            className="hidden sm:block rounded-xl bg-[#1a1a2e] px-5 py-2.5 text-sm font-black text-white hover:bg-black transition-all shadow-md active:scale-95"
+            className="hidden sm:block rounded-xl bg-iron-900 px-5 py-2.5 text-sm font-black text-white hover:bg-iron-950 transition-all shadow-md active:scale-95"
           >
             Descargar
           </Link>

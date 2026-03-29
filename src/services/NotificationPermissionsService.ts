@@ -116,6 +116,17 @@ class NotificationPermissionsService {
             return false;
         }
     }
+
+    /**
+     * Sets the application badge count (iOS only usually, but some Android launchers support it).
+     */
+    async setBadgeCount(count: number): Promise<void> {
+        try {
+            await notifee.setBadgeCount(count);
+        } catch (e) {
+            logger.captureException(e, { scope: 'NotificationPermissionsService.setBadgeCount' });
+        }
+    }
 }
 
 export const notificationPermissionsService = new NotificationPermissionsService();

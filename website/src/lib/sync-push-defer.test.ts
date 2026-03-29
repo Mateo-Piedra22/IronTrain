@@ -1,53 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import {
-    collectIncomingRecordIdsByTable,
-    shouldDeferWorkoutSetUpsert,
-    type PushOperation,
-} from './sync-push-defer';
+import { shouldDeferWorkoutSetUpsert } from './sync-push-defer';
 
-describe('collectIncomingRecordIdsByTable', () => {
-    it('collects ids from payload.id and recordId, ignoring deletes', () => {
-        const ops: PushOperation[] = [
-            { id: '1', table: 'workouts', operation: 'INSERT', payload: { id: 'w1' } },
-            { id: '2', table: 'workouts', operation: 'UPDATE', recordId: 'w2', payload: {} },
-            { id: '3', table: 'workouts', operation: 'DELETE', recordId: 'w3' },
-        ];
-
-        const m = collectIncomingRecordIdsByTable(ops);
-        expect(Array.from(m.get('workouts') ?? [])).toEqual(['w1', 'w2']);
+describe('Sync Push Defer Logic', () => {
+    it('defers workout_set if parent does not exist in DB but is in incoming payload', () => {
+        const incomingWorkouts = new Set(['workout-1']);
+        const result = shouldDeferWorkoutSetUpsert({
+            workoutId: 'workout-1',
+            parentExistsInDb: false,
+            incomingWorkouts
+        });
+        expect(result).toBe(true);
     });
 
-    it('ignores invalid tables and missing ids', () => {
-        const ops: PushOperation[] = [
-            { id: '1', table: '', operation: 'INSERT', payload: { id: 'x' } },
-            { id: '2', table: 'workouts', operation: 'INSERT', payload: {} },
-        ];
-
-        const m = collectIncomingRecordIdsByTable(ops);
-        expect(m.size).toBe(0);
-    });
-});
-
-describe('shouldDeferWorkoutSetUpsert', () => {
-    it('does not defer when parent already exists', () => {
-        expect(shouldDeferWorkoutSetUpsert({
-            workoutId: 'w1',
+    it('does not defer if parent already exists in DB', () => {
+        const incomingWorkouts = new Set<string>();
+        const result = shouldDeferWorkoutSetUpsert({
+            workoutId: 'workout-1',
             parentExistsInDb: true,
-            incomingWorkouts: new Set(['w1']),
-        })).toBe(false);
+            incomingWorkouts
+        });
+        expect(result).toBe(false);
     });
 
-    it('defers only when parent is missing in DB but included in incoming batch', () => {
-        expect(shouldDeferWorkoutSetUpsert({
-            workoutId: 'w1',
+    it('does not defer if parent neither exists in DB nor in incoming payload (orphan error case)', () => {
+        const incomingWorkouts = new Set<string>();
+        const result = shouldDeferWorkoutSetUpsert({
+            workoutId: 'workout-unknown',
             parentExistsInDb: false,
-            incomingWorkouts: new Set(['w1']),
-        })).toBe(true);
-
-        expect(shouldDeferWorkoutSetUpsert({
-            workoutId: 'w1',
-            parentExistsInDb: false,
-            incomingWorkouts: new Set(['w2']),
-        })).toBe(false);
+            incomingWorkouts
+        });
+        expect(result).toBe(false);
     });
 });

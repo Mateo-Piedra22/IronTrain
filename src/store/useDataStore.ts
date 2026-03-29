@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Category, CategoryService } from '../services/CategoryService';
+import { dataEventService } from '../services/DataEventService';
 import { Exercise, ExerciseService } from '../services/ExerciseService';
 
 interface DataState {
@@ -52,3 +53,8 @@ export const useDataStore = create<DataState>((set) => ({
         }
     }
 }));
+
+// Auto-sync store with Database events
+dataEventService.subscribe('DATA_UPDATED', () => {
+    useDataStore.getState().fetchAll().catch(console.error);
+});

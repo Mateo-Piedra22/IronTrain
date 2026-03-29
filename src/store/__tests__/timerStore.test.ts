@@ -35,5 +35,25 @@ describe('timerStore', () => {
 
     expect(useTimerStore.getState().timeLeft).toBe(17);
   });
+
+  it('should keep paused timer state when tick is called', () => {
+    jest.spyOn(Date, 'now').mockReturnValue(0);
+    useTimerStore.getState().startTimer(90);
+
+    jest.spyOn(Date, 'now').mockReturnValue(30_000);
+    useTimerStore.getState().tick();
+    useTimerStore.getState().pauseTimer();
+
+    const pausedLeft = useTimerStore.getState().timeLeft;
+    expect(pausedLeft).toBeGreaterThan(0);
+    expect(useTimerStore.getState().isRunning).toBe(false);
+
+    jest.spyOn(Date, 'now').mockReturnValue(60_000);
+    useTimerStore.getState().tick();
+
+    expect(useTimerStore.getState().timeLeft).toBe(pausedLeft);
+    expect(useTimerStore.getState().isRunning).toBe(false);
+    expect(useTimerStore.getState().duration).toBe(90);
+  });
 });
 

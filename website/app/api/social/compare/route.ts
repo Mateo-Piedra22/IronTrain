@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
+import { RATE_LIMITS } from '../../../../src/lib/rate-limit';
 
 const KG_PER_LB = 0.45359237;
 const LB_PER_KG = 2.2046226218;
@@ -24,21 +25,53 @@ export async function GET(req: NextRequest) {
         const userId = await verifyAuth(req);
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+        const rateLimit = await RATE_LIMITS.SOCIAL_COMPARE(userId);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
+        }
+
         const { searchParams } = new URL(req.url);
         const friendId = searchParams.get('friendId');
 
         if (!friendId) return NextResponse.json({ error: 'Missing friendId' }, { status: 400 });
 
         // Ensure friendship
-        const friendship = await db.select().from(schema.friendships).where(
-            and(
-                sql`(${schema.friendships.userId} = ${userId} AND ${schema.friendships.friendId} = ${friendId}) OR (${schema.friendships.userId} = ${friendId} AND ${schema.friendships.friendId} = ${userId})`,
-                eq(schema.friendships.status, 'accepted'),
-                isNull(schema.friendships.deletedAt)
-            )
-        ).limit(1);
+        const [directFriendship, reverseFriendship] = await Promise.all([
+            db.select({ id: schema.friendships.id })
+                .from(schema.friendships)
+                .where(
+                    and(
+                        eq(schema.friendships.userId, userId),
+                        eq(schema.friendships.friendId, friendId),
+                        eq(schema.friendships.status, 'accepted'),
+                        isNull(schema.friendships.deletedAt)
+                    )
+                )
+                .limit(1),
+            db.select({ id: schema.friendships.id })
+                .from(schema.friendships)
+                .where(
+                    and(
+                        eq(schema.friendships.userId, friendId),
+                        eq(schema.friendships.friendId, userId),
+                        eq(schema.friendships.status, 'accepted'),
+                        isNull(schema.friendships.deletedAt)
+                    )
+                )
+                .limit(1),
+        ]);
 
-        if (friendship.length === 0) {
+        const isFriend = directFriendship.length > 0 || reverseFriendship.length > 0;
+
+        if (!isFriend) {
             return NextResponse.json({ error: 'Not friends' }, { status: 403 });
         }
 
@@ -62,55 +95,81 @@ export async function GET(req: NextRequest) {
         const userUnit = unitByUserId.get(userId) || 'kg';
         const friendUnit = unitByUserId.get(friendId) || 'kg';
         const responseUnit: WeightUnit = userUnit;
-
-        const userWeightExpr = userUnit === 'lbs'
-            ? sql`(s.weight * ${KG_PER_LB})`
-            : sql`s.weight`;
-        const friendWeightExpr = friendUnit === 'lbs'
-            ? sql`(s.weight * ${KG_PER_LB})`
-            : sql`s.weight`;
+        const userWeightToKgFactor = userUnit === 'lbs' ? KG_PER_LB : 1;
+        const friendWeightToKgFactor = friendUnit === 'lbs' ? KG_PER_LB : 1;
 
         const query = sql`
-            WITH UserStats AS (
-                SELECT 
-                    LOWER(e.name) as exercise_name,
-                    (
-                        SELECT STRING_AGG(b.name, ', ' ORDER BY b.name)
-                        FROM exercise_badges eb
-                        JOIN badges b ON eb.badge_id = b.id
-                        WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL
-                    ) as badge_names,
-                    MAX(e.name) as display_name,
-                    MAX((${userWeightExpr}) * (1.0 + (s.reps / 30.0))) as max_1rm_kg
+            WITH exercise_badges_map AS (
+                SELECT
+                    eb.exercise_id,
+                    STRING_AGG(b.name, ', ' ORDER BY b.name) AS badge_names
+                FROM exercise_badges eb
+                JOIN badges b ON eb.badge_id = b.id
+                WHERE eb.deleted_at IS NULL AND b.deleted_at IS NULL
+                GROUP BY eb.exercise_id
+            ),
+            user_raw AS (
+                SELECT
+                    s.exercise_id,
+                    LOWER(e.name) AS exercise_name,
+                    MAX(e.name) AS display_name,
+                    MAX(
+                        (s.weight * ${userWeightToKgFactor}) * (1.0 + (s.reps / 30.0))
+                    ) AS max_1rm_kg
                 FROM workout_sets s
                 JOIN exercises e ON s.exercise_id = e.id
-                WHERE s.user_id = ${userId} AND s.weight > 0 AND s.reps > 0 AND s.completed = 1 AND s.deleted_at IS NULL
-                GROUP BY LOWER(e.name), badge_names
+                WHERE s.user_id = ${userId}
+                  AND s.weight > 0
+                  AND s.reps > 0
+                  AND s.completed = 1
+                  AND s.deleted_at IS NULL
+                GROUP BY s.exercise_id, LOWER(e.name)
+            ),
+            friend_raw AS (
+                SELECT
+                    s.exercise_id,
+                    LOWER(e.name) AS exercise_name,
+                    MAX(e.name) AS display_name,
+                    MAX(
+                        (s.weight * ${friendWeightToKgFactor}) * (1.0 + (s.reps / 30.0))
+                    ) AS max_1rm_kg
+                FROM workout_sets s
+                JOIN exercises e ON s.exercise_id = e.id
+                WHERE s.user_id = ${friendId}
+                  AND s.weight > 0
+                  AND s.reps > 0
+                  AND s.completed = 1
+                  AND s.deleted_at IS NULL
+                GROUP BY s.exercise_id, LOWER(e.name)
+            ),
+            UserStats AS (
+                SELECT
+                    ur.exercise_name,
+                    ur.display_name,
+                    ur.max_1rm_kg,
+                    ebm.badge_names
+                FROM user_raw ur
+                LEFT JOIN exercise_badges_map ebm ON ebm.exercise_id = ur.exercise_id
             ),
             FriendStats AS (
-                SELECT 
-                    LOWER(e.name) as exercise_name,
-                    (
-                        SELECT STRING_AGG(b.name, ', ' ORDER BY b.name)
-                        FROM exercise_badges eb
-                        JOIN badges b ON eb.badge_id = b.id
-                        WHERE eb.exercise_id = e.id AND eb.deleted_at IS NULL AND b.deleted_at IS NULL
-                    ) as badge_names,
-                    MAX(e.name) as display_name,
-                    MAX((${friendWeightExpr}) * (1.0 + (s.reps / 30.0))) as max_1rm_kg
-                FROM workout_sets s
-                JOIN exercises e ON s.exercise_id = e.id
-                WHERE s.user_id = ${friendId} AND s.weight > 0 AND s.reps > 0 AND s.completed = 1 AND s.deleted_at IS NULL
-                GROUP BY LOWER(e.name), badge_names
+                SELECT
+                    fr.exercise_name,
+                    fr.display_name,
+                    fr.max_1rm_kg,
+                    ebm.badge_names
+                FROM friend_raw fr
+                LEFT JOIN exercise_badges_map ebm ON ebm.exercise_id = fr.exercise_id
             )
-            SELECT 
-                COALESCE(u.display_name, f.display_name) as "exerciseName",
-                u.badge_names as "badgeNames",
-                FLOOR(u.max_1rm_kg) as "user1RMKg",
-                FLOOR(f.max_1rm_kg) as "friend1RMKg"
+            SELECT
+                COALESCE(u.display_name, f.display_name) AS "exerciseName",
+                COALESCE(u.badge_names, '') AS "badgeNames",
+                FLOOR(u.max_1rm_kg) AS "user1RMKg",
+                FLOOR(f.max_1rm_kg) AS "friend1RMKg"
             FROM UserStats u
-            JOIN FriendStats f ON u.exercise_name = f.exercise_name AND COALESCE(u.badge_names, '') = COALESCE(f.badge_names, '')
-            ORDER BY u.exercise_name ASC, u.badge_names ASC;
+            JOIN FriendStats f
+              ON u.exercise_name = f.exercise_name
+             AND COALESCE(u.badge_names, '') = COALESCE(f.badge_names, '')
+            ORDER BY u.exercise_name ASC, COALESCE(u.badge_names, '') ASC;
         `;
 
         const result = await db.execute(query);

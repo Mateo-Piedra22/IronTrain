@@ -17,6 +17,12 @@ describe('CalculatorService', () => {
       expect(CalculatorService.roundToIncrement(102.4, 2.5)).toBe(102.5);
       expect(CalculatorService.roundToIncrement(101.2, 2.5)).toBe(100);
     });
+
+    it('should avoid floating point drift for decimal increments', () => {
+      expect(CalculatorService.roundToIncrement(0.3, 0.1)).toBe(0.3);
+      expect(CalculatorService.roundToIncrement(1.005, 0.01)).toBe(1.01);
+      expect(CalculatorService.roundToIncrement(72.249999999, 0.25)).toBe(72.25);
+    });
   });
 });
 

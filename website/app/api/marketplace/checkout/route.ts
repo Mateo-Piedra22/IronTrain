@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '../../../../src/lib/auth';
 import { logger } from '../../../../src/lib/logger';
 import { MarketplaceResolver } from '../../../../src/lib/marketplace';
+import { parseMarketplaceCheckoutPayload } from '../../../../src/lib/marketplace-validation';
+import { RATE_LIMITS } from '../../../../src/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -16,22 +18,32 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        let body;
+        const rateLimit = await RATE_LIMITS.MARKETPLACE_CHECKOUT(userId);
+        if (!rateLimit.ok) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAtMs - Date.now()) / 1000)),
+                    },
+                }
+            );
+        }
+
+        let body: unknown;
         try {
             body = await req.json();
-        } catch (e) {
+        } catch {
             return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
         }
 
-        const { exerciseIds } = body;
-
-        if (!Array.isArray(exerciseIds) || exerciseIds.length === 0) {
-            return NextResponse.json({ error: 'Invalid payload: exerciseIds must be a non-empty array' }, { status: 400 });
+        const parsed = parseMarketplaceCheckoutPayload(body);
+        if (!parsed.success) {
+            return NextResponse.json({ error: parsed.message }, { status: 400 });
         }
 
-        if (exerciseIds.length > 50) {
-            return NextResponse.json({ error: 'Too many exercises per checkout (max 50)' }, { status: 413 });
-        }
+        const exerciseIds = [...new Set(parsed.data.exerciseIds)];
 
         logger.info(`Marketplace Checkout: User ...${userId.slice(-8)} adopting ${exerciseIds.length} exercises`);
 
@@ -42,11 +54,12 @@ export async function POST(req: NextRequest) {
             ...results
         });
 
-    } catch (error: any) {
-        logger.error(`Marketplace Checkout Fatal for User:`, error);
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        logger.error(`Marketplace Checkout Fatal for User`, { message });
         return NextResponse.json({
             error: 'Internal server error',
-            message: error.message
+            message
         }, { status: 500 });
     }
 }

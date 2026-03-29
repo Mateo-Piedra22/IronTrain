@@ -130,7 +130,7 @@ export function SyncConflictModal({ visible, onClose, diagnostics, onComplete }:
             } else if (mode === 'push') {
                 await syncService.pushLocalSnapshot();
             } else {
-                await syncService.syncBidirectional({ verify: true });
+                await syncService.syncBidirectional();
             }
             notify.success('Sincronización completa', 'Tus datos están actualizados.');
             setIsSyncing(false);

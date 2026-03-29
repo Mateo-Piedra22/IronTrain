@@ -8,19 +8,16 @@ jest.mock('../DatabaseService', () => ({
     run: jest.fn(),
     getAll: jest.fn(),
     getFirst: jest.fn(),
+    insert: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
     withTransaction: jest.fn(async (cb: () => Promise<void>) => { await cb(); }),
     queueSyncMutation: jest.fn(),
+    getExerciseById: jest.fn(),
     getWorkoutById: jest.fn(),
-    getWorkoutByDate: jest.fn(),
-    createWorkout: jest.fn(),
-    addSet: jest.fn(),
-    updateSet: jest.fn(),
-    deleteSet: jest.fn(),
+    getSetById: jest.fn(),
     getSetsForWorkout: jest.fn(),
     getLastSetForExercise: jest.fn(),
-    getSetById: jest.fn(),
-    getExerciseById: jest.fn(),
-    updateWorkout: jest.fn(),
   },
 }));
 
@@ -99,15 +96,18 @@ describe('WorkoutService', () => {
 
       await workoutService.addSet(workoutId, exerciseId);
 
-      expect(dbService.addSet).toHaveBeenCalledWith(expect.objectContaining({
-        workout_id: workoutId,
-        exercise_id: exerciseId,
-        order_index: 1,
-        weight: null,
-        reps: null,
-        notes: null,
-        rpe: null,
-      }));
+      expect(dbService.insert).toHaveBeenCalledWith(
+        'workout_sets',
+        expect.objectContaining({
+          workout_id: workoutId,
+          exercise_id: exerciseId,
+          order_index: 1,
+          weight: null,
+          reps: null,
+          notes: null,
+          rpe: null,
+        })
+      );
     });
 
     it('should allow overrides for copy/duplicate set for weight_reps exercises', async () => {
@@ -124,15 +124,18 @@ describe('WorkoutService', () => {
         notes: 'x',
       } as any);
 
-      expect(dbService.addSet).toHaveBeenCalledWith(expect.objectContaining({
-        workout_id: workoutId,
-        exercise_id: exerciseId,
-        weight: 100,
-        reps: 8,
-        rpe: 8,
-        notes: 'x',
-        completed: 0,
-      }));
+      expect(dbService.insert).toHaveBeenCalledWith(
+        'workout_sets',
+        expect.objectContaining({
+          workout_id: workoutId,
+          exercise_id: exerciseId,
+          weight: 100,
+          reps: 8,
+          rpe: 8,
+          notes: 'x',
+          completed: 0,
+        })
+      );
     });
 
     it('should allow overrides for copy/duplicate set for distance_time exercises (distance/time only)', async () => {
@@ -149,15 +152,18 @@ describe('WorkoutService', () => {
         time: 300,
       } as any);
 
-      expect(dbService.addSet).toHaveBeenCalledWith(expect.objectContaining({
-        workout_id: workoutId,
-        exercise_id: exerciseId,
-        weight: null,
-        reps: null,
-        distance: 1500,
-        time: 300,
-        completed: 0,
-      }));
+      expect(dbService.insert).toHaveBeenCalledWith(
+        'workout_sets',
+        expect.objectContaining({
+          workout_id: workoutId,
+          exercise_id: exerciseId,
+          weight: null,
+          reps: null,
+          distance: 1500,
+          time: 300,
+          completed: 0,
+        })
+      );
     });
 
     it('should not query history values when creating a new blank set', async () => {
@@ -170,10 +176,13 @@ describe('WorkoutService', () => {
       await workoutService.addSet(workoutId, exerciseId);
 
       expect(dbService.getLastSetForExercise).not.toHaveBeenCalled();
-      expect(dbService.addSet).toHaveBeenCalledWith(expect.objectContaining({
-        weight: null,
-        reps: null,
-      }));
+      expect(dbService.insert).toHaveBeenCalledWith(
+        'workout_sets',
+        expect.objectContaining({
+          weight: null,
+          reps: null,
+        })
+      );
     });
 
     it('should create distance/time set without weight/reps for distance_time exercises', async () => {
@@ -185,14 +194,17 @@ describe('WorkoutService', () => {
 
       await workoutService.addSet(workoutId, exerciseId);
 
-      expect(dbService.addSet).toHaveBeenCalledWith(expect.objectContaining({
-        workout_id: workoutId,
-        exercise_id: exerciseId,
-        weight: null,
-        reps: null,
-        distance: null,
-        time: null,
-      }));
+      expect(dbService.insert).toHaveBeenCalledWith(
+        'workout_sets',
+        expect.objectContaining({
+          workout_id: workoutId,
+          exercise_id: exerciseId,
+          weight: null,
+          reps: null,
+          distance: null,
+          time: null,
+        })
+      );
     });
   });
 
@@ -213,7 +225,7 @@ describe('WorkoutService', () => {
       (dbService.getSetById as jest.Mock).mockResolvedValue({ id: 's1', exercise_id: 'e1' });
       (dbService.getExerciseById as jest.Mock).mockResolvedValue({ id: 'e1', type: 'weight_reps' });
       await workoutService.updateSet('s1', { weight: 100 });
-      expect(dbService.updateSet).toHaveBeenCalledWith('s1', expect.objectContaining({ weight: 100 }));
+      expect(dbService.update).toHaveBeenCalledWith('workout_sets', 's1', expect.objectContaining({ weight: 100 }));
     });
 
     it('should ignore weight/reps updates for distance_time exercises and allow distance/time', async () => {
@@ -222,7 +234,7 @@ describe('WorkoutService', () => {
 
       await workoutService.updateSet('s1', { weight: 100, reps: 10, distance: 1500, time: 300 });
 
-      expect(dbService.updateSet).toHaveBeenCalledWith('s1', expect.objectContaining({
+      expect(dbService.update).toHaveBeenCalledWith('workout_sets', 's1', expect.objectContaining({
         weight: null,
         reps: null,
         distance: 1500,
@@ -238,7 +250,8 @@ describe('WorkoutService', () => {
 
       await workoutService.finishWorkout('w1');
 
-      expect(dbService.updateWorkout).toHaveBeenCalledWith(
+      expect(dbService.update).toHaveBeenCalledWith(
+        'workouts',
         'w1',
         expect.objectContaining({ status: 'completed' })
       );
@@ -312,11 +325,11 @@ describe('WorkoutService', () => {
       await workoutService.copyWorkoutToWorkout('source', 'target');
 
       expect(dbService.withTransaction).toHaveBeenCalled();
-      expect(dbService.run).toHaveBeenCalledWith(expect.stringContaining('UPDATE workouts SET name = ?'), expect.any(Array));
-      expect(dbService.addSet).toHaveBeenCalledTimes(2);
+      expect(dbService.update).toHaveBeenCalledWith('workouts', 'target', expect.objectContaining({ name: 'Pecho' }));
+      expect(dbService.insert).toHaveBeenCalledTimes(2);
 
-      const firstAdd = (dbService.addSet as jest.Mock).mock.calls[0][0];
-      const secondAdd = (dbService.addSet as jest.Mock).mock.calls[1][0];
+      const firstAdd = (dbService.insert as jest.Mock).mock.calls[0][1];
+      const secondAdd = (dbService.insert as jest.Mock).mock.calls[1][1];
       expect(firstAdd.workout_id).toBe('target');
       expect(firstAdd.order_index).toBe(0);
       expect(secondAdd.order_index).toBe(1);
@@ -338,8 +351,8 @@ describe('WorkoutService', () => {
       await workoutService.copyWorkoutToWorkout('source', 'target');
 
       expect(dbService.withTransaction).toHaveBeenCalled();
-      expect(dbService.run).toHaveBeenCalledWith('DELETE FROM workout_sets WHERE workout_id = ?', ['target']);
-      expect(dbService.addSet).toHaveBeenCalledTimes(1);
+      expect(dbService.delete).toHaveBeenCalledWith('workout_sets', 'existing');
+      expect(dbService.insert).toHaveBeenCalledTimes(1);
     });
 
     it('should append sets at the end when mode is append', async () => {
@@ -356,9 +369,9 @@ describe('WorkoutService', () => {
       await workoutService.copyWorkoutToWorkoutAdvanced('source', 'target', { mode: 'append' });
 
       expect(dbService.withTransaction).toHaveBeenCalled();
-      expect(dbService.run).not.toHaveBeenCalledWith('DELETE FROM workout_sets WHERE workout_id = ?', expect.anything());
-      expect(dbService.addSet).toHaveBeenCalledTimes(1);
-      const add = (dbService.addSet as jest.Mock).mock.calls[0][0];
+      expect(dbService.delete).not.toHaveBeenCalledWith('workout_sets', expect.anything());
+      expect(dbService.insert).toHaveBeenCalledTimes(1);
+      const add = (dbService.insert as jest.Mock).mock.calls[0][1];
       expect(add.order_index).toBe(3);
     });
 
@@ -383,9 +396,10 @@ describe('WorkoutService', () => {
 
       await workoutService.copyWorkoutToWorkoutAdvanced('source', 'target', { mode: 'replace', resumeTargetIfCompleted: true });
 
-      expect(dbService.run).toHaveBeenCalledWith(
-        'UPDATE workouts SET status = ?, end_time = NULL WHERE id = ?',
-        ['in_progress', 'target']
+      expect(dbService.update).toHaveBeenCalledWith(
+        'workouts',
+        'target',
+        expect.objectContaining({ status: 'in_progress', end_time: null })
       );
     });
 
@@ -402,7 +416,7 @@ describe('WorkoutService', () => {
 
       await workoutService.copyWorkoutToWorkoutAdvanced('source', 'target', { mode: 'replace', content: 'structure' });
 
-      const add = (dbService.addSet as jest.Mock).mock.calls[0][0];
+      const add = (dbService.insert as jest.Mock).mock.calls[0][1];
       expect(add.weight).toBeNull();
       expect(add.reps).toBeNull();
       expect(add.type).toBe('warmup');
@@ -425,8 +439,8 @@ describe('WorkoutService', () => {
 
       await workoutService.copyWorkoutToWorkoutAdvanced('source', 'target', { mode: 'replace', content: 'exercises_only' });
 
-      expect(dbService.addSet).toHaveBeenCalledTimes(2);
-      const first = (dbService.addSet as jest.Mock).mock.calls[0][0];
+      expect(dbService.insert).toHaveBeenCalledTimes(2);
+      const first = (dbService.insert as jest.Mock).mock.calls[0][1];
       expect(first.type).toBe('normal');
       expect(first.weight).toBeNull();
     });
@@ -448,8 +462,8 @@ describe('WorkoutService', () => {
       const res = await workoutService.copyWorkoutToWorkoutAdvanced('source', 'target', { mode: 'append', dedupeByExercise: true });
 
       expect(res.skippedExistingExercises).toBe(1);
-      expect(dbService.addSet).toHaveBeenCalledTimes(1);
-      const add = (dbService.addSet as jest.Mock).mock.calls[0][0];
+      expect(dbService.insert).toHaveBeenCalledTimes(1);
+      const add = (dbService.insert as jest.Mock).mock.calls[0][1];
       expect(add.exercise_id).toBe('e2');
     });
 

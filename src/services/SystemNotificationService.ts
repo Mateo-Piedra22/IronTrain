@@ -607,7 +607,7 @@ class SystemNotificationServiceImpl {
     // 11. PR NOTIFICATION
     // ═══════════════════════════════════════════════════════════════════════════
 
-    async showPRNotification(prs: { exerciseName: string; oneRm: number }[], force = false): Promise<void> {
+    async showPRNotification(prs: { exerciseName: string; best1RmKg: number }[], force = false): Promise<void> {
         if (!force && !(await this.canNotifyType('workoutComplete'))) return;
         await this.ensureChannels();
 
@@ -617,10 +617,10 @@ class SystemNotificationServiceImpl {
         let body = '';
 
         if (prs.length === 1) {
-            body = `¡Rompiste tu marca en ${prs[0].exerciseName} con ${Math.round(prs[0].oneRm)}kg!`;
+            body = `¡Rompiste tu marca en ${prs[0].exerciseName} con ${Math.round(prs[0].best1RmKg)}kg!`;
         } else {
             title = `🔥 ¡${prs.length} Nuevos Récords!`;
-            body = prs.map(p => `${p.exerciseName} (${Math.round(p.oneRm)}kg)`).join(', ');
+            body = prs.map(p => `${p.exerciseName} (${Math.round(p.best1RmKg)}kg)`).join(', ');
         }
 
         try {
