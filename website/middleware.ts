@@ -89,11 +89,11 @@ function addSecurityHeaders(response: NextResponse, pathname: string): NextRespo
     // Content-Security-Policy
     const csp = [
         "default-src 'self'",
-        "script-src 'self' https://assets.vercel.com",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://assets.vercel.com https://vercel.live",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "img-src 'self' data: https: blob:",
         "font-src 'self' https://fonts.gstatic.com",
-        "connect-src 'self' https://api.openweathermap.org https://assets.vercel.com https://vercel-vitals.axiom.co",
+        "connect-src 'self' https://api.openweathermap.org https://assets.vercel.com https://vercel-vitals.axiom.co https://vercel.live wss://vercel.live",
         "frame-src 'none'",
         "frame-ancestors 'none'",
         "object-src 'none'",
