@@ -477,9 +477,13 @@ export class IronScoreService {
         const w = configService.get('cachedSocialWeatherBonus') as WeatherInfo | null;
         if (!w || w.isActive !== true) return null;
         const now = Date.now();
-        if (!Number.isFinite(w.checkedAtMs) || !Number.isFinite(w.expiresAtMs)) return null;
-        if (Number(w.checkedAtMs) > now) return null;
-        if (Number(w.expiresAtMs) <= now) return null;
+        const hasCheckedAt = Number.isFinite(w.checkedAtMs);
+        const hasExpiresAt = Number.isFinite(w.expiresAtMs);
+
+        // Backward compatibility: legacy cached weather payloads may only include `isActive`.
+        // If timestamps are present, enforce the validity window; otherwise trust `isActive`.
+        if (hasCheckedAt && Number(w.checkedAtMs) > now) return null;
+        if (hasExpiresAt && Number(w.expiresAtMs) <= now) return null;
         if (!(typeof cfg.adverseWeatherPoints === 'number' && Number.isFinite(cfg.adverseWeatherPoints) && cfg.adverseWeatherPoints > 0)) return null;
         return {
             event_type: 'weather_bonus',
