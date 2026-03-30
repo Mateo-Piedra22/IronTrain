@@ -3,6 +3,17 @@ import { auth } from '../../../../src/lib/auth/server';
 const handlers = auth.handler();
 type AuthProxyHandler = (request: Request, context: { params: Promise<{ path: string[] }> }) => Promise<Response>;
 
+function sanitizeCookieDomain(value: string | undefined | null): string | null {
+    if (!value) return null;
+    const normalized = value.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
+    if (!normalized) return null;
+    if (normalized === 'localhost') return null;
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(normalized)) return null;
+    if (!/^[a-z0-9.-]+$/.test(normalized)) return null;
+    if (!normalized.includes('.')) return null;
+    return normalized.replace(/^\.+/, '');
+}
+
 /**
  * Proxy de Autenticación con Enforzamiento de Dominio
  * Este proxy asegura que las cookies emitidas por Neon tengan el dominio correcto
@@ -43,12 +54,22 @@ async function proxy(request: Request, { params }: { params: Promise<{ path: str
 
         if (setCookies.length > 0) {
             newHeaders.delete('Set-Cookie');
-            // Read domain from env so staging/preview environments work correctly.
-            // Falls back to the production domain only if the env var is not set.
-            const cookieDomain = process.env.NEON_AUTH_COOKIE_DOMAIN || 'irontrain.motiona.xyz';
+
+            const envCookieDomain = sanitizeCookieDomain(process.env.NEON_AUTH_COOKIE_DOMAIN);
+            const forwardedHost = request.headers.get('x-forwarded-host') || request.headers.get('host');
+            const requestHost = sanitizeCookieDomain(forwardedHost || new URL(request.url).hostname);
+            const cookieDomain = envCookieDomain || requestHost;
+
             setCookies.forEach((cookie: string) => {
-                // Reemplazamos cualquier dominio que venga de Neon por el dominio público de la app
-                const fixedCookie = cookie.replace(/Domain=[^;]+/i, `Domain=${cookieDomain}`);
+                if (!cookieDomain) {
+                    newHeaders.append('Set-Cookie', cookie);
+                    return;
+                }
+
+                const hasDomain = /;\s*domain=/i.test(cookie);
+                const fixedCookie = hasDomain
+                    ? cookie.replace(/Domain=[^;]+/i, `Domain=${cookieDomain}`)
+                    : `${cookie}; Domain=${cookieDomain}`;
                 newHeaders.append('Set-Cookie', fixedCookie);
             });
         }

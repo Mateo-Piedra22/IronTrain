@@ -80,7 +80,6 @@ export default async function RootLayout({
 }: {
     children: React.ReactNode;
 }) {
-    const sessionData: any = null;
     const user: any = null;
 
     return (
@@ -92,7 +91,7 @@ export default async function RootLayout({
             <body className="min-h-screen antialiased bg-iron-50" data-brand="irontrain">
                 <PHProvider userId={user?.id} userEmail={user?.email}>
                     {/* @ts-ignore */}
-                    <NeonAuthUIProvider authClient={authClient as any} initialSession={sessionData} redirectTo="/auth/bridge" emailOTP>
+                    <NeonAuthUIProvider authClient={authClient as any} redirectTo="/auth/bridge" emailOTP>
                         <MaintenanceGuard>
                             {children}
                         </MaintenanceGuard>

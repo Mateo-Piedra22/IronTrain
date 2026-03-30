@@ -255,7 +255,7 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
                             Ir al Feed
                         </Link>
                         <Link
-                            href={`/@${profile.username}`}
+                            href={`/user/${profile.username}`}
                             className="bg-white/50 border border-[#1a1a2e]/10 py-3 rounded-xl font-bold text-[10px] uppercase tracking-wider hover:bg-white transition-all flex items-center justify-center gap-2"
                         >
                             Ver Perfil
