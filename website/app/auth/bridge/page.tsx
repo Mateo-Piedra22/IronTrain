@@ -12,7 +12,15 @@ import { validateDisplayName, validateUsername } from '../../../src/lib/moderati
 export const revalidate = 0;
 
 async function getAuthenticatedSession() {
-    const { data } = await auth.getSession();
+    let data: any = null;
+    try {
+        const result = await auth.getSession();
+        data = result?.data ?? null;
+    } catch (error) {
+        console.error('[AuthBridge] auth.getSession failed:', error);
+        return null;
+    }
+
     if (!data?.session || !data.user) return null;
     const sessionData = data.session as { access_token?: string; token?: string } | null;
     const token = sessionData?.access_token ?? sessionData?.token;
