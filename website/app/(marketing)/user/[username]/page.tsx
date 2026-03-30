@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
+import { logger } from '../../../../src/lib/logger';
 import { verifyAuthFromHeaders } from '../../../../src/lib/server-auth';
 import { reconcileStreakStateForUser } from '../../../../src/lib/social-scoring';
 import { ExperimentWrapper } from '../../../components/PostHogFeatures';
@@ -56,7 +57,13 @@ export default async function UserProfilePage(props: {
         notFound();
     }
 
-    await reconcileStreakStateForUser(db, initialProfile.id).catch(() => undefined);
+    await reconcileStreakStateForUser(db, initialProfile.id).catch((error) => {
+        logger.captureException(error, {
+            scope: 'marketing.user.reconcileStreakState',
+            username,
+            userId: initialProfile.id,
+        });
+    });
 
     const profile = await db.query.userProfiles.findFirst({
         where: eq(schema.userProfiles.username, username)

@@ -57,6 +57,13 @@
       "when": 1774804429976,
       "tag": "0007_zippy_raider",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1774911640564,
+      "tag": "0008_admin_audit_logs_guard",
+      "breakpoints": true
     }
   ]
 }

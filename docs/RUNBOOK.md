@@ -92,6 +92,7 @@ Desde `website/`:
 - Dev: `npm run dev`
 - Build producción: `npm run build`
 - Start producción local: `npm run start`
+- Migraciones DB producción (Drizzle): `npm run db:migrate:prod`
 
 ## Fuentes de datos
 

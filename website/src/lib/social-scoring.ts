@@ -148,11 +148,12 @@ async function getWeeklyGoalDays(trx: ScoreExecutor, userId: string): Promise<nu
 }
 
 async function calculateDailyStreak(trx: ScoreExecutor, userId: string, trainingDays: number[], limit: number = 365): Promise<number> {
+    const workoutDayExpr = sql`date_trunc('day', to_timestamp(${schema.workouts.date} / 1000.0) at time zone 'UTC')`;
     // OPTIMIZATION: Instead of fetching all workouts and processing in JS,
     // we use SQL to get unique training days in descending order.
     const workoutDays = await trx
-        .select({ 
-            dateStr: sql<string>`to_char(date_trunc('day', to_timestamp(${schema.workouts.date} / 1000.0)), 'YYYY-MM-DD')`
+        .select({
+            dateStr: sql<string>`to_char(${workoutDayExpr}, 'YYYY-MM-DD')`
         })
         .from(schema.workouts)
         .where(and(
@@ -160,8 +161,8 @@ async function calculateDailyStreak(trx: ScoreExecutor, userId: string, training
             eq(schema.workouts.status, 'completed'),
             isNull(schema.workouts.deletedAt)
         ))
-        .groupBy(sql`date_trunc('day', to_timestamp(${schema.workouts.date} / 1000.0))`)
-        .orderBy(desc(schema.workouts.date))
+        .groupBy(workoutDayExpr)
+        .orderBy(desc(workoutDayExpr))
         .limit(limit);
 
     if (workoutDays.length === 0) return 0;

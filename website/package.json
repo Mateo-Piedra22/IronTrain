@@ -9,7 +9,8 @@
     "start": "next start",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "db:migrate:prod": "node scripts/db-migrate-prod.mjs"
   },
   "dependencies": {
     "@neondatabase/auth": "^0.2.0-beta.1",
