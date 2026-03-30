@@ -20,6 +20,7 @@ import { notFound } from 'next/navigation';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuthFromHeaders } from '../../../../src/lib/server-auth';
+import { reconcileStreakStateForUser } from '../../../../src/lib/social-scoring';
 import { ExperimentWrapper } from '../../../components/PostHogFeatures';
 
 export const revalidate = 0;
@@ -47,13 +48,19 @@ export default async function UserProfilePage(props: {
     const currentUserId = await verifyAuthFromHeaders(h);
 
     // Fetch User Profile
-    const profile = await db.query.userProfiles.findFirst({
+    const initialProfile = await db.query.userProfiles.findFirst({
         where: eq(schema.userProfiles.username, username)
     });
 
-    if (!profile) {
+    if (!initialProfile) {
         notFound();
     }
+
+    await reconcileStreakStateForUser(db, initialProfile.id).catch(() => undefined);
+
+    const profile = await db.query.userProfiles.findFirst({
+        where: eq(schema.userProfiles.username, username)
+    }) || initialProfile;
 
     const isOwner = currentUserId === profile.id;
     const isPrivate = profile.isPublic === false;
