@@ -5,8 +5,6 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { authClient } from '../../../src/lib/auth/client';
 
-export const revalidate = 0;
-
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
@@ -20,8 +18,15 @@ export default function ForgotPasswordPage() {
 
         try {
             const redirectTo = `${window.location.origin}/auth/reset-password`;
+            const normalizedEmail = email.trim().toLowerCase();
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+                setError('Ingresa un email válido');
+                setLoading(false);
+                return;
+            }
+
             const { error: resetError } = await authClient.requestPasswordReset({
-                email,
+                email: normalizedEmail,
                 redirectTo,
             });
 

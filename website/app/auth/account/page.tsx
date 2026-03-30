@@ -6,8 +6,6 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { authClient } from '../../../src/lib/auth/client';
 
-export const revalidate = 0;
-
 function getErrorMessage(error: unknown, fallback: string): string {
     if (error instanceof Error && error.message) {
         return error.message;

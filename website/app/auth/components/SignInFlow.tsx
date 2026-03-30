@@ -25,7 +25,7 @@ export function SignInFlow() {
         };
     }, []);
 
-    const handleSocialSignIn = async (provider: 'google' | 'github') => {
+    const handleSocialSignIn = async (provider: 'google') => {
         setError(null);
         setLoading(true);
         try {
@@ -50,9 +50,16 @@ export function SignInFlow() {
         setError(null);
         setLoading(true);
 
+        const normalizedEmail = email.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+            setError('Ingresa un email válido');
+            setLoading(false);
+            return;
+        }
+
         try {
             const { error: authError } = await authClient.signIn.email({
-                email,
+                email: normalizedEmail,
                 password,
                 callbackURL: '/auth/bridge'
             });
@@ -146,14 +153,6 @@ export function SignInFlow() {
                     className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#f5f1e8] transition-all disabled:opacity-50"
                 >
                     Continuar con Google
-                </button>
-                <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => handleSocialSignIn('github')}
-                    className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#f5f1e8] transition-all disabled:opacity-50"
-                >
-                    Continuar con GitHub
                 </button>
             </div>
 

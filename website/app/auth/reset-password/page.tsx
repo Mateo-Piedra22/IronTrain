@@ -6,8 +6,6 @@ import { useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { authClient } from '../../../src/lib/auth/client';
 
-export const revalidate = 0;
-
 export default function ResetPasswordPage() {
     const searchParams = useSearchParams();
     const token = useMemo(() => searchParams.get('token') || '', [searchParams]);
