@@ -9,7 +9,7 @@
 import { Mail, MapPin, Menu, Phone, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { authClient } from "../../src/lib/auth/client";
 
 interface MarketingLayoutProps {
@@ -29,6 +29,68 @@ const primaryLinks = [
 export default function MarketingLayout({ children }: MarketingLayoutProps) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { data: session, isPending: loading } = authClient.useSession();
+    const [stableSession, setStableSession] = useState<any>(null);
+    const [profileUsername, setProfileUsername] = useState<string | null>(null);
+    const [profileLookupDone, setProfileLookupDone] = useState(false);
+
+    useEffect(() => {
+        const hasUser = Boolean((session as any)?.user);
+        if (hasUser) {
+            setStableSession(session as any);
+        }
+        if (!hasUser && !loading && !stableSession) {
+            setProfileUsername(null);
+            setProfileLookupDone(false);
+        }
+    }, [session, loading, stableSession]);
+
+    const effectiveSession = useMemo(() => {
+        return ((session as any)?.user ? (session as any) : stableSession) as any;
+    }, [session, stableSession]);
+
+    useEffect(() => {
+        const hasUser = Boolean(effectiveSession?.user);
+        if (!hasUser || profileLookupDone) return;
+
+        const usernameFromSession = String(effectiveSession?.user?.username || '').trim();
+        if (usernameFromSession) {
+            setProfileUsername(usernameFromSession.replace(/^@+/, ''));
+            setProfileLookupDone(true);
+            return;
+        }
+
+        let cancelled = false;
+        const fetchProfile = async () => {
+            try {
+                const response = await fetch('/api/social/profile', {
+                    method: 'GET',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    cache: 'no-store',
+                });
+
+                if (!response.ok) {
+                    if (!cancelled) setProfileLookupDone(true);
+                    return;
+                }
+
+                const payload = await response.json().catch(() => null);
+                const rawUsername = String(payload?.profile?.username || '').trim();
+                if (!cancelled) {
+                    setProfileUsername(rawUsername ? rawUsername.replace(/^@+/, '') : null);
+                    setProfileLookupDone(true);
+                }
+            } catch {
+                if (!cancelled) setProfileLookupDone(true);
+            }
+        };
+
+        fetchProfile();
+        return () => {
+            cancelled = true;
+        };
+    }, [effectiveSession, profileLookupDone]);
+
+    const accountHref = profileUsername ? `/user/${profileUsername}` : '/auth/bridge';
 
     const currentDate = new Date().toLocaleDateString('es-AR', {
         day: '2-digit',
@@ -68,23 +130,23 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
                 ))}
 
                 <div className="mt-8 mb-3 text-[10px] opacity-40">━━ CUENTA ━━</div>
-                {!loading ? (
+                {!loading || effectiveSession ? (
                     <>
-                        {session ? (
+                        {effectiveSession ? (
                             <div className="space-y-1">
                                 <Link
-                                    href="/user/me"
+                                    href={accountHref}
                                     className="group flex items-center gap-3 py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-current"
                                 >
                                     <div className="w-6 h-6 rounded-full bg-current/10 flex items-center justify-center overflow-hidden">
-                                        {(session as any).user?.image ? (
-                                            <img src={(session as any).user.image} alt="" className="w-full h-full object-cover grayscale" />
+                                        {effectiveSession?.user?.image ? (
+                                            <img src={effectiveSession.user.image} alt="" className="w-full h-full object-cover grayscale" />
                                         ) : (
                                             <span className="text-[10px] font-bold">U</span>
                                         )}
                                     </div>
                                     <div className="flex-1 overflow-hidden">
-                                        <div className="font-bold truncate text-xs">{(session as any).user?.name || 'MI_CUENTA'}</div>
+                                        <div className="font-bold truncate text-xs">{effectiveSession?.user?.name || 'MI_CUENTA'}</div>
                                         <div className="text-[10px] opacity-40 truncate italic">Ver Perfil</div>
                                     </div>
                                 </Link>

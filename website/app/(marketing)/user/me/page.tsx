@@ -26,9 +26,13 @@ export default async function UserMePage() {
     const username = profile[0]?.username;
 
     if (!username) {
-        // User is logged in but hasn't set up a username yet
-        redirect('/settings');
+        redirect('/auth/bridge');
     }
 
-    redirect(`/user/${username}`);
+    const normalizedUsername = String(username).trim().replace(/^@+/, '');
+    if (!/^[a-z0-9_]{3,20}$/.test(normalizedUsername)) {
+        redirect('/auth/bridge');
+    }
+
+    redirect(`/user/${normalizedUsername}`);
 }
