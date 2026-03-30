@@ -1,10 +1,11 @@
 import { createHash, randomUUID } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { eq, inArray, or } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
 import { runDbTransaction } from '../../../../src/lib/db-transaction';
+import { setDbUserContext } from '../../../../src/lib/db-user-context';
 
 export const runtime = 'nodejs';
 
@@ -89,6 +90,25 @@ export async function POST(req: NextRequest) {
         });
 
         await runDbTransaction(async (trx) => {
+            await setDbUserContext(trx, userId);
+            const userFeedRows = await trx.select({ id: schema.activityFeed.id })
+                .from(schema.activityFeed)
+                .where(eq(schema.activityFeed.userId, userId));
+            const userFeedIds = userFeedRows.map((row) => row.id);
+
+            if (userFeedIds.length > 0) {
+                await trx.delete(schema.kudos).where(inArray(schema.kudos.feedId, userFeedIds));
+                await trx.delete(schema.activitySeen).where(inArray(schema.activitySeen.activityId, userFeedIds));
+            }
+
+            await trx.delete(schema.friendships)
+                .where(or(eq(schema.friendships.userId, userId), eq(schema.friendships.friendId, userId)));
+            await trx.delete(schema.sharesInbox)
+                .where(or(eq(schema.sharesInbox.senderId, userId), eq(schema.sharesInbox.receiverId, userId)));
+            await trx.delete(schema.notificationReactions).where(eq(schema.notificationReactions.userId, userId));
+            await trx.delete(schema.activitySeen).where(eq(schema.activitySeen.userId, userId));
+            await trx.delete(schema.weatherLogs).where(eq(schema.weatherLogs.userId, userId));
+            await trx.delete(schema.authCodes).where(eq(schema.authCodes.userId, userId));
             await trx.delete(schema.workoutSets).where(eq(schema.workoutSets.userId, userId));
             await trx.delete(schema.workouts).where(eq(schema.workouts.userId, userId));
             await trx.delete(schema.routineExercises).where(eq(schema.routineExercises.userId, userId));

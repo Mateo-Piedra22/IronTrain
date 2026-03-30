@@ -291,6 +291,9 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
                 </div>
 
                 <div className="pt-6 space-y-4">
+                    <Link href="/auth/account" className="block text-[10px] font-black uppercase text-[#1a1a2e]/60 hover:text-[#1a1a2e] transition-colors tracking-widest">
+                        Seguridad de Cuenta
+                    </Link>
                     <Link href="/settings/delete-account" className="block text-[10px] font-black uppercase text-red-400 hover:text-red-600 transition-colors tracking-widest">
                         Eliminar Cuenta (Zona de Peligro)
                     </Link>

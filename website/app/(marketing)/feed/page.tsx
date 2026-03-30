@@ -259,7 +259,7 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
 
                                         {!currentUserId ? (
                                             <Link
-                                                href={`/auth/login`}
+                                                href={`/auth/sign-in`}
                                                 className="px-6 py-3 bg-current text-background font-black text-[10px] uppercase tracking-[0.2em] hover:invert transition-all flex items-center gap-2"
                                             >
                                                 AUTH_REQUIRED <Plus className="w-3.5 h-3.5" />

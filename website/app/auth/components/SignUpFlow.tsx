@@ -1,11 +1,14 @@
 'use client';
 
 import { AlertTriangle, ArrowRight, Check, Eye, EyeOff, Loader2, Lock, Mail, User } from 'lucide-react';
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import { authClient } from '../../../src/lib/auth/client';
 import { createProfileAfterSignUp } from '../actions';
 
 export function SignUpFlow() {
+    const router = useRouter();
+    const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [step, setStep] = useState(1);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -18,6 +21,35 @@ export function SignUpFlow() {
     const [name, setName] = useState('');
     const [username, setUsername] = useState('');
     const [displayName, setDisplayName] = useState('');
+
+    useEffect(() => {
+        return () => {
+            if (redirectTimeoutRef.current) {
+                clearTimeout(redirectTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    const handleSocialSignIn = async (provider: 'google' | 'github') => {
+        setError(null);
+        setLoading(true);
+        try {
+            const { error: authError } = await authClient.signIn.social({
+                provider,
+                callbackURL: '/auth/bridge',
+                requestSignUp: true,
+            });
+
+            if (authError) {
+                setError(authError.message || `No se pudo continuar con ${provider}`);
+                setLoading(false);
+                return;
+            }
+        } catch {
+            setError('Error inesperado en registro social');
+            setLoading(false);
+        }
+    };
 
     const handleNext = (e: React.FormEvent) => {
         e.preventDefault();
@@ -38,6 +70,12 @@ export function SignUpFlow() {
         const cleanUser = username.trim().toLowerCase();
         if (cleanUser.length < 3 || cleanUser.length > 20) {
             setError('El usuario debe tener entre 3 y 20 caracteres');
+            setLoading(false);
+            return;
+        }
+
+        if (!/^[a-z0-9_]+$/.test(cleanUser)) {
+            setError('El usuario solo puede contener letras minúsculas, números y guiones bajos (_)');
             setLoading(false);
             return;
         }
@@ -67,10 +105,10 @@ export function SignUpFlow() {
 
             // SUCCESS!
             setSuccess(true);
-            setTimeout(() => {
-                window.location.href = '/auth/bridge';
+            redirectTimeoutRef.current = setTimeout(() => {
+                router.replace('/auth/bridge');
             }, 1000);
-        } catch (err) {
+        } catch {
             setError('Error inesperado durante el registro');
             setLoading(false);
         }
@@ -163,10 +201,29 @@ export function SignUpFlow() {
                         Continuar <ArrowRight className="w-4 h-4" />
                     </button>
 
+                    <div className="space-y-2">
+                        <button
+                            type="button"
+                            disabled={loading}
+                            onClick={() => handleSocialSignIn('google')}
+                            className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#f5f1e8] transition-all disabled:opacity-50"
+                        >
+                            Registrarme con Google
+                        </button>
+                        <button
+                            type="button"
+                            disabled={loading}
+                            onClick={() => handleSocialSignIn('github')}
+                            className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#f5f1e8] transition-all disabled:opacity-50"
+                        >
+                            Registrarme con GitHub
+                        </button>
+                    </div>
+
                     <div className="text-center pt-2">
                         <button
                             type="button"
-                            onClick={() => window.location.href = '/auth/sign-in'}
+                            onClick={() => router.push('/auth/sign-in')}
                             className="text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity"
                         >
                             ¿Ya tienes cuenta? Inicia sesión
@@ -235,6 +292,7 @@ export function SignUpFlow() {
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Finalizar Registro'}
                         </button>
                     </div>
+
                 </form>
             )}
         </div>

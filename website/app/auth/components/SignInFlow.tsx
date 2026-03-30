@@ -1,10 +1,13 @@
 'use client';
 
 import { ArrowRight, Check, Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import { authClient } from '../../../src/lib/auth/client';
 
 export function SignInFlow() {
+    const router = useRouter();
+    const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -13,6 +16,34 @@ export function SignInFlow() {
     // Form states
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+
+    useEffect(() => {
+        return () => {
+            if (redirectTimeoutRef.current) {
+                clearTimeout(redirectTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    const handleSocialSignIn = async (provider: 'google' | 'github') => {
+        setError(null);
+        setLoading(true);
+        try {
+            const { error: authError } = await authClient.signIn.social({
+                provider,
+                callbackURL: '/auth/bridge',
+            });
+
+            if (authError) {
+                setError(authError.message || `No se pudo iniciar con ${provider}`);
+                setLoading(false);
+                return;
+            }
+        } catch {
+            setError('Error inesperado en login social');
+            setLoading(false);
+        }
+    };
 
     const handleSignIn = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -33,10 +64,10 @@ export function SignInFlow() {
             }
 
             setSuccess(true);
-            setTimeout(() => {
-                window.location.href = '/auth/bridge';
+            redirectTimeoutRef.current = setTimeout(() => {
+                router.replace('/auth/bridge');
             }, 1000);
-        } catch (err) {
+        } catch {
             setError('Error inesperado');
             setLoading(false);
         }
@@ -107,10 +138,39 @@ export function SignInFlow() {
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Entrar <ArrowRight className="w-4 h-4" /></>}
             </button>
 
+            <div className="space-y-2">
+                <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => handleSocialSignIn('google')}
+                    className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#f5f1e8] transition-all disabled:opacity-50"
+                >
+                    Continuar con Google
+                </button>
+                <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => handleSocialSignIn('github')}
+                    className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#f5f1e8] transition-all disabled:opacity-50"
+                >
+                    Continuar con GitHub
+                </button>
+            </div>
+
+            <div className="text-center">
+                <button
+                    type="button"
+                    onClick={() => router.push('/auth/forgot-password')}
+                    className="text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity"
+                >
+                    ¿Olvidaste tu contraseña?
+                </button>
+            </div>
+
             <div className="text-center pt-2">
                 <button
                     type="button"
-                    onClick={() => window.location.href = '/auth/sign-up'}
+                    onClick={() => router.push('/auth/sign-up')}
                     className="text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity"
                 >
                     ¿No tienes cuenta? Regístrate

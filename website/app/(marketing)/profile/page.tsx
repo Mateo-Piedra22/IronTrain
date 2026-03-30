@@ -15,7 +15,7 @@ export default async function ProfileRedirectPage() {
     const userId = await verifyAuth(request);
 
     if (!userId) {
-        redirect('/auth/login');
+        redirect('/auth/sign-in');
     }
 
     const userProfile = await db.query.userProfiles.findFirst({
