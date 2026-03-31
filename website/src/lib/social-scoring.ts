@@ -1108,7 +1108,18 @@ export async function buildLeaderboard(userId: string) {
 
     await Promise.all(userIds.map((id) => reconcileStreakStateForUser(db, id).catch(() => undefined)));
 
-    const [profiles, monthScores, weekScores, workoutsLife, workoutsMonth, workoutsWeek] = await Promise.all([
+    const [
+        /* 0 */ profiles,
+        /* 1 */ monthScores,
+        /* 2 */ weekScores,
+        /* 3 */ workoutsLife,
+        /* 4 */ workoutsMonth,
+        /* 5 */ workoutsWeek,
+        /* 6 */ routinesPublished,
+        /* 7 */ sharesAccepted,
+        /* 8 */ kudosGiven,
+        /* 9 */ kudosReceived,
+    ] = await Promise.all([
         db.select().from(schema.userProfiles).where(inArray(schema.userProfiles.id, userIds)),
         db.select({
             userId: schema.scoreEvents.userId,
@@ -1130,6 +1141,26 @@ export async function buildLeaderboard(userId: string) {
             userId: schema.workouts.userId,
             total: sql<number>`count(*)`.mapWith(Number),
         }).from(schema.workouts).where(and(inArray(schema.workouts.userId, userIds), eq(schema.workouts.status, 'completed'), isNull(schema.workouts.deletedAt), gte(schema.workouts.date, weekStart.getTime()))).groupBy(schema.workouts.userId),
+        db.select({
+            userId: schema.routines.userId,
+            total: sql<number>`count(*)`.mapWith(Number),
+        }).from(schema.routines).where(and(inArray(schema.routines.userId, userIds), isNull(schema.routines.deletedAt))).groupBy(schema.routines.userId),
+        db.select({
+            userId: schema.sharesInbox.senderId,
+            total: sql<number>`count(*)`.mapWith(Number),
+        }).from(schema.sharesInbox).where(and(inArray(schema.sharesInbox.senderId, userIds), eq(schema.sharesInbox.status, 'accepted'), isNull(schema.sharesInbox.deletedAt))).groupBy(schema.sharesInbox.senderId),
+        db.select({
+            userId: schema.kudos.giverId,
+            total: sql<number>`count(*)`.mapWith(Number),
+        }).from(schema.kudos).where(and(inArray(schema.kudos.giverId, userIds), isNull(schema.kudos.deletedAt))).groupBy(schema.kudos.giverId),
+        db.select({
+            userId: schema.activityFeed.userId,
+            total: sql<number>`count(*)`.mapWith(Number),
+        })
+            .from(schema.kudos)
+            .innerJoin(schema.activityFeed, and(eq(schema.kudos.feedId, schema.activityFeed.id), isNull(schema.activityFeed.deletedAt)))
+            .where(and(inArray(schema.activityFeed.userId, userIds), isNull(schema.kudos.deletedAt)))
+            .groupBy(schema.activityFeed.userId),
     ]);
 
     const profileMap = new Map(profiles.map((p) => [p.id, p]));
@@ -1138,9 +1169,24 @@ export async function buildLeaderboard(userId: string) {
     const wLifeMap = new Map(workoutsLife.map((r) => [r.userId, r.total]));
     const wMonthMap = new Map(workoutsMonth.map((r) => [r.userId, r.total]));
     const wWeekMap = new Map(workoutsWeek.map((r) => [r.userId, r.total]));
+    const routinesMap = new Map(routinesPublished.map((r) => [r.userId, r.total]));
+    const acceptedSharesMap = new Map(sharesAccepted.map((r) => [r.userId, r.total]));
+    const kudosGivenMap = new Map(kudosGiven.map((r) => [r.userId, r.total]));
+    const kudosReceivedMap = new Map(kudosReceived.map((r) => [r.userId, r.total]));
 
     const leaderboard = userIds.map((id) => {
         const p = profileMap.get(id);
+        const routinesCount = Number(routinesMap.get(id) || 0);
+        const acceptedSharesCount = Number(acceptedSharesMap.get(id) || 0);
+        const kudosGivenCount = Number(kudosGivenMap.get(id) || 0);
+        const kudosReceivedCount = Number(kudosReceivedMap.get(id) || 0);
+        const engagementScore = computeEngagementScore({
+            routines: routinesCount,
+            acceptedShares: acceptedSharesCount,
+            kudosGiven: kudosGivenCount,
+            kudosReceived: kudosReceivedCount,
+        });
+
         return {
             id,
             displayName: p?.displayName || 'Unknown',
@@ -1155,17 +1201,40 @@ export async function buildLeaderboard(userId: string) {
                 workoutsLifetime: Number(wLifeMap.get(id) || 0),
                 workoutsMonthly: Number(wMonthMap.get(id) || 0),
                 workoutsWeekly: Number(wWeekMap.get(id) || 0),
-                routines: 0,
+                routines: routinesCount,
                 shares: Number(p?.shareStats || 0),
                 currentStreak: Number(p?.currentStreak || 0),
                 streakWeeks: Number(p?.streakWeeks || 0),
                 highestStreak: Number(p?.highestStreak || 0),
+                sharesAccepted: acceptedSharesCount,
+                kudosGiven: kudosGivenCount,
+                kudosReceived: kudosReceivedCount,
+                engagementScore,
             },
         };
     });
 
     leaderboard.sort((a, b) => b.scores.lifetime - a.scores.lifetime || b.stats.workoutsLifetime - a.stats.workoutsLifetime);
     return leaderboard;
+}
+
+    // Engagement weights:
+    // - routines: 2x to reward consistent participation/creation without letting it dominate;
+    // - acceptedShares: 3x as the strongest signal of meaningful, two-sided social interaction;
+    // - kudosGiven: 1x to encourage positive feedback but avoid incentivizing spammy giving;
+    // - kudosReceived: 2x to emphasize being valued by others while still secondary to accepted shares.
+export function computeEngagementScore(input: {
+    routines: number;
+    acceptedShares: number;
+    kudosGiven: number;
+    kudosReceived: number;
+}): number {
+    const routines = Math.max(0, Number(input.routines || 0));
+    const acceptedShares = Math.max(0, Number(input.acceptedShares || 0));
+    const kudosGiven = Math.max(0, Number(input.kudosGiven || 0));
+    const kudosReceived = Math.max(0, Number(input.kudosReceived || 0));
+
+    return (routines * 2) + (acceptedShares * 3) + kudosGiven + (kudosReceived * 2);
 }
 
 export async function cleanupWeatherLogs(trx?: ScoreExecutor): Promise<number> {

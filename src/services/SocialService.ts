@@ -47,6 +47,16 @@ export interface SocialProfile {
     weatherBonus?: WeatherInfo | null;
     scoreConfig?: ScoreConfig | null;
     trainingDays?: number[];
+    socialSummary?: {
+        friendsCount: number;
+        pendingIncomingCount: number;
+        pendingOutgoingCount: number;
+        activityCount: number;
+        acceptedShares?: number;
+        kudosGiven?: number;
+        kudosReceived?: number;
+        engagementScore?: number;
+    } | null;
 }
 
 export interface GlobalEvent {
@@ -126,6 +136,10 @@ export interface SocialLeaderboardEntry {
         currentStreak: number;
         streakWeeks: number;
         highestStreak: number;
+        sharesAccepted?: number;
+        kudosGiven?: number;
+        kudosReceived?: number;
+        engagementScore?: number;
     };
 }
 
@@ -143,6 +157,27 @@ export interface SocialComparisonEntry {
     user1RMKg: number;
     friend1RMKg: number;
     diff: number;
+}
+
+export interface SocialPulse {
+    version: string;
+    profileUpdatedAtMs: number;
+    latestActivityAtMs: number;
+    latestShareAtMs: number;
+    latestFriendAtMs: number;
+    latestScoreAtMs?: number;
+    latestFriendProfileAtMs?: number;
+    latestLeaderboardAtMs?: number;
+    pendingShareCount: number;
+    pendingFriendRequestCount: number;
+    domainVersions: {
+        profile: string;
+        feed: string;
+        notifications: string;
+        friends: string;
+        leaderboard: string;
+    };
+    serverTimeMs: number;
 }
 
 export class SocialService {
@@ -419,13 +454,13 @@ export class SocialService {
 
     // -- INBOX --
 
-    static async getInbox(): Promise<SocialInboxItem[]> {
-        const cacheKey = 'social_inbox';
+    static async getInbox(scope: 'all' | 'feed' | 'notifications' = 'all'): Promise<SocialInboxItem[]> {
+        const cacheKey = `social_inbox_${scope}`;
         const cached = this.getCached<SocialInboxItem[]>(cacheKey);
         if (cached) return cached;
 
         const headers = await this.getHeaders();
-        const data = await this.request<{ items: SocialInboxItem[] }>(`${API_URL}/api/social/inbox`, { headers });
+        const data = await this.request<{ items: SocialInboxItem[] }>(`${API_URL}/api/social/inbox?scope=${scope}`, { headers });
         this.setCache(cacheKey, data.items);
         return data.items;
     }
@@ -627,6 +662,12 @@ export class SocialService {
         const data = await this.request<{ comparison: SocialComparisonEntry[] }>(`${API_URL}/api/social/compare?friendId=${encodeURIComponent(friendId)}`, { headers });
         this.setCache(cacheKey, data.comparison);
         return data.comparison;
+    }
+
+    static async getPulse(): Promise<SocialPulse> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ pulse: SocialPulse }>(`${API_URL}/api/social/pulse`, { headers });
+        return data.pulse;
     }
 }
 

@@ -136,6 +136,18 @@ export default function PostHogGuidePanel() {
                                     <span className="w-2 h-2 bg-[#1a1a2e]"></span> Ser específico: `clicked_premium_button` ✅
                                 </li>
                             </ul>
+
+                            <div className="mt-6 border-t-2 border-[#1a1a2e] pt-4">
+                                <h5 className="text-[10px] font-black uppercase mb-3 tracking-widest">Realtime Social (Nuevos)</h5>
+                                <ul className="space-y-2 text-[10px] font-bold opacity-80 normal-case">
+                                    <li>• `social_realtime_started`</li>
+                                    <li>• `social_realtime_transport_changed` (`sse` / `polling`)</li>
+                                    <li>• `social_realtime_stale_detected`</li>
+                                    <li>• `social_realtime_recovered`</li>
+                                    <li>• `social_realtime_stream_error` / `social_realtime_sync_error`</li>
+                                    <li>• `social_stream_connected` / `social_stream_closed` (server)</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 </div>

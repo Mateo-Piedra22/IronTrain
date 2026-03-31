@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, lte, ne } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '../../../../src/db';
@@ -8,7 +8,7 @@ import { toIsoSafe } from '../../../../src/lib/date-utils';
 import { logger } from '../../../../src/lib/logger';
 import { validateDisplayName, validateUsername } from '../../../../src/lib/moderation';
 import { RATE_LIMITS } from '../../../../src/lib/rate-limit';
-import { reconcileStreakStateForUser } from '../../../../src/lib/social-scoring';
+import { computeEngagementScore, reconcileStreakStateForUser } from '../../../../src/lib/social-scoring';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -96,6 +96,84 @@ export async function GET(req: NextRequest) {
             expiresAtMs: checkedAtMs ? checkedAtMs + (20 * 60 * 1000) : null,
         } : null;
 
+        const [friendsAcceptedCount, pendingIncomingCount, pendingOutgoingCount, activityCount, routinesCount, acceptedSharesCount, kudosGivenCount, kudosReceivedCount] = await Promise.all([
+            db.select({ count: sql<number>`count(*)::int` })
+                .from(schema.friendships)
+                .where(
+                    and(
+                        isNull(schema.friendships.deletedAt),
+                        eq(schema.friendships.status, 'accepted'),
+                        or(eq(schema.friendships.userId, userId), eq(schema.friendships.friendId, userId))
+                    )
+                ),
+            db.select({ count: sql<number>`count(*)::int` })
+                .from(schema.friendships)
+                .where(
+                    and(
+                        isNull(schema.friendships.deletedAt),
+                        eq(schema.friendships.status, 'pending'),
+                        eq(schema.friendships.friendId, userId)
+                    )
+                ),
+            db.select({ count: sql<number>`count(*)::int` })
+                .from(schema.friendships)
+                .where(
+                    and(
+                        isNull(schema.friendships.deletedAt),
+                        eq(schema.friendships.status, 'pending'),
+                        eq(schema.friendships.userId, userId)
+                    )
+                ),
+            db.select({ count: sql<number>`count(*)::int` })
+                .from(schema.activityFeed)
+                .where(
+                    and(
+                        isNull(schema.activityFeed.deletedAt),
+                        eq(schema.activityFeed.userId, userId)
+                    )
+                ),
+            db.select({ count: sql<number>`count(*)::int` })
+                .from(schema.routines)
+                .where(
+                    and(
+                        isNull(schema.routines.deletedAt),
+                        eq(schema.routines.userId, userId)
+                    )
+                ),
+            db.select({ count: sql<number>`count(*)::int` })
+                .from(schema.sharesInbox)
+                .where(
+                    and(
+                        isNull(schema.sharesInbox.deletedAt),
+                        eq(schema.sharesInbox.senderId, userId),
+                        eq(schema.sharesInbox.status, 'accepted')
+                    )
+                ),
+            db.select({ count: sql<number>`count(*)::int` })
+                .from(schema.kudos)
+                .where(
+                    and(
+                        isNull(schema.kudos.deletedAt),
+                        eq(schema.kudos.giverId, userId)
+                    )
+                ),
+            db.select({ count: sql<number>`count(*)::int` })
+                .from(schema.kudos)
+                .leftJoin(schema.activityFeed, eq(schema.kudos.feedId, schema.activityFeed.id))
+                .where(
+                    and(
+                        isNull(schema.kudos.deletedAt),
+                        isNull(schema.activityFeed.deletedAt),
+                        eq(schema.activityFeed.userId, userId)
+                    )
+                ),
+        ]);
+
+        const acceptedShares = acceptedSharesCount[0]?.count ?? 0;
+        const kudosGiven = kudosGivenCount[0]?.count ?? 0;
+        const kudosReceived = kudosReceivedCount[0]?.count ?? 0;
+        const routines = routinesCount[0]?.count ?? 0;
+
         return NextResponse.json({
             success: true,
             profile: {
@@ -107,7 +185,17 @@ export async function GET(req: NextRequest) {
                     title: activeEvent.name,
                     multiplier: activeEvent.multiplier,
                     endDate: toIsoSafe(activeEvent.endDate),
-                } : null
+                } : null,
+                socialSummary: {
+                    friendsCount: friendsAcceptedCount[0]?.count ?? 0,
+                    pendingIncomingCount: pendingIncomingCount[0]?.count ?? 0,
+                    pendingOutgoingCount: pendingOutgoingCount[0]?.count ?? 0,
+                    activityCount: activityCount[0]?.count ?? 0,
+                    acceptedShares,
+                    kudosGiven,
+                    kudosReceived,
+                    engagementScore: computeEngagementScore({ routines, acceptedShares, kudosGiven, kudosReceived }),
+                },
             }
         });
     } catch (e: unknown) {

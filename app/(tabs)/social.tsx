@@ -1,9 +1,9 @@
 import { useColors } from '@/src/hooks/useColors';
 import { useDataReload } from '@/src/hooks/useDataReload';
-import { useTheme } from '@/src/hooks/useTheme';
 import { configService } from '@/src/services/ConfigService';
 import { routineService } from '@/src/services/RoutineService';
 import { SocialFriend, SocialSearchUser, SocialService } from '@/src/services/SocialService';
+import { buildStories, selectActivityFeed, selectIncomingFriendRequests, selectNotificationShares } from '@/src/social/socialSelectors';
 import { useAuthStore } from '@/src/store/authStore';
 import { confirm } from '@/src/store/confirmStore';
 import { useNotificationStore } from '@/src/store/notificationStore';
@@ -14,17 +14,18 @@ import { logger } from '@/src/utils/logger';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
-import { Globe, Inbox as InboxIcon, Search, Settings, Trophy, Users } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import { Bell, Globe, Search, Settings, Trophy, UserCircle2, Users } from 'lucide-react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useShallow } from 'zustand/react/shallow';
 
-import { IronTrainLogo } from '@/components/IronTrainLogo';
 import { FriendsTab } from '@/components/social/FriendsTab';
 import InboxTab from '@/components/social/InboxTab';
 import { LeaderboardTab } from '@/components/social/LeaderboardTab';
 import { ProfileCard } from '@/components/social/ProfileCard';
 import { SearchTab } from '@/components/social/SearchTab';
 import { useSocialStyles } from '@/components/social/social.styles';
+import SocialFeedTab from '@/components/social/SocialFeedTab';
 import {
     FriendDetailModal,
     GlobalEventModal,
@@ -32,11 +33,11 @@ import {
     ScoreInfoModal,
     WeatherBonusModal
 } from '@/components/social/SocialModals';
+import SocialNotificationsModal from '@/components/social/SocialNotificationsModal';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 
 export default function SocialTab() {
-    const { user, login, logout } = useAuthStore();
-    const { activeTheme } = useTheme();
+    const { user, login } = useAuthStore();
     const colors = useColors();
     const styles = useSocialStyles();
     const addToast = useNotificationStore(state => state.addToast);
@@ -44,35 +45,51 @@ export default function SocialTab() {
     const navigation = useNavigation();
 
     // -- STATE --
-    const [activeTab, setActiveTab] = useState<'leaderboard' | 'friends' | 'inbox' | 'search'>('leaderboard');
+    const [activeTab, setActiveTab] = useState<'leaderboard' | 'friends' | 'inbox' | 'search'>('inbox');
     const [refreshing, setRefreshing] = useState(false);
 
     // Global Data
     const {
-        profile, setProfile, leaderboard, friends, inbox, setInbox,
+        profile, leaderboard, friends, inbox, setInbox,
         loading, refreshingLocation, locationPermissionDenied, lastKnownLocation,
-        loadData, refreshLocation, weatherHistory, loadWeatherHistory
-    } = useSocialStore();
-
-    const incomingFriendRequests = friends.filter(f => f.status === 'pending' && !f.isSender).length;
-    const pendingRoutinesCount = inbox.filter(i => i.feedType === 'direct_share' && i.status === 'pending').length;
-    const unseenActivitiesCount = inbox.filter(i => !i.seenAt && i.feedType === 'activity_log').length;
-    const totalUnseenCount = incomingFriendRequests + pendingRoutinesCount + unseenActivitiesCount;
-    const unseenFeedCount = pendingRoutinesCount + unseenActivitiesCount;
+        loadData, refreshLocation, weatherHistory, loadWeatherHistory,
+        realtimeConnected, realtimeSource, lastRealtimeSyncAt, startRealtimeSync, stopRealtimeSync,
+    } = useSocialStore(useShallow((state) => ({
+        profile: state.profile,
+        leaderboard: state.leaderboard,
+        friends: state.friends,
+        inbox: state.inbox,
+        setInbox: state.setInbox,
+        loading: state.loading,
+        refreshingLocation: state.refreshingLocation,
+        locationPermissionDenied: state.locationPermissionDenied,
+        lastKnownLocation: state.lastKnownLocation,
+        loadData: state.loadData,
+        refreshLocation: state.refreshLocation,
+        weatherHistory: state.weatherHistory,
+        loadWeatherHistory: state.loadWeatherHistory,
+        realtimeConnected: state.realtimeConnected,
+        realtimeSource: state.realtimeSource,
+        lastRealtimeSyncAt: state.lastRealtimeSyncAt,
+        startRealtimeSync: state.startRealtimeSync,
+        stopRealtimeSync: state.stopRealtimeSync,
+    })));
 
     // UI State
-    const [isProfileExpanded, setIsProfileExpanded] = useState(false);
-    const [isGoalsExpanded, setIsGoalsExpanded] = useState(false);
-    const [showSeen, setShowSeen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<SocialSearchUser[]>([]);
     const [searching, setSearching] = useState(false);
     const [selectedFriend, setSelectedFriend] = useState<SocialFriend | null>(null);
     const [friendActionLoading, setFriendActionLoading] = useState(false);
-    const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
     const [isScoreModalVisible, setIsScoreModalVisible] = useState(false);
     const [isEventModalVisible, setIsEventModalVisible] = useState(false);
     const [isWeatherModalVisible, setIsWeatherModalVisible] = useState(false);
+    const [isMyProfileModalVisible, setIsMyProfileModalVisible] = useState(false);
+    const [isNotificationsModalVisible, setIsNotificationsModalVisible] = useState(false);
+    const [isProfileExpanded, setIsProfileExpanded] = useState(false);
+    const [isGoalsExpanded, setIsGoalsExpanded] = useState(false);
+    const [showSeen, setShowSeen] = useState(false);
+    const [inboxViewMode, setInboxViewMode] = useState<'feed' | 'classic'>('feed');
 
     // Leaderboard state
     const [rankingSegment, setRankingSegment] = useState<'weekly' | 'monthly' | 'lifetime'>('weekly');
@@ -81,6 +98,27 @@ export default function SocialTab() {
     const [expandedFriendId, setExpandedFriendId] = useState<string | null>(null);
     const [comparisons, setComparisons] = useState<Record<string, any>>({});
     const [loadingCompare, setLoadingCompare] = useState(false);
+
+    const incomingFriendRequestsList = useMemo(() => selectIncomingFriendRequests(friends), [friends]);
+    const activityFeedBase = useMemo(() => selectActivityFeed(inbox, profile?.id), [inbox, profile?.id]);
+    const notificationShares = useMemo(() => selectNotificationShares(inbox), [inbox]);
+    const activityFeedItems = useMemo(() => {
+        return activityFeedBase.filter((item) => {
+            if (hideOwnActivity && profile?.id && item.senderId === profile.id) return false;
+            if (typeFilter === 'all') return true;
+            if (typeFilter === 'pr') return item.actionType === 'pr_broken';
+            if (typeFilter === 'workout') return item.actionType === 'workout_completed';
+            if (typeFilter === 'routine') return item.actionType === 'routine_shared';
+            return true;
+        });
+    }, [activityFeedBase, hideOwnActivity, profile?.id, typeFilter]);
+    const stories = useMemo(() => buildStories(activityFeedItems.filter(item => item.senderId !== profile?.id)), [activityFeedItems, profile?.id]);
+
+    const incomingFriendRequests = incomingFriendRequestsList.length;
+    const pendingRoutinesCount = notificationShares.filter(i => i.status === 'pending' && !i.seenAt).length;
+    const unseenActivitiesCount = activityFeedItems.filter(i => !i.seenAt).length;
+    const totalUnseenCount = incomingFriendRequests + pendingRoutinesCount + unseenActivitiesCount;
+    const pendingNotificationsCount = incomingFriendRequests + pendingRoutinesCount;
 
     // Profile Edit forms
     const [displayName, setDisplayName] = useState('');
@@ -136,6 +174,7 @@ export default function SocialTab() {
             if (!user) return;
             loadTrainingDays();
             refreshLocation(true);
+            startRealtimeSync();
 
             // Capture analytics event for survey triggering
             analytics.capture('social_tab_viewed');
@@ -145,19 +184,12 @@ export default function SocialTab() {
                 refreshLocation(true);
             }, 3 * 60 * 1000);
 
-            return () => clearInterval(locInterval);
-        }, [user, loadTrainingDays, refreshLocation])
+            return () => {
+                clearInterval(locInterval);
+                stopRealtimeSync();
+            };
+        }, [user, loadTrainingDays, refreshLocation, startRealtimeSync, stopRealtimeSync])
     );
-
-    // Synchronize local modal states when opened
-    useEffect(() => {
-        if (isProfileModalVisible && profile) {
-            setDisplayName(profile.displayName || '');
-            setUsername(profile.username || '');
-            const val = profile.is_public !== undefined ? profile.is_public : profile.isPublic;
-            setIsPublic(val !== 0 && val !== false);
-        }
-    }, [isProfileModalVisible, profile]);
 
     const handleRefresh = () => {
         setRefreshing(true);
@@ -175,17 +207,6 @@ export default function SocialTab() {
         }
     }, [addToast]);
 
-    const handleCopyId = async () => {
-        if (profile?.id) {
-            await Clipboard.setStringAsync(profile.id);
-            addToast({
-                type: 'success',
-                title: 'ID copiado',
-                message: 'Ya podés compartirlo con tus amigos.'
-            });
-        }
-    };
-
     const handleUpdateProfile = async () => {
         if (!displayName.trim() || displayName.length < 2) {
             addToast({ type: 'error', title: 'Nombre muy corto' });
@@ -198,7 +219,7 @@ export default function SocialTab() {
                 username.trim() || null,
                 isPublic ? 1 : 0
             );
-            setIsProfileModalVisible(false);
+            setIsMyProfileModalVisible(false);
             fetchInitialData(true);
             addToast({ type: 'success', title: 'Perfil actualizado' });
         } catch (err: any) {
@@ -343,23 +364,6 @@ export default function SocialTab() {
         await handleExpandFriend(friendUserId);
     };
 
-    const handleRemoveFriend = async (friendId: string, name: string) => {
-        confirm.destructive(
-            'Eliminar amigo',
-            `¿Estás seguro de que querés eliminar a ${name}?`,
-            async () => {
-                try {
-                    await SocialService.respondFriendRequest(friendId, 'remove');
-                    setSelectedFriend(null);
-                    fetchInitialData(true, true);
-                    addToast({ type: 'success', title: 'Amigo eliminado' });
-                } catch (err) {
-                    addToast({ type: 'error', title: 'Error al eliminar' });
-                }
-            }
-        );
-    };
-
     const handleInboxResponse = async (inboxId: string, action: 'accept' | 'reject', payload?: any) => {
         try {
             if (action === 'accept' && payload) {
@@ -413,7 +417,7 @@ export default function SocialTab() {
     };
 
     const handleMarkAllAsSeen = async () => {
-        const unseen = inbox.filter(i => !i.seenAt);
+        const unseen = notificationShares.filter(i => !i.seenAt);
         if (unseen.length === 0) return;
 
         confirm.ask(
@@ -422,7 +426,8 @@ export default function SocialTab() {
             async () => {
                 const now = new Date().toISOString();
                 // Optimistic UI Update: Mark everything seen immediately
-                setInbox(current => current.map(item => ({ ...item, seenAt: item.seenAt || now })));
+                const unseenIds = new Set(unseen.map(item => item.id));
+                setInbox(current => current.map(item => unseenIds.has(item.id) ? ({ ...item, seenAt: item.seenAt || now }) : item));
                 addToast({ type: 'success', title: 'Buzón actualizado', message: 'Notificaciones archivadas.' });
 
                 try {
@@ -438,55 +443,73 @@ export default function SocialTab() {
         );
     };
 
-    const renderTabsMenu = () => (
-        <View style={styles.tabsMenu}>
-            <TouchableOpacity
-                style={[styles.tabBtn, activeTab === 'leaderboard' && styles.tabBtnActive]}
-                onPress={() => setActiveTab('leaderboard')}
-            >
-                <Trophy size={18} color={activeTab === 'leaderboard' ? colors.onPrimary : colors.textMuted} />
-                <Text style={[styles.tabText, activeTab === 'leaderboard' && styles.tabTextActive]}>Ranking</Text>
-            </TouchableOpacity>
+    const handleCopyProfileId = useCallback(async () => {
+        if (!profile?.id) return;
+        try {
+            await Clipboard.setStringAsync(profile.id);
+            addToast({ type: 'success', title: 'ID copiado' });
+        } catch (err) {
+            logger.captureException(err, { scope: 'SocialTab.copyProfileId' });
+            addToast({ type: 'error', title: 'Perfil', message: 'No se pudo copiar el ID.' });
+        }
+    }, [profile?.id, addToast]);
 
-            <TouchableOpacity
-                style={[styles.tabBtn, activeTab === 'friends' && styles.tabBtnActive]}
-                onPress={() => setActiveTab('friends')}
-            >
-                <Users size={18} color={activeTab === 'friends' ? colors.onPrimary : colors.textMuted} />
-                <Text style={[styles.tabText, activeTab === 'friends' && styles.tabTextActive]}>
-                    Amigos{incomingFriendRequests > 0 ? ` (${incomingFriendRequests})` : ''}
-                </Text>
-                {incomingFriendRequests > 0 && (
-                    <View style={[styles.inboxBadge, { backgroundColor: colors.red }]}>
-                        <Text style={styles.inboxBadgeText}>{incomingFriendRequests}</Text>
-                    </View>
-                )}
-            </TouchableOpacity>
+    const renderSharedProfileHeader = useCallback(() => {
+        if (!profile) return null;
 
-            <TouchableOpacity
-                style={[styles.tabBtn, activeTab === 'inbox' && styles.tabBtnActive]}
-                onPress={() => setActiveTab('inbox')}
-            >
-                <InboxIcon size={18} color={activeTab === 'inbox' ? colors.onPrimary : colors.textMuted} />
-                <Text style={[styles.tabText, activeTab === 'inbox' && styles.tabTextActive]}>
-                    Feed{unseenFeedCount > 0 ? ` (${unseenFeedCount})` : ''}
-                </Text>
-                {unseenFeedCount > 0 && (
-                    <View style={styles.inboxBadge}>
-                        <Text style={styles.inboxBadgeText}>{unseenFeedCount}</Text>
-                    </View>
-                )}
-            </TouchableOpacity>
+        return (
+            <View style={{ marginBottom: 14 }}>
+                <ProfileCard
+                    profile={profile}
+                    isProfileExpanded={isProfileExpanded}
+                    setIsProfileExpanded={setIsProfileExpanded}
+                    isGoalsExpanded={isGoalsExpanded}
+                    setIsGoalsExpanded={setIsGoalsExpanded}
+                    trainingDays={trainingDays}
+                    onToggleTrainingDay={handleToggleTrainingDay}
+                    onCopyId={handleCopyProfileId}
+                    onEditProfile={() => setIsMyProfileModalVisible(true)}
+                    onShowEventModal={() => setIsEventModalVisible(true)}
+                    onShowWeatherModal={() => setIsWeatherModalVisible(true)}
+                    onRefreshLocation={refreshLocation}
+                    locationPermissionDenied={locationPermissionDenied}
+                    lastKnownLocation={lastKnownLocation}
+                    refreshingLocation={refreshingLocation}
+                    colors={colors}
+                    styles={styles}
+                />
 
-            <TouchableOpacity
-                style={[styles.tabBtn, activeTab === 'search' && styles.tabBtnActive]}
-                onPress={() => setActiveTab('search')}
-            >
-                <Search size={18} color={activeTab === 'search' ? colors.onPrimary : colors.textMuted} />
-                <Text style={[styles.tabText, activeTab === 'search' && styles.tabTextActive]}>Buscar</Text>
-            </TouchableOpacity>
-        </View>
-    );
+                <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                        style={[styles.archiveToggle, inboxViewMode === 'feed' && styles.archiveToggleActive]}
+                        onPress={() => setInboxViewMode('feed')}
+                    >
+                        <Text style={[styles.archiveToggleText, inboxViewMode === 'feed' && styles.archiveToggleTextActive]}>Feed moderno</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.archiveToggle, inboxViewMode === 'classic' && styles.archiveToggleActive]}
+                        onPress={() => setInboxViewMode('classic')}
+                    >
+                        <Text style={[styles.archiveToggleText, inboxViewMode === 'classic' && styles.archiveToggleTextActive]}>Bandeja clásica</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        );
+    }, [
+        profile,
+        isProfileExpanded,
+        isGoalsExpanded,
+        trainingDays,
+        handleToggleTrainingDay,
+        handleCopyProfileId,
+        refreshLocation,
+        locationPermissionDenied,
+        lastKnownLocation,
+        refreshingLocation,
+        colors,
+        styles,
+        inboxViewMode,
+    ]);
 
     if (!user) {
         return (
@@ -521,16 +544,20 @@ export default function SocialTab() {
                         </View>
                     )}
                 </View>
-                <View style={styles.headerCenterIconWrapper}>
-                    <IronTrainLogo size={60} />
-                </View>
                 <View style={styles.headerActionsBox}>
-                    <TouchableOpacity style={styles.headerIconBtn} onPress={() => router.push('/settings' as any)}>
-                        <Settings size={20} color={colors.primary.DEFAULT} />
+                    <TouchableOpacity style={styles.headerIconBtn} onPress={() => setActiveTab('search')}>
+                        <Search size={20} color={colors.primary.DEFAULT} />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.publicBtn} onPress={handleOpenPublicRoutines}>
-                        <Globe size={16} color={colors.onPrimary} />
-                        <Text style={styles.publicBtnText}>Públicas</Text>
+                    <TouchableOpacity style={styles.headerIconBtn} onPress={() => setIsNotificationsModalVisible(true)}>
+                        <Bell size={20} color={colors.primary.DEFAULT} />
+                        {pendingNotificationsCount > 0 && (
+                            <View style={styles.inboxBadge}>
+                                <Text style={styles.inboxBadgeText}>{pendingNotificationsCount}</Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.headerIconBtn} onPress={() => setIsMyProfileModalVisible(true)}>
+                        <UserCircle2 size={20} color={colors.primary.DEFAULT} />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -543,31 +570,68 @@ export default function SocialTab() {
                     </View>
                 ) : (
                     <>
+                        {activeTab === 'inbox' && (
+                            inboxViewMode === 'feed' ? (
+                                <SocialFeedTab
+                                    items={activityFeedItems}
+                                    profile={profile}
+                                    stories={stories}
+                                    isLive={realtimeConnected}
+                                    liveSource={realtimeSource}
+                                    lastLiveSyncAt={lastRealtimeSyncAt}
+                                    renderHeader={renderSharedProfileHeader}
+                                    refreshing={refreshing}
+                                    onRefresh={handleRefresh}
+                                    onToggleKudo={handleToggleKudo}
+                                    onMarkAsSeen={handleMarkAsSeen}
+                                    onCopyRoutine={(item) => {
+                                        if (item.payload) {
+                                            handleInboxResponse(item.id, 'accept', item.payload);
+                                        }
+                                    }}
+                                    onOpenStory={(story) => {
+                                        setSearchQuery(story.username ? `@${story.username}` : story.name);
+                                        setActiveTab('search');
+                                    }}
+                                    colors={colors}
+                                    styles={styles}
+                                />
+                            ) : (
+                                <InboxTab
+                                    inbox={inbox}
+                                    showSeen={showSeen}
+                                    setShowSeen={setShowSeen}
+                                    hideOwnActivity={hideOwnActivity}
+                                    setHideOwnActivity={setHideOwnActivity}
+                                    typeFilter={typeFilter}
+                                    setTypeFilter={setTypeFilter}
+                                    handleInboxResponse={handleInboxResponse}
+                                    handleMarkAsSeen={handleMarkAsSeen}
+                                    handleMarkAllAsSeen={handleMarkAllAsSeen}
+                                    handleToggleKudo={handleToggleKudo}
+                                    profile={profile}
+                                    colors={colors}
+                                    styles={styles}
+                                    renderHeader={renderSharedProfileHeader}
+                                    refreshing={refreshing}
+                                    onRefresh={handleRefresh}
+                                    isLive={realtimeConnected}
+                                    liveSource={realtimeSource}
+                                    lastLiveSyncAt={lastRealtimeSyncAt}
+                                />
+                            )
+                        )}
                         {activeTab === 'leaderboard' && (
                             <ScrollView
                                 contentContainerStyle={styles.scrollContent}
                                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary.DEFAULT} />}
                             >
-                                <ProfileCard
-                                    profile={profile}
-                                    isProfileExpanded={isProfileExpanded}
-                                    setIsProfileExpanded={setIsProfileExpanded}
-                                    isGoalsExpanded={isGoalsExpanded}
-                                    setIsGoalsExpanded={setIsGoalsExpanded}
-                                    trainingDays={trainingDays}
-                                    onToggleTrainingDay={handleToggleTrainingDay}
-                                    onCopyId={handleCopyId}
-                                    onEditProfile={() => setIsProfileModalVisible(true)}
-                                    onShowEventModal={() => setIsEventModalVisible(true)}
-                                    onShowWeatherModal={() => setIsWeatherModalVisible(true)}
-                                    onRefreshLocation={refreshLocation}
-                                    refreshingLocation={refreshingLocation}
-                                    locationPermissionDenied={locationPermissionDenied}
-                                    lastKnownLocation={lastKnownLocation}
-                                    colors={colors}
-                                    styles={styles}
-                                />
-                                <View style={styles.tabsMenuWrapper}>{renderTabsMenu()}</View>
+                                <View style={{ marginBottom: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text style={styles.inboxStatusTitle}>Ranking social</Text>
+                                    <TouchableOpacity style={styles.archiveToggle} onPress={() => setActiveTab('inbox')}>
+                                        <Text style={styles.archiveToggleText}>Volver al feed</Text>
+                                    </TouchableOpacity>
+                                </View>
                                 <LeaderboardTab
                                     leaderboard={leaderboard}
                                     profile={profile}
@@ -578,6 +642,9 @@ export default function SocialTab() {
                                     onExpandFriend={handleExpandFriend}
                                     onShowScoreInfo={() => setIsScoreModalVisible(true)}
                                     setRankingSegment={setRankingSegment}
+                                    isLive={realtimeConnected}
+                                    liveSource={realtimeSource}
+                                    lastLiveSyncAt={lastRealtimeSyncAt}
                                     colors={colors}
                                     styles={styles}
                                 />
@@ -588,26 +655,12 @@ export default function SocialTab() {
                                 contentContainerStyle={styles.scrollContent}
                                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary.DEFAULT} />}
                             >
-                                <ProfileCard
-                                    profile={profile}
-                                    isProfileExpanded={isProfileExpanded}
-                                    setIsProfileExpanded={setIsProfileExpanded}
-                                    isGoalsExpanded={isGoalsExpanded}
-                                    setIsGoalsExpanded={setIsGoalsExpanded}
-                                    trainingDays={trainingDays}
-                                    onToggleTrainingDay={handleToggleTrainingDay}
-                                    onCopyId={handleCopyId}
-                                    onEditProfile={() => setIsProfileModalVisible(true)}
-                                    onShowEventModal={() => setIsEventModalVisible(true)}
-                                    onShowWeatherModal={() => setIsWeatherModalVisible(true)}
-                                    onRefreshLocation={refreshLocation}
-                                    refreshingLocation={refreshingLocation}
-                                    locationPermissionDenied={locationPermissionDenied}
-                                    lastKnownLocation={lastKnownLocation}
-                                    colors={colors}
-                                    styles={styles}
-                                />
-                                <View style={styles.tabsMenuWrapper}>{renderTabsMenu()}</View>
+                                <View style={{ marginBottom: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text style={styles.inboxStatusTitle}>Amigos</Text>
+                                    <TouchableOpacity style={styles.archiveToggle} onPress={() => setActiveTab('inbox')}>
+                                        <Text style={styles.archiveToggleText}>Volver al feed</Text>
+                                    </TouchableOpacity>
+                                </View>
                                 <FriendsTab
                                     friends={friends}
                                     onAcceptRequest={handleAcceptFriend}
@@ -618,75 +671,17 @@ export default function SocialTab() {
                                 />
                             </ScrollView>
                         )}
-                        {activeTab === 'inbox' && (
-                            <InboxTab
-                                inbox={inbox}
-                                showSeen={showSeen}
-                                setShowSeen={setShowSeen}
-                                hideOwnActivity={hideOwnActivity}
-                                setHideOwnActivity={setHideOwnActivity}
-                                typeFilter={typeFilter}
-                                setTypeFilter={setTypeFilter}
-                                handleInboxResponse={handleInboxResponse}
-                                handleMarkAsSeen={handleMarkAsSeen}
-                                handleToggleKudo={handleToggleKudo}
-                                handleMarkAllAsSeen={handleMarkAllAsSeen}
-                                profile={profile}
-                                colors={colors}
-                                styles={styles}
-                                refreshing={refreshing}
-                                onRefresh={handleRefresh}
-                                renderHeader={() => (
-                                    <>
-                                        <ProfileCard
-                                            profile={profile}
-                                            isProfileExpanded={isProfileExpanded}
-                                            setIsProfileExpanded={setIsProfileExpanded}
-                                            isGoalsExpanded={isGoalsExpanded}
-                                            setIsGoalsExpanded={setIsGoalsExpanded}
-                                            trainingDays={trainingDays}
-                                            onToggleTrainingDay={handleToggleTrainingDay}
-                                            onCopyId={handleCopyId}
-                                            onEditProfile={() => setIsProfileModalVisible(true)}
-                                            onShowEventModal={() => setIsEventModalVisible(true)}
-                                            onShowWeatherModal={() => setIsWeatherModalVisible(true)}
-                                            onRefreshLocation={refreshLocation}
-                                            refreshingLocation={refreshingLocation}
-                                            locationPermissionDenied={locationPermissionDenied}
-                                            lastKnownLocation={lastKnownLocation}
-                                            colors={colors}
-                                            styles={styles}
-                                        />
-                                        <View style={styles.tabsMenuWrapper}>{renderTabsMenu()}</View>
-                                    </>
-                                )}
-                            />
-                        )}
                         {activeTab === 'search' && (
                             <ScrollView
                                 contentContainerStyle={styles.scrollContent}
                                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary.DEFAULT} />}
                             >
-                                <ProfileCard
-                                    profile={profile}
-                                    isProfileExpanded={isProfileExpanded}
-                                    setIsProfileExpanded={setIsProfileExpanded}
-                                    isGoalsExpanded={isGoalsExpanded}
-                                    setIsGoalsExpanded={setIsGoalsExpanded}
-                                    trainingDays={trainingDays}
-                                    onToggleTrainingDay={handleToggleTrainingDay}
-                                    onCopyId={handleCopyId}
-                                    onEditProfile={() => setIsProfileModalVisible(true)}
-                                    onShowEventModal={() => setIsEventModalVisible(true)}
-                                    onShowWeatherModal={() => setIsWeatherModalVisible(true)}
-                                    onRefreshLocation={refreshLocation}
-                                    refreshingLocation={refreshingLocation}
-                                    locationPermissionDenied={locationPermissionDenied}
-                                    lastKnownLocation={lastKnownLocation}
-                                    colors={colors}
-                                    styles={styles}
-                                />
-                                <View style={styles.tabsMenuWrapper}>{renderTabsMenu()}</View>
+                                <View style={{ marginBottom: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text style={styles.inboxStatusTitle}>Buscar atletas</Text>
+                                    <TouchableOpacity style={styles.archiveToggle} onPress={() => setActiveTab('inbox')}>
+                                        <Text style={styles.archiveToggleText}>Volver al feed</Text>
+                                    </TouchableOpacity>
+                                </View>
                                 <SearchTab
                                     searchQuery={searchQuery}
                                     setSearchQuery={setSearchQuery}
@@ -703,9 +698,23 @@ export default function SocialTab() {
                 )}
             </View>
 
+            <SocialNotificationsModal
+                visible={isNotificationsModalVisible}
+                onClose={() => setIsNotificationsModalVisible(false)}
+                incomingFriendRequests={incomingFriendRequestsList}
+                shares={notificationShares.filter(i => !i.seenAt || i.status === 'pending')}
+                onAcceptFriend={handleAcceptFriend}
+                onRejectFriend={handleRejectFriend}
+                onAcceptShare={(inboxId, payload) => handleInboxResponse(inboxId, 'accept', payload)}
+                onRejectShare={(inboxId) => handleInboxResponse(inboxId, 'reject')}
+                onMarkAllSeen={handleMarkAllAsSeen}
+                colors={colors}
+                styles={styles}
+            />
+
             <ProfileEditModal
-                visible={isProfileModalVisible}
-                onClose={() => setIsProfileModalVisible(false)}
+                visible={isMyProfileModalVisible}
+                onClose={() => setIsMyProfileModalVisible(false)}
                 displayName={displayName}
                 setDisplayName={setDisplayName}
                 username={username}
@@ -718,6 +727,27 @@ export default function SocialTab() {
                 colors={colors}
                 styles={styles}
             />
+
+            <View style={{ paddingHorizontal: 20, paddingBottom: 14 }}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity style={[styles.archiveToggle, activeTab === 'leaderboard' && styles.archiveToggleActive]} onPress={() => setActiveTab('leaderboard')}>
+                        <Trophy size={14} color={activeTab === 'leaderboard' ? colors.onPrimary : colors.textMuted} />
+                        <Text style={[styles.archiveToggleText, activeTab === 'leaderboard' && styles.archiveToggleTextActive]}>Ranking</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.archiveToggle, activeTab === 'friends' && styles.archiveToggleActive]} onPress={() => setActiveTab('friends')}>
+                        <Users size={14} color={activeTab === 'friends' ? colors.onPrimary : colors.textMuted} />
+                        <Text style={[styles.archiveToggleText, activeTab === 'friends' && styles.archiveToggleTextActive]}>Amigos</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.archiveToggle} onPress={() => router.push('/settings' as any)}>
+                        <Settings size={14} color={colors.textMuted} />
+                        <Text style={styles.archiveToggleText}>Settings</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.archiveToggle} onPress={handleOpenPublicRoutines}>
+                        <Globe size={14} color={colors.textMuted} />
+                        <Text style={styles.archiveToggleText}>Públicas</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
 
             <FriendDetailModal
                 visible={!!selectedFriend}

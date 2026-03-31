@@ -265,6 +265,8 @@ export const friendships = pgTable('friendships', {
     statusIdx: index('friendships_status_idx').on(table.status),
     userStatusDeletedIdx: index('friendships_user_status_deleted_idx').on(table.userId, table.status, table.deletedAt),
     friendStatusDeletedIdx: index('friendships_friend_status_deleted_idx').on(table.friendId, table.status, table.deletedAt),
+    userDeletedUpdatedIdx: index('friendships_user_deleted_updated_idx').on(table.userId, table.deletedAt, table.updatedAt),
+    friendDeletedUpdatedIdx: index('friendships_friend_deleted_updated_idx').on(table.friendId, table.deletedAt, table.updatedAt),
 }));
 
 export const sharesInbox = pgTable('shares_inbox', {
@@ -298,11 +300,13 @@ export const activityFeed = pgTable('activity_feed', {
     userTimeIdx: index('feed_user_time_idx').on(table.userId, table.createdAt),
     actionIdx: index('feed_action_idx').on(table.actionType),
     userDeletedCreatedIdx: index('feed_user_deleted_created_idx').on(table.userId, table.deletedAt, table.createdAt),
+    deletedCreatedIdx: index('feed_deleted_created_idx').on(table.deletedAt, table.createdAt),
+    userDeletedUpdatedIdx: index('feed_user_deleted_updated_idx').on(table.userId, table.deletedAt, table.updatedAt),
 }));
 
 export const kudos = pgTable('kudos', {
     id: text('id').primaryKey(),
-    feedId: text('feed_id').notNull(),
+    feedId: text('feed_id').notNull().references(() => activityFeed.id, { onDelete: 'cascade' }),
     giverId: text('giver_id').notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -408,6 +412,7 @@ export const scoreEvents = pgTable('score_events', {
     userTimeIdx: index('score_user_time_idx').on(table.userId, table.createdAt),
     typeIdx: index('score_type_idx').on(table.eventType),
     userDeletedCreatedIdx: index('score_user_deleted_created_idx').on(table.userId, table.deletedAt, table.createdAt),
+    userDeletedUpdatedIdx: index('score_user_deleted_updated_idx').on(table.userId, table.deletedAt, table.updatedAt),
     userWorkoutIdx: index('score_user_workout_idx').on(table.userId, table.workoutId),
 }));
 
@@ -450,6 +455,7 @@ export const activitySeen = pgTable('activity_seen', {
     deletedAt: timestamp('deleted_at'),
 }, (table) => ({
     activityUserIdx: index('activity_seen_activity_user_idx').on(table.activityId, table.userId),
+    userActivityIdx: index('activity_seen_user_activity_idx').on(table.userId, table.activityId),
     userSeenIdx: index('activity_seen_user_seen_idx').on(table.userId, table.seenAt),
 }));
 

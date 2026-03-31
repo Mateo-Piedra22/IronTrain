@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateConsecutiveWeeklyStreakFromMap, isCurrentStreakStillValid } from './social-scoring';
+import { calculateConsecutiveWeeklyStreakFromMap, computeEngagementScore, isCurrentStreakStillValid } from './social-scoring';
 // Note: In an actual Vitest environment, we would import the real function
 // But since we are setting up tests, we will mock the logic or test the exported functions.
 
@@ -79,5 +79,30 @@ describe('Weekly streak reconstruction', () => {
         };
         const currentWeekKey = '2026-03-23';
         expect(calculateConsecutiveWeeklyStreakFromMap(completionMap, 3, currentWeekKey)).toBe(0);
+    });
+});
+
+describe('Engagement scoring', () => {
+    it('weights engagement inputs deterministically', () => {
+        const score = computeEngagementScore({
+            routines: 4,
+            acceptedShares: 2,
+            kudosGiven: 5,
+            kudosReceived: 7,
+        });
+
+        // routines*2 + acceptedShares*3 + kudosGiven + kudosReceived*2
+        expect(score).toBe((4 * 2) + (2 * 3) + 5 + (7 * 2));
+    });
+
+    it('clamps negative values to zero', () => {
+        const score = computeEngagementScore({
+            routines: -10,
+            acceptedShares: -2,
+            kudosGiven: -1,
+            kudosReceived: -5,
+        });
+
+        expect(score).toBe(0);
     });
 });

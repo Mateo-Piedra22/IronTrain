@@ -47,6 +47,11 @@ export async function GET(req: NextRequest) {
     try {
         const userId = await verifyAuth(req);
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const scopeParam = req.nextUrl.searchParams.get('scope');
+        const inboxScope: 'all' | 'feed' | 'notifications' =
+            scopeParam === 'feed' || scopeParam === 'notifications' ? scopeParam : 'all';
+        const shouldIncludeShares = inboxScope !== 'feed';
+        const shouldIncludeActivity = inboxScope !== 'notifications';
 
         const rateLimit = await RATE_LIMITS.SOCIAL_INBOX_READ(userId);
         if (!rateLimit.ok) {
@@ -62,46 +67,67 @@ export async function GET(req: NextRequest) {
         }
 
         // 1. Fetch direct shares (Inbox)
-        const shareRecords = await db.select()
-            .from(schema.sharesInbox)
-            .where(
-                and(
-                    eq(schema.sharesInbox.receiverId, userId),
-                    isNull(schema.sharesInbox.deletedAt)
+        const shareRecords = shouldIncludeShares
+            ? await db.select({
+                id: schema.sharesInbox.id,
+                senderId: schema.sharesInbox.senderId,
+                type: schema.sharesInbox.type,
+                payload: schema.sharesInbox.payload,
+                status: schema.sharesInbox.status,
+                updatedAt: schema.sharesInbox.updatedAt,
+                seenAt: schema.sharesInbox.seenAt,
+            })
+                .from(schema.sharesInbox)
+                .where(
+                    and(
+                        eq(schema.sharesInbox.receiverId, userId),
+                        isNull(schema.sharesInbox.deletedAt)
+                    )
                 )
-            )
-            .orderBy(desc(schema.sharesInbox.updatedAt))
-            .limit(50);
+                .orderBy(desc(schema.sharesInbox.updatedAt))
+                .limit(50)
+            : [];
 
         // 2. Fetch accepted friends to get their activity
-        const [outboundFriends, inboundFriends] = await Promise.all([
-            db.select()
-                .from(schema.friendships)
-                .where(
-                    and(
-                        eq(schema.friendships.userId, userId),
-                        eq(schema.friendships.status, 'accepted'),
-                        isNull(schema.friendships.deletedAt)
-                    )
-                ),
-            db.select()
-                .from(schema.friendships)
-                .where(
-                    and(
-                        eq(schema.friendships.friendId, userId),
-                        eq(schema.friendships.status, 'accepted'),
-                        isNull(schema.friendships.deletedAt)
-                    )
-                ),
-        ]);
-        const friends = [...outboundFriends, ...inboundFriends];
-        const friendIds = friends.map(r => r.userId === userId ? r.friendId : r.userId);
-        const feedUsers = [userId, ...friendIds];
+        const feedUsers: string[] = shouldIncludeActivity
+            ? await (async () => {
+                const [outboundFriends, inboundFriends] = await Promise.all([
+                    db.select({
+                        userId: schema.friendships.userId,
+                        friendId: schema.friendships.friendId,
+                    })
+                        .from(schema.friendships)
+                        .where(
+                            and(
+                                eq(schema.friendships.userId, userId),
+                                eq(schema.friendships.status, 'accepted'),
+                                isNull(schema.friendships.deletedAt)
+                            )
+                        ),
+                    db.select({
+                        userId: schema.friendships.userId,
+                        friendId: schema.friendships.friendId,
+                    })
+                        .from(schema.friendships)
+                        .where(
+                            and(
+                                eq(schema.friendships.friendId, userId),
+                                eq(schema.friendships.status, 'accepted'),
+                                isNull(schema.friendships.deletedAt)
+                            )
+                        ),
+                ]);
+                const friends = [...outboundFriends, ...inboundFriends];
+                const friendIds = friends.map(r => r.userId === userId ? r.friendId : r.userId);
+                return [userId, ...friendIds];
+            })()
+            : [];
 
-        // 3. Fetch Activity Feed with optimized single query (joins and subqueries)
-        let uniqueList: InboxItem[] = [];
+        // 3. Build feed and notification streams independently, then merge.
+        let activityItems: ActivityInboxItem[] = [];
+        let shareItems: DirectShareInboxItem[] = [];
 
-        if (feedUsers.length > 0) {
+        if (shouldIncludeActivity && feedUsers.length > 0) {
             const activityRecords = await db.select({
                 id: schema.activityFeed.id,
                 userId: schema.activityFeed.userId,
@@ -153,7 +179,7 @@ export async function GET(req: NextRequest) {
                 });
             }
 
-            const activityItems = activityRecords.map(a => {
+            activityItems = activityRecords.map(a => {
                 const meta = kudosMetadataMap.get(a.id) || { count: 0, hasKudoed: false };
                 return {
                     id: a.id,
@@ -169,9 +195,11 @@ export async function GET(req: NextRequest) {
                     seenAt: a.seenAt,
                 };
             });
+        }
 
+        if (shouldIncludeShares && shareRecords.length > 0) {
             // Fetch Profiles for shares (usually fewer records)
-            const senderIds = [...new Set(shareRecords.map(r => r.senderId))];
+            const senderIds = shouldIncludeShares ? [...new Set(shareRecords.map(r => r.senderId))] : [];
             const profilesMap = new Map<string, { name: string, username: string | null }>();
             
             if (senderIds.length > 0) {
@@ -184,7 +212,7 @@ export async function GET(req: NextRequest) {
                 shareProfiles.forEach(p => profilesMap.set(p.id, { name: p.name || 'Unknown', username: p.username }));
             }
 
-            const shareItems = shareRecords.map(r => ({
+            shareItems = shareRecords.map(r => ({
                 id: r.id,
                 feedType: 'direct_share' as const,
                 senderId: r.senderId,
@@ -196,17 +224,17 @@ export async function GET(req: NextRequest) {
                 createdAt: r.updatedAt,
                 seenAt: r.seenAt,
             }));
-
-            uniqueList = [...shareItems, ...activityItems].sort((a, b) => {
-                const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : 0;
-                const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : 0;
-                return dateB - dateA;
-            });
         }
+
+        const mergedList: InboxItem[] = [...shareItems, ...activityItems].sort((a, b) => {
+            const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : 0;
+            const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : 0;
+            return dateB - dateA;
+        });
 
         // Deduplicate by composite key to avoid collisions between different feed types
         const seenKeys = new Set<string>();
-        const finalUniqueList = uniqueList.filter(item => {
+        const finalUniqueList = mergedList.filter(item => {
             const key = `${item.feedType || 'direct_share'}:${item.id}`;
             if (seenKeys.has(key)) return false;
             seenKeys.add(key);

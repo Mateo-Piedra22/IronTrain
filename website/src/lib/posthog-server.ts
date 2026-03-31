@@ -29,6 +29,6 @@ export const captureServerEvent = async (userId: string, eventName: string, prop
                 env: process.env.NODE_ENV,
             },
         });
-        await client.shutdown(); // Ensure event is sent in long-running processes or serverless
+        await client.shutdown();
     }
 };

@@ -210,6 +210,16 @@ export const RATE_LIMITS = {
         limit: 30,
         windowMs: 60000,
     }),
+    SOCIAL_PULSE: createRateLimiter({
+        action: 'social:pulse',
+        limit: 180,
+        windowMs: 60000,
+    }),
+    SOCIAL_STREAM: createRateLimiter({
+        action: 'social:stream',
+        limit: 40,
+        windowMs: 60000,
+    }),
     SOCIAL_COMPARE: createRateLimiter({
         action: 'social:compare',
         limit: 30,

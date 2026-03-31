@@ -1,4 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '../../../../../src/db';
@@ -75,16 +76,46 @@ export async function POST(req: NextRequest) {
                 );
         }
 
-        // Batch update activity feed (only if user is the activity owner)
+        // Batch upsert per-user seen markers for activity feed
         if (activityLogIds.length > 0) {
-            await db.update(schema.activityFeed)
-                .set({ seenAt: now, updatedAt: now })
+            const existingSeenRows = await db.select({
+                id: schema.activitySeen.id,
+                activityId: schema.activitySeen.activityId,
+            })
+                .from(schema.activitySeen)
                 .where(
                     and(
-                        inArray(schema.activityFeed.id, activityLogIds),
-                        eq(schema.activityFeed.userId, userId)
+                        inArray(schema.activitySeen.activityId, activityLogIds),
+                        eq(schema.activitySeen.userId, userId)
                     )
                 );
+
+            const existingIds = new Set(existingSeenRows.map((row) => row.activityId));
+
+            const toInsert = activityLogIds
+                .filter((activityId) => !existingIds.has(activityId))
+                .map((activityId) => ({
+                    id: `seen:${userId}:${activityId}`,
+                    activityId,
+                    userId,
+                    seenAt: now,
+                    updatedAt: now,
+                }));
+
+            if (toInsert.length > 0) {
+                await db.insert(schema.activitySeen).values(toInsert);
+            }
+
+            if (existingSeenRows.length > 0) {
+                await db.update(schema.activitySeen)
+                    .set({ seenAt: now, updatedAt: now })
+                    .where(
+                        and(
+                            inArray(schema.activitySeen.activityId, existingSeenRows.map((row) => row.activityId)),
+                            eq(schema.activitySeen.userId, userId)
+                        )
+                    );
+            }
         }
 
         return NextResponse.json({

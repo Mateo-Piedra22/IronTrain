@@ -14,9 +14,22 @@ interface LeaderboardTabProps {
     onExpandFriend: (id: string) => void;
     onShowScoreInfo: () => void;
     setRankingSegment: (segment: 'weekly' | 'monthly' | 'lifetime') => void;
+    isLive?: boolean;
+    liveSource?: 'idle' | 'sse' | 'polling';
+    lastLiveSyncAt?: number | null;
     colors: any;
     styles: any;
 }
+
+const syncLabel = (value: number | null | undefined): string => {
+    if (!value) return 'sincronizando…';
+    const diffMs = Date.now() - value;
+    if (diffMs < 15000) return 'actualizado ahora';
+    const seconds = Math.floor(diffMs / 1000);
+    if (seconds < 60) return `actualizado hace ${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    return `actualizado hace ${minutes}m`;
+};
 
 const ComparisonRow = React.memo(({ comp, userDisplayName, colors, styles }: { comp: SocialComparisonEntry, userDisplayName: string, colors: any, styles: any }) => {
     const userWon = comp.user1RM > comp.friend1RM;
@@ -87,7 +100,10 @@ const LeaderboardItem = React.memo(({
                     </Text>
                     <View>
                         <Text style={styles.friendName}>{user.id === profileId ? 'Tú' : user.displayName}</Text>
-                        <Text style={styles.friendStatus}>IronScore {user.scores[rankingSegment]}</Text>
+                        <Text style={styles.friendStatus}>
+                            IronScore {user.scores[rankingSegment]}
+                            {typeof user.stats?.engagementScore === 'number' ? ` • ENG ${user.stats.engagementScore}` : ''}
+                        </Text>
                     </View>
                 </View>
                 {user.stats?.currentStreak >= 3 && (
@@ -135,6 +151,9 @@ export const LeaderboardTab = React.memo(({
     onExpandFriend,
     onShowScoreInfo,
     setRankingSegment,
+    isLive,
+    liveSource,
+    lastLiveSyncAt,
     renderHeader,
     refreshing,
     onRefresh,
@@ -170,6 +189,17 @@ export const LeaderboardTab = React.memo(({
                 ListHeaderComponent={() => (
                     <View>
                         {renderHeader && renderHeader()}
+                        <View style={{ marginBottom: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isLive ? colors.green : colors.red }} />
+                                <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>
+                                    {isLive ? `LIVE · ${liveSource === 'sse' ? 'SSE' : 'POLLING'}` : 'RECONNECTING'}
+                                </Text>
+                            </View>
+                            <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 11 }}>
+                                {syncLabel(lastLiveSyncAt)}
+                            </Text>
+                        </View>
                         <View style={styles.rankingHeader}>
                             <View style={styles.rankingSegmentRow}>
                                 {(['weekly', 'monthly', 'lifetime'] as const).map((seg) => (

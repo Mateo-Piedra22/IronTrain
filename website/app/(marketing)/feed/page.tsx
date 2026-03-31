@@ -1,10 +1,13 @@
 import { and, desc, eq, inArray, isNull, or } from 'drizzle-orm';
 import {
+    Activity,
     ChevronRight,
     Clock,
+    Flame,
     Globe,
     Plus,
     ShoppingBag,
+    Trophy,
     User
 } from 'lucide-react';
 import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
@@ -21,6 +24,14 @@ import { ExperimentWrapper } from '../../components/PostHogFeatures';
 // Force dynamic rendering since we want real-time social feed
 export const revalidate = 0;
 
+const parseActivityMetadata = (metadata: unknown): { metadata: Record<string, unknown> | null; value: unknown } => {
+    const obj = (typeof metadata === 'object' && metadata !== null)
+        ? metadata as Record<string, unknown>
+        : null;
+    const value = obj?.prValue ?? obj?.pointsAwarded ?? obj?.durationMin;
+    return { metadata: obj, value };
+};
+
 export default async function RoutineFeedPage(props: { searchParams: Promise<{ view?: string }> }) {
     noStore();
     const sp = await props.searchParams;
@@ -29,6 +40,12 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
 
     const h = await headers();
     const currentUserId = await verifyAuthFromHeaders(h);
+
+    const actionLabel = (actionType: string) => {
+        if (actionType === 'pr_broken') return 'PR BATIDO';
+        if (actionType === 'routine_shared') return 'RUTINA COMPARTIDA';
+        return 'WORKOUT COMPLETADO';
+    };
 
     // Fetch public routines with user profile usernames and scores
     const publicRoutinesData = await db.select({
@@ -54,6 +71,27 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
             )
         )
         .orderBy(desc(schema.routines.updatedAt));
+
+    const recentSocialActivity = await db.select({
+        id: schema.activityFeed.id,
+        actionType: schema.activityFeed.actionType,
+        metadata: schema.activityFeed.metadata,
+        createdAt: schema.activityFeed.createdAt,
+        kudoCount: schema.activityFeed.kudoCount,
+        username: schema.userProfiles.username,
+        displayName: schema.userProfiles.displayName,
+        scoreLifetime: schema.userProfiles.scoreLifetime,
+    })
+        .from(schema.activityFeed)
+        .leftJoin(schema.userProfiles, eq(schema.activityFeed.userId, schema.userProfiles.id))
+        .where(
+            and(
+                isNull(schema.activityFeed.deletedAt),
+                eq(schema.userProfiles.isPublic, true)
+            )
+        )
+        .orderBy(desc(schema.activityFeed.createdAt))
+        .limit(12);
 
     // Fetch Marketplace Data
     const officialExercises = await db.query.exercises.findMany({
@@ -146,7 +184,37 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                             <p className="text-[9px] font-bold opacity-30 uppercase tracking-[0.3em]">No hay transmisiones públicas activas en este momento.</p>
                         </div>
                     ) : (
-                        <div className="grid gap-6">
+                        <div className="grid gap-8">
+                            {recentSocialActivity.length > 0 && (
+                                <section className="border-2 border-[#1a1a2e] bg-white p-6 md:p-8">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h2 className="text-[10px] font-black uppercase tracking-[0.25em] opacity-60">SOCIAL_ACTIVITY_STREAM</h2>
+                                        <Activity className="w-4 h-4 opacity-40" />
+                                    </div>
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        {recentSocialActivity.map((entry) => {
+                                            const { metadata, value } = parseActivityMetadata(entry.metadata);
+                                            return (
+                                                <div key={entry.id} className="border border-[#1a1a2e]/20 p-4">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <div className="text-[9px] font-black uppercase tracking-[0.2em]">{actionLabel(entry.actionType)}</div>
+                                                        <div className="text-[9px] font-bold opacity-40">{new Date(entry.createdAt || new Date()).toLocaleDateString('es-AR')}</div>
+                                                    </div>
+                                                    <div className="text-sm font-black uppercase tracking-tight">
+                                                        @{entry.username || entry.displayName || 'athlete'}
+                                                    </div>
+                                                    <div className="flex items-center gap-4 mt-3 text-[10px] font-bold uppercase tracking-[0.15em] opacity-60">
+                                                        <span className="flex items-center gap-1"><Flame className="w-3.5 h-3.5" /> {entry.kudoCount || 0} KUDOS</span>
+                                                        <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" /> SCORE {entry.scoreLifetime || 0}</span>
+                                                        {value !== undefined && value !== null && <span>VALOR {String(value)}</span>}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </section>
+                            )}
+
                             {publicRoutinesData.map((routine: any) => (
                                 <ExperimentWrapper key={routine.id}>
                                     <Link

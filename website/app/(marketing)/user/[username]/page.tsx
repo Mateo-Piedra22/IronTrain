@@ -127,6 +127,27 @@ export default async function UserProfilePage(props: {
         .groupBy(schema.scoreEvents.eventType)
         .orderBy(desc(sql`sum(${schema.scoreEvents.pointsAwarded})`));
 
+    const recentActivity = (isPrivate && !isOwner) ? [] : await db.select({
+        id: schema.activityFeed.id,
+        actionType: schema.activityFeed.actionType,
+        metadata: schema.activityFeed.metadata,
+        createdAt: schema.activityFeed.createdAt,
+        kudoCount: schema.activityFeed.kudoCount,
+    })
+        .from(schema.activityFeed)
+        .where(and(
+            eq(schema.activityFeed.userId, profile.id),
+            isNull(schema.activityFeed.deletedAt)
+        ))
+        .orderBy(desc(schema.activityFeed.createdAt))
+        .limit(8);
+
+    const activityLabel = (actionType: string) => {
+        if (actionType === 'pr_broken') return 'PR roto';
+        if (actionType === 'routine_shared') return 'Rutina compartida';
+        return 'Workout completado';
+    };
+
     return (
         <main className="min-h-screen bg-[#f5f1e8] text-[#1a1a2e] selection:bg-[#1a1a2e] selection:text-[#f5f1e8]">
             {/* Profile Header */}
@@ -234,6 +255,41 @@ export default async function UserProfilePage(props: {
                     </section>
 
                     {/* Routines section */}
+                    <section className="py-20 lg:py-24 border-t border-[#1a1a2e]/5">
+                        <div className="container mx-auto px-4 max-w-5xl">
+                            <div className="flex items-center gap-4 mb-12">
+                                <div className="h-px bg-[#1a1a2e] flex-1 opacity-20"></div>
+                                <h2 className="text-sm font-black uppercase tracking-[0.5em] opacity-60 italic">SOCIAL_ACTIVITY</h2>
+                                <div className="h-px bg-[#1a1a2e] flex-1 opacity-20"></div>
+                            </div>
+
+                            {recentActivity.length === 0 ? (
+                                <div className="text-center py-16 border-2 border-[#1a1a2e] border-dashed bg-white/50">
+                                    <div className="text-[10px] font-black uppercase tracking-[0.3em] opacity-30">NO_ACTIVITY_LOGS</div>
+                                </div>
+                            ) : (
+                                <div className="grid md:grid-cols-2 gap-6">
+                                    {recentActivity.map((entry) => {
+                                        const metadata = (typeof entry.metadata === 'object' && entry.metadata !== null) ? entry.metadata as Record<string, unknown> : null;
+                                        const value = metadata?.prValue ?? metadata?.pointsAwarded ?? metadata?.durationMin;
+                                        return (
+                                            <article key={entry.id} className="border-2 border-[#1a1a2e] p-6 bg-white shadow-[8px_8px_0px_0px_rgba(26,26,46,0.03)]">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <div className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70">{activityLabel(entry.actionType)}</div>
+                                                    <div className="text-[10px] font-bold opacity-40">{new Date(entry.createdAt || new Date()).toLocaleDateString('es-AR')}</div>
+                                                </div>
+                                                <div className="text-xs font-bold uppercase tracking-[0.15em] opacity-60">KUDOS: {entry.kudoCount || 0}</div>
+                                                {value !== undefined && value !== null && (
+                                                    <div className="mt-3 text-3xl font-black tracking-tighter">{String(value)}</div>
+                                                )}
+                                            </article>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </section>
+
                     <section className="py-20 lg:py-24">
                         <div className="container mx-auto px-4 max-w-5xl">
                             <div className="flex items-center gap-4 mb-12">
