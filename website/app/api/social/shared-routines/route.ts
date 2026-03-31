@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, or } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '../../../../src/db';
@@ -53,6 +53,26 @@ export async function GET(req: NextRequest) {
             );
 
         const workspaceById = new Map(workspaces.map((workspace) => [workspace.id, workspace]));
+        const pendingRows = sharedRoutineIds.length > 0
+            ? await db
+                .select({
+                    sharedRoutineId: schema.sharedRoutineReviewRequests.sharedRoutineId,
+                    pendingCount: sql<number>`count(*)::int`,
+                })
+                .from(schema.sharedRoutineReviewRequests)
+                .where(
+                    and(
+                        inArray(schema.sharedRoutineReviewRequests.sharedRoutineId, sharedRoutineIds),
+                        eq(schema.sharedRoutineReviewRequests.status, 'pending'),
+                        isNull(schema.sharedRoutineReviewRequests.deletedAt),
+                    ),
+                )
+                .groupBy(schema.sharedRoutineReviewRequests.sharedRoutineId)
+            : [];
+
+        const pendingByWorkspaceId = new Map(
+            pendingRows.map((row) => [row.sharedRoutineId, Number(row.pendingCount) || 0]),
+        );
 
         const items = memberships
             .map((membership) => {
@@ -76,6 +96,7 @@ export async function GET(req: NextRequest) {
                         role: membership.role,
                         canEdit: derivedCanEdit,
                     },
+                    pendingReviewsCount: pendingByWorkspaceId.get(workspace.id) ?? 0,
                     updatedAt: workspace.updatedAt,
                 };
             })
@@ -150,9 +171,140 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        const now = new Date();
+
+        const [existingWorkspace] = await db
+            .select()
+            .from(schema.sharedRoutines)
+            .where(
+                and(
+                    eq(schema.sharedRoutines.ownerId, userId),
+                    eq(schema.sharedRoutines.sourceRoutineId, routineId),
+                    isNull(schema.sharedRoutines.deletedAt),
+                ),
+            )
+            .limit(1);
+
+        if (existingWorkspace) {
+            const normalizedTitle = title?.trim() || (payload.routine as Record<string, unknown>)?.name as string || existingWorkspace.title;
+
+            await db.transaction(async (tx) => {
+                await tx.update(schema.sharedRoutines).set({
+                    title: normalizedTitle,
+                    editMode,
+                    approvalMode,
+                    updatedAt: now,
+                }).where(eq(schema.sharedRoutines.id, existingWorkspace.id));
+
+                const [ownerMembership] = await tx
+                    .select()
+                    .from(schema.sharedRoutineMembers)
+                    .where(
+                        and(
+                            eq(schema.sharedRoutineMembers.sharedRoutineId, existingWorkspace.id),
+                            eq(schema.sharedRoutineMembers.userId, userId),
+                        ),
+                    )
+                    .limit(1);
+
+                if (ownerMembership) {
+                    await tx.update(schema.sharedRoutineMembers).set({
+                        role: 'owner',
+                        canEdit: true,
+                        invitedBy: userId,
+                        deletedAt: null,
+                        updatedAt: now,
+                    }).where(eq(schema.sharedRoutineMembers.id, ownerMembership.id));
+                } else {
+                    await tx.insert(schema.sharedRoutineMembers).values({
+                        id: crypto.randomUUID(),
+                        sharedRoutineId: existingWorkspace.id,
+                        userId,
+                        role: 'owner',
+                        canEdit: true,
+                        invitedBy: userId,
+                        joinedAt: now,
+                        updatedAt: now,
+                    });
+                }
+
+                for (const memberId of memberIds) {
+                    const [existingMember] = await tx
+                        .select()
+                        .from(schema.sharedRoutineMembers)
+                        .where(
+                            and(
+                                eq(schema.sharedRoutineMembers.sharedRoutineId, existingWorkspace.id),
+                                eq(schema.sharedRoutineMembers.userId, memberId),
+                            ),
+                        )
+                        .limit(1);
+
+                    const targetRole = editMode === 'collaborative' ? 'editor' : 'viewer';
+                    const targetCanEdit = editMode === 'collaborative';
+
+                    if (existingMember) {
+                        await tx.update(schema.sharedRoutineMembers).set({
+                            role: targetRole,
+                            canEdit: targetCanEdit,
+                            invitedBy: userId,
+                            deletedAt: null,
+                            updatedAt: now,
+                        }).where(eq(schema.sharedRoutineMembers.id, existingMember.id));
+                    } else {
+                        await tx.insert(schema.sharedRoutineMembers).values({
+                            id: crypto.randomUUID(),
+                            sharedRoutineId: existingWorkspace.id,
+                            userId: memberId,
+                            role: targetRole,
+                            canEdit: targetCanEdit,
+                            invitedBy: userId,
+                            joinedAt: now,
+                            updatedAt: now,
+                        });
+                    }
+                }
+
+                await tx.insert(schema.sharedRoutineChanges).values({
+                    id: crypto.randomUUID(),
+                    sharedRoutineId: existingWorkspace.id,
+                    actorId: userId,
+                    actionType: 'reconfigured',
+                    metadata: {
+                        routineId,
+                        requestedMemberCount: memberIds.length + 1,
+                        editMode,
+                        approvalMode,
+                        entities: payloadSummary,
+                    },
+                    createdAt: now,
+                    updatedAt: now,
+                });
+            });
+
+            const [memberCountRow] = await db
+                .select({
+                    memberCount: sql<number>`count(*)::int`,
+                })
+                .from(schema.sharedRoutineMembers)
+                .where(
+                    and(
+                        eq(schema.sharedRoutineMembers.sharedRoutineId, existingWorkspace.id),
+                        isNull(schema.sharedRoutineMembers.deletedAt),
+                    ),
+                );
+
+            return NextResponse.json({
+                success: true,
+                sharedRoutineId: existingWorkspace.id,
+                revision: existingWorkspace.currentRevision,
+                members: Number(memberCountRow?.memberCount) || 1,
+                reused: true,
+            });
+        }
+
         const sharedRoutineId = crypto.randomUUID();
         const snapshotId = crypto.randomUUID();
-        const now = new Date();
 
         await db.transaction(async (tx) => {
             await tx.insert(schema.sharedRoutines).values({
@@ -225,6 +377,7 @@ export async function POST(req: NextRequest) {
             sharedRoutineId,
             revision: 1,
             members: memberIds.length + 1,
+            reused: false,
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Internal server error';
