@@ -155,6 +155,11 @@ export const RATE_LIMITS = {
         limit: 20,
         windowMs: 60000,
     }),
+    SOCIAL_FRIENDS_READ: createRateLimiter({
+        action: 'social:friends:read',
+        limit: 60,
+        windowMs: 60000,
+    }),
     SOCIAL_INBOX_SEND: createRateLimiter({
         action: 'social:inbox:send',
         limit: 10,
@@ -228,6 +233,16 @@ export const RATE_LIMITS = {
     SOCIAL_WEATHER_HISTORY: createRateLimiter({
         action: 'social:weather:history',
         limit: 30,
+        windowMs: 60000,
+    }),
+    SOCIAL_SHARED_ROUTINES_READ: createRateLimiter({
+        action: 'social:shared-routines:read',
+        limit: 60,
+        windowMs: 60000,
+    }),
+    SOCIAL_SHARED_ROUTINES_WRITE: createRateLimiter({
+        action: 'social:shared-routines:write',
+        limit: 20,
         windowMs: 60000,
     }),
 

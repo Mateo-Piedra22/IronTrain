@@ -8,6 +8,7 @@ import { runDbTransaction } from '../../../../../src/lib/db-transaction';
 import { recordEndpointMetric } from '../../../../../src/lib/endpoint-metrics';
 import { logger } from '../../../../../src/lib/logger';
 import { RATE_LIMITS } from '../../../../../src/lib/rate-limit';
+import { sharedRoutinePayloadSchema } from '../../../../../src/lib/shared-routine-payload';
 import { formatActorName, getUserBrief, notifyUserById } from '../../../../../src/lib/social-notifications';
 
 const MAX_PAYLOAD_SIZE = 1_000_000; // 1MB max payload
@@ -15,7 +16,7 @@ const MAX_PAYLOAD_SIZE = 1_000_000; // 1MB max payload
 const inboxSendSchema = z.object({
     friendId: z.string().trim().min(1),
     type: z.literal('routine'),
-    payload: z.record(z.string(), z.unknown()),
+    payload: z.unknown(),
 });
 
 export async function POST(req: NextRequest) {
@@ -48,6 +49,14 @@ export async function POST(req: NextRequest) {
         }
         const { friendId, payload, type } = parsed.data;
 
+        const parsedPayload = sharedRoutinePayloadSchema.safeParse(payload);
+        if (!parsedPayload.success) {
+            recordEndpointMetric({ endpoint: 'social.inbox.send', outcome: 'error', statusCode: 400, event: 'invalid_payload' });
+            return NextResponse.json({ error: 'Invalid routine payload', details: parsedPayload.error.flatten() }, { status: 400 });
+        }
+
+        const safePayload = parsedPayload.data;
+
         if (userId === friendId) {
             recordEndpointMetric({ endpoint: 'social.inbox.send', outcome: 'error', statusCode: 400, event: 'self_target' });
             return NextResponse.json({ error: 'Cannot send to yourself' }, { status: 400 });
@@ -73,7 +82,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Serialize and validate payload size
-        const payloadStr = JSON.stringify(payload);
+        const payloadStr = JSON.stringify(safePayload);
         if (payloadStr.length > MAX_PAYLOAD_SIZE) {
             recordEndpointMetric({ endpoint: 'social.inbox.send', outcome: 'error', statusCode: 413, event: 'payload_too_large' });
             return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
@@ -116,9 +125,10 @@ export async function POST(req: NextRequest) {
 
         const newId = crypto.randomUUID();
         const activityId = crypto.randomUUID();
+        const routineObject = safePayload.routine;
         const routineName =
-            typeof (payload as { routine?: { name?: unknown } }).routine?.name === 'string'
-                ? (payload as { routine: { name: string } }).routine.name.slice(0, 120)
+            routineObject && typeof routineObject.name === 'string'
+                ? routineObject.name.slice(0, 120)
                 : null;
 
         await runDbTransaction(async (trx) => {

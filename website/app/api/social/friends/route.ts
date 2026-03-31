@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
         if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         // Rate limiting
-        const rateLimit = await RATE_LIMITS.SOCIAL_SEARCH(userId);
+        const rateLimit = await RATE_LIMITS.SOCIAL_FRIENDS_READ(userId);
         if (!rateLimit.ok) {
             return NextResponse.json(
                 { error: 'Too many requests. Please try again later.' },

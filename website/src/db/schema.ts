@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { bigint, boolean, index, integer, jsonb, pgTable, real, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, boolean, index, integer, jsonb, pgTable, real, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 const commonFields = {
     userId: text('user_id').notNull(),
@@ -128,6 +128,101 @@ export const routineExercises = pgTable('routine_exercises', {
 }, (table) => ({
     dayOrderIdx: index('routine_exercises_day_order_idx').on(table.routineDayId, table.orderIndex),
     dayDeletedIdx: index('routine_exercises_day_deleted_idx').on(table.routineDayId, table.deletedAt),
+}));
+
+export const sharedRoutines = pgTable('shared_routines', {
+    id: text('id').primaryKey(),
+    ownerId: text('owner_id').notNull(),
+    title: text('title').notNull(),
+    sourceRoutineId: text('source_routine_id'),
+    editMode: text('edit_mode').notNull().default('owner_only'), // owner_only | collaborative
+    approvalMode: text('approval_mode').notNull().default('none'), // none | owner_review
+    currentSnapshotId: text('current_snapshot_id'),
+    currentRevision: integer('current_revision').notNull().default(1),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+    ownerUpdatedIdx: index('shared_routines_owner_updated_idx').on(table.ownerId, table.updatedAt),
+    ownerDeletedIdx: index('shared_routines_owner_deleted_idx').on(table.ownerId, table.deletedAt),
+}));
+
+export const sharedRoutineMembers = pgTable('shared_routine_members', {
+    id: text('id').primaryKey(),
+    sharedRoutineId: text('shared_routine_id').notNull(),
+    userId: text('user_id').notNull(),
+    role: text('role').notNull().default('viewer'), // owner | editor | viewer
+    canEdit: boolean('can_edit').notNull().default(false),
+    invitedBy: text('invited_by'),
+    joinedAt: timestamp('joined_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+    userDeletedIdx: index('shared_routine_members_user_deleted_idx').on(table.userId, table.deletedAt),
+    routineDeletedIdx: index('shared_routine_members_routine_deleted_idx').on(table.sharedRoutineId, table.deletedAt),
+    uniqueMemberIdx: uniqueIndex('shared_routine_members_unique_member_idx').on(table.sharedRoutineId, table.userId),
+}));
+
+export const sharedRoutineSnapshots = pgTable('shared_routine_snapshots', {
+    id: text('id').primaryKey(),
+    sharedRoutineId: text('shared_routine_id').notNull(),
+    revision: integer('revision').notNull(),
+    payload: jsonb('payload').notNull(),
+    createdBy: text('created_by').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+    routineRevisionIdx: uniqueIndex('shared_routine_snapshots_routine_revision_idx').on(table.sharedRoutineId, table.revision),
+    routineCreatedIdx: index('shared_routine_snapshots_routine_created_idx').on(table.sharedRoutineId, table.createdAt),
+}));
+
+export const sharedRoutineChanges = pgTable('shared_routine_changes', {
+    id: text('id').primaryKey(),
+    sharedRoutineId: text('shared_routine_id').notNull(),
+    snapshotId: text('snapshot_id'),
+    actorId: text('actor_id').notNull(),
+    actionType: text('action_type').notNull(), // created | owner_sync | member_joined | member_removed
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+    routineCreatedIdx: index('shared_routine_changes_routine_created_idx').on(table.sharedRoutineId, table.createdAt),
+    actorCreatedIdx: index('shared_routine_changes_actor_created_idx').on(table.actorId, table.createdAt),
+}));
+
+export const sharedRoutineComments = pgTable('shared_routine_comments', {
+    id: text('id').primaryKey(),
+    sharedRoutineId: text('shared_routine_id').notNull(),
+    actorId: text('actor_id').notNull(),
+    snapshotId: text('snapshot_id'),
+    message: text('message').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+    routineCreatedIdx: index('shared_routine_comments_routine_created_idx').on(table.sharedRoutineId, table.createdAt),
+    actorCreatedIdx: index('shared_routine_comments_actor_created_idx').on(table.actorId, table.createdAt),
+}));
+
+export const sharedRoutineReviewRequests = pgTable('shared_routine_review_requests', {
+    id: text('id').primaryKey(),
+    sharedRoutineId: text('shared_routine_id').notNull(),
+    requesterId: text('requester_id').notNull(),
+    requestedBaseRevision: integer('requested_base_revision').notNull(),
+    candidatePayload: jsonb('candidate_payload').notNull(),
+    sourceRoutineId: text('source_routine_id'),
+    status: text('status').notNull().default('pending'), // pending | approved | rejected | cancelled
+    decidedBy: text('decided_by'),
+    decidedAt: timestamp('decided_at'),
+    decisionNote: text('decision_note'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+    routineStatusCreatedIdx: index('shared_routine_review_requests_routine_status_created_idx').on(table.sharedRoutineId, table.status, table.createdAt),
+    requesterCreatedIdx: index('shared_routine_review_requests_requester_created_idx').on(table.requesterId, table.createdAt),
 }));
 
 export const measurements = pgTable('measurements', {
