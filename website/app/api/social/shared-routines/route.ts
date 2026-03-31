@@ -12,6 +12,8 @@ const createSharedRoutineSchema = z.object({
     routineId: z.string().trim().min(1),
     title: z.string().trim().min(2).max(120).optional(),
     memberIds: z.array(z.string().trim().min(1)).max(12).default([]),
+    memberRoles: z.record(z.string().trim().min(1), z.enum(['editor', 'viewer'])).default({}),
+    removeMissingMembers: z.boolean().default(true),
     editMode: z.enum(['owner_only', 'collaborative']).default('owner_only'),
     approvalMode: z.enum(['none', 'owner_review']).default('none'),
 });
@@ -130,6 +132,8 @@ export async function POST(req: NextRequest) {
         const editMode = parsed.data.editMode;
         const approvalMode = parsed.data.approvalMode;
         const memberIds = Array.from(new Set(parsed.data.memberIds.filter((id) => id !== userId)));
+        const memberRoles = parsed.data.memberRoles ?? {};
+        const removeMissingMembers = parsed.data.removeMissingMembers ?? true;
 
         const payload = await buildRoutineSharePayloadForUser(db, userId, routineId);
         const payloadSummary = summarizeSharedRoutinePayload(payload as Record<string, unknown>);
@@ -240,8 +244,9 @@ export async function POST(req: NextRequest) {
                         )
                         .limit(1);
 
-                    const targetRole = editMode === 'collaborative' ? 'editor' : 'viewer';
-                    const targetCanEdit = editMode === 'collaborative';
+                    const requestedRole = memberRoles[memberId];
+                    const targetRole = requestedRole ?? (editMode === 'collaborative' ? 'editor' : 'viewer');
+                    const targetCanEdit = targetRole === 'editor';
 
                     if (existingMember) {
                         await tx.update(schema.sharedRoutineMembers).set({
@@ -265,6 +270,29 @@ export async function POST(req: NextRequest) {
                     }
                 }
 
+                if (removeMissingMembers) {
+                    const existingMembers = await tx
+                        .select()
+                        .from(schema.sharedRoutineMembers)
+                        .where(
+                            and(
+                                eq(schema.sharedRoutineMembers.sharedRoutineId, existingSharedSpace.id),
+                                isNull(schema.sharedRoutineMembers.deletedAt),
+                            ),
+                        );
+
+                    for (const existingMember of existingMembers) {
+                        if (existingMember.userId === userId) continue;
+                        if (memberIds.includes(existingMember.userId)) continue;
+
+                        await tx.update(schema.sharedRoutineMembers).set({
+                            canEdit: false,
+                            deletedAt: now,
+                            updatedAt: now,
+                        }).where(eq(schema.sharedRoutineMembers.id, existingMember.id));
+                    }
+                }
+
                 await tx.insert(schema.sharedRoutineChanges).values({
                     id: crypto.randomUUID(),
                     sharedRoutineId: existingSharedSpace.id,
@@ -273,6 +301,7 @@ export async function POST(req: NextRequest) {
                     metadata: {
                         routineId,
                         requestedMemberCount: memberIds.length + 1,
+                        removeMissingMembers,
                         editMode,
                         approvalMode,
                         entities: payloadSummary,
@@ -332,12 +361,15 @@ export async function POST(req: NextRequest) {
             });
 
             for (const memberId of memberIds) {
+                const requestedRole = memberRoles[memberId];
+                const targetRole = requestedRole ?? (editMode === 'collaborative' ? 'editor' : 'viewer');
+                const targetCanEdit = targetRole === 'editor';
                 await tx.insert(schema.sharedRoutineMembers).values({
                     id: crypto.randomUUID(),
                     sharedRoutineId,
                     userId: memberId,
-                    role: editMode === 'collaborative' ? 'editor' : 'viewer',
-                    canEdit: editMode === 'collaborative',
+                    role: targetRole,
+                    canEdit: targetCanEdit,
                     invitedBy: userId,
                     joinedAt: now,
                     updatedAt: now,

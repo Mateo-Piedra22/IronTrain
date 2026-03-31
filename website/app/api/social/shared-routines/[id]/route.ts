@@ -85,6 +85,24 @@ export async function GET(
             return NextResponse.json({ error: 'No snapshot found' }, { status: 404 });
         }
 
+        const members = await db
+            .select({
+                userId: schema.sharedRoutineMembers.userId,
+                role: schema.sharedRoutineMembers.role,
+                canEdit: schema.sharedRoutineMembers.canEdit,
+                joinedAt: schema.sharedRoutineMembers.joinedAt,
+                displayName: schema.userProfiles.displayName,
+                username: schema.userProfiles.username,
+            })
+            .from(schema.sharedRoutineMembers)
+            .leftJoin(schema.userProfiles, eq(schema.userProfiles.id, schema.sharedRoutineMembers.userId))
+            .where(
+                and(
+                    eq(schema.sharedRoutineMembers.sharedRoutineId, id),
+                    isNull(schema.sharedRoutineMembers.deletedAt),
+                ),
+            );
+
         return NextResponse.json({
             success: true,
             workspace: {
@@ -101,6 +119,14 @@ export async function GET(
                 role: membership.role,
                 canEdit: membership.role === 'owner' || membership.canEdit,
             },
+            members: members.map((member) => ({
+                userId: member.userId,
+                role: member.role,
+                canEdit: member.role === 'owner' || !!member.canEdit,
+                joinedAt: member.joinedAt,
+                displayName: member.displayName,
+                username: member.username,
+            })),
             snapshot: {
                 id: snapshot.id,
                 revision: snapshot.revision,
