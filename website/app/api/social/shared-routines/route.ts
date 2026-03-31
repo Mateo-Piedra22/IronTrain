@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
 
         const sharedRoutineIds = memberships.map((membership) => membership.sharedRoutineId);
 
-        const workspaces = await db
+        const sharedSpaces = await db
             .select()
             .from(schema.sharedRoutines)
             .where(
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
                 ),
             );
 
-        const workspaceById = new Map(workspaces.map((workspace) => [workspace.id, workspace]));
+        const sharedSpaceById = new Map(sharedSpaces.map((sharedSpace) => [sharedSpace.id, sharedSpace]));
         const pendingRows = sharedRoutineIds.length > 0
             ? await db
                 .select({
@@ -70,34 +70,34 @@ export async function GET(req: NextRequest) {
                 .groupBy(schema.sharedRoutineReviewRequests.sharedRoutineId)
             : [];
 
-        const pendingByWorkspaceId = new Map(
+        const pendingBySharedSpaceId = new Map(
             pendingRows.map((row) => [row.sharedRoutineId, Number(row.pendingCount) || 0]),
         );
 
         const items = memberships
             .map((membership) => {
-                const workspace = workspaceById.get(membership.sharedRoutineId);
-                if (!workspace) return null;
+                const sharedSpace = sharedSpaceById.get(membership.sharedRoutineId);
+                if (!sharedSpace) return null;
 
                 const derivedCanEdit =
                     membership.role === 'owner' ||
                     membership.canEdit ||
-                    (workspace.editMode === 'collaborative' && membership.role === 'editor');
+                    (sharedSpace.editMode === 'collaborative' && membership.role === 'editor');
 
                 return {
-                    id: workspace.id,
-                    title: workspace.title,
-                    ownerId: workspace.ownerId,
-                    editMode: workspace.editMode,
-                    approvalMode: workspace.approvalMode,
-                    currentRevision: workspace.currentRevision,
-                    sourceRoutineId: workspace.sourceRoutineId,
+                    id: sharedSpace.id,
+                    title: sharedSpace.title,
+                    ownerId: sharedSpace.ownerId,
+                    editMode: sharedSpace.editMode,
+                    approvalMode: sharedSpace.approvalMode,
+                    currentRevision: sharedSpace.currentRevision,
+                    sourceRoutineId: sharedSpace.sourceRoutineId,
                     membership: {
                         role: membership.role,
                         canEdit: derivedCanEdit,
                     },
-                    pendingReviewsCount: pendingByWorkspaceId.get(workspace.id) ?? 0,
-                    updatedAt: workspace.updatedAt,
+                    pendingReviewsCount: pendingBySharedSpaceId.get(sharedSpace.id) ?? 0,
+                    updatedAt: sharedSpace.updatedAt,
                 };
             })
             .filter(Boolean);
@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
 
         const now = new Date();
 
-        const [existingWorkspace] = await db
+        const [existingSharedSpace] = await db
             .select()
             .from(schema.sharedRoutines)
             .where(
@@ -185,8 +185,8 @@ export async function POST(req: NextRequest) {
             )
             .limit(1);
 
-        if (existingWorkspace) {
-            const normalizedTitle = title?.trim() || (payload.routine as Record<string, unknown>)?.name as string || existingWorkspace.title;
+        if (existingSharedSpace) {
+            const normalizedTitle = title?.trim() || (payload.routine as Record<string, unknown>)?.name as string || existingSharedSpace.title;
 
             await db.transaction(async (tx) => {
                 await tx.update(schema.sharedRoutines).set({
@@ -194,14 +194,14 @@ export async function POST(req: NextRequest) {
                     editMode,
                     approvalMode,
                     updatedAt: now,
-                }).where(eq(schema.sharedRoutines.id, existingWorkspace.id));
+                }).where(eq(schema.sharedRoutines.id, existingSharedSpace.id));
 
                 const [ownerMembership] = await tx
                     .select()
                     .from(schema.sharedRoutineMembers)
                     .where(
                         and(
-                            eq(schema.sharedRoutineMembers.sharedRoutineId, existingWorkspace.id),
+                            eq(schema.sharedRoutineMembers.sharedRoutineId, existingSharedSpace.id),
                             eq(schema.sharedRoutineMembers.userId, userId),
                         ),
                     )
@@ -218,7 +218,7 @@ export async function POST(req: NextRequest) {
                 } else {
                     await tx.insert(schema.sharedRoutineMembers).values({
                         id: crypto.randomUUID(),
-                        sharedRoutineId: existingWorkspace.id,
+                        sharedRoutineId: existingSharedSpace.id,
                         userId,
                         role: 'owner',
                         canEdit: true,
@@ -234,7 +234,7 @@ export async function POST(req: NextRequest) {
                         .from(schema.sharedRoutineMembers)
                         .where(
                             and(
-                                eq(schema.sharedRoutineMembers.sharedRoutineId, existingWorkspace.id),
+                                eq(schema.sharedRoutineMembers.sharedRoutineId, existingSharedSpace.id),
                                 eq(schema.sharedRoutineMembers.userId, memberId),
                             ),
                         )
@@ -254,7 +254,7 @@ export async function POST(req: NextRequest) {
                     } else {
                         await tx.insert(schema.sharedRoutineMembers).values({
                             id: crypto.randomUUID(),
-                            sharedRoutineId: existingWorkspace.id,
+                            sharedRoutineId: existingSharedSpace.id,
                             userId: memberId,
                             role: targetRole,
                             canEdit: targetCanEdit,
@@ -267,7 +267,7 @@ export async function POST(req: NextRequest) {
 
                 await tx.insert(schema.sharedRoutineChanges).values({
                     id: crypto.randomUUID(),
-                    sharedRoutineId: existingWorkspace.id,
+                    sharedRoutineId: existingSharedSpace.id,
                     actorId: userId,
                     actionType: 'reconfigured',
                     metadata: {
@@ -289,15 +289,15 @@ export async function POST(req: NextRequest) {
                 .from(schema.sharedRoutineMembers)
                 .where(
                     and(
-                        eq(schema.sharedRoutineMembers.sharedRoutineId, existingWorkspace.id),
+                        eq(schema.sharedRoutineMembers.sharedRoutineId, existingSharedSpace.id),
                         isNull(schema.sharedRoutineMembers.deletedAt),
                     ),
                 );
 
             return NextResponse.json({
                 success: true,
-                sharedRoutineId: existingWorkspace.id,
-                revision: existingWorkspace.currentRevision,
+                sharedRoutineId: existingSharedSpace.id,
+                revision: existingSharedSpace.currentRevision,
                 members: Number(memberCountRow?.memberCount) || 1,
                 reused: true,
             });
