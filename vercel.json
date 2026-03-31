@@ -1,0 +1,4 @@
+{
+  "installCommand": "npm ci --prefix website",
+  "buildCommand": "npm run build --prefix website"
+}
