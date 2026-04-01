@@ -103,6 +103,30 @@ export async function GET(
                 ),
             );
 
+        const pendingInvitations = membership.role === 'owner'
+            ? await db
+                .select({
+                    id: schema.sharedRoutineInvitations.id,
+                    invitedUserId: schema.sharedRoutineInvitations.invitedUserId,
+                    invitedBy: schema.sharedRoutineInvitations.invitedBy,
+                    proposedRole: schema.sharedRoutineInvitations.proposedRole,
+                    status: schema.sharedRoutineInvitations.status,
+                    createdAt: schema.sharedRoutineInvitations.createdAt,
+                    displayName: schema.userProfiles.displayName,
+                    username: schema.userProfiles.username,
+                })
+                .from(schema.sharedRoutineInvitations)
+                .leftJoin(schema.userProfiles, eq(schema.userProfiles.id, schema.sharedRoutineInvitations.invitedUserId))
+                .where(
+                    and(
+                        eq(schema.sharedRoutineInvitations.sharedRoutineId, id),
+                        isNull(schema.sharedRoutineInvitations.deletedAt),
+                    ),
+                )
+                .orderBy(desc(schema.sharedRoutineInvitations.createdAt))
+                .limit(30)
+            : [];
+
         return NextResponse.json({
             success: true,
             workspace: {
@@ -126,6 +150,16 @@ export async function GET(
                 joinedAt: member.joinedAt,
                 displayName: member.displayName,
                 username: member.username,
+            })),
+            pendingInvitations: pendingInvitations.map((invitation) => ({
+                id: invitation.id,
+                invitedUserId: invitation.invitedUserId,
+                invitedBy: invitation.invitedBy,
+                proposedRole: invitation.proposedRole,
+                status: invitation.status,
+                createdAt: invitation.createdAt,
+                displayName: invitation.displayName,
+                username: invitation.username,
             })),
             snapshot: {
                 id: snapshot.id,

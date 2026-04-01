@@ -72,8 +72,28 @@ export async function GET(req: NextRequest) {
                 .groupBy(schema.sharedRoutineReviewRequests.sharedRoutineId)
             : [];
 
+        const pendingInviteRows = sharedRoutineIds.length > 0
+            ? await db
+                .select({
+                    sharedRoutineId: schema.sharedRoutineInvitations.sharedRoutineId,
+                    pendingCount: sql<number>`count(*)::int`,
+                })
+                .from(schema.sharedRoutineInvitations)
+                .where(
+                    and(
+                        inArray(schema.sharedRoutineInvitations.sharedRoutineId, sharedRoutineIds),
+                        eq(schema.sharedRoutineInvitations.status, 'pending'),
+                        isNull(schema.sharedRoutineInvitations.deletedAt),
+                    ),
+                )
+                .groupBy(schema.sharedRoutineInvitations.sharedRoutineId)
+            : [];
+
         const pendingBySharedSpaceId = new Map(
             pendingRows.map((row) => [row.sharedRoutineId, Number(row.pendingCount) || 0]),
+        );
+        const pendingInvitesBySharedSpaceId = new Map(
+            pendingInviteRows.map((row) => [row.sharedRoutineId, Number(row.pendingCount) || 0]),
         );
 
         const items = memberships
@@ -99,6 +119,7 @@ export async function GET(req: NextRequest) {
                         canEdit: derivedCanEdit,
                     },
                     pendingReviewsCount: pendingBySharedSpaceId.get(sharedSpace.id) ?? 0,
+                    pendingInvitationsCount: pendingInvitesBySharedSpaceId.get(sharedSpace.id) ?? 0,
                     updatedAt: sharedSpace.updatedAt,
                 };
             })
@@ -233,40 +254,62 @@ export async function POST(req: NextRequest) {
                 }
 
                 for (const memberId of memberIds) {
-                    const [existingMember] = await tx
+                    const [activeMember] = await tx
                         .select()
                         .from(schema.sharedRoutineMembers)
                         .where(
                             and(
                                 eq(schema.sharedRoutineMembers.sharedRoutineId, existingSharedSpace.id),
                                 eq(schema.sharedRoutineMembers.userId, memberId),
+                                isNull(schema.sharedRoutineMembers.deletedAt),
                             ),
                         )
                         .limit(1);
 
                     const requestedRole = memberRoles[memberId];
-                    const targetRole = requestedRole ?? (editMode === 'collaborative' ? 'editor' : 'viewer');
+                    const targetRole = requestedRole ?? 'viewer';
                     const targetCanEdit = targetRole === 'editor';
 
-                    if (existingMember) {
+                    if (activeMember) {
                         await tx.update(schema.sharedRoutineMembers).set({
                             role: targetRole,
                             canEdit: targetCanEdit,
                             invitedBy: userId,
-                            deletedAt: null,
                             updatedAt: now,
-                        }).where(eq(schema.sharedRoutineMembers.id, existingMember.id));
+                        }).where(eq(schema.sharedRoutineMembers.id, activeMember.id));
                     } else {
-                        await tx.insert(schema.sharedRoutineMembers).values({
-                            id: crypto.randomUUID(),
-                            sharedRoutineId: existingSharedSpace.id,
-                            userId: memberId,
-                            role: targetRole,
-                            canEdit: targetCanEdit,
-                            invitedBy: userId,
-                            joinedAt: now,
-                            updatedAt: now,
-                        });
+                        const [existingInvite] = await tx
+                            .select()
+                            .from(schema.sharedRoutineInvitations)
+                            .where(
+                                and(
+                                    eq(schema.sharedRoutineInvitations.sharedRoutineId, existingSharedSpace.id),
+                                    eq(schema.sharedRoutineInvitations.invitedUserId, memberId),
+                                ),
+                            )
+                            .limit(1);
+
+                        if (existingInvite) {
+                            await tx.update(schema.sharedRoutineInvitations).set({
+                                invitedBy: userId,
+                                proposedRole: targetRole,
+                                status: 'pending',
+                                respondedAt: null,
+                                deletedAt: null,
+                                updatedAt: now,
+                            }).where(eq(schema.sharedRoutineInvitations.id, existingInvite.id));
+                        } else {
+                            await tx.insert(schema.sharedRoutineInvitations).values({
+                                id: crypto.randomUUID(),
+                                sharedRoutineId: existingSharedSpace.id,
+                                invitedUserId: memberId,
+                                invitedBy: userId,
+                                proposedRole: targetRole,
+                                status: 'pending',
+                                createdAt: now,
+                                updatedAt: now,
+                            });
+                        }
                     }
                 }
 
@@ -291,6 +334,27 @@ export async function POST(req: NextRequest) {
                             updatedAt: now,
                         }).where(eq(schema.sharedRoutineMembers.id, existingMember.id));
                     }
+
+                    const pendingInvites = await tx
+                        .select()
+                        .from(schema.sharedRoutineInvitations)
+                        .where(
+                            and(
+                                eq(schema.sharedRoutineInvitations.sharedRoutineId, existingSharedSpace.id),
+                                eq(schema.sharedRoutineInvitations.status, 'pending'),
+                                isNull(schema.sharedRoutineInvitations.deletedAt),
+                            ),
+                        );
+
+                    for (const invite of pendingInvites) {
+                        if (memberIds.includes(invite.invitedUserId)) continue;
+
+                        await tx.update(schema.sharedRoutineInvitations).set({
+                            status: 'cancelled',
+                            respondedAt: now,
+                            updatedAt: now,
+                        }).where(eq(schema.sharedRoutineInvitations.id, invite.id));
+                    }
                 }
 
                 await tx.insert(schema.sharedRoutineChanges).values({
@@ -301,6 +365,7 @@ export async function POST(req: NextRequest) {
                     metadata: {
                         routineId,
                         requestedMemberCount: memberIds.length + 1,
+                        invitationRequiredForNewMembers: true,
                         removeMissingMembers,
                         editMode,
                         approvalMode,
@@ -323,11 +388,25 @@ export async function POST(req: NextRequest) {
                     ),
                 );
 
+            const [pendingInvitesRow] = await db
+                .select({
+                    pendingInvites: sql<number>`count(*)::int`,
+                })
+                .from(schema.sharedRoutineInvitations)
+                .where(
+                    and(
+                        eq(schema.sharedRoutineInvitations.sharedRoutineId, existingSharedSpace.id),
+                        eq(schema.sharedRoutineInvitations.status, 'pending'),
+                        isNull(schema.sharedRoutineInvitations.deletedAt),
+                    ),
+                );
+
             return NextResponse.json({
                 success: true,
                 sharedRoutineId: existingSharedSpace.id,
                 revision: existingSharedSpace.currentRevision,
                 members: Number(memberCountRow?.memberCount) || 1,
+                pendingInvitations: Number(pendingInvitesRow?.pendingInvites) || 0,
                 reused: true,
             });
         }
@@ -362,16 +441,16 @@ export async function POST(req: NextRequest) {
 
             for (const memberId of memberIds) {
                 const requestedRole = memberRoles[memberId];
-                const targetRole = requestedRole ?? (editMode === 'collaborative' ? 'editor' : 'viewer');
-                const targetCanEdit = targetRole === 'editor';
-                await tx.insert(schema.sharedRoutineMembers).values({
+                const targetRole = requestedRole ?? 'viewer';
+                await tx.insert(schema.sharedRoutineInvitations).values({
                     id: crypto.randomUUID(),
                     sharedRoutineId,
-                    userId: memberId,
-                    role: targetRole,
-                    canEdit: targetCanEdit,
+                    invitedUserId: memberId,
                     invitedBy: userId,
-                    joinedAt: now,
+                    proposedRole: targetRole,
+                    status: 'pending',
+                    respondedAt: null,
+                    createdAt: now,
                     updatedAt: now,
                 });
             }
@@ -394,7 +473,8 @@ export async function POST(req: NextRequest) {
                 actionType: 'created',
                 metadata: {
                     routineId,
-                    memberCount: memberIds.length + 1,
+                    memberCount: 1,
+                    pendingInvitations: memberIds.length,
                     editMode,
                     approvalMode,
                     entities: payloadSummary,
@@ -408,7 +488,8 @@ export async function POST(req: NextRequest) {
             success: true,
             sharedRoutineId,
             revision: 1,
-            members: memberIds.length + 1,
+            members: 1,
+            pendingInvitations: memberIds.length,
             reused: false,
         });
     } catch (error) {

@@ -163,6 +163,23 @@ export const sharedRoutineMembers = pgTable('shared_routine_members', {
     uniqueMemberIdx: uniqueIndex('shared_routine_members_unique_member_idx').on(table.sharedRoutineId, table.userId),
 }));
 
+export const sharedRoutineInvitations = pgTable('shared_routine_invitations', {
+    id: text('id').primaryKey(),
+    sharedRoutineId: text('shared_routine_id').notNull(),
+    invitedUserId: text('invited_user_id').notNull(),
+    invitedBy: text('invited_by').notNull(),
+    proposedRole: text('proposed_role').notNull().default('viewer'), // editor | viewer
+    status: text('status').notNull().default('pending'), // pending | accepted | rejected | cancelled
+    respondedAt: timestamp('responded_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+    invitedUserStatusIdx: index('shared_routine_invites_user_status_idx').on(table.invitedUserId, table.status),
+    routineStatusIdx: index('shared_routine_invites_routine_status_idx').on(table.sharedRoutineId, table.status),
+    uniqueInviteIdx: uniqueIndex('shared_routine_invites_unique_idx').on(table.sharedRoutineId, table.invitedUserId),
+}));
+
 export const sharedRoutineSnapshots = pgTable('shared_routine_snapshots', {
     id: text('id').primaryKey(),
     sharedRoutineId: text('shared_routine_id').notNull(),
