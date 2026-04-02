@@ -1,4 +1,4 @@
-import { and, eq, getTableColumns, sql } from 'drizzle-orm';
+import { and, eq, getTableColumns, isNull, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '../../../../src/db';
@@ -248,7 +248,13 @@ export async function POST(req: NextRequest) {
                                 await tx
                                     .select({ id: schema.routineDays.id })
                                     .from(schema.routineDays)
-                                    .where(and(eq(schema.routineDays.id, routineDayId), eq(schema.routineDays.userId, userId)))
+                                    .where(
+                                        and(
+                                            eq(schema.routineDays.id, routineDayId),
+                                            eq(schema.routineDays.userId, userId),
+                                            isNull(schema.routineDays.deletedAt),
+                                        ),
+                                    )
                                     .limit(1)
                             ).length > 0;
 
@@ -315,6 +321,18 @@ export async function POST(req: NextRequest) {
                             if (ownerId === userId || tableName === 'friendships' || tableName === 'shares_inbox') {
                                 if (!existing.deletedAt) {
                                     await tx.update(tableSchema).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(pkCol, finalId));
+                                    if (tableName === 'routine_days') {
+                                        await tx
+                                            .update(schema.routineExercises)
+                                            .set({ deletedAt: new Date(), updatedAt: new Date() })
+                                            .where(
+                                                and(
+                                                    eq(schema.routineExercises.routineDayId, finalId),
+                                                    eq(schema.routineExercises.userId, userId),
+                                                    isNull(schema.routineExercises.deletedAt),
+                                                ),
+                                            );
+                                    }
                                     if (tableName === 'workouts') await revertWorkoutScoring(tx, userId, finalId);
                                 }
                             }

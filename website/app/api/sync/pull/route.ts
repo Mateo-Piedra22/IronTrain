@@ -118,6 +118,16 @@ export async function GET(req: NextRequest) {
                     } else if ('userId' in tableSchema) {
                         conditions.push(eq(tableSchema.userId, userId));
                     }
+
+                    if (tableName === 'routine_exercises') {
+                        conditions.push(sql`exists (
+                            select 1
+                            from ${schema.routineDays}
+                            where ${schema.routineDays.id} = ${tableSchema.routineDayId}
+                              and ${schema.routineDays.userId} = ${userId}
+                              and ${schema.routineDays.deletedAt} is null
+                        )`);
+                    }
                 }
 
                 const rows = await db.select().from(tableSchema)

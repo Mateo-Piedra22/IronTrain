@@ -172,8 +172,17 @@ export async function GET(req: NextRequest) {
             return isNonEmptyString(wid) && workoutIds.has(wid);
         });
         snapshot.routines = routines;
-        snapshot.routine_days = routineDays;
-        snapshot.routine_exercises = routineExercises;
+
+        const activeRoutineDays = routineDays.filter((day) => day.deletedAt == null);
+        const activeRoutineDayIds = new Set(activeRoutineDays.map((day) => day.id));
+        const activeRoutineExercises = routineExercises.filter((routineExercise) => {
+            if (routineExercise.deletedAt != null) return false;
+            const routineDayId = routineExercise.routineDayId;
+            return isNonEmptyString(routineDayId) && activeRoutineDayIds.has(routineDayId);
+        });
+
+        snapshot.routine_days = activeRoutineDays;
+        snapshot.routine_exercises = activeRoutineExercises;
         snapshot.measurements = measurements;
         snapshot.goals = goals;
         snapshot.body_metrics = bodyMetrics;

@@ -72,6 +72,7 @@ export async function GET(req: NextRequest) {
                 const ownerClause = eq(ownerColumn, userId);
 
                 const workoutIdColumn = getTableField(t.table, 'workoutId') as unknown;
+                const routineDayIdColumn = getTableField(t.table, 'routineDayId') as unknown;
                 const deletedAtColumn = getTableField(t.table, 'deletedAt') as unknown;
                 const updatedAtColumn = getTableField(t.table, 'updatedAt') as unknown;
                 if (updatedAtColumn === undefined) {
@@ -85,6 +86,14 @@ export async function GET(req: NextRequest) {
                         where ${schema.workouts.id} = ${workoutIdColumn}
                           and ${schema.workouts.userId} = ${userId}
                     )`
+                    : t.key === 'routine_exercises'
+                        ? sql`exists (
+                            select 1
+                            from ${schema.routineDays}
+                            where ${schema.routineDays.id} = ${routineDayIdColumn}
+                              and ${schema.routineDays.userId} = ${userId}
+                              and ${schema.routineDays.deletedAt} is null
+                        )`
                     : sql`true`;
 
                 const [aggregate] = await db

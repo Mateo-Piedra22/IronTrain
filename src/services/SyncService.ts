@@ -907,7 +907,24 @@ export class SyncService {
         const schemas = await this.fetchAllTableSchemas();
         for (const t of ALLOWED_TABLES) {
             const supportsSoftDelete = TABLES_WITH_SOFT_DELETE.has(t) && this.hasColumn(schemas, t, 'deleted_at');
-            const r = await dbService.getFirst<{ c: number }>(`SELECT COUNT(*) as c FROM ${t} ${supportsSoftDelete ? 'WHERE deleted_at IS NULL' : ''}`);
+            const activeWhereClauses: string[] = [];
+            if (supportsSoftDelete) {
+                activeWhereClauses.push('deleted_at IS NULL');
+            }
+            if (t === 'routine_exercises') {
+                activeWhereClauses.push(`EXISTS (
+                    SELECT 1
+                    FROM routine_days rd
+                    WHERE rd.id = routine_exercises.routine_day_id
+                      AND rd.deleted_at IS NULL
+                )`);
+            }
+
+            const activeWhereSql = activeWhereClauses.length > 0
+                ? `WHERE ${activeWhereClauses.join(' AND ')}`
+                : '';
+
+            const r = await dbService.getFirst<{ c: number }>(`SELECT COUNT(*) as c FROM ${t} ${activeWhereSql}`);
             const d = supportsSoftDelete
                 ? await dbService.getFirst<{ c: number }>(`SELECT COUNT(*) as c FROM ${t} WHERE deleted_at IS NOT NULL`)
                 : { c: 0 };
