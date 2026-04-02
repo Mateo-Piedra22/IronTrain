@@ -139,6 +139,13 @@ export async function middleware(request: NextRequest) {
     const { pathname } = nextUrl;
     const redirectUri = nextUrl.searchParams.get('redirectUri');
 
+    const normalizedLeadingSpacePath = pathname.replace(/^\/(?:%20|\s)+/i, '/');
+    if (normalizedLeadingSpacePath !== pathname) {
+        const target = nextUrl.clone();
+        target.pathname = normalizedLeadingSpacePath;
+        return NextResponse.redirect(target);
+    }
+
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set('x-url', request.url);
 
