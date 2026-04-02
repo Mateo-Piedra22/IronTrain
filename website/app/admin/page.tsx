@@ -1,4 +1,4 @@
-import { desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { Shield } from 'lucide-react';
 import { Suspense } from 'react';
 import { db } from '../../src/db';
