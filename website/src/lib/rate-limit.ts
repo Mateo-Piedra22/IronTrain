@@ -245,6 +245,26 @@ export const RATE_LIMITS = {
         limit: 20,
         windowMs: 60000,
     }),
+    SOCIAL_THEMES_READ: createRateLimiter({
+        action: 'social:themes:read',
+        limit: 90,
+        windowMs: 60000,
+    }),
+    SOCIAL_THEMES_WRITE: createRateLimiter({
+        action: 'social:themes:write',
+        limit: 30,
+        windowMs: 60000,
+    }),
+    SOCIAL_THEMES_INSTALL: createRateLimiter({
+        action: 'social:themes:install',
+        limit: 60,
+        windowMs: 60000,
+    }),
+    SOCIAL_THEMES_INTERACT: createRateLimiter({
+        action: 'social:themes:interact',
+        limit: 45,
+        windowMs: 60000,
+    }),
 
     // Sync endpoints
     SYNC_PUSH: createRateLimiter({
@@ -281,6 +301,11 @@ export const RATE_LIMITS = {
     }),
     SHARE_ROUTINE: createRateLimiter({
         action: 'share:routine',
+        limit: 120,
+        windowMs: 60000,
+    }),
+    SHARE_THEME: createRateLimiter({
+        action: 'share:theme',
         limit: 120,
         windowMs: 60000,
     }),

@@ -6,6 +6,7 @@ import {
     BookOpen,
     Database,
     LayoutDashboard,
+    Palette,
     Share2,
     ShieldAlert,
     ShoppingBag
@@ -18,6 +19,7 @@ interface AdminTabsProps {
     socialPanel: React.ReactNode;
     contentPanel: React.ReactNode;
     moderationPanel: React.ReactNode;
+    themesModerationPanel: React.ReactNode;
     marketplacePanel: React.ReactNode;
     syncPanel: React.ReactNode;
     analyticsPanel: React.ReactNode;
@@ -29,6 +31,7 @@ export default function AdminTabs({
     socialPanel,
     contentPanel,
     moderationPanel,
+    themesModerationPanel,
     marketplacePanel,
     syncPanel,
     analyticsPanel,
@@ -36,7 +39,7 @@ export default function AdminTabs({
 }: AdminTabsProps) {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const activeTab = (searchParams.get('tab') as 'status' | 'social' | 'content' | 'moderation' | 'marketplace' | 'sync' | 'analytics' | 'posthog') || 'status';
+    const activeTab = (searchParams.get('tab') as 'status' | 'social' | 'content' | 'moderation' | 'themes-moderation' | 'marketplace' | 'sync' | 'analytics' | 'posthog') || 'status';
 
     const setActiveTab = (tab: string) => {
         // Clear all sub-parameters when switching main tabs to prevent "jumping" or inconsistent states
@@ -53,6 +56,7 @@ export default function AdminTabs({
         { id: 'social', label: 'IRONSOCIAL_MGMT', icon: Share2 },
         { id: 'content', label: 'PUBLICADOR_UNIFICADO', icon: Bell },
         { id: 'moderation', label: 'MODERACION_COMUNIDAD', icon: ShieldAlert },
+        { id: 'themes-moderation', label: 'THEMES_MODERATION', icon: Palette },
         { id: 'sync', label: 'SYNC_WORKOUTS', icon: Database },
     ] as const;
 
@@ -86,6 +90,7 @@ export default function AdminTabs({
                 {activeTab === 'social' && socialPanel}
                 {activeTab === 'content' && contentPanel}
                 {activeTab === 'moderation' && moderationPanel}
+                {activeTab === 'themes-moderation' && themesModerationPanel}
                 {activeTab === 'marketplace' && marketplacePanel}
                 {activeTab === 'sync' && syncPanel}
                 {activeTab === 'posthog' && posthogPanel}

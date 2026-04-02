@@ -1,3 +1,4 @@
+import { ThemeStudioPanel } from '@/components/ThemeStudioPanel';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { useDataReload } from '@/src/hooks/useDataReload';
 import { useTheme } from '@/src/hooks/useTheme';
@@ -749,6 +750,9 @@ export default function SettingsScreen() {
                             onSelect={(id) => setThemeMode(id as any)}
                         />
                     </SettingRow>
+                    <View style={[s.cardInnerPadded, s.settingRowBorder]}>
+                        <ThemeStudioPanel />
+                    </View>
                     <SettingRow icon={Timer} title="Descanso por defecto">
                         <Stepper value={`${defaultTimer}s`} label="descanso" onMinus={() => saveSetting('defaultRestTimer', Math.max(0, defaultTimer - 30))} onPlus={() => saveSetting('defaultRestTimer', defaultTimer + 30)} />
                     </SettingRow>

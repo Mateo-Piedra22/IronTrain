@@ -10,7 +10,8 @@ export {
 export { handleMarketplaceEntityAction } from './actions/marketplace';
 
 export {
-    handleRoutineAction
+    handleRoutineAction,
+    handleThemeModerationAction
 } from './actions/moderation';
 
 export {

@@ -1,3 +1,4 @@
+import type { ThemeDraft } from '../theme-engine';
 import { logger } from '../utils/logger';
 import { dbService } from './DatabaseService';
 import { dataEventService } from './DataEventService';
@@ -76,6 +77,10 @@ export interface AppConfig {
     cachedSocialActiveEvent: GlobalEvent | null;
     cachedSocialWeatherBonus: WeatherInfo | null;
     cachedSocialScoringRefreshedAt: number;
+
+    themeDrafts: ThemeDraft[];
+    activeThemePackIdLight: string | null;
+    activeThemePackIdDark: string | null;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -123,6 +128,10 @@ const DEFAULT_CONFIG: AppConfig = {
     cachedSocialActiveEvent: null,
     cachedSocialWeatherBonus: null,
     cachedSocialScoringRefreshedAt: 0,
+
+    themeDrafts: [],
+    activeThemePackIdLight: null,
+    activeThemePackIdDark: null,
 };
 
 class ConfigService {
@@ -194,7 +203,8 @@ class ConfigService {
                         s.key === 'trophyExerciseIds' ||
                         s.key === 'cachedSocialScoreConfig' ||
                         s.key === 'cachedSocialActiveEvent' ||
-                        s.key === 'cachedSocialWeatherBonus'
+                        s.key === 'cachedSocialWeatherBonus' ||
+                        s.key === 'themeDrafts'
                     ) {
                         try {
                             loadedConfig[s.key] = JSON.parse(s.value);

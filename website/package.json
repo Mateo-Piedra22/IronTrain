@@ -8,6 +8,7 @@
     "build": "node scripts/sync-content.mjs && next build",
     "start": "next start",
     "test": "vitest run",
+    "test:themes:load": "node scripts/themes-load-test.mjs",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:migrate:prod": "node scripts/db-migrate-prod.mjs"

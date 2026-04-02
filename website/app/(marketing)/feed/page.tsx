@@ -5,6 +5,7 @@ import {
     Clock,
     Flame,
     Globe,
+    Palette,
     Plus,
     ShoppingBag,
     Trophy,
@@ -37,6 +38,7 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
     const sp = await props.searchParams;
     const view = sp.view || 'community';
     const isMarketplace = view === 'marketplace';
+    const isThemes = view === 'themes';
 
     const h = await headers();
     const currentUserId = await verifyAuthFromHeaders(h);
@@ -92,6 +94,56 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
         )
         .orderBy(desc(schema.activityFeed.createdAt))
         .limit(12);
+
+    const publicThemes = await db.select({
+        id: schema.themePacks.id,
+        slug: schema.themePacks.slug,
+        name: schema.themePacks.name,
+        description: schema.themePacks.description,
+        tags: schema.themePacks.tags,
+        supportsLight: schema.themePacks.supportsLight,
+        supportsDark: schema.themePacks.supportsDark,
+        ownerId: schema.themePacks.ownerId,
+        currentVersion: schema.themePacks.currentVersion,
+        downloadsCount: schema.themePacks.downloadsCount,
+        appliesCount: schema.themePacks.appliesCount,
+        ratingAvg: schema.themePacks.ratingAvg,
+        ratingCount: schema.themePacks.ratingCount,
+        updatedAt: schema.themePacks.updatedAt,
+        username: schema.userProfiles.username,
+        displayName: schema.userProfiles.displayName,
+    })
+        .from(schema.themePacks)
+        .leftJoin(schema.userProfiles, eq(schema.themePacks.ownerId, schema.userProfiles.id))
+        .where(
+            and(
+                isNull(schema.themePacks.deletedAt),
+                eq(schema.themePacks.visibility, 'public'),
+                eq(schema.themePacks.status, 'approved'),
+                or(eq(schema.userProfiles.isPublic, true), isNull(schema.userProfiles.id)),
+            ),
+        )
+        .orderBy(desc(schema.themePacks.appliesCount), desc(schema.themePacks.downloadsCount), desc(schema.themePacks.updatedAt))
+        .limit(40);
+
+    const themeIds = publicThemes.map((theme) => theme.id);
+    const themeVersions = themeIds.length > 0
+        ? await db.select({
+            themePackId: schema.themePackVersions.themePackId,
+            version: schema.themePackVersions.version,
+            payload: schema.themePackVersions.payload,
+        })
+            .from(schema.themePackVersions)
+            .where(inArray(schema.themePackVersions.themePackId, themeIds))
+        : [];
+
+    const versionMap = new Map<string, Record<string, unknown>>();
+    for (const row of themeVersions) {
+        const theme = publicThemes.find((item) => item.id === row.themePackId);
+        if (!theme) continue;
+        if (row.version !== theme.currentVersion) continue;
+        versionMap.set(row.themePackId, (row.payload ?? {}) as Record<string, unknown>);
+    }
 
     // Fetch Marketplace Data
     const officialExercises = await db.query.exercises.findMany({
@@ -163,7 +215,7 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                 <div className="flex bg-transparent border-2 border-[#1a1a2e] mb-12">
                     <Link
                         href="/feed?view=community"
-                        className={`flex-1 text-center py-4 font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${!isMarketplace ? 'bg-[#1a1a2e] text-[#f5f1e8]' : 'text-[#1a1a2e] hover:bg-[#1a1a2e]/5'}`}
+                        className={`flex-1 text-center py-4 font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${!isMarketplace && !isThemes ? 'bg-[#1a1a2e] text-[#f5f1e8]' : 'text-[#1a1a2e] hover:bg-[#1a1a2e]/5'}`}
                     >
                         <User className="w-3.5 h-3.5" /> COMUNIDAD_P2P
                     </Link>
@@ -173,10 +225,16 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                     >
                         <ShoppingBag className="w-3.5 h-3.5" /> MARKETPLACE_OFFICIAL
                     </Link>
+                    <Link
+                        href="/feed?view=themes"
+                        className={`flex-1 text-center py-4 font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${isThemes ? 'bg-[#1a1a2e] text-[#f5f1e8]' : 'text-[#1a1a2e] hover:bg-[#1a1a2e]/5'}`}
+                    >
+                        <Palette className="w-3.5 h-3.5" /> THEMES_MARKET
+                    </Link>
                 </div>
 
                 {/* List View */}
-                {!isMarketplace ? (
+                {!isMarketplace && !isThemes ? (
                     publicRoutinesData.length === 0 ? (
                         <div className="text-center py-24 border-2 border-[#1a1a2e] border-dashed bg-white/30">
                             <Globe className="w-12 h-12 mx-auto opacity-10 mb-6" />
@@ -272,7 +330,7 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                             ))}
                         </div>
                     )
-                ) : (
+                ) : isMarketplace ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {officialExercises.map((exercise: any) => {
                             const category = categories.find((c: any) => c.id === exercise.categoryId);
@@ -343,6 +401,81 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                             );
                         })}
                     </div>
+                ) : (
+                    publicThemes.length === 0 ? (
+                        <div className="text-center py-24 border-2 border-[#1a1a2e] border-dashed bg-white/30">
+                            <Palette className="w-12 h-12 mx-auto opacity-10 mb-6" />
+                            <h3 className="text-base font-black uppercase mb-2">0_THEME_PACKS_FOUND</h3>
+                            <p className="text-[9px] font-bold opacity-30 uppercase tracking-[0.3em]">No hay themes públicos aprobados todavía.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {publicThemes.map((theme) => {
+                                const payload = versionMap.get(theme.id) || {};
+                                const preview = (payload.preview && typeof payload.preview === 'object')
+                                    ? payload.preview as Record<string, string>
+                                    : {};
+                                const hero = preview.hero || '#8AA0B8';
+                                const surface = preview.surface || '#FFFFFF';
+                                const text = preview.text || '#0F172A';
+                                const tags = Array.isArray(theme.tags) ? theme.tags.slice(0, 3) : [];
+
+                                return (
+                                    <Link
+                                        key={theme.id}
+                                        href={`/share/theme/${theme.slug}`}
+                                        className="group relative border-[3px] border-[#1a1a2e] bg-white p-8 pb-24 flex flex-col justify-between hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all shadow-[12px_12px_0px_0px_rgba(26,26,46,0.05)]"
+                                    >
+                                        <div className="space-y-6 relative z-10">
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-current text-background px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter">THEME_PACK</div>
+                                                <span className="text-[10px] font-black uppercase opacity-40 italic tracking-widest">V{theme.currentVersion}</span>
+                                            </div>
+
+                                            <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tighter leading-[0.9] italic group-hover:underline">
+                                                {theme.name}
+                                            </h2>
+
+                                            {theme.description && (
+                                                <p className="text-[10px] font-bold opacity-60 uppercase tracking-tight leading-relaxed line-clamp-2 italic max-w-xs">
+                                                    {theme.description}
+                                                </p>
+                                            )}
+
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div className="h-12 border border-current/20" style={{ backgroundColor: hero }} />
+                                                <div className="h-12 border border-current/20" style={{ backgroundColor: surface }} />
+                                                <div className="h-12 border border-current/20" style={{ backgroundColor: text }} />
+                                            </div>
+
+                                            {tags.length > 0 && (
+                                                <div className="flex flex-wrap gap-2">
+                                                    {tags.map((tag) => (
+                                                        <span key={`${theme.id}:${tag}`} className="text-[8px] px-2 py-0.5 border border-current font-black tracking-tighter uppercase">
+                                                            #{tag}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="absolute bottom-0 left-0 w-full p-6 border-t-[1px] border-current/20 flex items-center justify-between z-20">
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-[8px] font-black opacity-30 uppercase tracking-[0.2em]">THEME_ID</span>
+                                                <span className="text-[10px] font-black tracking-tighter">{theme.slug.toUpperCase()}</span>
+                                                <span className="text-[8px] font-black opacity-50">@{theme.username || theme.displayName || 'ANON'}</span>
+                                            </div>
+                                            <div className="text-right text-[8px] font-black opacity-60 uppercase tracking-[0.2em]">
+                                                <div>Installs {theme.downloadsCount}</div>
+                                                <div>Applies {theme.appliesCount}</div>
+                                                <div>Rate {Number(theme.ratingAvg || 0).toFixed(1)} ({theme.ratingCount || 0})</div>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    )
                 )}
             </div>
         </section>

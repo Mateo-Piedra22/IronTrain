@@ -8,6 +8,7 @@ export type SocialDomainVersions = {
     notifications: string;
     friends: string;
     leaderboard: string;
+    themes: string;
 };
 
 export type SocialPulsePayload = {
@@ -19,6 +20,12 @@ export type SocialPulsePayload = {
     latestScoreAtMs: number;
     latestFriendProfileAtMs: number;
     latestLeaderboardAtMs: number;
+    latestThemeAtMs: number;
+    latestThemePackAtMs: number;
+    latestThemeVersionAtMs: number;
+    latestThemeRatingAtMs: number;
+    latestThemeFeedbackAtMs: number;
+    latestThemeReportAtMs: number;
     pendingShareCount: number;
     pendingFriendRequestCount: number;
     domainVersions: SocialDomainVersions;
@@ -67,7 +74,7 @@ export async function computeSocialPulse(userId: string): Promise<SocialPulsePay
     );
     const feedUsers = Array.from(new Set([userId, ...friendIds]));
 
-    const [profileRow, latestActivityRow, latestShareRow, latestFriendRow, pendingSharesRow, pendingIncomingRow, latestScoreRow, latestFriendProfileRow] = await Promise.all([
+    const [profileRow, latestActivityRow, latestShareRow, latestFriendRow, pendingSharesRow, pendingIncomingRow, latestScoreRow, latestFriendProfileRow, latestThemePackRow, latestThemeVersionRow, latestThemeRatingRow, latestThemeFeedbackRow, latestThemeReportRow] = await Promise.all([
         db.select({ updatedAt: schema.userProfiles.updatedAt })
             .from(schema.userProfiles)
             .where(eq(schema.userProfiles.id, userId))
@@ -131,6 +138,79 @@ export async function computeSocialPulse(userId: string): Promise<SocialPulsePay
                 .from(schema.userProfiles)
                 .where(inArray(schema.userProfiles.id, feedUsers))
             : Promise.resolve([{ latestAt: null }]),
+        db.select({ latestAt: sql<Date | null>`max(${schema.themePacks.updatedAt})` })
+            .from(schema.themePacks)
+            .where(
+                and(
+                    isNull(schema.themePacks.deletedAt),
+                    or(
+                        eq(schema.themePacks.ownerId, userId),
+                        and(
+                            eq(schema.themePacks.visibility, 'public'),
+                            eq(schema.themePacks.status, 'approved'),
+                        ),
+                    ),
+                ),
+            ),
+        db.select({ latestAt: sql<Date | null>`max(${schema.themePackVersions.createdAt})` })
+            .from(schema.themePackVersions)
+            .innerJoin(schema.themePacks, eq(schema.themePackVersions.themePackId, schema.themePacks.id))
+            .where(
+                and(
+                    isNull(schema.themePacks.deletedAt),
+                    or(
+                        eq(schema.themePacks.ownerId, userId),
+                        and(
+                            eq(schema.themePacks.visibility, 'public'),
+                            eq(schema.themePacks.status, 'approved'),
+                        ),
+                    ),
+                ),
+            ),
+        db.select({ latestAt: sql<Date | null>`max(${schema.themePackRatings.updatedAt})` })
+            .from(schema.themePackRatings)
+            .innerJoin(schema.themePacks, eq(schema.themePackRatings.themePackId, schema.themePacks.id))
+            .where(
+                and(
+                    isNull(schema.themePacks.deletedAt),
+                    isNull(schema.themePackRatings.deletedAt),
+                    or(
+                        eq(schema.themePacks.ownerId, userId),
+                        and(
+                            eq(schema.themePacks.visibility, 'public'),
+                            eq(schema.themePacks.status, 'approved'),
+                        ),
+                    ),
+                ),
+            ),
+        db.select({ latestAt: sql<Date | null>`max(${schema.themePackFeedback.updatedAt})` })
+            .from(schema.themePackFeedback)
+            .innerJoin(schema.themePacks, eq(schema.themePackFeedback.themePackId, schema.themePacks.id))
+            .where(
+                and(
+                    isNull(schema.themePacks.deletedAt),
+                    or(
+                        eq(schema.themePacks.ownerId, userId),
+                        eq(schema.themePackFeedback.userId, userId),
+                        and(
+                            eq(schema.themePacks.visibility, 'public'),
+                            eq(schema.themePacks.status, 'approved'),
+                        ),
+                    ),
+                ),
+            ),
+        db.select({ latestAt: sql<Date | null>`max(${schema.themePackReports.updatedAt})` })
+            .from(schema.themePackReports)
+            .innerJoin(schema.themePacks, eq(schema.themePackReports.themePackId, schema.themePacks.id))
+            .where(
+                and(
+                    isNull(schema.themePacks.deletedAt),
+                    or(
+                        eq(schema.themePacks.ownerId, userId),
+                        eq(schema.themePackReports.reporterUserId, userId),
+                    ),
+                ),
+            ),
     ]);
 
     const profileUpdatedAtMs = toMs(profileRow[0]?.updatedAt);
@@ -140,6 +220,18 @@ export async function computeSocialPulse(userId: string): Promise<SocialPulsePay
     const latestScoreAtMs = toMs(latestScoreRow[0]?.latestAt);
     const latestFriendProfileAtMs = toMs(latestFriendProfileRow[0]?.latestAt);
     const latestLeaderboardAtMs = Math.max(latestScoreAtMs, latestFriendProfileAtMs);
+    const latestThemePackAtMs = toMs(latestThemePackRow[0]?.latestAt);
+    const latestThemeVersionAtMs = toMs(latestThemeVersionRow[0]?.latestAt);
+    const latestThemeRatingAtMs = toMs(latestThemeRatingRow[0]?.latestAt);
+    const latestThemeFeedbackAtMs = toMs(latestThemeFeedbackRow[0]?.latestAt);
+    const latestThemeReportAtMs = toMs(latestThemeReportRow[0]?.latestAt);
+    const latestThemeAtMs = Math.max(
+        latestThemePackAtMs,
+        latestThemeVersionAtMs,
+        latestThemeRatingAtMs,
+        latestThemeFeedbackAtMs,
+        latestThemeReportAtMs,
+    );
     const pendingShareCount = pendingSharesRow[0]?.count ?? 0;
     const pendingFriendRequestCount = pendingIncomingRow[0]?.count ?? 0;
 
@@ -149,6 +241,7 @@ export async function computeSocialPulse(userId: string): Promise<SocialPulsePay
         notifications: `${latestShareAtMs}:${pendingShareCount}`,
         friends: `${latestFriendAtMs}:${pendingFriendRequestCount}`,
         leaderboard: `${latestLeaderboardAtMs}:${feedUsers.length}`,
+        themes: `${latestThemeAtMs}`,
     };
 
     const version = [
@@ -157,6 +250,7 @@ export async function computeSocialPulse(userId: string): Promise<SocialPulsePay
         domainVersions.notifications,
         domainVersions.friends,
         domainVersions.leaderboard,
+        domainVersions.themes,
     ].join(':');
 
     return {
@@ -168,6 +262,12 @@ export async function computeSocialPulse(userId: string): Promise<SocialPulsePay
         latestScoreAtMs,
         latestFriendProfileAtMs,
         latestLeaderboardAtMs,
+        latestThemeAtMs,
+        latestThemePackAtMs,
+        latestThemeVersionAtMs,
+        latestThemeRatingAtMs,
+        latestThemeFeedbackAtMs,
+        latestThemeReportAtMs,
         pendingShareCount,
         pendingFriendRequestCount,
         domainVersions,

@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { db } from '../db';
 import * as schema from '../db/schema';
-import { auth } from './auth/server';
 import { RATE_LIMITS } from './rate-limit';
 
 export type AdminRole = 'viewer' | 'editor' | 'moderator' | 'superadmin';
@@ -38,6 +37,7 @@ export type AdminContext = {
 
 export async function getAdminContext(): Promise<AdminContext | null> {
     try {
+        const { auth } = await import('./auth/server');
         const { data: session } = await auth.getSession();
         const userId = session?.user?.id;
         if (!userId) return null;

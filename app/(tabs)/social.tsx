@@ -386,6 +386,31 @@ export default function SocialTab() {
         );
     }, [addToast]);
 
+    const handleOpenPublicThemes = useCallback(async () => {
+        feedbackSelection();
+        Alert.alert(
+            'Abrir enlace externo',
+            'Vas a salir de la app para abrir el marketplace de themes.',
+            [
+                {
+                    text: 'Cancelar',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Abrir',
+                    onPress: async () => {
+                        try {
+                            await Linking.openURL('https://irontrain.motiona.xyz/feed?view=themes');
+                        } catch {
+                            addToast({ type: 'error', title: 'Error', message: 'No se pudo abrir la página de themes públicos.' });
+                        }
+                    },
+                },
+            ],
+            { cancelable: true },
+        );
+    }, [addToast]);
+
     const handleUpdateProfile = async () => {
         if (!displayName.trim() || displayName.length < 2) {
             addToast({ type: 'error', title: 'Nombre muy corto' });
@@ -1185,6 +1210,10 @@ export default function SocialTab() {
                         <TouchableOpacity style={[styles.archiveToggle, { flex: 1, minWidth: 0, minHeight: 34, justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 6, gap: 4 }]} onPress={handleOpenPublicRoutines}>
                             <Globe size={12} color={colors.textMuted} />
                             <Text numberOfLines={1} style={[styles.archiveToggleText, { textAlign: 'center', fontSize: 11 }]}>Rutinas</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.archiveToggle, { flex: 1, minWidth: 0, minHeight: 34, justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 6, gap: 4 }]} onPress={handleOpenPublicThemes}>
+                            <Zap size={12} color={colors.textMuted} />
+                            <Text numberOfLines={1} style={[styles.archiveToggleText, { textAlign: 'center', fontSize: 11 }]}>Themes</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.archiveToggle, { flex: 1, minWidth: 0, minHeight: 34, justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 6, gap: 4 }]}

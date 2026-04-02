@@ -29,4 +29,18 @@ describe('endpoint metrics', () => {
         const snapshot = getEndpointMetricsSnapshot();
         expect(Object.keys(snapshot)).toHaveLength(0);
     });
+
+    it('tracks latency aggregates when duration is provided', () => {
+        recordEndpointMetric({ endpoint: 'social.themes.list', outcome: 'success', statusCode: 200, event: 'listed', durationMs: 40 });
+        recordEndpointMetric({ endpoint: 'social.themes.list', outcome: 'success', statusCode: 200, event: 'listed', durationMs: 100 });
+        recordEndpointMetric({ endpoint: 'social.themes.list', outcome: 'success', statusCode: 200, event: 'listed', durationMs: 60 });
+
+        const snapshot = getEndpointMetricsSnapshot();
+        const bucket = snapshot['social.themes.list|success|200|listed'];
+
+        expect(bucket?.latencyMs.min).toBe(40);
+        expect(bucket?.latencyMs.max).toBe(100);
+        expect(bucket?.latencyMs.avg).toBeCloseTo(66.67, 2);
+        expect(bucket?.latencyMs.p95).toBeCloseTo(96, 2);
+    });
 });

@@ -156,3 +156,48 @@ cd website && npm run build
   - existe impacto en release productivo,
   - hay evidencia de riesgo de seguridad,
   - o no hay diagnóstico claro tras primer ciclo de contención.
+
+## 10) Incidente: degradación Theme Marketplace (FASE 6)
+
+### 10.1 Síntomas
+
+- Aumento sostenido de latencia en `social/themes` o `admin/themes`.
+- Incremento de errores 5xx en rutas de themes.
+- Señal `ok=false` en `GET /api/admin/themes-health`.
+
+### 10.2 Diagnóstico rápido
+
+1. Consultar `GET /api/admin/themes-health` con usuario admin autorizado.
+2. Revisar `report.failures` y `report.namespaces.*.breachingEndpoints`.
+3. Confirmar thresholds activos por entorno:
+  - `THEMES_SLO_MAX_ERROR_RATE`
+  - `THEMES_SLO_MAX_P95_MS`
+  - `THEMES_SLO_MAX_AVG_MS`
+  - `THEMES_SLO_MIN_SAMPLES`
+
+### 10.3 Contención
+
+- Aplicar throttling operativo (ajuste rate limits de themes) si hay abuso.
+- Pausar moderaciones masivas si el namespace `admin` aparece degradado.
+- Priorizar estabilidad del endpoint `GET /api/social/themes` (feed/market).
+
+### 10.4 Prueba de carga controlada
+
+Ejecutar desde `website/`:
+
+```bash
+THEMES_LOAD_TOKEN=<token> npm run test:themes:load
+```
+
+Opcional para escenarios de instalación/interacción:
+
+```bash
+THEMES_LOAD_TOKEN=<token> THEMES_LOAD_THEME_ID=<theme-id> npm run test:themes:load
+```
+
+### 10.5 Rollback
+
+1. Revertir último cambio en rutas `themes` y/o capa `theme-marketplace`.
+2. Verificar recuperación de SLO con `GET /api/admin/themes-health`.
+3. Confirmar auditoría admin de consulta/acción (`admin_audit_logs`).
+4. Registrar post-mortem y acción preventiva.

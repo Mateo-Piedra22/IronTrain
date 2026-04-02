@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
+import { applyThemeModerationAction, ThemeModerationAction } from '../../../src/lib/theme-marketplace/admin-moderation';
 import { getRedirectPath, requireAdminAction, writeAdminAuditLog } from './shared';
 
 export async function handleRoutineAction(formData: FormData) {
@@ -74,5 +75,72 @@ export async function handleRoutineAction(formData: FormData) {
             });
         }
     }
+    if (redirectPath) redirect(redirectPath);
+}
+
+export async function handleThemeModerationAction(formData: FormData) {
+    let redirectPath = '';
+    let adminUserId: string | null = null;
+    let adminRole: 'viewer' | 'editor' | 'moderator' | 'superadmin' = 'viewer';
+    const themePackId = String(formData.get('themePackId') || '').trim() || null;
+    const action = String(formData.get('intent') || '').trim() as ThemeModerationAction;
+
+    try {
+        const admin = await requireAdminAction({ action: 'admin.moderation.theme-pack', requiredRole: 'moderator' });
+        adminUserId = admin.userId;
+        adminRole = admin.role;
+
+        if (!themePackId) {
+            throw new Error('MISSING_THEME_PACK_ID');
+        }
+
+        if (!['approve', 'reject', 'suspend', 'restore'].includes(action)) {
+            throw new Error('INVALID_THEME_MODERATION_ACTION');
+        }
+
+        const message = String(formData.get('message') || '').trim();
+
+        const result = await applyThemeModerationAction({
+            themePackId,
+            action,
+            moderationMessage: message,
+        });
+
+        revalidatePath('/admin');
+        revalidatePath('/feed');
+
+        redirectPath = await getRedirectPath(formData, 'themes-moderation');
+
+        await writeAdminAuditLog({
+            adminUserId: admin.userId,
+            adminRole: admin.role,
+            action: `admin.moderation.theme-pack.${action}`,
+            status: 'success',
+            targetType: 'theme_pack',
+            targetId: themePackId,
+            metadata: {
+                previousStatus: result.previousStatus,
+                nextStatus: result.status,
+                resolvedReports: result.resolvedReports,
+            },
+        });
+    } catch (error: any) {
+        console.error('Theme Moderation Action Error:', error);
+        revalidatePath('/admin');
+        redirectPath = '/admin?tab=themes-moderation&error=theme_moderation_failed';
+
+        if (adminUserId) {
+            await writeAdminAuditLog({
+                adminUserId,
+                adminRole,
+                action: `admin.moderation.theme-pack.${action || 'unknown'}`,
+                status: 'error',
+                message: error?.message || 'unknown_error',
+                targetType: 'theme_pack',
+                targetId: themePackId,
+            });
+        }
+    }
+
     if (redirectPath) redirect(redirectPath);
 }

@@ -429,6 +429,101 @@ export const kudos = pgTable('kudos', {
     feedDeletedGiverIdx: index('kudos_feed_deleted_giver_idx').on(table.feedId, table.deletedAt, table.giverId),
 }));
 
+export const themePacks = pgTable('theme_packs', {
+    id: text('id').primaryKey(),
+    ownerId: text('owner_id').notNull(),
+    slug: text('slug').notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    tags: jsonb('tags').$type<string[]>().notNull().default([]),
+    supportsLight: boolean('supports_light').notNull().default(true),
+    supportsDark: boolean('supports_dark').notNull().default(true),
+    visibility: text('visibility').notNull().default('private'),
+    status: text('status').notNull().default('draft'),
+    moderationMessage: text('moderation_message'),
+    currentVersion: integer('current_version').notNull().default(1),
+    downloadsCount: integer('downloads_count').notNull().default(0),
+    appliesCount: integer('applies_count').notNull().default(0),
+    ratingAvg: real('rating_avg').notNull().default(0),
+    ratingCount: integer('rating_count').notNull().default(0),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+    slugUniqueIdx: uniqueIndex('theme_packs_slug_unique_idx').on(table.slug),
+    ownerUpdatedIdx: index('theme_packs_owner_updated_idx').on(table.ownerId, table.updatedAt),
+    statusVisibilityUpdatedIdx: index('theme_packs_status_visibility_updated_idx').on(table.status, table.visibility, table.updatedAt),
+    deletedUpdatedIdx: index('theme_packs_deleted_updated_idx').on(table.deletedAt, table.updatedAt),
+}));
+
+export const themePackVersions = pgTable('theme_pack_versions', {
+    id: text('id').primaryKey(),
+    themePackId: text('theme_pack_id').notNull().references(() => themePacks.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    payload: jsonb('payload').notNull(),
+    changelog: text('changelog'),
+    createdBy: text('created_by').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+    packVersionUniqueIdx: uniqueIndex('theme_pack_versions_pack_version_unique_idx').on(table.themePackId, table.version),
+    packCreatedIdx: index('theme_pack_versions_pack_created_idx').on(table.themePackId, table.createdAt),
+}));
+
+export const themePackInstalls = pgTable('theme_pack_installs', {
+    id: text('id').primaryKey(),
+    themePackId: text('theme_pack_id').notNull().references(() => themePacks.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    installedVersion: integer('installed_version').notNull(),
+    appliedLight: boolean('applied_light').notNull().default(false),
+    appliedDark: boolean('applied_dark').notNull().default(false),
+    installedAt: timestamp('installed_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+    packUserUniqueIdx: uniqueIndex('theme_pack_installs_pack_user_unique_idx').on(table.themePackId, table.userId),
+    userUpdatedIdx: index('theme_pack_installs_user_updated_idx').on(table.userId, table.updatedAt),
+}));
+
+export const themePackRatings = pgTable('theme_pack_ratings', {
+    id: text('id').primaryKey(),
+    themePackId: text('theme_pack_id').notNull().references(() => themePacks.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    rating: integer('rating').notNull(),
+    review: text('review'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+}, (table) => ({
+    packUserUniqueIdx: uniqueIndex('theme_pack_ratings_pack_user_unique_idx').on(table.themePackId, table.userId),
+    packDeletedIdx: index('theme_pack_ratings_pack_deleted_idx').on(table.themePackId, table.deletedAt),
+}));
+
+export const themePackFeedback = pgTable('theme_pack_feedback', {
+    id: text('id').primaryKey(),
+    themePackId: text('theme_pack_id').notNull().references(() => themePacks.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    kind: text('kind').notNull(),
+    message: text('message').notNull(),
+    status: text('status').notNull().default('open'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+    packStatusCreatedIdx: index('theme_pack_feedback_pack_status_created_idx').on(table.themePackId, table.status, table.createdAt),
+}));
+
+export const themePackReports = pgTable('theme_pack_reports', {
+    id: text('id').primaryKey(),
+    themePackId: text('theme_pack_id').notNull().references(() => themePacks.id, { onDelete: 'cascade' }),
+    reporterUserId: text('reporter_user_id').notNull(),
+    reason: text('reason').notNull(),
+    details: text('details'),
+    status: text('status').notNull().default('open'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+    statusCreatedIdx: index('theme_pack_reports_status_created_idx').on(table.status, table.createdAt),
+    packStatusIdx: index('theme_pack_reports_pack_status_idx').on(table.themePackId, table.status),
+}));
+
 
 // --- ADMIN & METRICS ---
 // --- CHANGELOG SYSTEM ---

@@ -16,6 +16,7 @@ import MarketplaceManagementPanel from './components/MarketplaceManagementPanel'
 import PostHogGuidePanel from './components/PostHogGuidePanel';
 import SyncWorkoutsPanel from './components/SyncWorkoutsPanel';
 import SystemStatusPanel from './components/SystemStatusPanel';
+import ThemesModerationPanel from './components/ThemesModerationPanel';
 
 export const revalidate = 0;
 export const runtime = 'nodejs';
@@ -83,7 +84,7 @@ export default async function AdminPage({
 
     // 0. Resolve parameters
     const params = await searchParams;
-    const activeTab = (params.tab as 'status' | 'social' | 'content' | 'moderation' | 'marketplace' | 'sync' | 'analytics' | 'posthog') || 'status';
+    const activeTab = (params.tab as 'status' | 'social' | 'content' | 'moderation' | 'themes-moderation' | 'marketplace' | 'sync' | 'analytics' | 'posthog') || 'status';
 
     const {
         editNotifId,
@@ -132,6 +133,8 @@ export default async function AdminPage({
     let officialCategoriesRaw: any[] = [];
     let officialBadgesRaw: any[] = [];
     let workoutsForSyncPanel: any[] = [];
+    let themeModerationPacksRaw: any[] = [];
+    let themeModerationReportsRaw: any[] = [];
 
     if (activeTab === 'status') {
         syncHealth = await getSyncHealthReport();
@@ -222,6 +225,62 @@ export default async function AdminPage({
         officialExercisesRaw = exercises;
         officialCategoriesRaw = categories;
         officialBadgesRaw = badges;
+    } else if (activeTab === 'themes-moderation') {
+        const [packs, reports] = await Promise.all([
+            db.select({
+                id: schema.themePacks.id,
+                slug: schema.themePacks.slug,
+                ownerId: schema.themePacks.ownerId,
+                ownerUsername: schema.userProfiles.username,
+                name: schema.themePacks.name,
+                visibility: schema.themePacks.visibility,
+                status: schema.themePacks.status,
+                moderationMessage: schema.themePacks.moderationMessage,
+                downloadsCount: schema.themePacks.downloadsCount,
+                appliesCount: schema.themePacks.appliesCount,
+                ratingAvg: schema.themePacks.ratingAvg,
+                ratingCount: schema.themePacks.ratingCount,
+                createdAt: schema.themePacks.createdAt,
+                updatedAt: schema.themePacks.updatedAt,
+            })
+                .from(schema.themePacks)
+                .leftJoin(schema.userProfiles, eq(schema.userProfiles.id, schema.themePacks.ownerId))
+                .where(
+                    and(
+                        isNull(schema.themePacks.deletedAt),
+                        sql`${schema.themePacks.status} in ('pending_review', 'approved', 'rejected', 'suspended')`,
+                    ),
+                )
+                .orderBy(desc(schema.themePacks.updatedAt))
+                .limit(200),
+            db.select({
+                id: schema.themePackReports.id,
+                themePackId: schema.themePackReports.themePackId,
+                reporterUserId: schema.themePackReports.reporterUserId,
+                reason: schema.themePackReports.reason,
+                details: schema.themePackReports.details,
+                status: schema.themePackReports.status,
+                createdAt: schema.themePackReports.createdAt,
+                updatedAt: schema.themePackReports.updatedAt,
+                themeSlug: schema.themePacks.slug,
+                themeName: schema.themePacks.name,
+                themeStatus: schema.themePacks.status,
+                ownerId: schema.themePacks.ownerId,
+            })
+                .from(schema.themePackReports)
+                .innerJoin(schema.themePacks, eq(schema.themePacks.id, schema.themePackReports.themePackId))
+                .where(
+                    and(
+                        isNull(schema.themePacks.deletedAt),
+                        sql`${schema.themePackReports.status} in ('open', 'resolved', 'dismissed')`,
+                    ),
+                )
+                .orderBy(desc(schema.themePackReports.createdAt))
+                .limit(200),
+        ]);
+
+        themeModerationPacksRaw = packs;
+        themeModerationReportsRaw = reports;
     }
 
     // Secondary Fetch: Targeted Analytics for current leaderboard page
@@ -370,6 +429,22 @@ export default async function AdminPage({
         setCount: Number(w.setCount || 0),
     }));
 
+    const sanitizedThemesModeration = (themeModerationPacksRaw || []).map((item) => ({
+        ...item,
+        ratingAvg: Number(item.ratingAvg || 0),
+        ratingCount: Number(item.ratingCount || 0),
+        downloadsCount: Number(item.downloadsCount || 0),
+        appliesCount: Number(item.appliesCount || 0),
+        createdAt: toIsoSafe((item as any)?.createdAt),
+        updatedAt: toIsoSafe((item as any)?.updatedAt),
+    }));
+
+    const sanitizedThemeReportsModeration = (themeModerationReportsRaw || []).map((item) => ({
+        ...item,
+        createdAt: toIsoSafe((item as any)?.createdAt),
+        updatedAt: toIsoSafe((item as any)?.updatedAt),
+    }));
+
     return (
         <div className="min-h-screen bg-[#f5f1e8] text-[#1a1a2e] font-mono p-4 md:p-8 selection:bg-[#1a1a2e] selection:text-[#f5f1e8]">
             <header className="mb-12 border-b-2 border-[#1a1a2e] pb-8">
@@ -453,6 +528,12 @@ export default async function AdminPage({
                     moderationPanel={
                         <CommunityModerationPanel
                             routines={sanitizedRoutines}
+                        />
+                    }
+                    themesModerationPanel={
+                        <ThemesModerationPanel
+                            themes={sanitizedThemesModeration}
+                            reports={sanitizedThemeReportsModeration}
                         />
                     }
                     marketplacePanel={

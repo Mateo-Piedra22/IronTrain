@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
             let interval: ReturnType<typeof setInterval> | null = null;
             let maxDurationTimeout: ReturnType<typeof setTimeout> | null = null;
             let lastVersion: string | null = null;
+            let lastPulse: Awaited<ReturnType<typeof computeSocialPulse>> | null = null;
             let emittedPulseCount = 0;
             let emittedHeartbeatCount = 0;
             let emitErrorCount = 0;
@@ -97,7 +98,38 @@ export async function GET(req: NextRequest) {
                 try {
                     const pulse = await computeSocialPulse(userId);
                     if (pulse.version !== lastVersion) {
+                        if (lastPulse) {
+                            if (pulse.latestThemeRatingAtMs !== lastPulse.latestThemeRatingAtMs) {
+                                sendEvent('theme.rating.updated', {
+                                    atMs: pulse.latestThemeRatingAtMs,
+                                    version: pulse.domainVersions.themes,
+                                });
+                            }
+
+                            if (pulse.latestThemeFeedbackAtMs !== lastPulse.latestThemeFeedbackAtMs) {
+                                sendEvent('theme.feedback.created', {
+                                    atMs: pulse.latestThemeFeedbackAtMs,
+                                    version: pulse.domainVersions.themes,
+                                });
+                            }
+
+                            if (pulse.latestThemePackAtMs !== lastPulse.latestThemePackAtMs) {
+                                sendEvent('theme.updated', {
+                                    atMs: pulse.latestThemePackAtMs,
+                                    version: pulse.domainVersions.themes,
+                                });
+                            }
+
+                            if (pulse.latestThemeReportAtMs !== lastPulse.latestThemeReportAtMs) {
+                                sendEvent('theme.moderation.changed', {
+                                    atMs: pulse.latestThemeReportAtMs,
+                                    version: pulse.domainVersions.themes,
+                                });
+                            }
+                        }
+
                         lastVersion = pulse.version;
+                        lastPulse = pulse;
                         emittedPulseCount += 1;
                         sendEvent('pulse', pulse);
                     } else {
