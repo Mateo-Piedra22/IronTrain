@@ -2,6 +2,7 @@ import { EmptyChartPlaceholder } from '@/components/EmptyChartPlaceholder';
 import { BadgePill } from '@/components/ui/BadgePill';
 import { ExerciseVolumeRow, VolumeSeriesPoint } from '@/src/services/AnalysisService';
 import { ThemeFx, withAlpha } from '@/src/theme';
+import { triggerSensoryFeedback } from '@/src/utils/sensoryFeedback';
 import { useRouter } from 'expo-router';
 import { ChevronRight, Minus, TrendingDown, TrendingUp, Zap } from 'lucide-react-native';
 import React, { useMemo } from 'react';
@@ -291,7 +292,10 @@ export const AnalysisTrends = React.memo(({ volumeSeries, topExercisesByVolume, 
                 {[7, 30, 90, 365].map((d) => (
                     <Pressable
                         key={d}
-                        onPress={() => handleRangeChange(d as any)}
+                        onPress={() => {
+                            void triggerSensoryFeedback('selection');
+                            handleRangeChange(d as any);
+                        }}
                         style={[styles.rangeChip, rangeDays === d && styles.rangeChipActive]}
                     >
                         <Text style={[styles.rangeChipText, rangeDays === d && styles.rangeChipTextActive]}>
@@ -370,7 +374,10 @@ export const AnalysisTrends = React.memo(({ volumeSeries, topExercisesByVolume, 
                     topExercisesByVolume.map((e, idx) => (
                         <Pressable
                             key={e.exerciseId}
-                            onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: e.exerciseId, exerciseId: e.exerciseId, exerciseName: e.exerciseName } } as any)}
+                            onPress={() => {
+                                void triggerSensoryFeedback('selection');
+                                router.push({ pathname: '/exercise/[id]', params: { id: e.exerciseId, exerciseId: e.exerciseId, exerciseName: e.exerciseName } } as any);
+                            }}
                             style={styles.exerciseCard}
                         >
                             <View style={styles.exerciseCardContent}>

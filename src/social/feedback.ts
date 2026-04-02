@@ -1,21 +1,21 @@
-import * as Haptics from 'expo-haptics';
+import { triggerSensoryFeedback } from '../utils/sensoryFeedback';
 
 export const feedbackSelection = () => {
-    Haptics.selectionAsync().catch(() => undefined);
+    void triggerSensoryFeedback('selection');
 };
 
 export const feedbackSuccess = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    void triggerSensoryFeedback('success');
 };
 
 export const feedbackWarning = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
+    void triggerSensoryFeedback('warning');
 };
 
 export const feedbackError = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
+    void triggerSensoryFeedback('error');
 };
 
 export const feedbackSoftImpact = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    void triggerSensoryFeedback('tapLight');
 };

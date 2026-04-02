@@ -1,4 +1,5 @@
 import { ThemeFx, withAlpha } from '@/src/theme';
+import { triggerSensoryFeedback } from '@/src/utils/sensoryFeedback';
 import { useRouter } from 'expo-router';
 import { Ruler, Scale, TrendingDown, TrendingUp } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -108,7 +109,13 @@ export function BodySnapshotWidget({ unit, displayWeight }: BodySnapshotWidgetPr
     if (!latestWeight && !latestFat) return null;
 
     return (
-        <Pressable onPress={() => router.push('/body' as any)} style={styles.bodyCard}>
+        <Pressable
+            onPress={() => {
+                void triggerSensoryFeedback('selection');
+                router.push('/body' as any);
+            }}
+            style={styles.bodyCard}
+        >
             <View style={styles.bodyHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                     <View style={styles.bodyIconCircle}>

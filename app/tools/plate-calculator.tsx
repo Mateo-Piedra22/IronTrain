@@ -5,6 +5,7 @@ import { PlateCalculatorService, PlateLoadout } from '@/src/services/PlateCalcul
 import { settingsService } from '@/src/services/SettingsService';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { PlateInventory, PlateType } from '@/src/types/db';
+import { triggerSensoryFeedback } from '@/src/utils/sensoryFeedback';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { ChevronDown, ChevronLeft, ChevronUp, Disc, PaintBucket, Plus, Settings, Trash2, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -63,6 +64,18 @@ export default function PlateCalculator() {
     const [editingPlate, setEditingPlate] = useState<{ weight: string, count: string, color?: string, type?: PlateType, originalWeight?: number, originalType?: PlateType } | null>(null);
     const [isColorPickerVisible, setIsColorPickerVisible] = useState(false);
     const [preferFewerPlates, setPreferFewerPlates] = useState(configService.get('plateCalculatorPreferFewerPlates'));
+
+    const feedbackSelection = () => {
+        void triggerSensoryFeedback('selection');
+    };
+
+    const feedbackTapLight = () => {
+        void triggerSensoryFeedback('tapLight');
+    };
+
+    const feedbackWarning = () => {
+        void triggerSensoryFeedback('warning');
+    };
 
     useEffect(() => { loadInventory(); }, []);
 
@@ -250,7 +263,7 @@ export default function PlateCalculator() {
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40, paddingTop: 16 }}>
                 <View style={{ marginBottom: 24, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                        <TouchableOpacity onPress={() => router.back()} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
+                        <TouchableOpacity onPress={() => { feedbackSelection(); router.back(); }} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
                             <ChevronLeft size={20} color={colors.text} />
                         </TouchableOpacity>
                         <View>
@@ -259,7 +272,10 @@ export default function PlateCalculator() {
                         </View>
                     </View>
                     <TouchableOpacity
-                        onPress={() => setIsSettingsVisible(true)}
+                        onPress={() => {
+                            feedbackSelection();
+                            setIsSettingsVisible(true);
+                        }}
                         style={ss.backBtn}
                         accessibilityRole="button"
                         accessibilityLabel="Abrir inventario de discos"
@@ -290,7 +306,11 @@ export default function PlateCalculator() {
                         {(unit === 'kg' ? ['20', '15', '10'] : ['45', '35', '25']).map(w => (
                             <Pressable
                                 key={w}
-                                onPress={() => { setBarWeight(w); setTimeout(calculate, 0); }}
+                                onPress={() => {
+                                    feedbackSelection();
+                                    setBarWeight(w);
+                                    setTimeout(calculate, 0);
+                                }}
                                 style={[ss.barChip, barWeight === w && ss.barChipActive]}
                                 accessibilityRole="button"
                             >
@@ -311,7 +331,7 @@ export default function PlateCalculator() {
                 </View>
 
                 {/* Calculate CTA */}
-                <Pressable onPress={calculate} style={ss.calcBtn} accessibilityRole="button" accessibilityLabel="Calcular discos">
+                <Pressable onPress={() => { feedbackTapLight(); calculate(); }} style={ss.calcBtn} accessibilityRole="button" accessibilityLabel="Calcular discos">
                     <Disc size={18} color={colors.onPrimary} />
                     <Text style={ss.calcBtnText}>CALCULAR</Text>
                 </Pressable>
@@ -377,7 +397,7 @@ export default function PlateCalculator() {
                     <View style={[ss.card, { marginBottom: 24 }]}>
                         <Text style={{ color: colors.text, fontWeight: '800', fontSize: 14, marginBottom: 12 }}>Alternativas exactas</Text>
                         {exactAlternatives.map((l, idx) => (
-                            <Pressable key={idx} onPress={() => setActiveLoadout(l)} style={[ss.altRow, idx < exactAlternatives.length - 1 && ss.plateRowBorder]} accessibilityRole="button">
+                            <Pressable key={idx} onPress={() => { feedbackSelection(); setActiveLoadout(l); }} style={[ss.altRow, idx < exactAlternatives.length - 1 && ss.plateRowBorder]} accessibilityRole="button">
                                 <Text style={{ color: colors.text, fontWeight: '800', fontSize: 14 }}>{l.totalWeight} {unit}</Text>
                                 <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '600', marginTop: 2 }}>
                                     {l.perSide.map((p) => `${p.plate}${unit} ×${p.pairs}`).join(' · ')}
@@ -401,7 +421,7 @@ export default function PlateCalculator() {
                                         <Text style={ss.modalTitle}>{editingPlate ? (editingPlate.originalWeight ? 'Editar Disco' : 'Nuevo Disco') : 'Inventario de discos'}</Text>
                                         <Text style={ss.modalSub}>{editingPlate ? 'Ajusta peso, color y cantidad' : 'Gestiona tus discos disponibles'}</Text>
                                     </View>
-                                    <TouchableOpacity onPress={() => { editingPlate ? setEditingPlate(null) : setIsSettingsVisible(false) }} style={ss.modalCloseBtn} accessibilityRole="button">
+                                    <TouchableOpacity onPress={() => { feedbackSelection(); editingPlate ? setEditingPlate(null) : setIsSettingsVisible(false); }} style={ss.modalCloseBtn} accessibilityRole="button">
                                         <X color={colors.text} size={18} />
                                     </TouchableOpacity>
                                 </View>
@@ -433,11 +453,14 @@ export default function PlateCalculator() {
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
                                                 <TouchableOpacity
                                                     style={[ss.colorBtn, { backgroundColor: editingPlate.color || getPlateColor(parseFloat(editingPlate.weight) || 0, unit, editingPlate.type) }]}
-                                                    onPress={() => setIsColorPickerVisible(true)}
+                                                    onPress={() => {
+                                                        feedbackSelection();
+                                                        setIsColorPickerVisible(true);
+                                                    }}
                                                 >
                                                     <PaintBucket size={18} color={editingPlate.color ? colors.white : colors.black} />
                                                 </TouchableOpacity>
-                                                <TouchableOpacity onPress={() => setEditingPlate({ ...editingPlate, color: undefined })}>
+                                                <TouchableOpacity onPress={() => { feedbackSelection(); setEditingPlate({ ...editingPlate, color: undefined }); }}>
                                                     <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 12 }}>RESTABLECER AUTO</Text>
                                                 </TouchableOpacity>
                                             </View>
@@ -453,7 +476,7 @@ export default function PlateCalculator() {
                                                     return (
                                                         <Pressable
                                                             key={opt.val}
-                                                            onPress={() => setEditingPlate({ ...editingPlate, type: opt.val as PlateType })}
+                                                            onPress={() => { feedbackSelection(); setEditingPlate({ ...editingPlate, type: opt.val as PlateType }); }}
                                                             style={[ss.barChip, { paddingVertical: 10 }, isActive && ss.barChipActive]}
                                                         >
                                                             <Text style={[ss.barChipText, { fontSize: 13 }, isActive && ss.barChipTextActive]}>{opt.label}</Text>
@@ -465,11 +488,11 @@ export default function PlateCalculator() {
 
                                         <View style={{ flexDirection: 'row', gap: 12, marginTop: 'auto', paddingTop: 16 }}>
                                             {editingPlate.originalWeight !== undefined && (
-                                                <TouchableOpacity onPress={deletePlateEditor} style={[ss.calcBtn, { flex: 0, paddingHorizontal: 20, backgroundColor: colors.red }]}>
+                                                <TouchableOpacity onPress={() => { feedbackWarning(); deletePlateEditor(); }} style={[ss.calcBtn, { flex: 0, paddingHorizontal: 20, backgroundColor: colors.red }]}>
                                                     <Trash2 size={18} color={colors.white} />
                                                 </TouchableOpacity>
                                             )}
-                                            <TouchableOpacity onPress={savePlateEditor} style={[ss.calcBtn, { flex: 1, marginBottom: 0 }]}>
+                                            <TouchableOpacity onPress={() => { feedbackTapLight(); savePlateEditor(); }} style={[ss.calcBtn, { flex: 1, marginBottom: 0 }]}>
                                                 <Text style={ss.calcBtnText}>GUARDAR DISCO</Text>
                                             </TouchableOpacity>
                                         </View>
@@ -484,7 +507,10 @@ export default function PlateCalculator() {
                                         <View style={[ss.card, { marginBottom: 12 }]}>
                                             <Text style={ss.invSectionTitle}>Preferencia</Text>
                                             <TouchableOpacity
-                                                onPress={() => setPreferFewerPlates(!preferFewerPlates)}
+                                                onPress={() => {
+                                                    feedbackSelection();
+                                                    setPreferFewerPlates(!preferFewerPlates);
+                                                }}
                                                 style={[ss.toggleRow, preferFewerPlates && { backgroundColor: withAlpha(colors.primary.DEFAULT, '26'), borderColor: colors.primary.DEFAULT }]}
                                             >
                                                 <Text style={[{ fontWeight: '700', fontSize: 13 }, preferFewerPlates ? { color: colors.primary.DEFAULT } : { color: colors.text }]}>
@@ -498,7 +524,7 @@ export default function PlateCalculator() {
                                             <Text style={ss.invSectionTitle}>Simetría</Text>
                                             <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: 8, lineHeight: 16 }}>La app calcula por pares (1 disco por lado). Un disco suelto no se usa.</Text>
                                             {hasOddCounts && (
-                                                <TouchableOpacity onPress={normalizeToPairs} style={ss.toggleRow}>
+                                                <TouchableOpacity onPress={() => { feedbackSelection(); normalizeToPairs(); }} style={ss.toggleRow}>
                                                     <Text style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>Normalizar a pares</Text>
                                                     <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>Resta 1 a los conteos impares (solo {unit}).</Text>
                                                 </TouchableOpacity>
@@ -510,7 +536,10 @@ export default function PlateCalculator() {
                                             <TouchableOpacity
                                                 key={`${p.weight}-${p.type || 'standard'}`}
                                                 style={ss.invRow}
-                                                onPress={() => setEditingPlate({ weight: String(p.weight), count: String(p.count), color: p.color, type: p.type, originalWeight: p.weight, originalType: p.type })}
+                                                onPress={() => {
+                                                    feedbackSelection();
+                                                    setEditingPlate({ weight: String(p.weight), count: String(p.count), color: p.color, type: p.type, originalWeight: p.weight, originalType: p.type });
+                                                }}
                                             >
                                                 <View style={{ flex: 1 }}>
                                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -533,7 +562,10 @@ export default function PlateCalculator() {
                                         ))}
 
                                         <TouchableOpacity
-                                            onPress={() => setEditingPlate({ weight: '', count: '2' })}
+                                            onPress={() => {
+                                                feedbackTapLight();
+                                                setEditingPlate({ weight: '', count: '2' });
+                                            }}
                                             style={[ss.calcBtn, { marginTop: 16, backgroundColor: colors.border, shadowOpacity: 0, borderWidth: 1, borderColor: colors.border }]}
                                         >
                                             <Plus size={18} color={colors.text} />

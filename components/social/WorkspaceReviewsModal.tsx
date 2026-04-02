@@ -1,4 +1,5 @@
 import { SharedRoutineItem, SharedRoutineReviewRequest } from '@/src/services/SocialService';
+import { workspaceFeedback } from '@/src/social/workspaceFeedback';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { Check, RefreshCcw, X } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
@@ -83,6 +84,7 @@ export function WorkspaceReviewsModal({
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                             <TouchableOpacity
                                 onPress={() => {
+                                    workspaceFeedback.selection();
                                     void onRefresh();
                                 }}
                                 style={{ width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceLighter }}
@@ -90,7 +92,10 @@ export function WorkspaceReviewsModal({
                                 <RefreshCcw size={14} color={colors.textMuted} />
                             </TouchableOpacity>
                             <TouchableOpacity
-                                onPress={onClose}
+                                onPress={() => {
+                                    workspaceFeedback.selection();
+                                    onClose();
+                                }}
                                 style={{ width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceLighter }}
                             >
                                 <X size={14} color={colors.textMuted} />
@@ -105,7 +110,10 @@ export function WorkspaceReviewsModal({
                             return (
                                 <TouchableOpacity
                                     key={`review-filter-${status}`}
-                                    onPress={() => setStatusFilter(status)}
+                                    onPress={() => {
+                                        workspaceFeedback.selection();
+                                        setStatusFilter(status);
+                                    }}
                                     style={{ borderWidth: 1, borderColor: active ? withAlpha(colors.primary.DEFAULT, '35') : colors.border, borderRadius: 9, paddingHorizontal: 8, paddingVertical: 5, backgroundColor: active ? withAlpha(colors.primary.DEFAULT, '12') : colors.surface }}
                                 >
                                     <Text style={{ color: active ? colors.primary.DEFAULT : colors.textMuted, fontSize: 10, fontWeight: '900' }}>{label}</Text>
@@ -201,14 +209,20 @@ export function WorkspaceReviewsModal({
                                         {item.status === 'pending' && workspace?.membership.role === 'owner' && (
                                             <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                                                 <TouchableOpacity
-                                                    onPress={() => onDecideReview(item, 'approve')}
+                                                    onPress={() => {
+                                                        workspaceFeedback.selection();
+                                                        onDecideReview(item, 'approve');
+                                                    }}
                                                     style={{ flex: 1, minHeight: 34, borderRadius: 10, borderWidth: 1.5, borderColor: colors.primary.DEFAULT, backgroundColor: withAlpha(colors.primary.DEFAULT, '18'), alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
                                                 >
                                                     <Check size={14} color={colors.primary.DEFAULT} />
                                                     <Text style={{ color: colors.primary.DEFAULT, fontSize: 11, fontWeight: '900' }}>Aprobar cambio</Text>
                                                 </TouchableOpacity>
                                                 <TouchableOpacity
-                                                    onPress={() => onDecideReview(item, 'reject')}
+                                                    onPress={() => {
+                                                        workspaceFeedback.selection();
+                                                        onDecideReview(item, 'reject');
+                                                    }}
                                                     style={{ flex: 1, minHeight: 34, borderRadius: 10, borderWidth: 1, borderColor: withAlpha(colors.red, '35'), backgroundColor: colors.surfaceLighter, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
                                                 >
                                                     <X size={14} color={colors.red} />

@@ -109,7 +109,7 @@ const DirectShareItem = React.memo(({
                         {safeDate(item.createdAt).toLocaleDateString()}
                     </Text>
                     {!item.seenAt && (
-                        <TouchableOpacity onPress={() => onMarkAsSeen(item.id, 'direct_share')}>
+                        <TouchableOpacity onPress={() => { feedbackSelection(); onMarkAsSeen(item.id, 'direct_share'); }}>
                             <EyeOff size={14} color={colors.textMuted} />
                         </TouchableOpacity>
                     )}
@@ -124,10 +124,10 @@ const DirectShareItem = React.memo(({
 
             {!item.seenAt ? (
                 <View style={styles.premiumActions}>
-                    <TouchableOpacity style={styles.premiumBtnPrimary} onPress={() => onResponse(item.id, 'accept', item.payload)}>
+                    <TouchableOpacity style={styles.premiumBtnPrimary} onPress={() => { feedbackSelection(); onResponse(item.id, 'accept', item.payload); }}>
                         <Text style={styles.premiumBtnTextPrimary}>Importar Rutina</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.premiumBtnSecondary} onPress={() => onResponse(item.id, 'reject')}>
+                    <TouchableOpacity style={styles.premiumBtnSecondary} onPress={() => { feedbackSelection(); onResponse(item.id, 'reject'); }}>
                         <Text style={styles.premiumBtnTextSecondary}>Ignorar</Text>
                     </TouchableOpacity>
                 </View>
@@ -207,7 +207,11 @@ const ActivityItem = React.memo(({
             <View style={styles.activityFooter}>
                 <TouchableOpacity
                     style={[styles.kudoBtn, item.hasKudoed && styles.kudoBtnActive, isOwn && styles.kudoBtnDisabled]}
-                    onPress={() => !isOwn && onToggleKudo(item.id)}
+                    onPress={() => {
+                        if (isOwn) return;
+                        feedbackSelection();
+                        onToggleKudo(item.id);
+                    }}
                     disabled={isOwn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
@@ -219,7 +223,7 @@ const ActivityItem = React.memo(({
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                     {isOwn && <Text style={styles.ownActivityHint}>Tu actividad</Text>}
                     {!item.seenAt && (
-                        <TouchableOpacity onPress={() => onMarkAsSeen(item.id, 'activity_log')}>
+                        <TouchableOpacity onPress={() => { feedbackSelection(); onMarkAsSeen(item.id, 'activity_log'); }}>
                             <Eye size={18} color={colors.textMuted} />
                         </TouchableOpacity>
                     )}
@@ -498,7 +502,10 @@ const InboxTab = React.memo(({
                             {!showSeen && handleMarkAllAsSeen && (
                                 <TouchableOpacity
                                     style={[styles.archiveToggle, { marginLeft: 10, borderColor: colors.border }]}
-                                    onPress={handleMarkAllAsSeen}
+                                    onPress={() => {
+                                        feedbackSelection();
+                                        handleMarkAllAsSeen();
+                                    }}
                                     hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                 >
                                     <CheckCircle size={16} color={colors.textMuted} />

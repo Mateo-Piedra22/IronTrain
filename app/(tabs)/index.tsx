@@ -16,7 +16,6 @@ import { useTimerStore } from '@/src/store/timerStore';
 import { formatTimeSeconds } from '@/src/utils/time';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { addDays, subDays } from 'date-fns';
-import * as Haptics from 'expo-haptics';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
 import { BookOpen, Check, Copy, Info, Plus, Timer, Wrench, X } from 'lucide-react-native';
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
@@ -31,6 +30,7 @@ import { ThemeFx } from '../../src/theme';
 import { ExerciseType, Workout, WorkoutSet } from '../../src/types/db';
 import { logger } from '../../src/utils/logger';
 import { notify } from '../../src/utils/notify';
+import { triggerSensoryFeedback } from '../../src/utils/sensoryFeedback';
 
 export default function DailyLogScreen() {
   const router = useRouter();
@@ -175,7 +175,7 @@ export default function DailyLogScreen() {
 
   const handleStartNewSession = useCallback(async () => {
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      void triggerSensoryFeedback('tapMedium');
       await workoutService.startNewSession(selectedDate);
       await loadData();
       notify.success('Nueva sesión', 'Se ha iniciado un nuevo entrenamiento.');
@@ -338,7 +338,7 @@ export default function DailyLogScreen() {
 
   // Swipe Gesture
   const changeDate = (direction: 'next' | 'prev') => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void triggerSensoryFeedback('selection');
     const newDate = direction === 'next' ? addDays(selectedDate, 1) : subDays(selectedDate, 1);
     setSelectedDate(newDate);
   };
@@ -355,7 +355,7 @@ export default function DailyLogScreen() {
       }
     }
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void triggerSensoryFeedback('tapLight');
   };
 
   const handleDeleteSession = async (workoutId: string) => {
@@ -433,7 +433,10 @@ export default function DailyLogScreen() {
                 {/* Compact Session Pill */}
                 {sessionStatus && (
                   <TouchableOpacity
-                    onPress={() => setShowSessionModal(true)}
+                    onPress={() => {
+                      void triggerSensoryFeedback('selection');
+                      setShowSessionModal(true);
+                    }}
                     activeOpacity={0.7}
                     style={{
                       flexDirection: 'row',
@@ -464,6 +467,9 @@ export default function DailyLogScreen() {
                 {/* Changelog Info */}
                 <Link href="/changelog" asChild>
                   <TouchableOpacity
+                    onPress={() => {
+                      void triggerSensoryFeedback('selection');
+                    }}
                     activeOpacity={0.7}
                     style={{
                       width: 40,
@@ -557,7 +563,10 @@ export default function DailyLogScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => setLoadRoutineModalVisible(true)}
+                onPress={() => {
+                  void triggerSensoryFeedback('selection');
+                  setLoadRoutineModalVisible(true);
+                }}
                 style={{
                   backgroundColor: colors.surface,
                   paddingHorizontal: 20,
@@ -578,6 +587,7 @@ export default function DailyLogScreen() {
 
               <TouchableOpacity
                 onPress={async () => {
+                  void triggerSensoryFeedback('selection');
                   if (!workout) {
                     try {
                       await workoutService.startNewSession(selectedDate);
@@ -608,7 +618,10 @@ export default function DailyLogScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => router.push('/(tabs)/analysis' as any)}
+                onPress={() => {
+                  void triggerSensoryFeedback('selection');
+                  router.push('/(tabs)/analysis' as any);
+                }}
                 style={{
                   backgroundColor: colors.surface,
                   paddingHorizontal: 20,
@@ -652,7 +665,10 @@ export default function DailyLogScreen() {
       {
         !loading && (
           <TouchableOpacity
-            onPress={handleAddButton}
+            onPress={() => {
+              void triggerSensoryFeedback('tapLight');
+              handleAddButton();
+            }}
             style={{
               position: 'absolute',
               bottom: bottomOffset,
@@ -689,7 +705,10 @@ export default function DailyLogScreen() {
                 <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>Tocá uno para agregarlo al entrenamiento</Text>
               </View>
               <TouchableOpacity
-                onPress={() => setIsPickerVisible(false)}
+                onPress={() => {
+                  void triggerSensoryFeedback('selection');
+                  setIsPickerVisible(false);
+                }}
                 style={{ padding: 12 }}
                 accessibilityRole="button"
                 accessibilityLabel="Cerrar selector de ejercicios"
@@ -732,7 +751,10 @@ export default function DailyLogScreen() {
       >
         <TouchableOpacity
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 }}
-          onPress={() => setShowSessionModal(false)}
+          onPress={() => {
+            void triggerSensoryFeedback('selection');
+            setShowSessionModal(false);
+          }}
           activeOpacity={1}
         >
           <View style={{
@@ -747,7 +769,7 @@ export default function DailyLogScreen() {
           }}>
             <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={{ fontSize: 18, fontWeight: '900', color: colors.text }}>Sesiones de Hoy</Text>
-              <TouchableOpacity onPress={() => setShowSessionModal(false)}>
+              <TouchableOpacity onPress={() => { void triggerSensoryFeedback('selection'); setShowSessionModal(false); }}>
                 <X size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
@@ -821,6 +843,7 @@ export default function DailyLogScreen() {
 
                     <TouchableOpacity
                       onPress={(e) => {
+                        void triggerSensoryFeedback('warning');
                         e.stopPropagation();
                         handleDeleteSession(w.id);
                       }}
@@ -835,6 +858,7 @@ export default function DailyLogScreen() {
 
             <TouchableOpacity
               onPress={() => {
+                void triggerSensoryFeedback('tapLight');
                 setShowSessionModal(false);
                 handleStartNewSession();
               }}
@@ -847,6 +871,7 @@ export default function DailyLogScreen() {
             <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: ThemeFx.withAlpha(colors.surface, 0.5) }}>
               <TouchableOpacity
                 onPress={() => {
+                  void triggerSensoryFeedback('selection');
                   setShowSessionModal(false);
                   router.push('/(tabs)/analysis' as any);
                 }}
@@ -884,7 +909,10 @@ export default function DailyLogScreen() {
       {
         !loading && (
           <TouchableOpacity
-            onPress={() => setTimerVisible(true)}
+            onPress={() => {
+              void triggerSensoryFeedback('selection');
+              setTimerVisible(true);
+            }}
             style={{
               position: 'absolute',
               bottom: bottomOffset,

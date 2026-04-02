@@ -1,6 +1,7 @@
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
 import { SharedRoutineChangeItem, SharedRoutineItem, SharedRoutineReviewRequest } from '@/src/services/SocialService';
+import { workspaceFeedback } from '@/src/social/workspaceFeedback';
 import { withAlpha } from '@/src/theme';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
@@ -126,12 +127,15 @@ export function WorkspaceActionsSection({
                 <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
                     <TouchableOpacity
                         style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, alignItems: 'center', justifyContent: 'center', minHeight: 34, backgroundColor: colors.surface, paddingHorizontal: 10 }}
-                        onPress={() => runExplainedAction(
-                            'Traer última versión',
-                            'Descarga y aplica en tu rutina la versión más reciente de este espacio. Si ya la tenés, no se duplica.',
-                            'Aplicar revisión',
-                            onImportWorkspaceSnapshot,
-                        )}
+                        onPress={() => {
+                            workspaceFeedback.selection();
+                            runExplainedAction(
+                                'Traer última versión',
+                                'Descarga y aplica en tu rutina la versión más reciente de este espacio. Si ya la tenés, no se duplica.',
+                                'Aplicar revisión',
+                                onImportWorkspaceSnapshot,
+                            );
+                        }}
                         disabled={teamLoading}
                     >
                         <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>Traer revisión actual</Text>
@@ -140,12 +144,15 @@ export function WorkspaceActionsSection({
                     {activeWorkspace.membership.canEdit && (
                         <TouchableOpacity
                             style={{ borderWidth: 1.5, borderColor: colors.primary.DEFAULT, borderRadius: 10, alignItems: 'center', justifyContent: 'center', minHeight: 34, backgroundColor: withAlpha(colors.primary.DEFAULT, '18'), paddingHorizontal: 10 }}
-                            onPress={() => runExplainedAction(
-                                'Publicar tus cambios',
-                                'Sube tu versión local como nueva propuesta para el equipo. Si el espacio requiere aprobación, quedará pendiente del owner.',
-                                'Publicar',
-                                onPublishWorkspaceChanges,
-                            )}
+                            onPress={() => {
+                                workspaceFeedback.selection();
+                                runExplainedAction(
+                                    'Publicar tus cambios',
+                                    'Sube tu versión local como nueva propuesta para el equipo. Si el espacio requiere aprobación, quedará pendiente del owner.',
+                                    'Publicar',
+                                    onPublishWorkspaceChanges,
+                                );
+                            }}
                             disabled={teamLoading}
                         >
                             <Text style={{ color: colors.primary.DEFAULT, fontWeight: '900', fontSize: 11 }}>Publicar tus cambios</Text>
@@ -155,12 +162,15 @@ export function WorkspaceActionsSection({
                     {activeWorkspace.membership.role === 'owner' && (
                         <TouchableOpacity
                             style={{ borderWidth: 1, borderColor: withAlpha(colors.primary.DEFAULT, '35'), borderRadius: 10, alignItems: 'center', justifyContent: 'center', minHeight: 34, backgroundColor: colors.surface, paddingHorizontal: 10 }}
-                            onPress={() => runExplainedAction(
-                                'Actualizar desde rutina base',
-                                'Reemplaza el contenido actual del espacio con tu rutina base local y genera una nueva revisión.',
-                                'Actualizar',
-                                onOwnerSyncWorkspace,
-                            )}
+                            onPress={() => {
+                                workspaceFeedback.selection();
+                                runExplainedAction(
+                                    'Actualizar desde rutina base',
+                                    'Reemplaza el contenido actual del espacio con tu rutina base local y genera una nueva revisión.',
+                                    'Actualizar',
+                                    onOwnerSyncWorkspace,
+                                );
+                            }}
                             disabled={teamLoading}
                         >
                             <Text style={{ color: colors.primary.DEFAULT, fontWeight: '900', fontSize: 11 }}>Actualizar desde rutina base</Text>
@@ -177,12 +187,15 @@ export function WorkspaceActionsSection({
                 <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
                     <TouchableOpacity
                         style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, alignItems: 'center', justifyContent: 'center', minHeight: 34, backgroundColor: colors.surface, paddingHorizontal: 10 }}
-                        onPress={() => runExplainedAction(
-                            'Ver historial',
-                            'Muestra los cambios registrados en este espacio para entender qué se modificó y cuándo.',
-                            'Ver historial',
-                            onViewWorkspaceHistory,
-                        )}
+                        onPress={() => {
+                            workspaceFeedback.selection();
+                            runExplainedAction(
+                                'Ver historial',
+                                'Muestra los cambios registrados en este espacio para entender qué se modificó y cuándo.',
+                                'Ver historial',
+                                onViewWorkspaceHistory,
+                            );
+                        }}
                         disabled={teamLoading}
                     >
                         <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>Abrir historial</Text>
@@ -190,12 +203,15 @@ export function WorkspaceActionsSection({
 
                     <TouchableOpacity
                         style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, alignItems: 'center', justifyContent: 'center', minHeight: 34, backgroundColor: colors.surface, paddingHorizontal: 10 }}
-                        onPress={() => runExplainedAction(
-                            'Ver comentarios',
-                            'Abre el resumen de comentarios recientes del equipo para este espacio.',
-                            'Ver comentarios',
-                            onLoadWorkspaceComments,
-                        )}
+                        onPress={() => {
+                            workspaceFeedback.selection();
+                            runExplainedAction(
+                                'Ver comentarios',
+                                'Abre el resumen de comentarios recientes del equipo para este espacio.',
+                                'Ver comentarios',
+                                onLoadWorkspaceComments,
+                            );
+                        }}
                         disabled={teamLoading}
                     >
                         <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>Abrir comentarios</Text>
@@ -203,12 +219,15 @@ export function WorkspaceActionsSection({
 
                     <TouchableOpacity
                         style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, alignItems: 'center', justifyContent: 'center', minHeight: 34, backgroundColor: colors.surface, paddingHorizontal: 10 }}
-                        onPress={() => runExplainedAction(
-                            'Ver revisiones',
-                            'Consulta propuestas pendientes, aprobadas o rechazadas en este espacio.',
-                            'Ver revisiones',
-                            onLoadWorkspaceReviews,
-                        )}
+                        onPress={() => {
+                            workspaceFeedback.selection();
+                            runExplainedAction(
+                                'Ver revisiones',
+                                'Consulta propuestas pendientes, aprobadas o rechazadas en este espacio.',
+                                'Ver revisiones',
+                                onLoadWorkspaceReviews,
+                            );
+                        }}
                         disabled={teamLoading}
                     >
                         <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>Abrir revisiones</Text>
@@ -226,7 +245,10 @@ export function WorkspaceActionsSection({
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                             <TouchableOpacity
                                 style={{ flex: 1, borderWidth: 1, borderColor: withAlpha(colors.red, '35'), borderRadius: 10, alignItems: 'center', justifyContent: 'center', minHeight: 34, backgroundColor: withAlpha(colors.red, '08') }}
-                                onPress={onRollbackWorkspace}
+                                onPress={() => {
+                                    workspaceFeedback.selection();
+                                    onRollbackWorkspace();
+                                }}
                                 disabled={teamLoading || activeWorkspace.currentRevision <= 1}
                             >
                                 <Text style={{ color: colors.red, fontWeight: '900', fontSize: 11 }}>Volver a revisión anterior</Text>
@@ -246,7 +268,10 @@ export function WorkspaceActionsSection({
                     <View style={{ width: 140, justifyContent: 'flex-end', paddingBottom: 2 }}>
                         <IronButton
                             label="Enviar comentario"
-                            onPress={onAddWorkspaceComment}
+                            onPress={() => {
+                                workspaceFeedback.selection();
+                                onAddWorkspaceComment();
+                            }}
                             disabled={teamLoading || !workspaceCommentDraft.trim()}
                         />
                     </View>
@@ -267,14 +292,20 @@ export function WorkspaceActionsSection({
                             <View key={`pending-review-${review.id}`} style={{ flexDirection: 'row', gap: 8 }}>
                                 <TouchableOpacity
                                     style={{ flex: 1, borderWidth: 1, borderColor: colors.primary.DEFAULT, borderRadius: 10, alignItems: 'center', justifyContent: 'center', minHeight: 34, backgroundColor: withAlpha(colors.primary.DEFAULT, '12') }}
-                                    onPress={() => onDecideReview(review, 'approve')}
+                                    onPress={() => {
+                                        workspaceFeedback.selection();
+                                        onDecideReview(review, 'approve');
+                                    }}
                                     disabled={teamLoading}
                                 >
                                     <Text style={{ color: colors.primary.DEFAULT, fontWeight: '900', fontSize: 11 }}>Aprobar propuesta</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={{ flex: 1, borderWidth: 1, borderColor: withAlpha(colors.red, '35'), borderRadius: 10, alignItems: 'center', justifyContent: 'center', minHeight: 34, backgroundColor: withAlpha(colors.red, '08') }}
-                                    onPress={() => onDecideReview(review, 'reject')}
+                                    onPress={() => {
+                                        workspaceFeedback.selection();
+                                        onDecideReview(review, 'reject');
+                                    }}
                                     disabled={teamLoading}
                                 >
                                     <Text style={{ color: colors.red, fontWeight: '900', fontSize: 11 }}>Rechazar propuesta</Text>

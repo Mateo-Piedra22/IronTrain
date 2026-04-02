@@ -1,16 +1,16 @@
 import { notify } from '@/src/utils/notify';
-import * as Haptics from 'expo-haptics';
+import { triggerSensoryFeedback } from '@/src/utils/sensoryFeedback';
 
 function fireSelection() {
-    void Haptics.selectionAsync().catch(() => undefined);
+    void triggerSensoryFeedback('selection');
 }
 
 function fireSuccess() {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    void triggerSensoryFeedback('success');
 }
 
 function fireError() {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
+    void triggerSensoryFeedback('error');
 }
 
 export const workspaceFeedback = {

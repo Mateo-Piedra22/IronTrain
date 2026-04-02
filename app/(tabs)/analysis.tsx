@@ -18,6 +18,7 @@ import { IronTrainLogo } from '../../components/IronTrainLogo';
 import { useColors } from '../../src/hooks/useColors';
 import { ThemeFx } from '../../src/theme';
 import { logger } from '../../src/utils/logger';
+import { triggerSensoryFeedback } from '../../src/utils/sensoryFeedback';
 
 interface RangeAnalysisState {
     summary7: WorkoutSummary | null;
@@ -289,7 +290,10 @@ export default function AnalysisScreen() {
                             ].map((t) => (
                                 <Pressable
                                     key={t.key}
-                                    onPress={() => setTab(t.key as any)}
+                                    onPress={() => {
+                                        void triggerSensoryFeedback('selection');
+                                        setTab(t.key as any);
+                                    }}
                                     style={{
                                         paddingHorizontal: 16,
                                         paddingVertical: 8,
@@ -328,7 +332,7 @@ export default function AnalysisScreen() {
                             <IronCard style={ss.errorCard}>
                                 <Text style={ss.errorTitle}>Error de carga</Text>
                                 <Text style={ss.errorMsg}>{error}</Text>
-                                <Pressable onPress={loadStats} style={ss.retryBtn}>
+                                <Pressable onPress={() => { void triggerSensoryFeedback('tapLight'); loadStats(); }} style={ss.retryBtn}>
                                     <Text style={ss.retryText}>Reintentar</Text>
                                 </Pressable>
                             </IronCard>

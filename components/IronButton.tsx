@@ -1,8 +1,9 @@
 import { ThemeFx, withAlpha } from '@/src/theme';
-import * as Haptics from 'expo-haptics';
 import { useMemo } from 'react';
-import { ActivityIndicator, Pressable, PressableProps, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, PressableProps, StyleSheet, Text } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useColors } from '../src/hooks/useColors';
+import { triggerSensoryFeedback } from '../src/utils/sensoryFeedback';
 
 interface IronButtonProps extends PressableProps {
     variant?: 'solid' | 'outline' | 'ghost';
@@ -18,9 +19,12 @@ export function IronButton({
     loading = false,
     disabled,
     onPress,
+    onPressIn,
+    onPressOut,
     ...props
 }: IronButtonProps) {
     const colors = useColors();
+    const pressScale = useSharedValue(1);
 
     const ss = useMemo(() => {
         const variants = {
@@ -89,11 +93,25 @@ export function IronButton({
         });
     }, [colors, variant, size]);
 
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: pressScale.value }],
+    }));
+
     const handlePress = (e: any) => {
         if (!disabled && !loading) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            void triggerSensoryFeedback('tapLight');
             onPress?.(e);
         }
+    };
+
+    const handlePressIn: NonNullable<PressableProps['onPressIn']> = (e) => {
+        pressScale.value = withSpring(0.97, { damping: 18, stiffness: 320, mass: 0.3 });
+        onPressIn?.(e);
+    };
+
+    const handlePressOut: NonNullable<PressableProps['onPressOut']> = (e) => {
+        pressScale.value = withSpring(1, { damping: 18, stiffness: 260, mass: 0.3 });
+        onPressOut?.(e);
     };
 
     const rippleColor = useMemo(() => {
@@ -102,11 +120,13 @@ export function IronButton({
     }, [colors, variant]);
 
     return (
-        <View style={[ss.container, disabled && ss.disabled]}>
+        <Animated.View style={[ss.container, disabled && ss.disabled, animatedStyle]}>
             <Pressable
                 style={ss.pressable}
                 android_ripple={{ color: rippleColor }}
                 onPress={handlePress}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
                 disabled={disabled || loading}
                 accessibilityRole="button"
                 accessibilityLabel={props.accessibilityLabel || label}
@@ -122,6 +142,6 @@ export function IronButton({
                     </Text>
                 )}
             </Pressable>
-        </View>
+        </Animated.View>
     );
 }

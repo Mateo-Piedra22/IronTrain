@@ -1,5 +1,6 @@
 import { backupService } from '@/src/services/BackupService';
 import { ThemeFx, withAlpha } from '@/src/theme';
+import { triggerSensoryFeedback } from '@/src/utils/sensoryFeedback';
 import { useRouter } from 'expo-router';
 import { Calculator, ChevronRight, CircleDot, Database, History, Ruler, Settings, Wrench } from 'lucide-react-native';
 import React, { useMemo } from 'react';
@@ -123,6 +124,7 @@ export function AnalysisTools({ setCalcVisible, setHistoryVisible }: AnalysisToo
     };
 
     const handlePress = (id: string) => {
+        void triggerSensoryFeedback('selection');
         switch (id) {
             case 'history':
                 setHistoryVisible(true);

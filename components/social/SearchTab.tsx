@@ -91,7 +91,10 @@ export const SearchTab = React.memo(({
                     autoCapitalize="none"
                     autoCorrect={false}
                     returnKeyType="search"
-                    onSubmitEditing={onSearch}
+                    onSubmitEditing={() => {
+                        feedbackSelection();
+                        onSearch();
+                    }}
                 />
                 {!!trimmedQuery && (
                     <TouchableOpacity
@@ -104,7 +107,15 @@ export const SearchTab = React.memo(({
                         <X size={14} color={colors.textMuted} />
                     </TouchableOpacity>
                 )}
-                <TouchableOpacity style={[styles.searchBtn, (!canSearch || loading) && { opacity: 0.5 }]} onPress={onSearch} disabled={loading || !canSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <TouchableOpacity
+                    style={[styles.searchBtn, (!canSearch || loading) && { opacity: 0.5 }]}
+                    onPress={() => {
+                        feedbackSelection();
+                        onSearch();
+                    }}
+                    disabled={loading || !canSearch}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
                     <Text style={styles.searchBtnText}>Buscar</Text>
                 </TouchableOpacity>
             </View>

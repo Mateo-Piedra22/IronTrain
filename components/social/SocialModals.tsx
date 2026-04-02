@@ -111,8 +111,8 @@ export const ProfileEditModal = React.memo(({
     };
 
     return (
-        <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-            <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <Modal visible={visible} transparent animationType="fade" onRequestClose={() => { feedbackSelection(); onClose(); }}>
+            <Pressable style={styles.modalOverlay} onPress={() => { feedbackSelection(); onClose(); }}>
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%', alignItems: 'center' }}>
                     <Pressable style={styles.modalCard} onPress={() => { }}>
                         <View style={styles.modalHeader}>
@@ -301,9 +301,9 @@ export const FriendDetailModal = React.memo(({
     const bodyMaxHeight = Math.max(220, modalMaxHeight - 66 - actionAreaEstimate);
 
     return (
-        <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+        <Modal visible={visible} transparent animationType="fade" onRequestClose={() => { feedbackSelection(); onClose(); }}>
             <View style={styles.modalOverlay}>
-                <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => { feedbackSelection(); onClose(); }} />
                 <View style={{ width: '100%', alignItems: 'center' }}>
                     <Animated.View style={[styles.modalCard, { width: '100%', maxWidth: modalMaxWidth, maxHeight: modalMaxHeight, opacity: cardOpacity, transform: [{ translateY: cardTranslateY }] }]}>
                     <View style={styles.modalHeader}>
@@ -469,9 +469,9 @@ export const ScoreInfoModal = React.memo(({
     styles
 }: ScoreInfoModalProps) => {
     return (
-        <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+        <Modal visible={visible} transparent animationType="fade" onRequestClose={() => { feedbackSelection(); onClose(); }}>
             <View style={styles.modalOverlay}>
-                <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => { feedbackSelection(); onClose(); }} />
                 <View style={[styles.modalCard, { height: '80%', maxHeight: '85%' }]}>
                     <View style={styles.modalHeader}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -602,9 +602,9 @@ export const GlobalEventModal = React.memo(({
 }: GlobalEventModalProps) => {
     if (!event) return null;
     return (
-        <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+        <Modal visible={visible} transparent animationType="fade" onRequestClose={() => { feedbackSelection(); onClose(); }}>
             <View style={styles.modalOverlay}>
-                <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => { feedbackSelection(); onClose(); }} />
                 <View style={styles.detailModalCard}>
                     <View style={[styles.detailIconCircle, { borderColor: colors.yellow, backgroundColor: withAlpha(colors.yellow, '15') }]}>
                         <Zap size={32} color={colors.yellow} fill={colors.yellow} />
@@ -659,9 +659,9 @@ export const WeatherBonusModal = React.memo(({
         }
     }, [visible, onLoadHistory]);
     return (
-        <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+        <Modal visible={visible} transparent animationType="fade" onRequestClose={() => { feedbackSelection(); onClose(); }}>
             <View style={styles.modalOverlay}>
-                <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => { feedbackSelection(); onClose(); }} />
                 <View style={styles.detailModalCard}>
                     <View style={[
                         styles.detailIconCircle,

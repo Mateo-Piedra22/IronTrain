@@ -10,6 +10,7 @@ import { updateService } from '@/src/services/UpdateService';
 import { useUpdateStore } from '@/src/store/updateStore';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { notify } from '@/src/utils/notify';
+import { triggerSensoryFeedback } from '@/src/utils/sensoryFeedback';
 import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
 import { AlertTriangle, BarChart3, Bell, Calculator, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, CloudLightning, Database, Disc, Download, LogOut, Megaphone, MessageSquare, RefreshCw, Ruler, Shield, Smartphone, Timer, Trash2, User, Vibrate, Volume2, Zap } from 'lucide-react-native';
@@ -111,6 +112,18 @@ export default function SettingsScreen() {
     const lastChecked = useUpdateStore((state) => state.lastChecked);
 
     const updateInfo = { installedVersion: installedVersionStr, latestVersion, date: releaseDate, error: updateError, downloadUrl, notesUrl, lastChecked };
+
+    const feedbackSelection = () => {
+        void triggerSensoryFeedback('selection');
+    };
+
+    const feedbackTapLight = () => {
+        void triggerSensoryFeedback('tapLight');
+    };
+
+    const feedbackWarning = () => {
+        void triggerSensoryFeedback('warning');
+    };
 
     useDataReload(() => {
         loadSettings();
@@ -566,7 +579,7 @@ export default function SettingsScreen() {
         activeCount: number; totalCount: number; borderBottom?: boolean;
     }) => (
         <View style={[ns.groupRow, borderBottom && s.settingRowBorder]}>
-            <TouchableOpacity onPress={onExpand} style={ns.groupLeft} activeOpacity={0.6}>
+            <TouchableOpacity onPress={() => { feedbackSelection(); onExpand(); }} style={ns.groupLeft} activeOpacity={0.6}>
                 <View style={[ns.groupIcon, !enabled && { opacity: 0.35 }]}>
                     <Icon size={15} color={colors.primary.DEFAULT} />
                 </View>
@@ -622,11 +635,11 @@ export default function SettingsScreen() {
 
     const Stepper = ({ value, label, onMinus, onPlus }: { value: string; label?: string; onMinus: () => void; onPlus: () => void }) => (
         <View style={s.stepperRow}>
-            <TouchableOpacity onPress={onMinus} style={s.stepperBtn} accessibilityRole="button" accessibilityLabel={`Reducir ${label || ''}`}>
+            <TouchableOpacity onPress={() => { feedbackTapLight(); onMinus(); }} style={s.stepperBtn} accessibilityRole="button" accessibilityLabel={`Reducir ${label || ''}`}>
                 <Text style={s.stepperBtnText}>−</Text>
             </TouchableOpacity>
             <Text style={s.stepperValue}>{value}</Text>
-            <TouchableOpacity onPress={onPlus} style={s.stepperBtn} accessibilityRole="button" accessibilityLabel={`Aumentar ${label || ''}`}>
+            <TouchableOpacity onPress={() => { feedbackTapLight(); onPlus(); }} style={s.stepperBtn} accessibilityRole="button" accessibilityLabel={`Aumentar ${label || ''}`}>
                 <Text style={s.stepperBtnText}>+</Text>
             </TouchableOpacity>
         </View>
@@ -637,7 +650,10 @@ export default function SettingsScreen() {
             {options.map((o) => (
                 <TouchableOpacity
                     key={o.id}
-                    onPress={() => onSelect(o.id)}
+                    onPress={() => {
+                        feedbackSelection();
+                        onSelect(o.id);
+                    }}
                     style={[s.chip, selected === o.id && s.chipActive]}
                     accessibilityRole="button"
                     accessibilityLabel={`Seleccionar ${o.label}`}
@@ -654,7 +670,7 @@ export default function SettingsScreen() {
 
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40, paddingTop: 16 }}>
                 <View style={{ marginBottom: 24, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                    <TouchableOpacity onPress={() => router.back()} style={s.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
+                    <TouchableOpacity onPress={() => { feedbackSelection(); router.back(); }} style={s.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
                         <ChevronLeft size={20} color={colors.text} />
                     </TouchableOpacity>
                     <View>
@@ -674,6 +690,7 @@ export default function SettingsScreen() {
                             </View>
                             <TouchableOpacity
                                 onPress={() => {
+                                    feedbackWarning();
                                     confirm.ask('Cerrar Sesión', '¿Estás seguro que deseas cerrar sesión? Tus datos locales no se borrarán, pero dejarás de sincronizarte.', async () => {
                                         await auth.logout();
                                         notify.success('Sesión cerrada', 'Te has desconectado correctamente.');
@@ -692,6 +709,7 @@ export default function SettingsScreen() {
                             </Text>
                             <TouchableOpacity
                                 onPress={async () => {
+                                    feedbackSelection();
                                     await auth.login();
                                 }}
                                 disabled={auth.isLoading}
@@ -757,6 +775,7 @@ export default function SettingsScreen() {
                                     <TouchableOpacity
                                         key={day.id}
                                         onPress={() => {
+                                            feedbackSelection();
                                             const newDays = isSelected ? trainingDays.filter(d => d !== day.id) : [...trainingDays, day.id].sort();
                                             saveSetting('training_days', newDays);
                                         }}
@@ -908,7 +927,7 @@ export default function SettingsScreen() {
                 {/* Tools & Data */}
                 <SectionHeader icon={Database} title="Herramientas y datos" />
                 <View style={s.card}>
-                    <TouchableOpacity onPress={() => router.push('/tools/plate-calculator' as any)} style={[s.settingRow, s.settingRowBorder]}>
+                    <TouchableOpacity onPress={() => { feedbackSelection(); router.push('/tools/plate-calculator' as any); }} style={[s.settingRow, s.settingRowBorder]}>
                         <View style={s.settingLeft}>
                             <View style={s.settingIconCircle}><Disc size={16} color={colors.primary.DEFAULT} /></View>
                             <Text style={s.settingLabel}>Inventario de discos</Text>
@@ -916,7 +935,7 @@ export default function SettingsScreen() {
                         <ChevronRight size={16} color={colors.textMuted} />
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={() => router.push('/body' as any)} style={[s.settingRow, s.settingRowBorder]}>
+                    <TouchableOpacity onPress={() => { feedbackSelection(); router.push('/body' as any); }} style={[s.settingRow, s.settingRowBorder]}>
                         <View style={s.settingLeft}>
                             <View style={s.settingIconCircle}><Ruler size={16} color={colors.primary.DEFAULT} /></View>
                             <Text style={s.settingLabel}>Evolución Física</Text>
@@ -924,7 +943,7 @@ export default function SettingsScreen() {
                         <ChevronRight size={16} color={colors.textMuted} />
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={handleNormalizeNames} style={[s.settingRow, s.settingRowBorder]}>
+                    <TouchableOpacity onPress={() => { feedbackSelection(); handleNormalizeNames(); }} style={[s.settingRow, s.settingRowBorder]}>
                         <View style={s.settingLeft}>
                             <View style={s.settingIconCircle}><RefreshCw size={16} color={colors.primary.DEFAULT} /></View>
                             <View style={{ flex: 1 }}>
@@ -951,7 +970,7 @@ export default function SettingsScreen() {
                         <Switch value={preferFewerPlates} onValueChange={(v) => saveSetting('plateCalculatorPreferFewerPlates', v)} trackColor={{ true: colors.primary.DEFAULT }} />
                     </SettingRow>
 
-                    <TouchableOpacity onPress={handleBackup} style={[s.settingRow, s.settingRowBorder]}>
+                    <TouchableOpacity onPress={() => { feedbackSelection(); handleBackup(); }} style={[s.settingRow, s.settingRowBorder]}>
                         <View style={s.settingLeft}>
                             <View style={s.settingIconCircle}><Disc size={16} color={colors.primary.DEFAULT} /></View>
                             <Text style={s.settingLabel}>Exportar backup (JSON)</Text>
@@ -959,7 +978,7 @@ export default function SettingsScreen() {
                         <ChevronRight size={16} color={colors.textMuted} />
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={handleDownloadBackup} style={[s.settingRow, s.settingRowBorder]}>
+                    <TouchableOpacity onPress={() => { feedbackSelection(); handleDownloadBackup(); }} style={[s.settingRow, s.settingRowBorder]}>
                         <View style={s.settingLeft}>
                             <View style={s.settingIconCircle}><Download size={16} color={colors.primary.DEFAULT} /></View>
                             <Text style={s.settingLabel}>Descargar backup (JSON)</Text>
@@ -967,7 +986,7 @@ export default function SettingsScreen() {
                         <ChevronRight size={16} color={colors.textMuted} />
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={handleCloudSnapshot} style={[s.settingRow, s.settingRowBorder]}>
+                    <TouchableOpacity onPress={() => { feedbackSelection(); handleCloudSnapshot(); }} style={[s.settingRow, s.settingRowBorder]}>
                         <View style={s.settingLeft}>
                             <View style={[s.settingIconCircle, { backgroundColor: withAlpha(colors.blue, '15') }]}><CloudLightning size={16} color={colors.blue} /></View>
                             <Text style={[s.settingLabel, { color: colors.blue }]}>Forzar Sync a Nube Neon</Text>
@@ -975,7 +994,7 @@ export default function SettingsScreen() {
                         <ChevronRight size={16} color={colors.blue} />
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={handleRestore} style={s.settingRow}>
+                    <TouchableOpacity onPress={() => { feedbackSelection(); handleRestore(); }} style={s.settingRow}>
                         <View style={s.settingLeft}>
                             <View style={[s.settingIconCircle, { backgroundColor: withAlpha(colors.red, '15') }]}><RefreshCw size={16} color={colors.red} /></View>
                             <Text style={[s.settingLabel, { color: colors.red }]}>Restaurar backup</Text>
@@ -987,7 +1006,7 @@ export default function SettingsScreen() {
                 {/* Danger Zone */}
                 <SectionHeader icon={Shield} title="Zona de riesgo" />
                 <View style={[s.card, { borderColor: withAlpha(colors.red, '30'), marginBottom: 24 }]}>
-                    <TouchableOpacity onPress={handleResetDB} style={[s.settingRow, s.settingRowBorder]}>
+                    <TouchableOpacity onPress={() => { feedbackWarning(); handleResetDB(); }} style={[s.settingRow, s.settingRowBorder]}>
                         <View style={s.settingLeft}>
                             <View style={[s.settingIconCircle, { backgroundColor: withAlpha(colors.red, '15') }]}><Trash2 size={16} color={colors.red} /></View>
                             <View style={{ flex: 1 }}>
@@ -998,7 +1017,7 @@ export default function SettingsScreen() {
                         <ChevronRight size={16} color={colors.red} />
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={handleFullAccountWipe} style={[s.settingRow, s.settingRowBorder]}>
+                    <TouchableOpacity onPress={() => { feedbackWarning(); handleFullAccountWipe(); }} style={[s.settingRow, s.settingRowBorder]}>
                         <View style={s.settingLeft}>
                             <View style={[s.settingIconCircle, { backgroundColor: withAlpha(colors.red, '20') }]}><AlertTriangle size={16} color={colors.red} /></View>
                             <View style={{ flex: 1 }}>
@@ -1010,7 +1029,10 @@ export default function SettingsScreen() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        onPress={() => Linking.openURL('https://irontrain.motiona.xyz/delete-account')}
+                        onPress={() => {
+                            feedbackWarning();
+                            Linking.openURL('https://irontrain.motiona.xyz/delete-account');
+                        }}
                         style={s.settingRow}
                     >
                         <View style={s.settingLeft}>
@@ -1028,7 +1050,10 @@ export default function SettingsScreen() {
                 <SectionHeader icon={Shield} title="Soporte" />
                 <View style={[s.card, { marginBottom: 24 }]}>
                     <TouchableOpacity
-                        onPress={() => Linking.openURL('https://irontrain.motiona.xyz/help')}
+                        onPress={() => {
+                            feedbackSelection();
+                            Linking.openURL('https://irontrain.motiona.xyz/help');
+                        }}
                         style={s.settingRow}
                     >
                         <View style={s.settingLeft}>
@@ -1042,7 +1067,7 @@ export default function SettingsScreen() {
                 {/* Community and Feedback */}
                 <SectionHeader icon={MessageSquare} title="Comunidad y Feedback" />
                 <View style={[s.card, { marginBottom: 24 }]}>
-                    <TouchableOpacity onPress={() => router.push('/feedback' as any)} style={s.settingRow}>
+                    <TouchableOpacity onPress={() => { feedbackSelection(); router.push('/feedback' as any); }} style={s.settingRow}>
                         <View style={s.settingLeft}>
                             <View style={[s.settingIconCircle, { backgroundColor: withAlpha(colors.primary.DEFAULT, '15') }]}>
                                 <MessageSquare size={16} color={colors.primary.DEFAULT} />
@@ -1074,7 +1099,10 @@ export default function SettingsScreen() {
 
                     <View style={{ flexDirection: 'row', gap: 12, padding: 16 }}>
                         <TouchableOpacity
-                            onPress={checkUpdates}
+                            onPress={() => {
+                                feedbackSelection();
+                                checkUpdates();
+                            }}
                             disabled={updateStatus === 'checking'}
                             style={[s.updateBtn, updateStatus === 'checking' && { opacity: 0.5 }]}
                             accessibilityRole="button"
@@ -1084,6 +1112,7 @@ export default function SettingsScreen() {
                         </TouchableOpacity>
                         <TouchableOpacity
                             onPress={async () => {
+                                feedbackSelection();
                                 if (updateStatus !== 'update_available' && updateStatus !== 'update_pending') return;
                                 const url = updateInfo.downloadUrl ?? updateInfo.notesUrl;
                                 if (!url) { notify.error('Descarga cancelada', 'No hay enlace de descarga disponible.'); return; }

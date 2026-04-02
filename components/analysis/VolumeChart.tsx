@@ -1,7 +1,7 @@
 import { EmptyChartPlaceholder } from '@/components/EmptyChartPlaceholder';
+import { triggerSensoryFeedback } from '@/src/utils/sensoryFeedback';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import * as Haptics from 'expo-haptics';
 import React, { useMemo, useState } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
@@ -119,7 +119,7 @@ export function VolumeChart({ data, bucket }: VolumeChartProps) {
                 frontColor: colors.primary.DEFAULT,
                 gradientColor: colors.primary.light,
                 onPress: () => {
-                    Haptics.selectionAsync();
+                    void triggerSensoryFeedback('selection');
                     setTooltipData({
                         value: v,
                         metricType: metric,
@@ -164,13 +164,13 @@ export function VolumeChart({ data, bucket }: VolumeChartProps) {
                     <Text style={styles.title}>Carga Acumulada</Text>
                     <View style={styles.tabContainer}>
                         <Text
-                            onPress={() => { Haptics.selectionAsync(); setMetric('volume'); setTooltipData(null); }}
+                            onPress={() => { void triggerSensoryFeedback('selection'); setMetric('volume'); setTooltipData(null); }}
                             style={[styles.tabBtn, metric === 'volume' && styles.tabBtnActive]}
                         >
                             Volumen
                         </Text>
                         <Text
-                            onPress={() => { Haptics.selectionAsync(); setMetric('sets'); setTooltipData(null); }}
+                            onPress={() => { void triggerSensoryFeedback('selection'); setMetric('sets'); setTooltipData(null); }}
                             style={[styles.tabBtn, metric === 'sets' && styles.tabBtnActive]}
                         >
                             Series

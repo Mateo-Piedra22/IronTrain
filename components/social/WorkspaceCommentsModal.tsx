@@ -1,6 +1,7 @@
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
 import { SharedRoutineComment, SharedRoutineItem } from '@/src/services/SocialService';
+import { workspaceFeedback } from '@/src/social/workspaceFeedback';
 import { ThemeFx, withAlpha } from '@/src/theme';
 import { RefreshCcw, X } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
@@ -97,6 +98,7 @@ export function WorkspaceCommentsModal({
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                             <TouchableOpacity
                                 onPress={() => {
+                                    workspaceFeedback.selection();
                                     void onRefresh();
                                 }}
                                 style={{ width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceLighter }}
@@ -104,7 +106,10 @@ export function WorkspaceCommentsModal({
                                 <RefreshCcw size={14} color={colors.textMuted} />
                             </TouchableOpacity>
                             <TouchableOpacity
-                                onPress={onClose}
+                                onPress={() => {
+                                    workspaceFeedback.selection();
+                                    onClose();
+                                }}
                                 style={{ width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceLighter }}
                             >
                                 <X size={14} color={colors.textMuted} />
@@ -119,7 +124,10 @@ export function WorkspaceCommentsModal({
                             return (
                                 <TouchableOpacity
                                     key={`comments-scope-${value}`}
-                                    onPress={() => setScope(value)}
+                                    onPress={() => {
+                                        workspaceFeedback.selection();
+                                        setScope(value);
+                                    }}
                                     style={{ borderWidth: 1, borderColor: active ? withAlpha(colors.primary.DEFAULT, '35') : colors.border, borderRadius: 9, paddingHorizontal: 8, paddingVertical: 5, backgroundColor: active ? withAlpha(colors.primary.DEFAULT, '12') : colors.surface }}
                                 >
                                     <Text style={{ color: active ? colors.primary.DEFAULT : colors.textMuted, fontSize: 10, fontWeight: '900' }}>{label}</Text>
@@ -137,7 +145,14 @@ export function WorkspaceCommentsModal({
                             <IronInput label="Nuevo comentario" value={draft} onChangeText={onDraftChange} />
                         </View>
                         <View style={{ width: 120, paddingBottom: 2 }}>
-                            <IronButton label="Enviar comentario" onPress={onSendComment} disabled={!draft.trim() || loading} />
+                            <IronButton
+                                label="Enviar comentario"
+                                onPress={() => {
+                                    workspaceFeedback.selection();
+                                    void onSendComment();
+                                }}
+                                disabled={!draft.trim() || loading}
+                            />
                         </View>
                     </View>
 

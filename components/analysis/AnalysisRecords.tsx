@@ -4,6 +4,7 @@ import { BadgePill } from '@/components/ui/BadgePill';
 import { useColors } from '@/src/hooks/useColors';
 import { OneRMProgressRow, OneRepMax } from '@/src/services/AnalysisService';
 import { ThemeFx, withAlpha } from '@/src/theme';
+import { triggerSensoryFeedback } from '@/src/utils/sensoryFeedback';
 import { useRouter } from 'expo-router';
 import { ChevronRight, TrendingUp, Trophy } from 'lucide-react-native';
 import React, { useMemo } from 'react';
@@ -184,7 +185,10 @@ export const AnalysisRecords = React.memo(({ oneRepMaxes, top1RMProgress, rangeD
                         <Pressable
                             key={orm.exerciseId}
                             style={styles.ormCard}
-                            onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: orm.exerciseId, exerciseId: orm.exerciseId, exerciseName: orm.exerciseName } } as any)}
+                            onPress={() => {
+                                void triggerSensoryFeedback('selection');
+                                router.push({ pathname: '/exercise/[id]', params: { id: orm.exerciseId, exerciseId: orm.exerciseId, exerciseName: orm.exerciseName } } as any);
+                            }}
                         >
                             <View style={styles.cardContent}>
                                 <View style={styles.rankBadge}>
@@ -237,7 +241,10 @@ export const AnalysisRecords = React.memo(({ oneRepMaxes, top1RMProgress, rangeD
                         <Pressable
                             key={prog.exerciseId}
                             style={styles.ormCard}
-                            onPress={() => router.push({ pathname: '/exercise/[id]', params: { id: prog.exerciseId, exerciseId: prog.exerciseId, exerciseName: prog.exerciseName } } as any)}
+                            onPress={() => {
+                                void triggerSensoryFeedback('selection');
+                                router.push({ pathname: '/exercise/[id]', params: { id: prog.exerciseId, exerciseId: prog.exerciseId, exerciseName: prog.exerciseName } } as any);
+                            }}
                         >
                             <View style={styles.cardContent}>
                                 <View style={[styles.rankBadge, styles.progBadge]}>

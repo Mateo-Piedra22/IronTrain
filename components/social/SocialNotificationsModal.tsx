@@ -64,11 +64,22 @@ export const SocialNotificationsModal = memo(({
     };
 
     return (
-        <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+        <Modal
+            visible={visible}
+            animationType="fade"
+            transparent
+            onRequestClose={() => {
+                feedbackSelection();
+                onClose();
+            }}
+        >
             <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center', backgroundColor: withAlpha(colors.background, '38'), paddingHorizontal: 16 }]}> 
                 <TouchableOpacity
                     activeOpacity={1}
-                    onPress={onClose}
+                    onPress={() => {
+                        feedbackSelection();
+                        onClose();
+                    }}
                     style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                 />
                 <View style={[styles.detailModalCard, { width: '94%', maxWidth: 450, maxHeight: '88%', padding: 18, borderRadius: 20, backgroundColor: colors.surface }]}> 

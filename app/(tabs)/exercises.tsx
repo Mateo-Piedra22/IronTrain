@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IronTrainLogo } from '../../components/IronTrainLogo';
 import { useColors } from '../../src/hooks/useColors';
 import { ThemeFx, withAlpha } from '../../src/theme';
+import { triggerSensoryFeedback } from '../../src/utils/sensoryFeedback';
 
 type SegmentMode = 'exercises' | 'categories' | 'routines';
 
@@ -40,7 +41,10 @@ const RoutineCard = React.memo(({ item, colors, ss, onPress, onEdit, onDelete, i
     isShared: boolean;
 }) => (
     <TouchableOpacity
-        onPress={() => onPress(item.id)}
+        onPress={() => {
+            void triggerSensoryFeedback('selection');
+            onPress(item.id);
+        }}
         style={ss.exerciseCard}
         accessibilityRole="button"
         accessibilityLabel={`Abrir rutina ${item.name}`}
@@ -72,7 +76,10 @@ const RoutineCard = React.memo(({ item, colors, ss, onPress, onEdit, onDelete, i
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <TouchableOpacity
-                onPress={() => onEdit(item)}
+                onPress={() => {
+                    void triggerSensoryFeedback('tapLight');
+                    onEdit(item);
+                }}
                 style={ss.editBtn}
                 accessibilityRole="button"
                 accessibilityLabel={`Editar rutina ${item.name}`}
@@ -80,7 +87,10 @@ const RoutineCard = React.memo(({ item, colors, ss, onPress, onEdit, onDelete, i
                 <Pencil size={14} color={colors.textMuted} />
             </TouchableOpacity>
             <TouchableOpacity
-                onPress={() => onDelete(item)}
+                onPress={() => {
+                    void triggerSensoryFeedback('warning');
+                    onDelete(item);
+                }}
                 style={ss.deleteBtn}
                 accessibilityRole="button"
                 accessibilityLabel={`Eliminar rutina ${item.name}`}
@@ -457,7 +467,10 @@ export default function LibraryScreen() {
                         )}
                     </TouchableOpacity>
                     <TouchableOpacity
-                        onPress={() => setDuplicatesVisible(true)}
+                        onPress={() => {
+                            void triggerSensoryFeedback('selection');
+                            setDuplicatesVisible(true);
+                        }}
                         disabled={duplicateCount <= 0}
                         style={{
                             opacity: duplicateCount > 0 ? 1 : 0.35,
@@ -509,7 +522,10 @@ export default function LibraryScreen() {
                     ] as const).map((seg) => (
                         <TouchableOpacity
                             key={seg.key}
-                            onPress={() => setMode(seg.key)}
+                            onPress={() => {
+                                void triggerSensoryFeedback('selection');
+                                setMode(seg.key);
+                            }}
                             style={[ss.segmentTab, mode === seg.key && ss.segmentTabActive]}
                         >
                             <Text style={[ss.segmentText, mode === seg.key && ss.segmentTextActive]}>{seg.label}</Text>
@@ -568,7 +584,10 @@ export default function LibraryScreen() {
 
                     {/* FAB — same as ExerciseList */}
                     <TouchableOpacity
-                        onPress={handleCreateRoutine}
+                        onPress={() => {
+                            void triggerSensoryFeedback('tapLight');
+                            handleCreateRoutine();
+                        }}
                         style={[ss.fab, { bottom: bottomOffset }]}
                         accessibilityRole="button"
                         accessibilityLabel="Crear rutina"

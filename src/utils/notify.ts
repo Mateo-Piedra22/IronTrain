@@ -1,9 +1,9 @@
 import notifee, { AndroidImportance } from '@notifee/react-native';
-import * as Haptics from 'expo-haptics';
 import { AppState, Platform } from 'react-native';
 import { configService } from '../services/ConfigService';
 import { BannerMessage, ToastType, useNotificationStore } from '../store/notificationStore';
 import { logger } from './logger';
+import { triggerSensoryFeedback } from './sensoryFeedback';
 
 notifee.onBackgroundEvent(async ({ type, detail }) => {
     // For now, no background interactions logic like "Stop timer" handled here.
@@ -53,13 +53,13 @@ export const notify = {
     toast: (title: string, message?: string, type: ToastType = 'info', duration: number = 3000, onPress?: () => void) => {
         // Haptic feedback strategy based on type
         if (type === 'success') {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+            void triggerSensoryFeedback('success');
         } else if (type === 'error') {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => { });
+            void triggerSensoryFeedback('error');
         } else if (type === 'warning') {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => { });
+            void triggerSensoryFeedback('warning');
         } else {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+            void triggerSensoryFeedback('tapLight');
         }
 
         if (AppState.currentState !== 'active') {
@@ -80,7 +80,7 @@ export const notify = {
             return;
         }
         useNotificationStore.getState().setGlobalBanner({ message, type, actionLabel, onAction, dismissible });
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
+        void triggerSensoryFeedback('tapMedium');
     },
     clearBanner: () => useNotificationStore.getState().clearGlobalBanner(),
 };

@@ -758,7 +758,10 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                 <Text style={{ color: colors.text, fontWeight: '900', fontSize: 15 }}>{opts.title}</Text>
                 {opts.allowCreateNew && (
                     <TouchableOpacity
-                        onPress={() => selectWorkspace(null)}
+                        onPress={() => {
+                            workspaceFeedback.selection();
+                            selectWorkspace(null);
+                        }}
                         style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.surfaceLighter }}
                     >
                         <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '800' }}>Crear espacio</Text>
@@ -781,7 +784,10 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                         return (
                             <TouchableOpacity
                                 key={`selector-${opts.title}-${workspace.id}`}
-                                onPress={() => selectWorkspace(workspace)}
+                                onPress={() => {
+                                    workspaceFeedback.selection();
+                                    selectWorkspace(workspace);
+                                }}
                                 style={{
                                     borderWidth: 1.5,
                                     borderColor: isSelected ? colors.primary.DEFAULT : colors.border,
@@ -817,7 +823,15 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
 
     return (
         <>
-        <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+        <Modal
+            visible={visible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => {
+                workspaceFeedback.selection();
+                onClose();
+            }}
+        >
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                 <GestureHandlerRootView style={{ flex: 1 }}>
                     <View style={{ flex: 1, backgroundColor: ThemeFx.backdropStrong, justifyContent: 'center', paddingHorizontal: isCompact ? 12 : 16, paddingVertical: isCompact ? 26 : 48 }}>
@@ -849,7 +863,10 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                                 </Text>
                             </View>
                             <TouchableOpacity
-                                onPress={onClose}
+                                onPress={() => {
+                                    workspaceFeedback.selection();
+                                    onClose();
+                                }}
                                 style={{
                                     width: 32,
                                     height: 32,
@@ -893,12 +910,15 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
 
                                                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
                                                     <TouchableOpacity
-                                                        onPress={() => confirm.ask(
-                                                            'Aceptar invitación',
-                                                            `Vas a entrar a "${invitation.workspace.title}" con rol ${invitation.proposedRole.toUpperCase()}.`,
-                                                            () => { void handleDecideIncomingInvitation(invitation, 'accept'); },
-                                                            'Aceptar',
-                                                        )}
+                                                        onPress={() => {
+                                                            workspaceFeedback.selection();
+                                                            confirm.ask(
+                                                                'Aceptar invitación',
+                                                                `Vas a entrar a "${invitation.workspace.title}" con rol ${invitation.proposedRole.toUpperCase()}.`,
+                                                                () => { void handleDecideIncomingInvitation(invitation, 'accept'); },
+                                                                'Aceptar',
+                                                            );
+                                                        }}
                                                         style={{ flex: 1, borderWidth: 1, borderColor: colors.primary.DEFAULT, borderRadius: 10, backgroundColor: withAlpha(colors.primary.DEFAULT, '12'), alignItems: 'center', justifyContent: 'center', minHeight: 34 }}
                                                         disabled={teamLoading}
                                                     >
@@ -906,12 +926,15 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                                                     </TouchableOpacity>
 
                                                     <TouchableOpacity
-                                                        onPress={() => confirm.destructive(
-                                                            'Rechazar invitación',
-                                                            `No te vamos a agregar a "${invitation.workspace.title}".`,
-                                                            () => { void handleDecideIncomingInvitation(invitation, 'reject'); },
-                                                            'Rechazar',
-                                                        )}
+                                                        onPress={() => {
+                                                            workspaceFeedback.selection();
+                                                            confirm.destructive(
+                                                                'Rechazar invitación',
+                                                                `No te vamos a agregar a "${invitation.workspace.title}".`,
+                                                                () => { void handleDecideIncomingInvitation(invitation, 'reject'); },
+                                                                'Rechazar',
+                                                            );
+                                                        }}
                                                         style={{ flex: 1, borderWidth: 1, borderColor: withAlpha(colors.red, '35'), borderRadius: 10, backgroundColor: withAlpha(colors.red, '08'), alignItems: 'center', justifyContent: 'center', minHeight: 34 }}
                                                         disabled={teamLoading}
                                                     >
@@ -951,13 +974,19 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                                 </Text>
                                 <View style={{ flexDirection: 'row', gap: 8 }}>
                                     <TouchableOpacity
-                                        onPress={() => setWorkspacePanel('config')}
+                                        onPress={() => {
+                                            workspaceFeedback.selection();
+                                            setWorkspacePanel('config');
+                                        }}
                                         style={{ flex: 1, borderWidth: 1.5, borderColor: workspacePanel === 'config' ? colors.primary.DEFAULT : colors.border, borderRadius: 12, paddingVertical: 10, alignItems: 'center', backgroundColor: workspacePanel === 'config' ? withAlpha(colors.primary.DEFAULT, '12') : colors.surfaceLighter }}
                                     >
                                         <Text style={{ color: workspacePanel === 'config' ? colors.primary.DEFAULT : colors.textMuted, fontWeight: '800', fontSize: 12 }}>Configurar espacio</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
-                                        onPress={() => setWorkspacePanel('actions')}
+                                        onPress={() => {
+                                            workspaceFeedback.selection();
+                                            setWorkspacePanel('actions');
+                                        }}
                                         style={{ flex: 1, borderWidth: 1.5, borderColor: workspacePanel === 'actions' ? colors.primary.DEFAULT : colors.border, borderRadius: 12, paddingVertical: 10, alignItems: 'center', backgroundColor: workspacePanel === 'actions' ? withAlpha(colors.primary.DEFAULT, '12') : colors.surfaceLighter }}
                                     >
                                         <Text style={{ color: workspacePanel === 'actions' ? colors.primary.DEFAULT : colors.textMuted, fontWeight: '800', fontSize: 12 }}>Acciones activas</Text>
@@ -1067,7 +1096,10 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                                                 Elegí un espacio para habilitar las acciones de revisión, historial, comentarios y sincronización.
                                             </Text>
                                             <TouchableOpacity
-                                                onPress={() => setWorkspacePanel('config')}
+                                                onPress={() => {
+                                                    workspaceFeedback.selection();
+                                                    setWorkspacePanel('config');
+                                                }}
                                                 style={{ alignSelf: 'flex-start', marginTop: 10, borderWidth: 1, borderColor: withAlpha(colors.primary.DEFAULT, '35'), borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: withAlpha(colors.primary.DEFAULT, '12') }}
                                             >
                                                 <Text style={{ color: colors.primary.DEFAULT, fontSize: 11, fontWeight: '900' }}>Ir a configuración</Text>
@@ -1089,7 +1121,10 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
             workspace={activeWorkspace}
             reviews={activeWorkspace ? (selectedWorkspaceReviews[activeWorkspace.id] ?? []) : []}
             loading={teamLoading}
-            onClose={() => setReviewsModalVisible(false)}
+            onClose={() => {
+                workspaceFeedback.selection();
+                setReviewsModalVisible(false);
+            }}
             onRefresh={() => activeWorkspace ? handleLoadWorkspaceReviews(activeWorkspace) : undefined}
             onDecideReview={(review, decision) => {
                 if (!activeWorkspace) return;
@@ -1102,7 +1137,10 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
             workspace={activeWorkspace}
             changes={activeWorkspace ? (selectedWorkspaceChanges[activeWorkspace.id] ?? []) : []}
             loading={teamLoading}
-            onClose={() => setHistoryModalVisible(false)}
+            onClose={() => {
+                workspaceFeedback.selection();
+                setHistoryModalVisible(false);
+            }}
             onRefresh={() => activeWorkspace ? handleViewWorkspaceHistory(activeWorkspace) : undefined}
         />
         <WorkspaceCommentsModal
@@ -1112,7 +1150,10 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
             comments={activeWorkspace ? (selectedWorkspaceComments[activeWorkspace.id] ?? []) : []}
             loading={teamLoading}
             draft={activeWorkspace ? (workspaceCommentDrafts[activeWorkspace.id] || '') : ''}
-            onClose={() => setCommentsModalVisible(false)}
+            onClose={() => {
+                workspaceFeedback.selection();
+                setCommentsModalVisible(false);
+            }}
             onRefresh={() => activeWorkspace ? handleLoadWorkspaceComments(activeWorkspace) : undefined}
             onDraftChange={(value) => {
                 if (!activeWorkspace) return;

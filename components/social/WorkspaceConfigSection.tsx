@@ -1,6 +1,7 @@
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
 import { SharedRoutineItem } from '@/src/services/SocialService';
+import { workspaceFeedback } from '@/src/social/workspaceFeedback';
 import { withAlpha } from '@/src/theme';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
@@ -121,7 +122,10 @@ export function WorkspaceConfigSection({
                 <View style={{ borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, padding: 10, marginBottom: 10 }}>
                     <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '900', marginBottom: 6 }}>SINCRONIZACIÓN AUTOMÁTICA AL ABRIR (OWNER/EDITOR)</Text>
                     <TouchableOpacity
-                        onPress={onToggleAutoSync}
+                        onPress={() => {
+                            workspaceFeedback.selection();
+                            onToggleAutoSync();
+                        }}
                         style={{ borderWidth: 1, borderColor: autoSyncForEditorsEnabled ? withAlpha(colors.primary.DEFAULT, '35') : colors.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: autoSyncForEditorsEnabled ? withAlpha(colors.primary.DEFAULT, '10') : colors.surface }}
                     >
                         <Text style={{ color: autoSyncForEditorsEnabled ? colors.primary.DEFAULT : colors.textMuted, fontSize: 11, fontWeight: '800' }}>
@@ -185,14 +189,20 @@ export function WorkspaceConfigSection({
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
                 <TouchableOpacity
                     style={{ flex: 1, borderWidth: 1.5, borderColor: teamEditMode === 'owner_only' ? colors.primary.DEFAULT : colors.border, borderRadius: 12, paddingVertical: 10, alignItems: 'center', backgroundColor: colors.surfaceLighter }}
-                    onPress={() => onSetTeamEditMode('owner_only')}
+                    onPress={() => {
+                        workspaceFeedback.selection();
+                        onSetTeamEditMode('owner_only');
+                    }}
                     disabled={!canEditConfig}
                 >
                     <Text style={{ color: teamEditMode === 'owner_only' ? colors.primary.DEFAULT : colors.textMuted, fontWeight: '800', fontSize: 12 }}>Solo propietario edita</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={{ flex: 1, borderWidth: 1.5, borderColor: teamEditMode === 'collaborative' ? colors.primary.DEFAULT : colors.border, borderRadius: 12, paddingVertical: 10, alignItems: 'center', backgroundColor: colors.surfaceLighter }}
-                    onPress={() => onSetTeamEditMode('collaborative')}
+                    onPress={() => {
+                        workspaceFeedback.selection();
+                        onSetTeamEditMode('collaborative');
+                    }}
                     disabled={!canEditConfig}
                 >
                     <Text style={{ color: teamEditMode === 'collaborative' ? colors.primary.DEFAULT : colors.textMuted, fontWeight: '800', fontSize: 12 }}>Colaborativa</Text>
@@ -203,14 +213,20 @@ export function WorkspaceConfigSection({
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
                 <TouchableOpacity
                     style={{ flex: 1, borderWidth: 1.5, borderColor: teamApprovalMode === 'none' ? colors.primary.DEFAULT : colors.border, borderRadius: 12, paddingVertical: 10, alignItems: 'center', backgroundColor: colors.surfaceLighter }}
-                    onPress={() => onSetTeamApprovalMode('none')}
+                    onPress={() => {
+                        workspaceFeedback.selection();
+                        onSetTeamApprovalMode('none');
+                    }}
                     disabled={!canEditConfig}
                 >
                     <Text style={{ color: teamApprovalMode === 'none' ? colors.primary.DEFAULT : colors.textMuted, fontWeight: '800', fontSize: 12 }}>Sin aprobación</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={{ flex: 1, borderWidth: 1.5, borderColor: teamApprovalMode === 'owner_review' ? colors.primary.DEFAULT : colors.border, borderRadius: 12, paddingVertical: 10, alignItems: 'center', backgroundColor: colors.surfaceLighter }}
-                    onPress={() => onSetTeamApprovalMode('owner_review')}
+                    onPress={() => {
+                        workspaceFeedback.selection();
+                        onSetTeamApprovalMode('owner_review');
+                    }}
                     disabled={!canEditConfig}
                 >
                     <Text style={{ color: teamApprovalMode === 'owner_review' ? colors.primary.DEFAULT : colors.textMuted, fontWeight: '800', fontSize: 12 }}>Propietario aprueba</Text>
@@ -245,7 +261,10 @@ export function WorkspaceConfigSection({
                             return (
                                 <TouchableOpacity
                                     key={`role-filter-${filterRole}`}
-                                    onPress={() => onSetMemberRoleFilter(filterRole)}
+                                    onPress={() => {
+                                        workspaceFeedback.selection();
+                                        onSetMemberRoleFilter(filterRole);
+                                    }}
                                     style={{ borderWidth: 1, borderColor: selectedFilter ? withAlpha(colors.primary.DEFAULT, '35') : colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, backgroundColor: selectedFilter ? withAlpha(colors.primary.DEFAULT, '12') : colors.surface }}
                                 >
                                     <Text style={{ color: selectedFilter ? colors.primary.DEFAULT : colors.textMuted, fontSize: 10, fontWeight: '900' }}>{label}</Text>
@@ -274,14 +293,20 @@ export function WorkspaceConfigSection({
                                     {!isOwner && (
                                         <View style={{ flexDirection: 'row', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
                                             <TouchableOpacity
-                                                onPress={() => onAddMember(member.userId, 'editor')}
+                                                onPress={() => {
+                                                    workspaceFeedback.selection();
+                                                    onAddMember(member.userId, 'editor');
+                                                }}
                                                 style={{ borderWidth: 1, borderColor: effectiveRole === 'editor' && selectedInSpace ? withAlpha(colors.primary.DEFAULT, '35') : colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: effectiveRole === 'editor' && selectedInSpace ? withAlpha(colors.primary.DEFAULT, '12') : colors.surfaceLighter }}
                                                 disabled={!canEditConfig}
                                             >
                                                 <Text style={{ color: effectiveRole === 'editor' && selectedInSpace ? colors.primary.DEFAULT : colors.textMuted, fontSize: 10, fontWeight: '900' }}>Poner editor</Text>
                                             </TouchableOpacity>
                                             <TouchableOpacity
-                                                onPress={() => onAddMember(member.userId, 'viewer')}
+                                                onPress={() => {
+                                                    workspaceFeedback.selection();
+                                                    onAddMember(member.userId, 'viewer');
+                                                }}
                                                 style={{ borderWidth: 1, borderColor: effectiveRole === 'viewer' && selectedInSpace ? withAlpha(colors.primary.DEFAULT, '35') : colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: effectiveRole === 'viewer' && selectedInSpace ? withAlpha(colors.primary.DEFAULT, '12') : colors.surfaceLighter }}
                                                 disabled={!canEditConfig}
                                             >
@@ -290,7 +315,10 @@ export function WorkspaceConfigSection({
 
                                             {selectedInSpace ? (
                                                 <TouchableOpacity
-                                                    onPress={() => onRemoveMember(member.userId)}
+                                                    onPress={() => {
+                                                        workspaceFeedback.selection();
+                                                        onRemoveMember(member.userId);
+                                                    }}
                                                     style={{ borderWidth: 1, borderColor: withAlpha(colors.red, '35'), borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: withAlpha(colors.red, '08') }}
                                                     disabled={!canEditConfig}
                                                 >
@@ -298,7 +326,10 @@ export function WorkspaceConfigSection({
                                                 </TouchableOpacity>
                                             ) : (
                                                 <TouchableOpacity
-                                                    onPress={() => onAddMember(member.userId, member.role === 'editor' ? 'editor' : 'viewer')}
+                                                    onPress={() => {
+                                                        workspaceFeedback.selection();
+                                                        onAddMember(member.userId, member.role === 'editor' ? 'editor' : 'viewer');
+                                                    }}
                                                     style={{ borderWidth: 1, borderColor: withAlpha(colors.primary.DEFAULT, '35'), borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: withAlpha(colors.primary.DEFAULT, '08') }}
                                                     disabled={!canEditConfig}
                                                 >
@@ -346,7 +377,10 @@ export function WorkspaceConfigSection({
                             <TouchableOpacity
                                 key={`team-invite-${friend.friendId}`}
                                 style={{ borderWidth: 1, borderColor: selected ? colors.primary.DEFAULT : colors.border, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 10, backgroundColor: selected ? withAlpha(colors.primary.DEFAULT, '10') : colors.surfaceLighter }}
-                                onPress={() => onToggleFriendSelection(friend.friendId)}
+                                onPress={() => {
+                                    workspaceFeedback.selection();
+                                    onToggleFriendSelection(friend.friendId);
+                                }}
                                 disabled={!canEditConfig}
                             >
                                 <Text style={{ color: selected ? colors.primary.DEFAULT : colors.text, fontWeight: '800', fontSize: 12 }}>
@@ -356,21 +390,30 @@ export function WorkspaceConfigSection({
                                 {selected && (
                                     <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
                                         <TouchableOpacity
-                                            onPress={() => onSetMemberRole(friend.friendId, 'editor')}
+                                            onPress={() => {
+                                                workspaceFeedback.selection();
+                                                onSetMemberRole(friend.friendId, 'editor');
+                                            }}
                                             style={{ borderWidth: 1, borderColor: roleValue === 'editor' ? withAlpha(colors.primary.DEFAULT, '35') : colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: roleValue === 'editor' ? withAlpha(colors.primary.DEFAULT, '12') : colors.surface }}
                                             disabled={!canEditConfig}
                                         >
                                             <Text style={{ color: roleValue === 'editor' ? colors.primary.DEFAULT : colors.textMuted, fontSize: 10, fontWeight: '900' }}>EDITOR</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
-                                            onPress={() => onSetMemberRole(friend.friendId, 'viewer')}
+                                            onPress={() => {
+                                                workspaceFeedback.selection();
+                                                onSetMemberRole(friend.friendId, 'viewer');
+                                            }}
                                             style={{ borderWidth: 1, borderColor: roleValue === 'viewer' ? withAlpha(colors.primary.DEFAULT, '35') : colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: roleValue === 'viewer' ? withAlpha(colors.primary.DEFAULT, '12') : colors.surface }}
                                             disabled={!canEditConfig}
                                         >
                                             <Text style={{ color: roleValue === 'viewer' ? colors.primary.DEFAULT : colors.textMuted, fontSize: 10, fontWeight: '900' }}>VIEWER</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
-                                            onPress={() => onRemoveMember(friend.friendId)}
+                                            onPress={() => {
+                                                workspaceFeedback.selection();
+                                                onRemoveMember(friend.friendId);
+                                            }}
                                             style={{ borderWidth: 1, borderColor: withAlpha(colors.red, '35'), borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: withAlpha(colors.red, '08') }}
                                             disabled={!canEditConfig}
                                         >
@@ -386,7 +429,10 @@ export function WorkspaceConfigSection({
 
             <IronButton
                 label={teamLoading ? 'Procesando...' : isEditingConfig ? 'Guardar e invitar' : 'Crear e invitar'}
-                onPress={onSaveWorkspace}
+                onPress={() => {
+                    workspaceFeedback.selection();
+                    onSaveWorkspace();
+                }}
                 disabled={teamLoading || !routineId || !canEditConfig}
             />
         </View>

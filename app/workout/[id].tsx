@@ -5,6 +5,7 @@ import { useWorkoutStore } from '@/src/store/workoutStore';
 import { withAlpha } from '@/src/theme';
 import { WorkoutSet } from '@/src/types/db';
 import * as analytics from '@/src/utils/analytics';
+import { triggerSensoryFeedback } from '@/src/utils/sensoryFeedback';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { LucideClock, LucideMoreVertical } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -29,6 +30,14 @@ export default function ActiveWorkoutScreen() {
     }, [id]);
 
     const [unit, setUnit] = useState(configService.get('weightUnit'));
+
+    const feedbackSelection = () => {
+        void triggerSensoryFeedback('selection');
+    };
+
+    const feedbackTapLight = () => {
+        void triggerSensoryFeedback('tapLight');
+    };
 
     const ss = useMemo(() => StyleSheet.create({
         header: {
@@ -301,7 +310,7 @@ export default function ActiveWorkoutScreen() {
                         <View key={exId} style={{ marginBottom: 24 }}>
                             <View style={ss.exerciseHeader}>
                                 <Text style={ss.exerciseName}>{exerciseNames[exId] || 'Loading Exercise...'}</Text>
-                                <Pressable onPress={() => { }}><LucideMoreVertical size={20} color={colors.textMuted} /></Pressable>
+                                <Pressable onPress={() => { feedbackSelection(); }}><LucideMoreVertical size={20} color={colors.textMuted} /></Pressable>
                             </View>
 
                             {/* Sets Header */}
@@ -346,7 +355,7 @@ export default function ActiveWorkoutScreen() {
                             />
 
                             {isEditable && (
-                                <Pressable onPress={() => addSet(exId)} style={ss.addSetBtn} accessibilityRole="button" accessibilityLabel="Agregar serie">
+                                <Pressable onPress={() => { feedbackTapLight(); addSet(exId); }} style={ss.addSetBtn} accessibilityRole="button" accessibilityLabel="Agregar serie">
                                     <Text style={ss.addSetText}>+ Agregar serie</Text>
                                 </Pressable>
                             )}
@@ -354,11 +363,11 @@ export default function ActiveWorkoutScreen() {
                     ))}
 
                     {isEditable ? (
-                        <Pressable onPress={() => router.push('/(tabs)/exercises')} style={ss.addExerciseBtn} accessibilityRole="button" accessibilityLabel="Agregar ejercicio">
+                        <Pressable onPress={() => { feedbackSelection(); router.push('/(tabs)/exercises'); }} style={ss.addExerciseBtn} accessibilityRole="button" accessibilityLabel="Agregar ejercicio">
                             <Text style={ss.addExerciseText}>+ Agregar ejercicio</Text>
                         </Pressable>
                     ) : (
-                        <Pressable onPress={() => router.replace('/(tabs)')} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
+                        <Pressable onPress={() => { feedbackSelection(); router.replace('/(tabs)'); }} style={ss.backBtn} accessibilityRole="button" accessibilityLabel="Volver">
                             <Text style={ss.backBtnText}>Volver</Text>
                         </Pressable>
                     )}

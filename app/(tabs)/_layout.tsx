@@ -3,6 +3,11 @@ import { useColors } from '@/src/hooks/useColors';
 import { Tabs } from 'expo-router';
 import { BarChart2, Calendar, Dumbbell, Users } from 'lucide-react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { triggerSensoryFeedback } from '../../src/utils/sensoryFeedback';
+
+const tabPressFeedback = () => {
+  void triggerSensoryFeedback('selection');
+};
 
 export default function TabLayout() {
   const colors = useColors();
@@ -45,6 +50,7 @@ export default function TabLayout() {
             headerShown: false,
             tabBarIcon: ({ color }) => <Calendar color={color} size={24} />,
           }}
+          listeners={{ tabPress: tabPressFeedback }}
         />
         <Tabs.Screen
           name="exercises"
@@ -53,6 +59,7 @@ export default function TabLayout() {
             headerShown: false,
             tabBarIcon: ({ color }) => <Dumbbell color={color} size={24} />,
           }}
+          listeners={{ tabPress: tabPressFeedback }}
         />
         <Tabs.Screen
           name="analysis"
@@ -61,6 +68,7 @@ export default function TabLayout() {
             headerShown: false,
             tabBarIcon: ({ color }) => <BarChart2 color={color} size={24} />,
           }}
+          listeners={{ tabPress: tabPressFeedback }}
         />
         <Tabs.Screen
           name="social"
@@ -69,6 +77,7 @@ export default function TabLayout() {
             headerShown: false,
             tabBarIcon: ({ color }) => <Users color={color} size={24} />,
           }}
+          listeners={{ tabPress: tabPressFeedback }}
         />
         {/* Hide the routines file from tab bar — routines are now inside Biblioteca */}
         <Tabs.Screen

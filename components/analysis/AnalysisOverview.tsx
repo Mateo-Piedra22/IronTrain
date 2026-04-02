@@ -4,6 +4,7 @@ import { BodySnapshotWidget } from '@/components/analysis/BodySnapshotWidget';
 import { VolumeChart } from '@/components/analysis/VolumeChart';
 import { CardioSummary, CategoryVolumeRow, RepsOnlySummary, WeightOnlySummary, WorkoutComparison, WorkoutStreak, WorkoutSummary } from '@/src/services/AnalysisService';
 import { ThemeFx, withAlpha } from '@/src/theme';
+import { triggerSensoryFeedback } from '@/src/utils/sensoryFeedback';
 import { Activity, BarChart3, CircleDot, Clock, Flame, History as HistoryIcon, Ruler, TrendingDown, TrendingUp, Trophy, Zap } from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -497,7 +498,10 @@ export const AnalysisOverview = React.memo(({
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsScroll}>
                     <Pressable
                         style={styles.actionCard}
-                        onPress={onOpenHistory}
+                        onPress={() => {
+                            void triggerSensoryFeedback('selection');
+                            onOpenHistory?.();
+                        }}
                         android_ripple={{ color: colors.surfaceLighter }}
                     >
                         <View style={styles.actionIcon}>
@@ -508,7 +512,10 @@ export const AnalysisOverview = React.memo(({
 
                     <Pressable
                         style={styles.actionCard}
-                        onPress={() => onOpenCalc?.('oneRm')}
+                        onPress={() => {
+                            void triggerSensoryFeedback('selection');
+                            onOpenCalc?.('oneRm');
+                        }}
                         android_ripple={{ color: colors.surfaceLighter }}
                     >
                         <View style={styles.actionIcon}>
@@ -519,7 +526,10 @@ export const AnalysisOverview = React.memo(({
 
                     <Pressable
                         style={styles.actionCard}
-                        onPress={() => onNavigate?.('/tools/plate-calculator')}
+                        onPress={() => {
+                            void triggerSensoryFeedback('selection');
+                            onNavigate?.('/tools/plate-calculator');
+                        }}
                         android_ripple={{ color: colors.surfaceLighter }}
                     >
                         <View style={styles.actionIcon}>
@@ -530,7 +540,10 @@ export const AnalysisOverview = React.memo(({
 
                     <Pressable
                         style={styles.actionCard}
-                        onPress={() => onOpenCalc?.('warmup')}
+                        onPress={() => {
+                            void triggerSensoryFeedback('selection');
+                            onOpenCalc?.('warmup');
+                        }}
                         android_ripple={{ color: colors.surfaceLighter }}
                     >
                         <View style={styles.actionIcon}>
@@ -541,7 +554,10 @@ export const AnalysisOverview = React.memo(({
 
                     <Pressable
                         style={styles.actionCard}
-                        onPress={() => onNavigate?.('/body')}
+                        onPress={() => {
+                            void triggerSensoryFeedback('selection');
+                            onNavigate?.('/body');
+                        }}
                         android_ripple={{ color: colors.surfaceLighter }}
                     >
                         <View style={styles.actionIcon}>
@@ -557,7 +573,10 @@ export const AnalysisOverview = React.memo(({
                 {[7, 30, 90, 365].map((d) => (
                     <Pressable
                         key={d}
-                        onPress={() => setRangeDays(d as any)}
+                        onPress={() => {
+                            void triggerSensoryFeedback('selection');
+                            setRangeDays(d as any);
+                        }}
                         style={[styles.rangeChip, rangeDays === d && styles.rangeChipActive]}
                     >
                         <Text style={[styles.rangeChipText, rangeDays === d && styles.rangeChipTextActive]}>

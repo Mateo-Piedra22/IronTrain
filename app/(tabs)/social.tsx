@@ -362,6 +362,7 @@ export default function SocialTab() {
     };
 
     const handleOpenPublicRoutines = useCallback(async () => {
+        feedbackSelection();
         Alert.alert(
             'Abrir enlace externo',
             'Vas a salir de la app para abrir el marketplace de rutinas.',
@@ -819,10 +820,22 @@ export default function SocialTab() {
                     <Text style={styles.loggedOutSub}>
                         Sincronizá tus rutinas, compartilas con amigos y descubrí la comunidad IronTrain.
                     </Text>
-                    <TouchableOpacity style={styles.loginBtn} onPress={() => login()}>
+                    <TouchableOpacity
+                        style={styles.loginBtn}
+                        onPress={() => {
+                            feedbackSelection();
+                            login();
+                        }}
+                    >
                         <Text style={styles.loginBtnText}>Iniciar Sesión</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.signupBtn} onPress={() => login()}>
+                    <TouchableOpacity
+                        style={styles.signupBtn}
+                        onPress={() => {
+                            feedbackSelection();
+                            login();
+                        }}
+                    >
                         <Text style={styles.signupBtnText}>Crear Cuenta</Text>
                     </TouchableOpacity>
                 </View>
@@ -848,6 +861,7 @@ export default function SocialTab() {
                     <TouchableOpacity
                         style={styles.headerIconBtn}
                         onPress={() => {
+                            feedbackSelection();
                             handleSwitchTab('friends');
                             setFriendsSubTab('search');
                         }}
@@ -1034,12 +1048,18 @@ export default function SocialTab() {
                 visible={isProfileQuickPanelVisible}
                 transparent
                 animationType="fade"
-                onRequestClose={() => setIsProfileQuickPanelVisible(false)}
+                onRequestClose={() => {
+                    feedbackSelection();
+                    setIsProfileQuickPanelVisible(false);
+                }}
             >
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: withAlpha(colors.background, '2E'), paddingHorizontal: 16 }}>
                     <TouchableOpacity
                         activeOpacity={1}
-                        onPress={() => setIsProfileQuickPanelVisible(false)}
+                        onPress={() => {
+                            feedbackSelection();
+                            setIsProfileQuickPanelVisible(false);
+                        }}
                         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                     />
 
@@ -1130,6 +1150,7 @@ export default function SocialTab() {
                     reloadSharedWorkspaceSummary();
                 }}
                 onOpenRoutine={() => {
+                    feedbackSelection();
                     router.push('/(tabs)/exercises');
                 }}
             />
@@ -1165,7 +1186,13 @@ export default function SocialTab() {
                             <Globe size={12} color={colors.textMuted} />
                             <Text numberOfLines={1} style={[styles.archiveToggleText, { textAlign: 'center', fontSize: 11 }]}>Rutinas</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.archiveToggle, { flex: 1, minWidth: 0, minHeight: 34, justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 6, gap: 4 }]} onPress={() => router.push('/settings' as any)}>
+                        <TouchableOpacity
+                            style={[styles.archiveToggle, { flex: 1, minWidth: 0, minHeight: 34, justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 6, gap: 4 }]}
+                            onPress={() => {
+                                feedbackSelection();
+                                router.push('/settings' as any);
+                            }}
+                        >
                             <Settings size={12} color={colors.textMuted} />
                             <Text numberOfLines={1} style={[styles.archiveToggleText, { textAlign: 'center', fontSize: 11 }]}>Ajustes</Text>
                         </TouchableOpacity>

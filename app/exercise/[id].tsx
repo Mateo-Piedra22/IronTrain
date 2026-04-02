@@ -18,8 +18,8 @@ import { ThemeFx, withAlpha } from '@/src/theme';
 import { Exercise, WorkoutSet } from '@/src/types/db';
 import { logger } from '@/src/utils/logger';
 import { notify } from '@/src/utils/notify';
+import { triggerSensoryFeedback } from '@/src/utils/sensoryFeedback';
 import { formatTimeSeconds } from '@/src/utils/time';
-import * as Haptics from 'expo-haptics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Calculator, Dumbbell, Info, Pencil, Timer, Trophy, Zap } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -61,6 +61,14 @@ export default function ExerciseDetailScreen() {
     // Config Modal
     const [isConfigVisible, setIsConfigVisible] = useState(false);
     const [currentExercise, setCurrentExercise] = useState<(Exercise & { badges?: any[] }) | null>(null);
+
+    const feedbackSelection = () => {
+        void triggerSensoryFeedback('selection');
+    };
+
+    const feedbackTapLight = () => {
+        void triggerSensoryFeedback('tapLight');
+    };
 
     const screenWidth = Dimensions.get('window').width;
 
@@ -253,7 +261,7 @@ export default function ExerciseDetailScreen() {
         if (!s) return;
 
         try {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            feedbackTapLight();
             await workoutService.addSet(workoutId, exerciseId, s.type as any, {
                 weight: s.weight,
                 reps: s.reps,
@@ -265,7 +273,7 @@ export default function ExerciseDetailScreen() {
             loadTrackData();
             notify.success('Serie duplicada', 'Se copiaron exitosamente sus valores.');
         } catch (e: any) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            void triggerSensoryFeedback('error');
             notify.error('Error al clonar', e?.message || 'Fallo general al clonar la serie.');
         }
     };
@@ -676,7 +684,10 @@ export default function ExerciseDetailScreen() {
     const renderChip = (id: string, label: string, isActive: boolean, onPress: () => void) => (
         <TouchableOpacity
             key={id}
-            onPress={onPress}
+            onPress={() => {
+                feedbackSelection();
+                onPress();
+            }}
             style={{
                 paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1,
                 backgroundColor: isActive ? withAlpha(colors.primary.DEFAULT, '15') : 'transparent',
@@ -825,7 +836,10 @@ export default function ExerciseDetailScreen() {
                                     <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>Sesión completada</Text>
                                     {workoutId && (
                                         <TouchableOpacity
-                                            onPress={() => copyFromHistory(h.sets)}
+                                            onPress={() => {
+                                                feedbackSelection();
+                                                copyFromHistory(h.sets);
+                                            }}
                                             style={{ backgroundColor: colors.background, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1.5, borderColor: colors.border }}
                                             accessibilityRole="button"
                                             accessibilityLabel="Copiar series de esta sesión"
@@ -1425,7 +1439,10 @@ export default function ExerciseDetailScreen() {
 
                         {(exType === 'weight_reps' || exType === 'weight_only') && (
                             <TouchableOpacity
-                                onPress={() => setWarmupVisible(true)}
+                                onPress={() => {
+                                    feedbackSelection();
+                                    setWarmupVisible(true);
+                                }}
                                 style={{
                                     backgroundColor: withAlpha(colors.yellow, '15'),
                                     paddingHorizontal: 16,
@@ -1450,7 +1467,10 @@ export default function ExerciseDetailScreen() {
                         )}
 
                         <TouchableOpacity
-                            onPress={() => useTimerStore.getState().startTimer(configService.get('defaultRestTimer'))}
+                            onPress={() => {
+                                feedbackTapLight();
+                                useTimerStore.getState().startTimer(configService.get('defaultRestTimer'));
+                            }}
                             style={{
                                 backgroundColor: colors.primary.DEFAULT,
                                 paddingHorizontal: 16,
@@ -1475,7 +1495,11 @@ export default function ExerciseDetailScreen() {
                             {[60, 90, 120].map((s) => (
                                 <TouchableOpacity
                                     key={s}
-                                    onPress={async () => { await configService.set('defaultRestTimer', s); useTimerStore.getState().startTimer(s); }}
+                                    onPress={async () => {
+                                        feedbackSelection();
+                                        await configService.set('defaultRestTimer', s);
+                                        useTimerStore.getState().startTimer(s);
+                                    }}
                                     style={{
                                         flex: 1,
                                         backgroundColor: colors.surface,
@@ -1498,7 +1522,10 @@ export default function ExerciseDetailScreen() {
 
                         <View style={{ flexDirection: 'row', gap: 10 }}>
                             <TouchableOpacity
-                                onPress={() => router.push('/tools/plate-calculator' as any)}
+                                onPress={() => {
+                                    feedbackSelection();
+                                    router.push('/tools/plate-calculator' as any);
+                                }}
                                 style={{ flex: 1, backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8 }}
                                 accessibilityRole="button"
                                 accessibilityLabel="Abrir calculadora de discos"
@@ -1508,7 +1535,10 @@ export default function ExerciseDetailScreen() {
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                onPress={() => setAnalysisTab('prs')}
+                                onPress={() => {
+                                    feedbackSelection();
+                                    setAnalysisTab('prs');
+                                }}
                                 style={{ flex: 1, backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8 }}
                                 accessibilityRole="button"
                                 accessibilityLabel="Ver mejor 1RM"
@@ -1586,7 +1616,10 @@ export default function ExerciseDetailScreen() {
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                         {!workoutId && (
                             <TouchableOpacity
-                                onPress={() => setIsConfigVisible(true)}
+                                onPress={() => {
+                                    feedbackSelection();
+                                    setIsConfigVisible(true);
+                                }}
                                 style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: colors.surfaceLighter, borderWidth: 1.5, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }}
                             >
                                 <Pencil size={16} color={colors.textMuted} />
@@ -1595,6 +1628,7 @@ export default function ExerciseDetailScreen() {
                         {workoutId && (exType === 'weight_reps' || exType === 'weight_only') && (
                             <TouchableOpacity
                                 onPress={() => {
+                                    feedbackSelection();
                                     if (workoutLocked) { notify.info('Bloqueado', 'El entrenamiento finalizó. Para editar debés reabrirlo.'); return; }
                                     setWarmupVisible(true);
                                 }}
@@ -1622,7 +1656,10 @@ export default function ExerciseDetailScreen() {
                     {availableTabs.map(tab => (
                         <TouchableOpacity
                             key={tab}
-                            onPress={() => setActiveTab(tab)}
+                            onPress={() => {
+                                feedbackSelection();
+                                setActiveTab(tab);
+                            }}
                             style={{
                                 flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
                                 ...(activeTab === tab ? { backgroundColor: colors.primary.DEFAULT } : {})
