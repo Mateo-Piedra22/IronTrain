@@ -21,6 +21,37 @@ export type ApplyThemeModerationResult = {
     updatedAt: Date;
 };
 
+export async function setThemePackSystemFlag(params: {
+    themePackId: string;
+    isSystem: boolean;
+}) {
+    const now = new Date();
+    const [updated] = await db
+        .update(schema.themePacks)
+        .set({
+            isSystem: params.isSystem,
+            updatedAt: now,
+        })
+        .where(
+            and(
+                eq(schema.themePacks.id, params.themePackId),
+                isNull(schema.themePacks.deletedAt),
+            ),
+        )
+        .returning({
+            id: schema.themePacks.id,
+            slug: schema.themePacks.slug,
+            isSystem: schema.themePacks.isSystem,
+            updatedAt: schema.themePacks.updatedAt,
+        });
+
+    if (!updated) {
+        throw new Error('THEME_PACK_NOT_FOUND');
+    }
+
+    return updated;
+}
+
 const nextStatusByAction: Record<ThemeModerationAction, string> = {
     approve: 'approved',
     reject: 'rejected',

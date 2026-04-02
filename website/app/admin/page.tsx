@@ -47,6 +47,7 @@ interface AdminPageProps {
     params: Promise<any>;
     searchParams: Promise<{
         tab?: string;
+        source?: 'all' | 'system' | 'community';
         editNotifId?: string;
         editChangelogId?: string;
         editEventId?: string;
@@ -85,6 +86,7 @@ export default async function AdminPage({
     // 0. Resolve parameters
     const params = await searchParams;
     const activeTab = (params.tab as 'status' | 'social' | 'content' | 'moderation' | 'themes-moderation' | 'marketplace' | 'sync' | 'analytics' | 'posthog') || 'status';
+    const themeSourceFilter = (params.source as 'all' | 'system' | 'community') || 'all';
 
     const {
         editNotifId,
@@ -226,6 +228,12 @@ export default async function AdminPage({
         officialCategoriesRaw = categories;
         officialBadgesRaw = badges;
     } else if (activeTab === 'themes-moderation') {
+        const sourceFilterSql = themeSourceFilter === 'system'
+            ? eq(schema.themePacks.isSystem, true)
+            : themeSourceFilter === 'community'
+                ? eq(schema.themePacks.isSystem, false)
+                : sql`1=1`;
+
         const [packs, reports] = await Promise.all([
             db.select({
                 id: schema.themePacks.id,
@@ -233,6 +241,7 @@ export default async function AdminPage({
                 ownerId: schema.themePacks.ownerId,
                 ownerUsername: schema.userProfiles.username,
                 name: schema.themePacks.name,
+                isSystem: schema.themePacks.isSystem,
                 visibility: schema.themePacks.visibility,
                 status: schema.themePacks.status,
                 moderationMessage: schema.themePacks.moderationMessage,
@@ -248,6 +257,7 @@ export default async function AdminPage({
                 .where(
                     and(
                         isNull(schema.themePacks.deletedAt),
+                        sourceFilterSql,
                         sql`${schema.themePacks.status} in ('pending_review', 'approved', 'rejected', 'suspended')`,
                     ),
                 )
@@ -265,6 +275,7 @@ export default async function AdminPage({
                 themeSlug: schema.themePacks.slug,
                 themeName: schema.themePacks.name,
                 themeStatus: schema.themePacks.status,
+                themeIsSystem: schema.themePacks.isSystem,
                 ownerId: schema.themePacks.ownerId,
             })
                 .from(schema.themePackReports)
@@ -272,6 +283,7 @@ export default async function AdminPage({
                 .where(
                     and(
                         isNull(schema.themePacks.deletedAt),
+                        sourceFilterSql,
                         sql`${schema.themePackReports.status} in ('open', 'resolved', 'dismissed')`,
                     ),
                 )

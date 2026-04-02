@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
-import { applyThemeModerationAction, ThemeModerationAction } from '../../../src/lib/theme-marketplace/admin-moderation';
+import { applyThemeModerationAction, setThemePackSystemFlag, ThemeModerationAction } from '../../../src/lib/theme-marketplace/admin-moderation';
 import { getRedirectPath, requireAdminAction, writeAdminAuditLog } from './shared';
 
 export async function handleRoutineAction(formData: FormData) {
@@ -83,7 +83,7 @@ export async function handleThemeModerationAction(formData: FormData) {
     let adminUserId: string | null = null;
     let adminRole: 'viewer' | 'editor' | 'moderator' | 'superadmin' = 'viewer';
     const themePackId = String(formData.get('themePackId') || '').trim() || null;
-    const action = String(formData.get('intent') || '').trim() as ThemeModerationAction;
+    const action = String(formData.get('intent') || '').trim();
 
     try {
         const admin = await requireAdminAction({ action: 'admin.moderation.theme-pack', requiredRole: 'moderator' });
@@ -94,17 +94,25 @@ export async function handleThemeModerationAction(formData: FormData) {
             throw new Error('MISSING_THEME_PACK_ID');
         }
 
-        if (!['approve', 'reject', 'suspend', 'restore'].includes(action)) {
+        if (!['approve', 'reject', 'suspend', 'restore', 'mark-system', 'unmark-system'].includes(action)) {
             throw new Error('INVALID_THEME_MODERATION_ACTION');
         }
 
         const message = String(formData.get('message') || '').trim();
 
-        const result = await applyThemeModerationAction({
-            themePackId,
-            action,
-            moderationMessage: message,
-        });
+        let result: any;
+        if (action === 'mark-system' || action === 'unmark-system') {
+            result = await setThemePackSystemFlag({
+                themePackId,
+                isSystem: action === 'mark-system',
+            });
+        } else {
+            result = await applyThemeModerationAction({
+                themePackId,
+                action: action as ThemeModerationAction,
+                moderationMessage: message,
+            });
+        }
 
         revalidatePath('/admin');
         revalidatePath('/feed');
@@ -122,6 +130,7 @@ export async function handleThemeModerationAction(formData: FormData) {
                 previousStatus: result.previousStatus,
                 nextStatus: result.status,
                 resolvedReports: result.resolvedReports,
+                isSystem: result.isSystem,
             },
         });
     } catch (error: any) {

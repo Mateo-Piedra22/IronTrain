@@ -45,6 +45,7 @@ export type ThemePackSummary = {
   tags: string[];
   supportsLight: boolean;
   supportsDark: boolean;
+  isSystem: boolean;
   visibility: ThemeVisibility;
   status: ThemeModerationStatus;
   currentVersion: number;
@@ -65,6 +66,7 @@ export type ListThemesQuery = {
   scope?: 'public' | 'owned' | 'friends';
   mode?: 'light' | 'dark' | 'both';
   sort?: 'trending' | 'new' | 'top';
+  source?: 'all' | 'system' | 'community';
   page?: number;
   pageSize?: number;
   q?: string;

@@ -19,11 +19,13 @@ export async function getRedirectPath(formData: FormData, defaultSection?: strin
     const tab = (formData.get('origin_tab') as string) || 'content';
     const section = (formData.get('origin_section') as string) || defaultSection || '';
     const id = formData.get('origin_id') as string;
+    const source = formData.get('source') as string;
 
     const params = new URLSearchParams();
     params.set('tab', tab);
     if (section) params.set('section', section);
     if (id) params.set('id', id);
+    if (source) params.set('source', source);
 
     return `/admin?${params.toString()}`;
 }

@@ -346,6 +346,52 @@ export interface SharedRoutineReviewRequest {
     updatedAt?: string | number | Date;
 }
 
+export type MarketplaceThemeVisibility = 'private' | 'friends' | 'public';
+export type MarketplaceThemeStatus = 'draft' | 'pending_review' | 'approved' | 'rejected' | 'suspended';
+
+export interface MarketplaceThemePackPayload {
+    schemaVersion: 1;
+    base: { light: 'core-light'; dark: 'core-dark' };
+    lightPatch?: Record<string, unknown>;
+    darkPatch?: Record<string, unknown>;
+    preview?: {
+        hero?: string;
+        surface?: string;
+        text?: string;
+    };
+    meta?: {
+        name?: string;
+        description?: string;
+        tags?: string[];
+    };
+}
+
+export interface MarketplaceThemePackSummary {
+    id: string;
+    slug: string;
+    ownerId: string;
+    name: string;
+    description?: string | null;
+    tags: string[];
+    supportsLight: boolean;
+    supportsDark: boolean;
+    isSystem: boolean;
+    visibility: MarketplaceThemeVisibility;
+    status: MarketplaceThemeStatus;
+    currentVersion: number;
+    downloadsCount: number;
+    appliesCount: number;
+    ratingAvg: number;
+    ratingCount: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface MarketplaceThemePackDetail extends MarketplaceThemePackSummary {
+    payload: MarketplaceThemePackPayload | null;
+    moderationMessage?: string | null;
+}
+
 export class SocialApiError extends Error {
     status: number;
     code?: string;
@@ -1072,6 +1118,42 @@ export class SocialService {
         const data = await this.request<{ comparison: SocialComparisonEntry[] }>(`${API_URL}/api/social/compare?friendId=${encodeURIComponent(friendId)}`, { headers });
         this.setCache(cacheKey, data.comparison);
         return data.comparison;
+    }
+
+    static async listMarketplaceThemes(input?: {
+        scope?: 'public' | 'owned' | 'friends';
+        mode?: 'light' | 'dark' | 'both';
+        sort?: 'trending' | 'new' | 'top';
+        source?: 'all' | 'system' | 'community';
+        q?: string;
+        page?: number;
+        pageSize?: number;
+    }): Promise<MarketplaceThemePackSummary[]> {
+        const headers = await this.getHeaders();
+        const params = new URLSearchParams();
+        if (input?.scope) params.set('scope', input.scope);
+        if (input?.mode) params.set('mode', input.mode);
+        if (input?.sort) params.set('sort', input.sort);
+        if (input?.source) params.set('source', input.source);
+        if (input?.q && input.q.trim()) params.set('q', input.q.trim());
+        if (typeof input?.page === 'number') params.set('page', String(input.page));
+        if (typeof input?.pageSize === 'number') params.set('pageSize', String(input.pageSize));
+
+        const suffix = params.toString() ? `?${params.toString()}` : '';
+        const data = await this.request<{ items: MarketplaceThemePackSummary[] }>(
+            `${API_URL}/api/social/themes${suffix}`,
+            { headers },
+        );
+        return Array.isArray(data.items) ? data.items : [];
+    }
+
+    static async getMarketplaceThemeDetail(themeId: string): Promise<MarketplaceThemePackDetail> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ item: MarketplaceThemePackDetail }>(
+            `${API_URL}/api/social/themes/${encodeURIComponent(themeId)}`,
+            { headers },
+        );
+        return data.item;
     }
 
     static async getPulse(): Promise<SocialPulse> {

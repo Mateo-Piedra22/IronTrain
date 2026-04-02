@@ -10,6 +10,7 @@ type ThemePackModerationItem = {
     ownerId: string;
     ownerUsername: string | null;
     name: string;
+    isSystem: boolean;
     visibility: string;
     status: string;
     moderationMessage: string | null;
@@ -33,6 +34,7 @@ type ThemeReportModerationItem = {
     themeSlug: string;
     themeName: string;
     themeStatus: string;
+    themeIsSystem: boolean;
     ownerId: string;
 };
 
@@ -56,8 +58,10 @@ function shortDate(value: string | null): string {
 export default function ThemesModerationPanel({ themes, reports }: ThemesModerationPanelProps) {
     const searchParams = useSearchParams();
     const activeSection = (searchParams.get('section') as 'queue' | 'reports') || 'queue';
+    const activeSource = (searchParams.get('source') as 'all' | 'system' | 'community') || 'all';
 
     const pendingQueue = themes.filter((item) => item.status === 'pending_review');
+    const systemCount = themes.filter((item) => item.isSystem).length;
 
     return (
         <div className="space-y-10">
@@ -73,6 +77,27 @@ export default function ThemesModerationPanel({ themes, reports }: ThemesModerat
                     className={`px-8 py-3 font-black text-xs uppercase transition-all border-b-2 -mb-[1px] ${activeSection === 'reports' ? 'border-[#1a1a2e] text-[#1a1a2e]' : 'border-transparent text-[#1a1a2e]/40 hover:text-[#1a1a2e]'}`}
                 >
                     REPORTS_QUEUE
+                </a>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+                <a
+                    href={`?tab=themes-moderation&section=${activeSection}&source=all`}
+                    className={`px-3 py-1 border text-[10px] font-black uppercase tracking-wider ${activeSource === 'all' ? 'bg-[#1a1a2e] text-[#f5f1e8] border-[#1a1a2e]' : 'bg-white text-[#1a1a2e] border-[#1a1a2e]/30'}`}
+                >
+                    ALL
+                </a>
+                <a
+                    href={`?tab=themes-moderation&section=${activeSection}&source=system`}
+                    className={`px-3 py-1 border text-[10px] font-black uppercase tracking-wider ${activeSource === 'system' ? 'bg-[#1a1a2e] text-[#f5f1e8] border-[#1a1a2e]' : 'bg-white text-[#1a1a2e] border-[#1a1a2e]/30'}`}
+                >
+                    SYSTEM ({systemCount})
+                </a>
+                <a
+                    href={`?tab=themes-moderation&section=${activeSection}&source=community`}
+                    className={`px-3 py-1 border text-[10px] font-black uppercase tracking-wider ${activeSource === 'community' ? 'bg-[#1a1a2e] text-[#f5f1e8] border-[#1a1a2e]' : 'bg-white text-[#1a1a2e] border-[#1a1a2e]/30'}`}
+                >
+                    COMMUNITY ({themes.length - systemCount})
                 </a>
             </div>
 
@@ -100,6 +125,9 @@ export default function ThemesModerationPanel({ themes, reports }: ThemesModerat
                                         <tr key={item.id} className="hover:bg-[#1a1a2e]/5 transition-colors align-top">
                                             <td className="p-3">
                                                 <div className="font-black uppercase text-sm">{item.name}</div>
+                                                {item.isSystem ? (
+                                                    <div className="inline-flex mt-1 border border-[#1a1a2e] px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider">SYSTEM_THEME</div>
+                                                ) : null}
                                                 <div className="font-mono text-[9px] opacity-50 mt-1">/{item.slug}</div>
                                                 {item.moderationMessage ? (
                                                     <div className="text-[9px] text-amber-700 font-bold mt-2 max-w-80">
@@ -127,6 +155,7 @@ export default function ThemesModerationPanel({ themes, reports }: ThemesModerat
                                                     <input type="hidden" name="themePackId" value={item.id} />
                                                     <input type="hidden" name="origin_tab" value="themes-moderation" />
                                                     <input type="hidden" name="origin_section" value="queue" />
+                                                    <input type="hidden" name="source" value={activeSource} />
 
                                                     <input
                                                         type="text"
@@ -168,6 +197,14 @@ export default function ThemesModerationPanel({ themes, reports }: ThemesModerat
                                                         >
                                                             <Undo2 className="w-3.5 h-3.5" /> RESTORE
                                                         </button>
+                                                        <button
+                                                            type="submit"
+                                                            name="intent"
+                                                            value={item.isSystem ? 'unmark-system' : 'mark-system'}
+                                                            className="h-8 px-3 border border-[#1a1a2e] bg-[#f5f1e8] hover:bg-indigo-600 hover:text-white font-black uppercase text-[9px] transition-all flex items-center gap-1"
+                                                        >
+                                                            <Shield className="w-3.5 h-3.5" /> {item.isSystem ? 'UNMARK_SYSTEM' : 'MARK_SYSTEM'}
+                                                        </button>
                                                     </div>
                                                 </form>
                                             </td>
@@ -203,6 +240,7 @@ export default function ThemesModerationPanel({ themes, reports }: ThemesModerat
                                         </td>
                                         <td className="p-3">
                                             <div className="font-black">{item.themeName}</div>
+                                            {item.themeIsSystem ? <div className="text-[8px] font-black opacity-70 uppercase">SYSTEM_THEME</div> : null}
                                             <div className="font-mono text-[9px] opacity-50">/{item.themeSlug}</div>
                                             <div className="text-[9px] opacity-60 mt-1">theme status: {item.themeStatus}</div>
                                         </td>
@@ -219,6 +257,7 @@ export default function ThemesModerationPanel({ themes, reports }: ThemesModerat
                                                 <input type="hidden" name="themePackId" value={item.themePackId} />
                                                 <input type="hidden" name="origin_tab" value="themes-moderation" />
                                                 <input type="hidden" name="origin_section" value="reports" />
+                                                <input type="hidden" name="source" value={activeSource} />
                                                 <button
                                                     type="submit"
                                                     name="intent"

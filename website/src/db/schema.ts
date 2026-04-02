@@ -438,6 +438,7 @@ export const themePacks = pgTable('theme_packs', {
     tags: jsonb('tags').$type<string[]>().notNull().default([]),
     supportsLight: boolean('supports_light').notNull().default(true),
     supportsDark: boolean('supports_dark').notNull().default(true),
+    isSystem: boolean('is_system').notNull().default(false),
     visibility: text('visibility').notNull().default('private'),
     status: text('status').notNull().default('draft'),
     moderationMessage: text('moderation_message'),
@@ -452,6 +453,7 @@ export const themePacks = pgTable('theme_packs', {
 }, (table) => ({
     slugUniqueIdx: uniqueIndex('theme_packs_slug_unique_idx').on(table.slug),
     ownerUpdatedIdx: index('theme_packs_owner_updated_idx').on(table.ownerId, table.updatedAt),
+    systemStatusUpdatedIdx: index('theme_packs_system_status_updated_idx').on(table.isSystem, table.status, table.updatedAt),
     statusVisibilityUpdatedIdx: index('theme_packs_status_visibility_updated_idx').on(table.status, table.visibility, table.updatedAt),
     deletedUpdatedIdx: index('theme_packs_deleted_updated_idx').on(table.deletedAt, table.updatedAt),
 }));

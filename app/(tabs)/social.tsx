@@ -19,7 +19,7 @@ import * as analytics from '@/src/utils/analytics';
 import { logger } from '@/src/utils/logger';
 import * as Linking from 'expo-linking';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
-import { Bell, CloudRain, Flame, Globe, Search, Settings, Trophy, UserCircle2, Users, Zap } from 'lucide-react-native';
+import { Bell, CloudRain, Flame, Globe, Palette, Search, Settings, Trophy, UserCircle2, Users, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, BackHandler, LayoutAnimation, Modal, Platform, RefreshControl, ScrollView, Text, TouchableOpacity, UIManager, View } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
@@ -386,30 +386,10 @@ export default function SocialTab() {
         );
     }, [addToast]);
 
-    const handleOpenPublicThemes = useCallback(async () => {
+    const handleOpenThemeStudio = useCallback(() => {
         feedbackSelection();
-        Alert.alert(
-            'Abrir enlace externo',
-            'Vas a salir de la app para abrir el marketplace de themes.',
-            [
-                {
-                    text: 'Cancelar',
-                    style: 'cancel',
-                },
-                {
-                    text: 'Abrir',
-                    onPress: async () => {
-                        try {
-                            await Linking.openURL('https://irontrain.motiona.xyz/feed?view=themes');
-                        } catch {
-                            addToast({ type: 'error', title: 'Error', message: 'No se pudo abrir la página de themes públicos.' });
-                        }
-                    },
-                },
-            ],
-            { cancelable: true },
-        );
-    }, [addToast]);
+        router.push('/theme-studio' as any);
+    }, [router]);
 
     const handleUpdateProfile = async () => {
         if (!displayName.trim() || displayName.length < 2) {
@@ -1211,9 +1191,9 @@ export default function SocialTab() {
                             <Globe size={12} color={colors.textMuted} />
                             <Text numberOfLines={1} style={[styles.archiveToggleText, { textAlign: 'center', fontSize: 11 }]}>Rutinas</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.archiveToggle, { flex: 1, minWidth: 0, minHeight: 34, justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 6, gap: 4 }]} onPress={handleOpenPublicThemes}>
-                            <Zap size={12} color={colors.textMuted} />
-                            <Text numberOfLines={1} style={[styles.archiveToggleText, { textAlign: 'center', fontSize: 11 }]}>Themes</Text>
+                        <TouchableOpacity style={[styles.archiveToggle, { flex: 1, minWidth: 0, minHeight: 34, justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 6, gap: 4 }]} onPress={handleOpenThemeStudio}>
+                            <Palette size={12} color={colors.textMuted} />
+                            <Text numberOfLines={1} style={[styles.archiveToggleText, { textAlign: 'center', fontSize: 11 }]}>Studio</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.archiveToggle, { flex: 1, minWidth: 0, minHeight: 34, justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 6, gap: 4 }]}

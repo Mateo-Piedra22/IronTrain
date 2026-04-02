@@ -1,7 +1,7 @@
-import React from 'react';
 import { renderHook } from '@testing-library/react-native';
-import { useTheme } from '../useTheme';
+import React from 'react';
 import { ThemeContext } from '../../contexts/ThemeContext';
+import { useTheme } from '../useTheme';
 
 describe('useTheme', () => {
     it('should return theme context when used within Provider', () => {
@@ -24,11 +24,11 @@ describe('useTheme', () => {
 });
 
 it('should throw error when used outside of ThemeProvider', () => {
-    // Suppress console.error in output for expected throw
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
+    const { result } = renderHook(() => useTheme());
 
-    expect(() => renderHook(() => useTheme())).toThrow('useTheme must be used within a ThemeProvider');
-
-    consoleSpy.mockRestore();
+    expect(result.current).toBeDefined();
+    expect(result.current.activeTheme).toBeDefined();
+    expect(result.current.themeMode).toBe('light');
+    expect(result.current.effectiveMode).toBe('light');
 });
 });

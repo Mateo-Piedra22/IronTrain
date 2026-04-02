@@ -291,6 +291,7 @@ function MainAppContent({ dbInitialized, fontsLoaded, fontError, installedVersio
           }}
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="theme-studio" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'IronTrain' }} />
           <Stack.Screen name="changelog" options={{ presentation: 'modal', title: 'Novedades' }} />
           <Stack.Screen name="workout/[id]" options={{ title: 'Sesión', headerBackTitle: 'Atrás' }} />

@@ -1,4 +1,3 @@
-import { ThemeStudioPanel } from '@/components/ThemeStudioPanel';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { useDataReload } from '@/src/hooks/useDataReload';
 import { useTheme } from '@/src/hooks/useTheme';
@@ -14,7 +13,7 @@ import { notify } from '@/src/utils/notify';
 import { triggerSensoryFeedback } from '@/src/utils/sensoryFeedback';
 import * as Linking from 'expo-linking';
 import { Stack, useRouter } from 'expo-router';
-import { AlertTriangle, BarChart3, Bell, Calculator, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, CloudLightning, Database, Disc, Download, LogOut, Megaphone, MessageSquare, RefreshCw, Ruler, Shield, Smartphone, Timer, Trash2, User, Vibrate, Volume2, Zap } from 'lucide-react-native';
+import { AlertTriangle, BarChart3, Bell, Calculator, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, CloudLightning, Database, Disc, Download, LogOut, Megaphone, MessageSquare, Palette, RefreshCw, Ruler, Shield, Smartphone, Timer, Trash2, User, Vibrate, Volume2, Zap } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useColors } from '../src/hooks/useColors';
@@ -750,9 +749,26 @@ export default function SettingsScreen() {
                             onSelect={(id) => setThemeMode(id as any)}
                         />
                     </SettingRow>
-                    <View style={[s.cardInnerPadded, s.settingRowBorder]}>
-                        <ThemeStudioPanel />
-                    </View>
+                    <SettingRow
+                        icon={Palette}
+                        title="Theme Studio"
+                        subtitle="Editor completo de temas en pantalla dedicada."
+                    >
+                        <TouchableOpacity
+                            onPress={() => router.push('/theme-studio' as any)}
+                            style={{
+                                paddingHorizontal: 14,
+                                paddingVertical: 9,
+                                borderRadius: 10,
+                                backgroundColor: withAlpha(colors.primary.DEFAULT, '16'),
+                                borderWidth: 1.5,
+                                borderColor: withAlpha(colors.primary.DEFAULT, '44'),
+                            }}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={{ color: colors.primary.DEFAULT, fontWeight: '900', fontSize: 12 }}>Abrir</Text>
+                        </TouchableOpacity>
+                    </SettingRow>
                     <SettingRow icon={Timer} title="Descanso por defecto">
                         <Stepper value={`${defaultTimer}s`} label="descanso" onMinus={() => saveSetting('defaultRestTimer', Math.max(0, defaultTimer - 30))} onPlus={() => saveSetting('defaultRestTimer', defaultTimer + 30)} />
                     </SettingRow>

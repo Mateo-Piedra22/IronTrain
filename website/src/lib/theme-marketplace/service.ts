@@ -89,6 +89,7 @@ const querySchema = z.object({
     scope: z.enum(['public', 'owned', 'friends']).default('public'),
     mode: z.enum(['light', 'dark', 'both']).default('both'),
     sort: z.enum(['trending', 'new', 'top']).default('trending'),
+    source: z.enum(['all', 'system', 'community']).default('all'),
     page: z.number().int().min(1).default(1),
     pageSize: z.number().int().min(1).max(50).default(20),
     q: z.string().trim().max(80).optional(),
@@ -104,6 +105,7 @@ export function parseThemeListQuery(url: URL): ThemeListQuery {
         scope: url.searchParams.get('scope') ?? 'public',
         mode: url.searchParams.get('mode') ?? 'both',
         sort: url.searchParams.get('sort') ?? 'trending',
+        source: url.searchParams.get('source') ?? 'all',
         page,
         pageSize,
         q: url.searchParams.get('q') ?? undefined,
@@ -247,6 +249,12 @@ export function buildThemeListFilters(userId: string, query: ThemeListQuery, fri
         filters.push(eq(schema.themePacks.supportsDark, true));
     }
 
+    if (query.source === 'system') {
+        filters.push(eq(schema.themePacks.isSystem, true));
+    } else if (query.source === 'community') {
+        filters.push(eq(schema.themePacks.isSystem, false));
+    }
+
     if (query.q) {
         const pattern = `%${query.q.toLowerCase()}%`;
         filters.push(or(
@@ -268,6 +276,7 @@ export function mapThemePackSummary(row: typeof schema.themePacks.$inferSelect) 
         tags: Array.isArray(row.tags) ? row.tags : [],
         supportsLight: row.supportsLight,
         supportsDark: row.supportsDark,
+        isSystem: row.isSystem,
         visibility: row.visibility,
         status: row.status,
         currentVersion: row.currentVersion,
