@@ -217,13 +217,13 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                         href="/feed?view=community"
                         className={`flex-1 text-center py-4 font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${!isMarketplace && !isThemes ? 'bg-[#1a1a2e] text-[#f5f1e8]' : 'text-[#1a1a2e] hover:bg-[#1a1a2e]/5'}`}
                     >
-                        <User className="w-3.5 h-3.5" /> COMUNIDAD_P2P
+                        <User className="w-3.5 h-3.5" /> ROUTINES_MARKET
                     </Link>
                     <Link
                         href="/feed?view=marketplace"
                         className={`flex-1 text-center py-4 font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${isMarketplace ? 'bg-[#1a1a2e] text-[#f5f1e8]' : 'text-[#1a1a2e] hover:bg-[#1a1a2e]/5'}`}
                     >
-                        <ShoppingBag className="w-3.5 h-3.5" /> MARKETPLACE_OFFICIAL
+                        <ShoppingBag className="w-3.5 h-3.5" /> OFFICIAL_MARKET
                     </Link>
                     <Link
                         href="/feed?view=themes"
@@ -238,41 +238,11 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                     publicRoutinesData.length === 0 ? (
                         <div className="text-center py-24 border-2 border-[#1a1a2e] border-dashed bg-white/30">
                             <Globe className="w-12 h-12 mx-auto opacity-10 mb-6" />
-                            <h3 className="text-base font-black uppercase mb-2">0_SOCIAL_DATA_FOUND</h3>
-                            <p className="text-[9px] font-bold opacity-30 uppercase tracking-[0.3em]">No hay transmisiones públicas activas en este momento.</p>
+                            <h3 className="text-base font-black uppercase mb-2">0_ROUTINES_FOUND</h3>
+                            <p className="text-[9px] font-bold opacity-30 uppercase tracking-[0.3em]">No hay rutinas públicas disponibles en este momento.</p>
                         </div>
                     ) : (
                         <div className="grid gap-8">
-                            {recentSocialActivity.length > 0 && (
-                                <section className="border-2 border-[#1a1a2e] bg-white p-6 md:p-8">
-                                    <div className="flex items-center justify-between mb-6">
-                                        <h2 className="text-[10px] font-black uppercase tracking-[0.25em] opacity-60">SOCIAL_ACTIVITY_STREAM</h2>
-                                        <Activity className="w-4 h-4 opacity-40" />
-                                    </div>
-                                    <div className="grid md:grid-cols-2 gap-4">
-                                        {recentSocialActivity.map((entry) => {
-                                            const { metadata, value } = parseActivityMetadata(entry.metadata);
-                                            return (
-                                                <div key={entry.id} className="border border-[#1a1a2e]/20 p-4">
-                                                    <div className="flex items-center justify-between mb-3">
-                                                        <div className="text-[9px] font-black uppercase tracking-[0.2em]">{actionLabel(entry.actionType)}</div>
-                                                        <div className="text-[9px] font-bold opacity-40">{new Date(entry.createdAt || new Date()).toLocaleDateString('es-AR')}</div>
-                                                    </div>
-                                                    <div className="text-sm font-black uppercase tracking-tight">
-                                                        @{entry.username || entry.displayName || 'athlete'}
-                                                    </div>
-                                                    <div className="flex items-center gap-4 mt-3 text-[10px] font-bold uppercase tracking-[0.15em] opacity-60">
-                                                        <span className="flex items-center gap-1"><Flame className="w-3.5 h-3.5" /> {entry.kudoCount || 0} KUDOS</span>
-                                                        <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" /> SCORE {entry.scoreLifetime || 0}</span>
-                                                        {value !== undefined && value !== null && <span>VALOR {String(value)}</span>}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </section>
-                            )}
-
                             {publicRoutinesData.map((routine: any) => (
                                 <ExperimentWrapper key={routine.id}>
                                     <Link
@@ -328,85 +298,123 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                                     </Link>
                                 </ExperimentWrapper>
                             ))}
+
+                            {recentSocialActivity.length > 0 && (
+                                <section className="border-2 border-[#1a1a2e] bg-white p-6 md:p-8">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h2 className="text-[10px] font-black uppercase tracking-[0.25em] opacity-60">SOCIAL_ACTIVITY_STREAM</h2>
+                                        <Activity className="w-4 h-4 opacity-40" />
+                                    </div>
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        {recentSocialActivity.map((entry) => {
+                                            const { metadata, value } = parseActivityMetadata(entry.metadata);
+                                            return (
+                                                <div key={entry.id} className="border border-[#1a1a2e]/20 p-4">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <div className="text-[9px] font-black uppercase tracking-[0.2em]">{actionLabel(entry.actionType)}</div>
+                                                        <div className="text-[9px] font-bold opacity-40">{new Date(entry.createdAt || new Date()).toLocaleDateString('es-AR')}</div>
+                                                    </div>
+                                                    <div className="text-sm font-black uppercase tracking-tight">
+                                                        @{entry.username || entry.displayName || 'athlete'}
+                                                    </div>
+                                                    <div className="flex items-center gap-4 mt-3 text-[10px] font-bold uppercase tracking-[0.15em] opacity-60">
+                                                        <span className="flex items-center gap-1"><Flame className="w-3.5 h-3.5" /> {entry.kudoCount || 0} KUDOS</span>
+                                                        <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" /> SCORE {entry.scoreLifetime || 0}</span>
+                                                        {value !== undefined && value !== null && <span>VALOR {String(value)}</span>}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </section>
+                            )}
                         </div>
                     )
                 ) : isMarketplace ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {officialExercises.map((exercise: any) => {
-                            const category = categories.find((c: any) => c.id === exercise.categoryId);
-                            const isAdopted = adoptedOriginIds.includes(exercise.id);
+                    officialExercises.length === 0 ? (
+                        <div className="text-center py-24 border-2 border-[#1a1a2e] border-dashed bg-white/30">
+                            <ShoppingBag className="w-12 h-12 mx-auto opacity-10 mb-6" />
+                            <h3 className="text-base font-black uppercase mb-2">0_OFFICIAL_ASSETS_FOUND</h3>
+                            <p className="text-[9px] font-bold opacity-30 uppercase tracking-[0.3em]">No hay assets oficiales públicos disponibles en este momento.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {officialExercises.map((exercise: any) => {
+                                const category = categories.find((c: any) => c.id === exercise.categoryId);
+                                const isAdopted = adoptedOriginIds.includes(exercise.id);
 
-                            return (
-                                <div
-                                    key={exercise.id}
-                                    className="group relative border-[3px] border-[#1a1a2e] bg-white p-8 pb-24 flex flex-col justify-between hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all shadow-[12px_12px_0px_0px_rgba(26,26,46,0.05)]"
-                                >
-                                    <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
-                                        <ShoppingBag size={100} strokeWidth={1.5} />
-                                    </div>
-
-                                    <div className="space-y-6 relative z-10">
-                                        <div className="flex items-center gap-3">
-                                            <div className="bg-current text-background px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter">OFFICIAL_CORE_ASSET</div>
-                                            <span className="text-[10px] font-black uppercase opacity-40 italic tracking-widest">{category?.name || 'GENERIC_COMPONENT'}</span>
+                                return (
+                                    <div
+                                        key={exercise.id}
+                                        className="group relative border-[3px] border-[#1a1a2e] bg-white p-8 pb-24 flex flex-col justify-between hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all shadow-[12px_12px_0px_0px_rgba(26,26,46,0.05)]"
+                                    >
+                                        <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
+                                            <ShoppingBag size={100} strokeWidth={1.5} />
                                         </div>
 
-                                        <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tighter leading-[0.9] italic group-hover:underline">
-                                            {exercise.name}
-                                        </h2>
+                                        <div className="space-y-6 relative z-10">
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-current text-background px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter">OFFICIAL_CORE_ASSET</div>
+                                                <span className="text-[10px] font-black uppercase opacity-40 italic tracking-widest">{category?.name || 'GENERIC_COMPONENT'}</span>
+                                            </div>
 
-                                        <div className="flex flex-wrap gap-2">
-                                            {exercise.badges.map((eb: any) => (
-                                                <span
-                                                    key={eb.badge.id}
-                                                    className="px-2 py-0.5 border border-current text-[8px] font-black uppercase tracking-widest bg-current/5"
-                                                    style={{
-                                                        color: eb.badge.color === '#ef4444' ? 'inherit' : eb.badge.color,
-                                                        borderColor: `${eb.badge.color}40`
-                                                    }}
+                                            <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tighter leading-[0.9] italic group-hover:underline">
+                                                {exercise.name}
+                                            </h2>
+
+                                            <div className="flex flex-wrap gap-2">
+                                                {exercise.badges.map((eb: any) => (
+                                                    <span
+                                                        key={eb.badge.id}
+                                                        className="px-2 py-0.5 border border-current text-[8px] font-black uppercase tracking-widest bg-current/5"
+                                                        style={{
+                                                            color: eb.badge.color === '#ef4444' ? 'inherit' : eb.badge.color,
+                                                            borderColor: `${eb.badge.color}40`
+                                                        }}
+                                                    >
+                                                        {eb.badge.name}
+                                                    </span>
+                                                ))}
+                                            </div>
+
+                                            {exercise.notes && (
+                                                <p className="text-[10px] font-bold opacity-60 uppercase tracking-tight leading-relaxed line-clamp-2 italic max-w-xs">
+                                                    {exercise.notes}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="absolute bottom-0 left-0 w-full p-6 border-t-[1px] border-current/20 flex items-center justify-between z-20">
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-[8px] font-black opacity-30 uppercase tracking-[0.2em]">IRON_ASSET_ID</span>
+                                                <span className="text-[10px] font-black tracking-tighter">{exercise.id.slice(0, 12).toUpperCase()}</span>
+                                            </div>
+
+                                            {!currentUserId ? (
+                                                <Link
+                                                    href={`/auth/sign-in`}
+                                                    className="px-6 py-3 bg-current text-background font-black text-[10px] uppercase tracking-[0.2em] hover:invert transition-all flex items-center gap-2"
                                                 >
-                                                    {eb.badge.name}
-                                                </span>
-                                            ))}
+                                                    AUTH_REQUIRED <Plus className="w-3.5 h-3.5" />
+                                                </Link>
+                                            ) : (
+                                                <form action={handleAdoptAction}>
+                                                    <input type="hidden" name="exerciseId" value={exercise.id} />
+                                                    <AdoptButton isAdopted={isAdopted} />
+                                                </form>
+                                            )}
                                         </div>
-
-                                        {exercise.notes && (
-                                            <p className="text-[10px] font-bold opacity-60 uppercase tracking-tight leading-relaxed line-clamp-2 italic max-w-xs">
-                                                {exercise.notes}
-                                            </p>
-                                        )}
                                     </div>
-
-                                    <div className="absolute bottom-0 left-0 w-full p-6 border-t-[1px] border-current/20 flex items-center justify-between z-20">
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="text-[8px] font-black opacity-30 uppercase tracking-[0.2em]">IRON_ASSET_ID</span>
-                                            <span className="text-[10px] font-black tracking-tighter">{exercise.id.slice(0, 12).toUpperCase()}</span>
-                                        </div>
-
-                                        {!currentUserId ? (
-                                            <Link
-                                                href={`/auth/sign-in`}
-                                                className="px-6 py-3 bg-current text-background font-black text-[10px] uppercase tracking-[0.2em] hover:invert transition-all flex items-center gap-2"
-                                            >
-                                                AUTH_REQUIRED <Plus className="w-3.5 h-3.5" />
-                                            </Link>
-                                        ) : (
-                                            <form action={handleAdoptAction}>
-                                                <input type="hidden" name="exerciseId" value={exercise.id} />
-                                                <AdoptButton isAdopted={isAdopted} />
-                                            </form>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                );
+                            })}
+                        </div>
+                    )
                 ) : (
                     publicThemes.length === 0 ? (
                         <div className="text-center py-24 border-2 border-[#1a1a2e] border-dashed bg-white/30">
                             <Palette className="w-12 h-12 mx-auto opacity-10 mb-6" />
-                            <h3 className="text-base font-black uppercase mb-2">0_THEME_PACKS_FOUND</h3>
-                            <p className="text-[9px] font-bold opacity-30 uppercase tracking-[0.3em]">No hay themes públicos aprobados todavía.</p>
+                            <h3 className="text-base font-black uppercase mb-2">0_THEMES_FOUND</h3>
+                            <p className="text-[9px] font-bold opacity-30 uppercase tracking-[0.3em]">No hay themes públicos disponibles en este momento.</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
