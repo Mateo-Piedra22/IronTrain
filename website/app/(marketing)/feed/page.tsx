@@ -19,6 +19,7 @@ import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { MarketplaceResolver } from '../../../src/lib/marketplace';
 import { verifyAuthFromHeaders } from '../../../src/lib/server-auth';
+import { resolveThemePreview } from '../../../src/lib/theme-marketplace/preview';
 import { ExperimentWrapper } from '../../components/PostHogFeatures';
 
 
@@ -420,12 +421,7 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {publicThemes.map((theme) => {
                                 const payload = versionMap.get(theme.id) || {};
-                                const preview = (payload.preview && typeof payload.preview === 'object')
-                                    ? payload.preview as Record<string, string>
-                                    : {};
-                                const hero = preview.hero || '#8AA0B8';
-                                const surface = preview.surface || '#FFFFFF';
-                                const text = preview.text || '#0F172A';
+                                const { hero, surface, text } = resolveThemePreview(payload);
                                 const tags = Array.isArray(theme.tags) ? theme.tags.slice(0, 3) : [];
 
                                 return (

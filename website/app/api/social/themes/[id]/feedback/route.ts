@@ -4,11 +4,13 @@ import { verifyAuth } from '@/lib/auth';
 import { createEndpointMetricRecorder } from '@/lib/endpoint-metrics';
 import { RATE_LIMITS } from '@/lib/rate-limit';
 import { canReadThemePack, createThemeFeedbackSchema } from '@/lib/theme-marketplace/service';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+const FEEDBACK_DEDUP_WINDOW_MS = 60 * 60 * 1000;
 
 export async function POST(
     req: NextRequest,
@@ -55,6 +57,11 @@ export async function POST(
             return NextResponse.json({ error: 'not_found' }, { status: 404 });
         }
 
+        if (pack.ownerId === userId) {
+            recordMetric({ outcome: 'error', statusCode: 403, event: 'owner_cannot_feedback' });
+            return NextResponse.json({ error: 'owners_cannot_feedback_own_theme' }, { status: 403 });
+        }
+
         const canWriteFeedback = await canReadThemePack(userId, pack);
         if (!canWriteFeedback) {
             recordMetric({ outcome: 'error', statusCode: 403, event: 'forbidden' });
@@ -62,14 +69,45 @@ export async function POST(
         }
 
         const now = new Date();
+        const dedupThreshold = new Date(now.getTime() - FEEDBACK_DEDUP_WINDOW_MS);
         const feedbackId = crypto.randomUUID();
+        const normalizedMessage = parsed.data.message.trim();
+
+        const [recentFeedback] = await db
+            .select({ id: schema.themePackFeedback.id })
+            .from(schema.themePackFeedback)
+            .where(
+                and(
+                    eq(schema.themePackFeedback.themePackId, id),
+                    eq(schema.themePackFeedback.userId, userId),
+                    eq(schema.themePackFeedback.kind, parsed.data.kind),
+                    eq(schema.themePackFeedback.message, normalizedMessage),
+                    eq(schema.themePackFeedback.status, 'open'),
+                    gt(schema.themePackFeedback.createdAt, dedupThreshold),
+                ),
+            )
+            .limit(1);
+
+        if (recentFeedback?.id) {
+            recordMetric({ outcome: 'ignored', statusCode: 200, event: 'deduplicated' });
+            return NextResponse.json({
+                success: true,
+                deduplicated: true,
+                item: {
+                    id: recentFeedback.id,
+                    themePackId: id,
+                    kind: parsed.data.kind,
+                    status: 'open',
+                },
+            });
+        }
 
         await db.insert(schema.themePackFeedback).values({
             id: feedbackId,
             themePackId: id,
             userId,
             kind: parsed.data.kind,
-            message: parsed.data.message,
+            message: normalizedMessage,
             status: 'open',
             createdAt: now,
             updatedAt: now,

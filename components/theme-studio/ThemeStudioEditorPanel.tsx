@@ -1,11 +1,11 @@
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { ThemeDraft } from '@/src/theme-engine';
 import { Check, ChevronDown, ChevronUp, Moon, Palette, Save, Sun, SunMoon } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { applyEditorSmartDefaults } from './helpers';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { applyEditorSmartDefaults, ContrastAuditReport } from './helpers';
 import { ThemeStudioPreviewModal } from './ThemeStudioPreviewModal';
-import { ApplyOnSave, CatalogItem, EditableColorFieldKey, EditorMode, LocalThemeMeta } from './types';
+import { ApplyOnSave, CatalogItem, EditableColorFieldKey, EditableColorFields, EditorMode, LocalThemeMeta } from './types';
 
 type ThemeStudioEditorTabProps = {
     styles: any;
@@ -33,8 +33,16 @@ type ThemeStudioEditorTabProps = {
     pickerField: EditableColorFieldKey | null;
     hasInvalidInputs: boolean;
     validColorCount: number;
+    contrastScoreAverage: number;
+    contrastBlockersTotal: number;
+    contrastWarningsTotal: number;
+    effectiveContrastBlockersTotal: number;
+    strictContrastMode: boolean;
+    lightContrastReport: ContrastAuditReport;
+    darkContrastReport: ContrastAuditReport;
     isCreationFlow: boolean;
     canSaveTheme: boolean;
+    isSavingTheme: boolean;
     saveDisabledReason: string | null;
     editorEntryReady: boolean;
     hasUnsavedNewDraft: boolean;
@@ -42,6 +50,8 @@ type ThemeStudioEditorTabProps = {
     selectedEditorThemeKey: string | null;
     previewLightColors: any;
     previewDarkColors: any;
+    previewLightResolvedFields: EditableColorFields;
+    previewDarkResolvedFields: EditableColorFields;
     onFeedbackSelection: () => void;
     onCreateNamedThemeFromEditor: () => void;
     onCreateBlankTheme: () => void;
@@ -53,6 +63,10 @@ type ThemeStudioEditorTabProps = {
     onUpdateFieldFromRgb: (fieldKey: EditableColorFieldKey, next: string) => void;
     onUpdateFieldFromHsl: (fieldKey: EditableColorFieldKey, next: string) => void;
     onSaveTheme: () => void;
+    onAutoFixContrast: () => void;
+    onToggleStrictContrast: () => void;
+    onGetSuggestedColorForField: (fieldKey: EditableColorFieldKey, mode: EditorMode) => string | null;
+    onApplySuggestedColorForField: (fieldKey: EditableColorFieldKey, mode: EditorMode, color: string) => void;
     onSelectColorFromPicker: (fieldKey: EditableColorFieldKey, color: string) => void;
     hexToRgbInput: (hex: string) => string;
     hexToHslInput: (hex: string) => string;
@@ -84,8 +98,16 @@ export function ThemeStudioEditorTab({
     pickerField,
     hasInvalidInputs,
     validColorCount,
+    contrastScoreAverage,
+    contrastBlockersTotal,
+    contrastWarningsTotal,
+    effectiveContrastBlockersTotal,
+    strictContrastMode,
+    lightContrastReport,
+    darkContrastReport,
     isCreationFlow,
     canSaveTheme,
+    isSavingTheme,
     saveDisabledReason,
     editorEntryReady,
     hasUnsavedNewDraft,
@@ -93,6 +115,8 @@ export function ThemeStudioEditorTab({
     selectedEditorThemeKey,
     previewLightColors,
     previewDarkColors,
+    previewLightResolvedFields,
+    previewDarkResolvedFields,
     onFeedbackSelection,
     onCreateNamedThemeFromEditor,
     onRequestThemeSwitch,
@@ -103,6 +127,10 @@ export function ThemeStudioEditorTab({
     onUpdateFieldFromRgb,
     onUpdateFieldFromHsl,
     onSaveTheme,
+    onAutoFixContrast,
+    onToggleStrictContrast,
+    onGetSuggestedColorForField,
+    onApplySuggestedColorForField,
     onSelectColorFromPicker,
     hexToRgbInput,
     hexToHslInput,
@@ -114,6 +142,13 @@ export function ThemeStudioEditorTab({
     const [chooseExistingExpanded, setChooseExistingExpanded] = useState(true);
     const [createNewExpanded, setCreateNewExpanded] = useState(false);
     const [previewModalVisible, setPreviewModalVisible] = useState(false);
+    const [currentStepIndex, setCurrentStepIndex] = useState(0);
+    const [highlightedField, setHighlightedField] = useState<EditableColorFieldKey | null>(null);
+    const [highlightPulseOn, setHighlightPulseOn] = useState(false);
+    const [suggestedColorMap, setSuggestedColorMap] = useState<Partial<Record<EditableColorFieldKey, string>>>({});
+    const [pendingScrollField, setPendingScrollField] = useState<EditableColorFieldKey | null>(null);
+    const colorFieldsScrollRef = useRef<ScrollView | null>(null);
+    const colorFieldOffsetsRef = useRef<Partial<Record<EditableColorFieldKey, number>>>({});
     const [expandedColorDetails, setExpandedColorDetails] = useState<Record<EditableColorFieldKey, boolean>>({
         primaryDefault: false,
         primaryLight: false,
@@ -163,6 +198,110 @@ export function ThemeStudioEditorTab({
 
     const getEffectiveColorForField = (fieldKey: EditableColorFieldKey) => {
         return effectiveFields[fieldKey] ?? '';
+    };
+
+    const currentContrastIssuesByField = useMemo(() => {
+        const issues = editorMode === 'light' ? lightContrastReport.issues : darkContrastReport.issues;
+        const result: Partial<Record<EditableColorFieldKey, 'blocker' | 'warning' | 'info'>> = {};
+
+        const rank = (severity: 'blocker' | 'warning' | 'info') => (severity === 'blocker' ? 3 : severity === 'warning' ? 2 : 1);
+
+        const setIfHigher = (fieldKey: EditableColorFieldKey, severity: 'blocker' | 'warning' | 'info') => {
+            const current = result[fieldKey];
+            if (!current || rank(severity) > rank(current)) {
+                result[fieldKey] = severity;
+            }
+        };
+
+        for (const issue of issues) {
+            if (issue.id === 'text-on-background' || issue.id === 'text-on-surface' || issue.id === 'text-on-surface-lighter') setIfHigher('text', issue.severity);
+            if (issue.id === 'onprimary-on-primary') setIfHigher('onPrimary', issue.severity);
+            if (issue.id === 'muted-on-background' || issue.id === 'muted-on-surface') setIfHigher('textMuted', issue.severity);
+            if (issue.id === 'primary-on-background') setIfHigher('primaryDefault', issue.severity);
+            if (issue.id === 'primary-light-on-background') setIfHigher('primaryLight', issue.severity);
+            if (issue.id === 'primary-dark-on-background') setIfHigher('primaryDark', issue.severity);
+            if (issue.id === 'border-on-surface') setIfHigher('border', issue.severity);
+        }
+
+        return result;
+    }, [editorMode, lightContrastReport.issues, darkContrastReport.issues]);
+
+    const steps = useMemo(
+        () => [
+            { id: 'setup', label: '1. Config' },
+            { id: 'colors', label: '2. Colores' },
+            { id: 'preview', label: '3. Preview' },
+            { id: 'quality', label: '4. QA' },
+            { id: 'save', label: '5. Guardar' },
+        ] as const,
+        [],
+    );
+
+    const currentStep = steps[currentStepIndex]?.id ?? 'setup';
+
+    useEffect(() => {
+        if (!editorEntryReady) {
+            setCurrentStepIndex(0);
+        }
+    }, [editorEntryReady]);
+
+    useEffect(() => {
+        if (!highlightedField) return;
+        setHighlightPulseOn(true);
+        const pulseOffTimeout = setTimeout(() => setHighlightPulseOn(false), 170);
+        const pulseOnTimeout = setTimeout(() => setHighlightPulseOn(true), 310);
+        const timeout = setTimeout(() => setHighlightedField(null), 1800);
+        return () => {
+            clearTimeout(pulseOffTimeout);
+            clearTimeout(pulseOnTimeout);
+            clearTimeout(timeout);
+            setHighlightPulseOn(false);
+        };
+    }, [highlightedField]);
+
+    useEffect(() => {
+        if (!pendingScrollField) return;
+        if (currentStep !== 'colors') return;
+
+        const timeout = setTimeout(() => {
+            const y = colorFieldOffsetsRef.current[pendingScrollField];
+            if (typeof y === 'number') {
+                colorFieldsScrollRef.current?.scrollTo({ y: Math.max(0, y - 14), animated: true });
+            }
+            setPendingScrollField(null);
+        }, 120);
+
+        return () => clearTimeout(timeout);
+    }, [pendingScrollField, currentStep]);
+
+    const nextStepBlockedReason = useMemo(() => {
+        if (currentStep === 'setup') {
+            if (!name.trim()) return 'Definí el nombre para avanzar.';
+            return null;
+        }
+        if (currentStep === 'colors') {
+            if (hasInvalidInputs) return 'Corregí colores inválidos para avanzar.';
+            if (validColorCount === 0) return 'Definí al menos 1 color válido para avanzar.';
+            return null;
+        }
+        if (currentStep === 'quality') {
+            if (effectiveContrastBlockersTotal > 0) return 'Resolvé bloqueos de contraste para avanzar.';
+            return null;
+        }
+        return null;
+    }, [currentStep, name, hasInvalidInputs, validColorCount, effectiveContrastBlockersTotal]);
+
+    const canGoNext = nextStepBlockedReason === null;
+
+    const goPrevStep = () => {
+        setCurrentStepIndex((prev) => Math.max(0, prev - 1));
+        onFeedbackSelection();
+    };
+
+    const goNextStep = () => {
+        if (!canGoNext) return;
+        setCurrentStepIndex((prev) => Math.min(steps.length - 1, prev + 1));
+        onFeedbackSelection();
     };
 
     if (!editorEntryReady) {
@@ -266,9 +405,54 @@ export function ThemeStudioEditorTab({
 
     return (
         <View style={{ gap: 9 }}>
+            <View style={styles.subtlePanel}>
+                <Text style={styles.sectionLabel}>Flujo guiado</Text>
+                <View style={[styles.row, { flexWrap: 'wrap' }]}>
+                    {steps.map((step, index) => {
+                        const selected = index === currentStepIndex;
+                        const completed = index < currentStepIndex;
+                        return (
+                            <TouchableOpacity
+                                key={step.id}
+                                style={[styles.chip, (selected || completed) && styles.chipActive]}
+                                activeOpacity={0.85}
+                                onPress={() => {
+                                    setCurrentStepIndex(index);
+                                    onFeedbackSelection();
+                                }}
+                            >
+                                <Text style={[styles.chipText, (selected || completed) && styles.chipTextActive]}>
+                                    {step.label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+                {nextStepBlockedReason ? <Text style={styles.helperError}>{nextStepBlockedReason}</Text> : null}
+                <View style={styles.row}>
+                    <TouchableOpacity
+                        style={[styles.actionBtn, styles.grow, currentStepIndex === 0 && styles.disabledBtn]}
+                        activeOpacity={0.85}
+                        disabled={currentStepIndex === 0}
+                        onPress={goPrevStep}
+                    >
+                        <Text style={styles.actionBtnText}>Atrás</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.actionBtn, styles.actionBtnPrimary, styles.grow, (currentStepIndex === steps.length - 1 || !canGoNext) && styles.disabledBtn]}
+                        activeOpacity={0.85}
+                        disabled={currentStepIndex === steps.length - 1 || !canGoNext}
+                        onPress={goNextStep}
+                    >
+                        <Text style={[styles.actionBtnText, styles.actionBtnTextPrimary]}>Siguiente</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            {currentStep === 'setup' ? (
             <View style={styles.card}>
                 <Text style={styles.sectionLabel}>Editor del tema</Text>
-                <Text style={styles.cardSub}>Flujo: nombre → colores principales → guardar.</Text>
+                <Text style={styles.cardSub}>Flujo: configuración → colores → preview → QA → guardar.</Text>
 
                 <View style={styles.statusCard}>
                     <Text style={styles.sectionLabel}>Estado del editor</Text>
@@ -348,72 +532,69 @@ export function ThemeStudioEditorTab({
                 </View>
 
                 <View style={styles.subtlePanel}>
-                    <TouchableOpacity
-                        style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
-                        activeOpacity={0.85}
-                        onPress={() => {
-                            setEditorAdvancedExpanded((current) => !current);
-                            onFeedbackSelection();
-                        }}
-                    >
-                        <Text style={styles.sectionLabel}>Controles avanzados</Text>
-                        {editorAdvancedExpanded ? <ChevronUp size={13} color={colors.textMuted} /> : <ChevronDown size={13} color={colors.textMuted} />}
-                    </TouchableOpacity>
+                    <Text style={styles.sectionLabel}>Visibilidad del tema</Text>
+                    <Text style={styles.cardSub}>Definí quién puede ver este tema cuando lo guardes.</Text>
 
-                    {editorAdvancedExpanded ? (
-                        <View style={{ gap: 7 }}>
-                            <TouchableOpacity
-                                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
-                                activeOpacity={0.85}
-                                onPress={() => {
-                                    setEditorVisibilityExpanded((current) => !current);
-                                    onFeedbackSelection();
-                                }}
-                            >
-                                <Text style={styles.colorRowSub}>Visibilidad del tema</Text>
-                                {editorVisibilityExpanded ? <ChevronUp size={12} color={colors.textMuted} /> : <ChevronDown size={12} color={colors.textMuted} />}
-                            </TouchableOpacity>
-
-                            {editorVisibilityExpanded ? (
-                                isEditingCoreTheme ? (
-                                    <View style={{ gap: 6 }}>
-                                        <Text style={styles.cardSub}>Tema core seleccionado: visibilidad fija.</Text>
-                                        <View style={[styles.row, { flexWrap: 'wrap' }]}>
-                                            <View style={[styles.chip, styles.chipActive]}>
-                                                <Text style={[styles.chipText, styles.chipTextActive]}>Público (bloqueado)</Text>
-                                            </View>
-                                        </View>
-                                    </View>
-                                ) : (
-                                    <View style={[styles.row, { flexWrap: 'wrap' }]}>
-                                        {([
-                                            { id: 'private', label: 'Privado' },
-                                            { id: 'friends', label: 'Amigos' },
-                                            { id: 'public', label: 'Público' },
-                                        ] as const).map((option) => {
-                                            const selected = editorVisibility === option.id;
-                                            return (
-                                                <TouchableOpacity
-                                                    key={option.id}
-                                                    style={[styles.chip, selected && styles.chipActive]}
-                                                    activeOpacity={0.85}
-                                                    onPress={() => {
-                                                        onSetEditorThemeVisibility(option.id);
-                                                    }}
-                                                >
-                                                    <Text style={[styles.chipText, selected && styles.chipTextActive]}>{option.label}</Text>
-                                                </TouchableOpacity>
-                                            );
-                                        })}
-                                    </View>
-                                )
-                            ) : null}
-                            {!selectedDraft && !isEditingCoreTheme ? <Text style={styles.cardSub}>Se aplicará al guardar el nuevo tema.</Text> : null}
+                    {isEditingCoreTheme ? (
+                        <View style={{ gap: 6 }}>
+                            <Text style={styles.cardSub}>Tema core seleccionado: visibilidad fija.</Text>
+                            <View style={[styles.row, { flexWrap: 'wrap' }]}>
+                                <View style={[styles.chip, styles.chipActive]}>
+                                    <Text style={[styles.chipText, styles.chipTextActive]}>Público (bloqueado)</Text>
+                                </View>
+                            </View>
                         </View>
-                    ) : null}
+                    ) : (
+                        <View style={{ gap: 7 }}>
+                            <View style={[styles.row, { flexWrap: 'wrap' }]}>
+                                {([
+                                    {
+                                        id: 'private',
+                                        label: 'Privado',
+                                        description: 'Solo vos lo podés ver y usar.',
+                                    },
+                                    {
+                                        id: 'friends',
+                                        label: 'Amigos',
+                                        description: 'Disponible solo para tus contactos/amigos.',
+                                    },
+                                    {
+                                        id: 'public',
+                                        label: 'Público',
+                                        description: 'Visible para toda la comunidad.',
+                                    },
+                                ] as const).map((option) => {
+                                    const selected = editorVisibility === option.id;
+                                    return (
+                                        <TouchableOpacity
+                                            key={option.id}
+                                            style={[styles.chip, selected && styles.chipActive]}
+                                            activeOpacity={0.85}
+                                            onPress={() => {
+                                                onSetEditorThemeVisibility(option.id);
+                                                onFeedbackSelection();
+                                            }}
+                                        >
+                                            <Text style={[styles.chipText, selected && styles.chipTextActive]}>{option.label}</Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+
+                            <View style={{ gap: 4 }}>
+                                <Text style={styles.cardSub}>• Privado: solo vos.</Text>
+                                <Text style={styles.cardSub}>• Amigos: solo tus contactos/amigos.</Text>
+                                <Text style={styles.cardSub}>• Público: visible para la comunidad.</Text>
+                            </View>
+                        </View>
+                    )}
+
+                    {!selectedDraft && !isEditingCoreTheme ? <Text style={styles.cardSub}>Se aplicará al guardar el nuevo tema.</Text> : null}
                 </View>
             </View>
+            ) : null}
 
+            {currentStep === 'colors' ? (
             <View style={styles.subtlePanel}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Text style={styles.sectionLabel}>Colores del tema</Text>
@@ -429,22 +610,54 @@ export function ThemeStudioEditorTab({
                     </TouchableOpacity>
                 </View>
                 <Text style={styles.cardSub}>Vista principal: Picker. Detalles HEX/RGB/HSL en desplegable.</Text>
+                <Text style={styles.cardSub}>Formato válido no siempre implica contraste correcto: validá en Preview/QA.</Text>
+                {effectiveContrastBlockersTotal > 0 ? (
+                    <Text style={styles.helperError}>Pendientes de contraste: {effectiveContrastBlockersTotal}.</Text>
+                ) : (
+                    <Text style={styles.helperOk}>Sin pendientes de contraste.</Text>
+                )}
             </View>
+            ) : null}
 
-            <View style={{ gap: 7 }}>
+            {currentStep === 'colors' ? (
+            <ScrollView
+                ref={colorFieldsScrollRef}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ gap: 7, paddingBottom: 4 }}
+                keyboardShouldPersistTaps="handled"
+            >
                 {visibleColorFields.map((field) => {
                     const explicitValue = activeFields[field.key];
                     const effectiveValue = getEffectiveColorForField(field.key);
                     const valid = !effectiveValue || isValidHexColor(effectiveValue);
                     const rgbText = hexToRgbInput(effectiveValue);
                     const detailsExpanded = expandedColorDetails[field.key] === true;
+                    const isHighlighted = highlightedField === field.key;
+                    const suggestedColor = suggestedColorMap[field.key];
+                    const contrastSeverity = currentContrastIssuesByField[field.key];
+                    const contrastValid = !contrastSeverity;
 
                     return (
-                        <View key={field.key} style={styles.colorRow}>
+                        <View
+                            key={field.key}
+                            onLayout={(event) => {
+                                colorFieldOffsetsRef.current[field.key] = event.nativeEvent.layout.y;
+                            }}
+                            style={[
+                                styles.colorRow,
+                                isHighlighted
+                                    ? {
+                                        borderColor: colors.primary.DEFAULT,
+                                        backgroundColor: colors.surfaceLighter,
+                                    }
+                                    : null,
+                            ]}
+                        >
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.colorRowTitle}>{field.label}</Text>
                                     <Text style={styles.colorRowSub}>{field.description}</Text>
+                                    <Text style={[styles.cardSub, { fontSize: 10 }]}>Token: {field.key}</Text>
                                 </View>
                                 <TouchableOpacity
                                     style={[styles.actionBtn, styles.actionBtnPrimary, { minWidth: 120 }]}
@@ -455,7 +668,19 @@ export function ThemeStudioEditorTab({
                                     }}
                                 >
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <View style={[styles.swatch, { width: 16, height: 16, borderRadius: 5, backgroundColor: valid && effectiveValue ? effectiveValue : colors.surfaceLighter }]} />
+                                        <View
+                                            style={[
+                                                styles.swatch,
+                                                {
+                                                    width: isHighlighted && highlightPulseOn ? 18 : 16,
+                                                    height: isHighlighted && highlightPulseOn ? 18 : 16,
+                                                    borderRadius: 5,
+                                                    borderWidth: isHighlighted ? 2 : 1,
+                                                    borderColor: isHighlighted ? colors.primary.DEFAULT : colors.border,
+                                                    backgroundColor: valid && effectiveValue ? effectiveValue : colors.surfaceLighter,
+                                                },
+                                            ]}
+                                        />
                                         <Text style={[styles.actionBtnText, styles.actionBtnTextPrimary]}>Abrir picker</Text>
                                     </View>
                                 </TouchableOpacity>
@@ -472,6 +697,32 @@ export function ThemeStudioEditorTab({
                             />
                             <Text style={styles.cardSub}>{valid && effectiveValue ? effectiveValue : 'Sin color válido definido'}</Text>
                             {!explicitValue && valid && effectiveValue ? <Text style={styles.cardSub}>Usando default del tema core ({editorMode === 'light' ? 'claro' : 'oscuro'}).</Text> : null}
+                            {isHighlighted ? (
+                                <View style={{ gap: 6 }}>
+                                    <Text style={[styles.helperOk, { color: colors.primary.DEFAULT }]}>
+                                        Campo sugerido para corregir contraste.
+                                        {suggestedColor ? ` Sugerido: ${suggestedColor}` : ''}
+                                    </Text>
+                                    {suggestedColor ? (
+                                        <TouchableOpacity
+                                            style={[styles.actionBtn, styles.actionBtnPrimary]}
+                                            activeOpacity={0.85}
+                                            onPress={() => {
+                                                onApplySuggestedColorForField(field.key, editorMode, suggestedColor);
+                                                setSuggestedColorMap((current) => {
+                                                    if (!current[field.key]) return current;
+                                                    const next = { ...current };
+                                                    delete next[field.key];
+                                                    return next;
+                                                });
+                                                onFeedbackSelection();
+                                            }}
+                                        >
+                                            <Text style={[styles.actionBtnText, styles.actionBtnTextPrimary]}>Aplicar sugerido</Text>
+                                        </TouchableOpacity>
+                                    ) : null}
+                                </View>
+                            ) : null}
 
                             <TouchableOpacity
                                 style={styles.actionBtn}
@@ -537,14 +788,27 @@ export function ThemeStudioEditorTab({
                                 </>
                             ) : null}
 
-                            <Text style={valid ? styles.helperOk : styles.helperError}>
-                                {valid ? 'Formato válido' : 'Formato inválido. Usá #RRGGBB, #RRGGBBAA o RGB'}
-                            </Text>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                                <Text style={valid ? styles.helperOk : styles.helperError}>
+                                    {valid ? 'Formato válido' : 'Formato inválido. Usá #RRGGBB, #RRGGBBAA o RGB'}
+                                </Text>
+                                <Text style={contrastValid ? styles.helperOk : styles.helperError}>
+                                    {contrastValid
+                                        ? 'Contraste válido'
+                                        : contrastSeverity === 'blocker'
+                                            ? 'Contraste inválido (crítico)'
+                                            : contrastSeverity === 'warning'
+                                                ? 'Contraste inválido (advertencia)'
+                                                : 'Contraste inválido (info)'}
+                                </Text>
+                            </View>
                         </View>
                     );
                 })}
-            </View>
+            </ScrollView>
+            ) : null}
 
+            {currentStep === 'preview' ? (
             <View style={{ gap: 7 }}>
                 <Text style={styles.sectionLabel}>Vista previa en vivo</Text>
                 <View style={styles.row}>
@@ -562,7 +826,83 @@ export function ThemeStudioEditorTab({
                     <Text style={[styles.actionBtnText, styles.actionBtnTextPrimary]}>Abrir preview por pestañas</Text>
                 </TouchableOpacity>
             </View>
+            ) : null}
 
+            {currentStep === 'quality' ? (
+            <View style={{ gap: 7 }}>
+                <Text style={styles.sectionLabel}>QA contraste</Text>
+                <View style={styles.statusCard}>
+                    <Text style={styles.cardSub}>Score promedio: {contrastScoreAverage}/100</Text>
+                    <Text style={styles.cardSub}>Bloqueos críticos: {contrastBlockersTotal} · Advertencias: {contrastWarningsTotal}</Text>
+                    <Text style={styles.cardSub}>Modo AA estricto: {strictContrastMode ? 'ON' : 'OFF'}</Text>
+                    {effectiveContrastBlockersTotal > 0 ? (
+                        <Text style={styles.helperError}>
+                            {strictContrastMode
+                                ? 'AA estricto activo: las advertencias también bloquean guardado.'
+                                : 'Hay bloqueos críticos. El guardado queda bloqueado hasta corregirlos.'}
+                        </Text>
+                    ) : (
+                        <Text style={styles.helperOk}>Sin bloqueos críticos de contraste.</Text>
+                    )}
+                </View>
+
+                <TouchableOpacity
+                    style={[styles.actionBtn, strictContrastMode ? styles.actionBtnPrimary : null]}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                        onToggleStrictContrast();
+                        onFeedbackSelection();
+                    }}
+                >
+                    <Text style={[styles.actionBtnText, strictContrastMode ? styles.actionBtnTextPrimary : null]}>
+                        {strictContrastMode ? 'Desactivar AA estricto' : 'Activar AA estricto'}
+                    </Text>
+                </TouchableOpacity>
+                <Text style={styles.cardSub}>
+                    En AA estricto, también se bloquea guardar por advertencias (no solo bloqueos críticos).
+                </Text>
+                <Text style={styles.cardSub}>Este QA usa la misma base de reglas que el heatmap de Preview.</Text>
+
+                <View style={styles.subtlePanel}>
+                    <Text style={styles.colorRowSub}>Modo claro</Text>
+                    {lightContrastReport.issues.length === 0 ? (
+                        <Text style={styles.helperOk}>Sin incidencias.</Text>
+                    ) : (
+                        lightContrastReport.issues.slice(0, 4).map((issue) => (
+                            <Text key={`light-${issue.id}`} style={issue.severity === 'blocker' ? styles.helperError : styles.cardSub}>
+                                • {issue.label}: {issue.ratio}:1 (mín {issue.minRatio}:1)
+                            </Text>
+                        ))
+                    )}
+                </View>
+
+                <View style={styles.subtlePanel}>
+                    <Text style={styles.colorRowSub}>Modo oscuro</Text>
+                    {darkContrastReport.issues.length === 0 ? (
+                        <Text style={styles.helperOk}>Sin incidencias.</Text>
+                    ) : (
+                        darkContrastReport.issues.slice(0, 4).map((issue) => (
+                            <Text key={`dark-${issue.id}`} style={issue.severity === 'blocker' ? styles.helperError : styles.cardSub}>
+                                • {issue.label}: {issue.ratio}:1 (mín {issue.minRatio}:1)
+                            </Text>
+                        ))
+                    )}
+                </View>
+
+                <TouchableOpacity
+                    style={[styles.actionBtn, styles.actionBtnPrimary]}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                        onAutoFixContrast();
+                        onFeedbackSelection();
+                    }}
+                >
+                    <Text style={[styles.actionBtnText, styles.actionBtnTextPrimary]}>Autocorregir contraste</Text>
+                </TouchableOpacity>
+            </View>
+            ) : null}
+
+            {currentStep === 'save' ? (
             <View style={{ gap: 7 }}>
                 <Text style={styles.sectionLabel}>Al guardar</Text>
                 <View style={[styles.row, { flexWrap: 'wrap' }]}>
@@ -593,38 +933,68 @@ export function ThemeStudioEditorTab({
                     })}
                 </View>
                 {hasInvalidInputs ? <Text style={styles.helperError}>Hay colores inválidos. Revisá antes de guardar.</Text> : <Text style={styles.helperOk}>Colores válidos.</Text>}
+
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+                <View style={[styles.chip, strictContrastMode && styles.chipActive]}>
+                    <Text style={[styles.chipText, strictContrastMode && styles.chipTextActive]}>
+                        {strictContrastMode ? 'AA ESTRICTO ON' : 'AA ESTRICTO OFF'}
+                    </Text>
+                </View>
             </View>
 
             <TouchableOpacity
                 onPress={onSaveTheme}
-                disabled={!canSaveTheme}
+                disabled={!canSaveTheme || isSavingTheme}
                 style={{
                     borderRadius: 11,
-                    backgroundColor: canSaveTheme ? colors.primary.DEFAULT : colors.surfaceLighter,
+                    backgroundColor: canSaveTheme && !isSavingTheme ? colors.primary.DEFAULT : colors.surfaceLighter,
                     borderWidth: 1.5,
-                    borderColor: canSaveTheme ? colors.primary.dark : colors.border,
+                    borderColor: canSaveTheme && !isSavingTheme ? colors.primary.dark : colors.border,
                     paddingVertical: 12,
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexDirection: 'row',
                     gap: 8,
-                    opacity: canSaveTheme ? 1 : 0.65,
+                    opacity: canSaveTheme && !isSavingTheme ? 1 : 0.65,
                 }}
                 activeOpacity={0.86}
             >
-                <Save size={15} color={canSaveTheme ? colors.onPrimary : colors.textMuted} />
-                <Text style={{ color: canSaveTheme ? colors.onPrimary : colors.textMuted, fontWeight: '900', fontSize: 14 }}>Guardar tema</Text>
-                <Check size={13} color={canSaveTheme ? colors.onPrimary : colors.textMuted} />
+                {isSavingTheme ? (
+                    <ActivityIndicator size="small" color={colors.textMuted} />
+                ) : (
+                    <Save size={15} color={canSaveTheme ? colors.onPrimary : colors.textMuted} />
+                )}
+                <Text style={{ color: canSaveTheme && !isSavingTheme ? colors.onPrimary : colors.textMuted, fontWeight: '900', fontSize: 14 }}>
+                    {isSavingTheme ? 'Guardando...' : 'Guardar tema'}
+                </Text>
+                {!isSavingTheme ? <Check size={13} color={canSaveTheme ? colors.onPrimary : colors.textMuted} /> : null}
             </TouchableOpacity>
+            <Text style={[styles.cardSub, { color: strictContrastMode ? colors.yellow : colors.green, fontWeight: '800' }]}>
+                {strictContrastMode
+                    ? 'Validación AA estricta activa: se bloquea guardar si hay advertencias o bloqueos de contraste.'
+                    : 'Validación estándar activa: se bloquea guardar solo con bloqueos críticos de contraste.'}
+            </Text>
             {!canSaveTheme && saveDisabledReason ? <Text style={styles.cardSub}>{saveDisabledReason}</Text> : null}
+            </View>
+            ) : null}
 
             <ColorPicker
                 visible={pickerField !== null}
-                initialColor={pickerField ? (getEffectiveColorForField(pickerField) || colors.primary.DEFAULT) : colors.primary.DEFAULT}
+                initialColor={
+                    pickerField
+                        ? (suggestedColorMap[pickerField] || getEffectiveColorForField(pickerField) || colors.primary.DEFAULT)
+                        : colors.primary.DEFAULT
+                }
                 onClose={() => onSetPickerField(null)}
                 onSelect={(pickedColor) => {
                     if (!pickerField) return;
                     onSelectColorFromPicker(pickerField, pickedColor);
+                    setSuggestedColorMap((current) => {
+                        if (!current[pickerField]) return current;
+                        const next = { ...current };
+                        delete next[pickerField];
+                        return next;
+                    });
                 }}
             />
 
@@ -634,7 +1004,37 @@ export function ThemeStudioEditorTab({
                 colors={colors}
                 lightColors={previewLightColors}
                 darkColors={previewDarkColors}
+                lightResolvedFields={previewLightResolvedFields}
+                darkResolvedFields={previewDarkResolvedFields}
                 initialMode={editorMode}
+                onJumpToColorField={(fieldKey, mode) => {
+                    const suggested = onGetSuggestedColorForField(fieldKey, mode);
+                    if (suggested) {
+                        setSuggestedColorMap((current) => ({ ...current, [fieldKey]: suggested }));
+                    }
+                    setPreviewModalVisible(false);
+                    setEditorMode(mode);
+                    setCurrentStepIndex(1);
+                    setShowAllColorFields(true);
+                    setExpandedColorDetails((current) => ({ ...current, [fieldKey]: true }));
+                    setHighlightedField(fieldKey);
+                    setPendingScrollField(fieldKey);
+                    onSetPickerField(fieldKey);
+                    onFeedbackSelection();
+                }}
+                onAutoFixColorField={(fieldKey, mode) => {
+                    const suggested = onGetSuggestedColorForField(fieldKey, mode);
+                    if (!suggested) return;
+                    setEditorMode(mode);
+                    onApplySuggestedColorForField(fieldKey, mode, suggested);
+                    setSuggestedColorMap((current) => {
+                        if (!current[fieldKey]) return current;
+                        const next = { ...current };
+                        delete next[fieldKey];
+                        return next;
+                    });
+                    onFeedbackSelection();
+                }}
             />
         </View>
     );

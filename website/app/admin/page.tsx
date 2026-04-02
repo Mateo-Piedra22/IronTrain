@@ -137,6 +137,7 @@ export default async function AdminPage({
     let workoutsForSyncPanel: any[] = [];
     let themeModerationPacksRaw: any[] = [];
     let themeModerationReportsRaw: any[] = [];
+    let themeSystemFlagAvailable = true;
 
     if (activeTab === 'status') {
         syncHealth = await getSyncHealthReport();
@@ -241,6 +242,7 @@ export default async function AdminPage({
         `);
 
         const hasThemeIsSystemColumn = Boolean((hasThemeIsSystemColumnResult as any)?.rows?.[0]?.exists);
+        themeSystemFlagAvailable = hasThemeIsSystemColumn;
         const themeIsSystemExpr = hasThemeIsSystemColumn ? schema.themePacks.isSystem : sql<boolean>`false`;
 
         const sourceFilterSql = !hasThemeIsSystemColumn
@@ -563,6 +565,7 @@ export default async function AdminPage({
                         <ThemesModerationPanel
                             themes={sanitizedThemesModeration}
                             reports={sanitizedThemeReportsModeration}
+                            systemFlagAvailable={themeSystemFlagAvailable}
                         />
                     }
                     marketplacePanel={

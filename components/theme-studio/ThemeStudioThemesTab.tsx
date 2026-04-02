@@ -257,11 +257,17 @@ export function ThemeStudioThemesTab({
                         ? (localMarketplaceState
                             ? (localMarketplaceState.status === 'pending_review'
                                 ? 'Marketplace: En revisión'
-                                : localMarketplaceState.visibility === 'friends'
-                                    ? 'Marketplace: Amigos'
-                                    : localMarketplaceState.visibility === 'public'
-                                        ? 'Marketplace: Público'
-                                        : 'Marketplace: Draft')
+                                : localMarketplaceState.status === 'approved'
+                                    ? (localMarketplaceState.visibility === 'friends'
+                                        ? 'Marketplace: Aprobado (Amigos)'
+                                        : localMarketplaceState.visibility === 'public'
+                                            ? 'Marketplace: Aprobado (Público)'
+                                            : 'Marketplace: Aprobado (Privado)')
+                                    : localMarketplaceState.status === 'rejected'
+                                        ? 'Marketplace: Rechazado'
+                                        : localMarketplaceState.status === 'suspended'
+                                            ? 'Marketplace: Suspendido'
+                                            : 'Marketplace: Draft')
                             : 'Marketplace: Draft')
                         : null;
                     const actionsExpanded = expandedActionsThemeId === item.id;
@@ -285,13 +291,13 @@ export function ThemeStudioThemesTab({
 
                             <View style={styles.row}>
                                 <TouchableOpacity
-                                    style={[styles.actionBtn, styles.grow, isSelected && styles.actionBtnPrimary]}
+                                    style={[styles.actionBtn, styles.grow, styles.actionBtnPrimary]}
                                     activeOpacity={0.85}
                                     onPress={() => {
                                         onSelectThemeForEdit(item);
                                     }}
                                 >
-                                    <Text style={[styles.actionBtnText, isSelected && styles.actionBtnTextPrimary]}>Editar</Text>
+                                    <Text style={[styles.actionBtnText, styles.actionBtnTextPrimary]}>{isSelected ? 'Editando' : 'Editar'}</Text>
                                 </TouchableOpacity>
                                 {item.supportsLight ? (
                                     <TouchableOpacity
@@ -399,30 +405,41 @@ export function ThemeStudioThemesTab({
                 })}
             </View>
 
-            <View style={styles.row}>
-                <TouchableOpacity style={[styles.actionBtn, styles.grow]} activeOpacity={0.85} onPress={onCreateBlankTheme}>
+            <View style={styles.subtlePanel}>
+                <Text style={styles.sectionLabel}>Acciones de tema</Text>
+                <View style={styles.row}>
+                <TouchableOpacity style={[styles.actionBtn, styles.actionBtnPrimary, styles.grow]} activeOpacity={0.85} onPress={onCreateBlankTheme}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Palette size={12} color={colors.textMuted} />
-                        <Text style={styles.actionBtnText}>Nuevo tema</Text>
+                        <Palette size={12} color={colors.primary.DEFAULT} />
+                        <Text style={[styles.actionBtnText, styles.actionBtnTextPrimary]}>Nuevo tema</Text>
                     </View>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.actionBtn, styles.grow]} activeOpacity={0.85} onPress={onDuplicateTheme}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <CopyPlus size={12} color={colors.textMuted} />
+                        <CopyPlus size={12} color={colors.text} />
                         <Text style={styles.actionBtnText}>Duplicar tema</Text>
                     </View>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.actionBtn, styles.grow, !selectedDraft && styles.disabledBtn]}
+                    style={[
+                        styles.actionBtn,
+                        styles.grow,
+                        {
+                            borderColor: colors.red,
+                            backgroundColor: colors.surface,
+                        },
+                        !selectedDraft && styles.disabledBtn,
+                    ]}
                     activeOpacity={0.85}
                     disabled={!selectedDraft}
                     onPress={onRemoveTheme}
                 >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Trash2 size={12} color={colors.red} />
-                        <Text style={styles.actionBtnText}>Eliminar tema</Text>
+                        <Text style={[styles.actionBtnText, { color: colors.red }]}>Eliminar tema</Text>
                     </View>
                 </TouchableOpacity>
+                </View>
             </View>
         </View>
     );

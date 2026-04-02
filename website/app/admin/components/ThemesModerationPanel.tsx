@@ -42,6 +42,7 @@ type ThemeReportModerationItem = {
 interface ThemesModerationPanelProps {
     themes: ThemePackModerationItem[];
     reports: ThemeReportModerationItem[];
+    systemFlagAvailable: boolean;
 }
 
 function shortDate(value: string | null): string {
@@ -56,7 +57,7 @@ function shortDate(value: string | null): string {
     });
 }
 
-export default function ThemesModerationPanel({ themes, reports }: ThemesModerationPanelProps) {
+export default function ThemesModerationPanel({ themes, reports, systemFlagAvailable }: ThemesModerationPanelProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
@@ -160,6 +161,12 @@ export default function ThemesModerationPanel({ themes, reports }: ThemesModerat
                 <span className="text-[9px] font-black uppercase tracking-wider text-[#1a1a2e]/60">LAST_SYNC {lastRefreshLabel}</span>
             </div>
 
+            {!systemFlagAvailable ? (
+                <div className="border border-amber-600/40 bg-amber-50 p-3 text-[10px] font-black uppercase tracking-wider text-amber-900">
+                    Compatibilidad DB: columna theme_packs.is_system no disponible. Filtro y acciones SYSTEM deshabilitados.
+                </div>
+            ) : null}
+
             {activeSection === 'queue' && (
                 <div className="space-y-6">
                     <div className="border-2 border-[#1a1a2e] bg-white p-5">
@@ -256,14 +263,16 @@ export default function ThemesModerationPanel({ themes, reports }: ThemesModerat
                                                         >
                                                             <Undo2 className="w-3.5 h-3.5" /> RESTORE
                                                         </button>
-                                                        <button
-                                                            type="submit"
-                                                            name="intent"
-                                                            value={item.isSystem ? 'unmark-system' : 'mark-system'}
-                                                            className="h-8 px-3 border border-[#1a1a2e] bg-[#f5f1e8] hover:bg-indigo-600 hover:text-white font-black uppercase text-[9px] transition-all flex items-center gap-1"
-                                                        >
-                                                            <Shield className="w-3.5 h-3.5" /> {item.isSystem ? 'UNMARK_SYSTEM' : 'MARK_SYSTEM'}
-                                                        </button>
+                                                        {systemFlagAvailable ? (
+                                                            <button
+                                                                type="submit"
+                                                                name="intent"
+                                                                value={item.isSystem ? 'unmark-system' : 'mark-system'}
+                                                                className="h-8 px-3 border border-[#1a1a2e] bg-[#f5f1e8] hover:bg-indigo-600 hover:text-white font-black uppercase text-[9px] transition-all flex items-center gap-1"
+                                                            >
+                                                                <Shield className="w-3.5 h-3.5" /> {item.isSystem ? 'UNMARK_SYSTEM' : 'MARK_SYSTEM'}
+                                                            </button>
+                                                        ) : null}
                                                     </div>
                                                 </form>
                                             </td>

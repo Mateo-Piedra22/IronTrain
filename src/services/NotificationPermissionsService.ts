@@ -1,8 +1,30 @@
-import notifee, { AuthorizationStatus } from '@notifee/react-native';
 import * as SecureStore from 'expo-secure-store';
 import { Linking, Platform } from 'react-native';
 import { confirm } from '../store/confirmStore';
 import { logger } from '../utils/logger';
+
+type NotifeeModule = typeof import('@notifee/react-native');
+
+const notifeeModule: NotifeeModule | null = (() => {
+    try {
+        return require('@notifee/react-native') as NotifeeModule;
+    } catch {
+        return null;
+    }
+})();
+
+const notifee = (notifeeModule?.default ?? {
+    getNotificationSettings: async () => ({ authorizationStatus: 0 }),
+    requestPermission: async () => ({ authorizationStatus: 0 }),
+    setBadgeCount: async () => undefined,
+}) as any;
+
+const AuthorizationStatus = notifeeModule?.AuthorizationStatus ?? {
+    NOT_DETERMINED: -1,
+    DENIED: 0,
+    AUTHORIZED: 1,
+    PROVISIONAL: 2,
+};
 
 const NOTIFICATION_PERMISSION_PROMPTED_KEY = 'irontrain_notification_prompted_v1';
 

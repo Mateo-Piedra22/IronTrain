@@ -1,6 +1,6 @@
 import { useTheme } from '@/src/hooks/useTheme';
 import { configService } from '@/src/services/ConfigService';
-import { MarketplaceThemePackSummary, SocialService } from '@/src/services/SocialService';
+import { MarketplaceThemePackSummary, SocialApiError, SocialService } from '@/src/services/SocialService';
 import { confirm } from '@/src/store/confirmStore';
 import {
     applyThemeColorPatch,
@@ -14,12 +14,15 @@ import { triggerSensoryFeedback } from '@/src/utils/sensoryFeedback';
 import * as Linking from 'expo-linking';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
-import { COLOR_FIELD_META, EMPTY_FIELDS, META_STORAGE_KEY, REMOTE_LINK_STORAGE_KEY, THEMES_EXPANDED_ACTIONS_STORAGE_KEY, THEMES_FILTER_PREFS_STORAGE_KEY } from './theme-studio/constants';
+import { COLOR_FIELD_META, EMPTY_FIELDS, META_STORAGE_KEY, REMOTE_LINK_STORAGE_KEY, THEME_STUDIO_STRICT_CONTRAST_STORAGE_KEY, THEMES_EXPANDED_ACTIONS_STORAGE_KEY, THEMES_FILTER_PREFS_STORAGE_KEY } from './theme-studio/constants';
 import {
     applyEditorSmartDefaults,
+    autoFixThemeContrastFields,
+    evaluateThemeContrastAudit,
     fieldsToPatch,
     hexToHslInput,
     hexToRgbInput,
+    ModeFallbackColors,
     normalizeRemoteLinkMap,
     normalizeThemeFilterPreferences,
     normalizeThemeMeta,
@@ -72,6 +75,7 @@ export function ThemeStudioPanel() {
     const [editorThemeListExpanded, setEditorThemeListExpanded] = useState(false);
     const [editorAdvancedExpanded, setEditorAdvancedExpanded] = useState(false);
     const [editorVisibilityExpanded, setEditorVisibilityExpanded] = useState(false);
+    const [strictContrastMode, setStrictContrastMode] = useState(false);
     const [editorEntryReady, setEditorEntryReady] = useState(false);
     const [editorSelectedCatalogItem, setEditorSelectedCatalogItem] = useState<CatalogItem | null>(null);
     const [newThemeNameInput, setNewThemeNameInput] = useState('');
@@ -82,6 +86,7 @@ export function ThemeStudioPanel() {
     const [remoteThemeLinks, setRemoteThemeLinks] = useState<Record<string, string>>({});
     const [remoteThemes, setRemoteThemes] = useState<MarketplaceThemePackSummary[]>([]);
     const [isLoadingRemoteThemes, setIsLoadingRemoteThemes] = useState(false);
+    const [isSavingTheme, setIsSavingTheme] = useState(false);
     const [remoteThemeError, setRemoteThemeError] = useState<string | null>(null);
     const [expandedActionsThemeId, setExpandedActionsThemeId] = useState<string | null>(null);
     const [lightFields, setLightFields] = useState<EditableColorFields>(themeDrafts[0] ? patchToFields(themeDrafts[0].lightPatch) : EMPTY_FIELDS);
@@ -106,6 +111,9 @@ export function ThemeStudioPanel() {
 
         const storedExpanded = configService.get(THEMES_EXPANDED_ACTIONS_STORAGE_KEY as any);
         setExpandedActionsThemeId(typeof storedExpanded === 'string' && storedExpanded.trim().length > 0 ? storedExpanded : null);
+
+        const storedStrictContrast = configService.get(THEME_STUDIO_STRICT_CONTRAST_STORAGE_KEY as any);
+        setStrictContrastMode(storedStrictContrast === true);
 
         return () => {
             if (liveFeedbackTimeoutRef.current) {
@@ -133,6 +141,10 @@ export function ThemeStudioPanel() {
         void configService.set(THEMES_EXPANDED_ACTIONS_STORAGE_KEY as any, expandedActionsThemeId as any);
     }, [expandedActionsThemeId]);
 
+    useEffect(() => {
+        void configService.set(THEME_STUDIO_STRICT_CONTRAST_STORAGE_KEY as any, strictContrastMode as any);
+    }, [strictContrastMode]);
+
     const persistRemoteThemeLinks = async (next: Record<string, string>) => {
         setRemoteThemeLinks(next);
         await configService.set(REMOTE_LINK_STORAGE_KEY as any, next as any);
@@ -145,6 +157,58 @@ export function ThemeStudioPanel() {
         return null;
     };
 
+    const normalizeCompare = (value: string): string => value.trim().toLowerCase();
+    const slugifyThemeName = (value: string): string =>
+        value
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+
+    const resolveOwnedRemoteMatch = async (draft: ThemeDraft): Promise<MarketplaceThemePackSummary | null> => {
+        const draftName = draft.name.trim();
+        if (!draftName) return null;
+
+        try {
+            const ownedCandidates = await SocialService.listMarketplaceThemes({
+                scope: 'owned',
+                mode: 'both',
+                sort: 'new',
+                source: 'all',
+                page: 1,
+                pageSize: 100,
+                q: draftName,
+            });
+
+            const draftNameKey = normalizeCompare(draftName);
+            const draftSlug = slugifyThemeName(draftName);
+
+            return ownedCandidates.find((item) => {
+                const sameName = normalizeCompare(item.name) === draftNameKey;
+                const sameSlug = item.slug === draftSlug;
+                return sameName || sameSlug;
+            }) ?? null;
+        } catch {
+            return null;
+        }
+    };
+
+    const ensureRemoteLinkForDraft = async (draft: ThemeDraft): Promise<string | null> => {
+        const alreadyLinked = findRemoteThemeIdByLocalDraftId(draft.id);
+        if (alreadyLinked) return alreadyLinked;
+
+        const matched = await resolveOwnedRemoteMatch(draft);
+        if (!matched) return null;
+
+        await persistRemoteThemeLinks({
+            ...remoteThemeLinks,
+            [matched.id]: draft.id,
+        });
+
+        return matched.id;
+    };
+
     const buildMarketplacePayloadFromDraft = (draft: ThemeDraft) => ({
         schemaVersion: 1 as const,
         base: { light: 'core-light' as const, dark: 'core-dark' as const },
@@ -155,35 +219,62 @@ export function ThemeStudioPanel() {
         },
     });
 
+    const formatMarketplaceError = (error: unknown): string => {
+        if (error instanceof SocialApiError) {
+            const codePart = error.code ? ` (${error.code})` : '';
+            return `Marketplace ${error.status}${codePart}: ${error.message}`;
+        }
+        if (error instanceof Error) {
+            return error.message;
+        }
+        return 'Error desconocido en marketplace.';
+    };
+
     const loadRemoteThemes = async (query?: string) => {
         setIsLoadingRemoteThemes(true);
         try {
             const token = await SocialService.getToken();
             if (!token) {
                 setRemoteThemes([]);
-                setRemoteThemeError(null);
+                setRemoteThemeError('No hay sesión activa para marketplace. Iniciá sesión e intentá de nuevo.');
                 return;
             }
 
-            const items = await SocialService.listMarketplaceThemes({
-                scope: 'owned',
-                mode: 'both',
-                sort: 'new',
-                source: 'all',
-                page: 1,
-                pageSize: 50,
-                q: query?.trim() || undefined,
-            });
-            setRemoteThemes(items);
-            setRemoteThemeError(null);
+            try {
+                const items = await SocialService.listMarketplaceThemes({
+                    scope: 'owned',
+                    mode: 'both',
+                    sort: 'new',
+                    source: 'all',
+                    page: 1,
+                    pageSize: 50,
+                    q: query?.trim() || undefined,
+                });
+                setRemoteThemes(items);
+                setRemoteThemeError(null);
+            } catch (ownedError) {
+                const publicItems = await SocialService.listMarketplaceThemes({
+                    scope: 'public',
+                    mode: 'both',
+                    sort: 'new',
+                    source: 'all',
+                    page: 1,
+                    pageSize: 50,
+                    q: query?.trim() || undefined,
+                });
+                setRemoteThemes(publicItems);
+                setRemoteThemeError(`No se pudo cargar "owned". Mostrando catálogo público. ${formatMarketplaceError(ownedError)}`);
+            }
+
             if (query !== undefined) {
                 pushLiveFeedback('Catálogo del marketplace actualizado.');
             }
-        } catch {
-            setRemoteThemeError('Marketplace no disponible en este momento.');
+        } catch (error) {
+            const errorMessage = formatMarketplaceError(error);
+            setRemoteThemeError(errorMessage);
             setRemoteThemes([]);
             if (query !== undefined) {
-                pushLiveFeedback('No se pudo actualizar marketplace ahora.', 'warn');
+                pushLiveFeedback(`No se pudo actualizar marketplace. ${errorMessage}`, 'warn');
             }
         } finally {
             setIsLoadingRemoteThemes(false);
@@ -193,6 +284,69 @@ export function ThemeStudioPanel() {
     useEffect(() => {
         void loadRemoteThemes();
     }, []);
+
+    useEffect(() => {
+        if (remoteThemes.length === 0) return;
+
+        const localIds = new Set(themeDrafts.map((draft) => draft.id));
+        const remoteById = new Map(remoteThemes.map((item) => [item.id, item]));
+        const usedLocalIds = new Set<string>();
+        const nextLinks: Record<string, string> = {};
+
+        for (const [remoteId, localId] of Object.entries(remoteThemeLinks)) {
+            if (!remoteById.has(remoteId)) continue;
+            if (!localIds.has(localId)) continue;
+            if (usedLocalIds.has(localId)) continue;
+            nextLinks[remoteId] = localId;
+            usedLocalIds.add(localId);
+        }
+
+        const localBySlug = new Map<string, string>();
+        const duplicatedSlug = new Set<string>();
+        const localByName = new Map<string, string>();
+        const duplicatedName = new Set<string>();
+
+        for (const draft of themeDrafts) {
+            const slug = slugifyThemeName(draft.name);
+            const nameKey = normalizeCompare(draft.name);
+
+            if (slug) {
+                if (localBySlug.has(slug)) {
+                    duplicatedSlug.add(slug);
+                } else {
+                    localBySlug.set(slug, draft.id);
+                }
+            }
+
+            if (nameKey) {
+                if (localByName.has(nameKey)) {
+                    duplicatedName.add(nameKey);
+                } else {
+                    localByName.set(nameKey, draft.id);
+                }
+            }
+        }
+
+        for (const item of remoteThemes) {
+            if (nextLinks[item.id]) continue;
+
+            const remoteSlug = item.slug;
+            const remoteName = normalizeCompare(item.name);
+            const slugCandidate = remoteSlug && !duplicatedSlug.has(remoteSlug) ? localBySlug.get(remoteSlug) : null;
+            const nameCandidate = remoteName && !duplicatedName.has(remoteName) ? localByName.get(remoteName) : null;
+            const candidateId = slugCandidate ?? nameCandidate ?? null;
+
+            if (!candidateId || usedLocalIds.has(candidateId)) continue;
+            nextLinks[item.id] = candidateId;
+            usedLocalIds.add(candidateId);
+        }
+
+        const prevSerialized = JSON.stringify(remoteThemeLinks);
+        const nextSerialized = JSON.stringify(nextLinks);
+        if (prevSerialized !== nextSerialized) {
+            void persistRemoteThemeLinks(nextLinks);
+        }
+    }, [remoteThemes, themeDrafts, remoteThemeLinks]);
 
     const pushLiveFeedback = (message: string, tone: 'ok' | 'warn' = 'ok') => {
         setLiveFeedback({ message, tone });
@@ -237,22 +391,42 @@ export function ThemeStudioPanel() {
     }, []);
 
     const localThemes: CatalogItem[] = useMemo(() => {
-        return themeDrafts.map((draft) => ({
-            id: draft.id,
-            name: draft.name,
-            source: 'community' as const,
-            lightPatch: draft.lightPatch,
-            darkPatch: draft.darkPatch,
-            supportsLight: true,
-            supportsDark: true,
-            isCore: false,
-            isVerified: false,
-            origin: 'local' as const,
-        }));
-    }, [themeDrafts]);
+        const remoteByLocalDraftId = new Map<string, MarketplaceThemePackSummary>();
+        const remoteById = new Map(remoteThemes.map((item) => [item.id, item]));
+
+        for (const [remoteId, localDraftId] of Object.entries(remoteThemeLinks)) {
+            const remote = remoteById.get(remoteId);
+            if (!remote) continue;
+            remoteByLocalDraftId.set(localDraftId, remote);
+        }
+
+        return themeDrafts.map((draft) => {
+            const linkedRemote = remoteByLocalDraftId.get(draft.id);
+
+            return {
+                id: draft.id,
+                name: draft.name,
+                source: 'community' as const,
+                lightPatch: draft.lightPatch,
+                darkPatch: draft.darkPatch,
+                supportsLight: true,
+                supportsDark: true,
+                isCore: false,
+                isVerified: linkedRemote?.status === 'approved',
+                origin: 'local' as const,
+                remoteId: linkedRemote?.id,
+                remoteStatus: linkedRemote?.status,
+                remoteVisibility: linkedRemote?.visibility,
+                remoteRatingCount: linkedRemote?.ratingCount,
+                remoteDownloadsCount: linkedRemote?.downloadsCount,
+            };
+        });
+    }, [themeDrafts, remoteThemeLinks, remoteThemes]);
 
     const remoteCatalogThemes: CatalogItem[] = useMemo(() => {
-        return remoteThemes.map((item) => ({
+        return remoteThemes
+            .filter((item) => !remoteThemeLinks[item.id])
+            .map((item) => ({
             id: `remote:${item.id}`,
             name: item.name,
             source: item.isSystem ? 'core' : 'community',
@@ -269,23 +443,22 @@ export function ThemeStudioPanel() {
             remoteRatingCount: item.ratingCount,
             remoteDownloadsCount: item.downloadsCount,
         }));
-    }, [remoteThemes]);
+    }, [remoteThemes, remoteThemeLinks]);
 
     const catalog = useMemo(() => [...coreThemes, ...localThemes, ...remoteCatalogThemes], [coreThemes, localThemes, remoteCatalogThemes]);
     const editorSelectableThemes = useMemo(() => [...coreThemes, ...localThemes], [coreThemes, localThemes]);
     const localMarketplaceStateByDraftId = useMemo(() => {
         const map: Record<string, { visibility: 'private' | 'friends' | 'public'; status: string }> = {};
-        for (const remoteItem of remoteCatalogThemes) {
-            if (!remoteItem.remoteId) continue;
-            const linkedLocalId = remoteThemeLinks[remoteItem.remoteId];
+        for (const remoteItem of remoteThemes) {
+            const linkedLocalId = remoteThemeLinks[remoteItem.id];
             if (!linkedLocalId) continue;
             map[linkedLocalId] = {
-                visibility: remoteItem.remoteVisibility ?? 'private',
-                status: remoteItem.remoteStatus ?? 'draft',
+                visibility: remoteItem.visibility ?? 'private',
+                status: remoteItem.status ?? 'draft',
             };
         }
         return map;
-    }, [remoteCatalogThemes, remoteThemeLinks]);
+    }, [remoteThemes, remoteThemeLinks]);
 
     const selectedDraft = useMemo(() => themeDrafts.find((draft) => draft.id === selectedThemeId) ?? null, [themeDrafts, selectedThemeId]);
 
@@ -339,14 +512,12 @@ export function ThemeStudioPanel() {
     const selectedThemeMeta = selectedThemeId ? themeMetaMap[selectedThemeId] : null;
     const isEditingCoreTheme = editorSelectedCatalogItem?.isCore === true || selectedThemeMeta?.isCoreDerived === true;
 
-    const saveDisabledReason = useMemo(() => {
+    const basicSaveDisabledReason = useMemo(() => {
         if (!name.trim()) return 'Definí un nombre antes de guardar.';
         if (hasInvalidInputs) return 'Corregí los colores inválidos antes de guardar.';
         if (isCreationFlow && !hasAnyValidColor) return 'Agregá al menos 1 color válido para crear el tema.';
         return null;
     }, [name, hasInvalidInputs, isCreationFlow, hasAnyValidColor]);
-
-    const canSaveTheme = saveDisabledReason === null;
 
     const requestThemeSwitch = () => {
         if (hasUnsavedNewDraft) {
@@ -371,6 +542,96 @@ export function ThemeStudioPanel() {
     const previewDark = useMemo(() => {
         return applyThemeColorPatch(getCoreThemeToken('dark'), fieldsToPatch(darkFields), { id: 'preview-dark', label: name || 'Preview Dark' });
     }, [darkFields, name]);
+
+    const buildContrastFallback = (mode: EditorMode): ModeFallbackColors => {
+        const palette = mode === 'light' ? previewLight.colors : previewDark.colors;
+        return {
+            primary: {
+                DEFAULT: palette.primary?.DEFAULT ?? colors.primary.DEFAULT,
+                light: palette.primary?.light ?? colors.primary.light,
+                dark: palette.primary?.dark ?? colors.primary.dark,
+            },
+            onPrimary: palette.onPrimary ?? colors.onPrimary,
+            background: palette.background ?? colors.background,
+            surface: palette.surface ?? colors.surface,
+            surfaceLighter: palette.surfaceLighter ?? colors.surfaceLighter,
+            text: palette.text ?? colors.text,
+            textMuted: palette.textMuted ?? colors.textMuted,
+            border: palette.border ?? colors.border,
+        };
+    };
+
+    const lightContrastReport = useMemo(
+        () => evaluateThemeContrastAudit(lightFields, 'light', buildContrastFallback('light')),
+        [lightFields, previewLight.colors, colors],
+    );
+
+    const darkContrastReport = useMemo(
+        () => evaluateThemeContrastAudit(darkFields, 'dark', buildContrastFallback('dark')),
+        [darkFields, previewDark.colors, colors],
+    );
+
+    const lightResolvedFields = useMemo(
+        () => applyEditorSmartDefaults(lightFields, 'light', buildContrastFallback('light')),
+        [lightFields, previewLight.colors, colors],
+    );
+
+    const darkResolvedFields = useMemo(
+        () => applyEditorSmartDefaults(darkFields, 'dark', buildContrastFallback('dark')),
+        [darkFields, previewDark.colors, colors],
+    );
+
+    const contrastBlockersTotal = lightContrastReport.blockers + darkContrastReport.blockers;
+    const contrastWarningsTotal = lightContrastReport.warnings + darkContrastReport.warnings;
+    const contrastScoreAverage = Math.round((lightContrastReport.score + darkContrastReport.score) / 2);
+    const effectiveContrastBlockersTotal = contrastBlockersTotal + (strictContrastMode ? contrastWarningsTotal : 0);
+
+    const saveDisabledReason = useMemo(() => {
+        if (basicSaveDisabledReason) return basicSaveDisabledReason;
+        if (effectiveContrastBlockersTotal > 0) {
+            return strictContrastMode
+                ? `Modo AA estricto activo: ${effectiveContrastBlockersTotal} bloqueos de contraste (incluye warnings).`
+                : `Hay ${effectiveContrastBlockersTotal} bloqueos críticos de contraste.`;
+        }
+        return null;
+    }, [basicSaveDisabledReason, effectiveContrastBlockersTotal, strictContrastMode]);
+
+    const canSaveTheme = saveDisabledReason === null;
+
+    const autoFixContrast = async () => {
+        const nextLight = autoFixThemeContrastFields(lightFields, 'light', buildContrastFallback('light'));
+        const nextDark = autoFixThemeContrastFields(darkFields, 'dark', buildContrastFallback('dark'));
+        setLightFields(nextLight);
+        setDarkFields(nextDark);
+        pushLiveFeedback('Autocorrección de contraste aplicada. Revisá el preview antes de guardar.');
+        await triggerSensoryFeedback('selection');
+    };
+
+    const toggleStrictContrastMode = async () => {
+        const nextValue = !strictContrastMode;
+        setStrictContrastMode(nextValue);
+        pushLiveFeedback(nextValue ? 'Modo AA estricto activado.' : 'Modo AA estricto desactivado.');
+        await triggerSensoryFeedback('selection');
+    };
+
+    const getSuggestedColorForField = (fieldKey: EditableColorFieldKey, mode: EditorMode): string | null => {
+        const modeFields = mode === 'light' ? lightFields : darkFields;
+        const nextMode = autoFixThemeContrastFields(modeFields, mode, buildContrastFallback(mode));
+        const suggested = nextMode[fieldKey];
+        if (isValidHexColor(suggested)) return suggested;
+        return null;
+    };
+
+    const applySuggestedColorForField = async (fieldKey: EditableColorFieldKey, mode: EditorMode, color: string) => {
+        if (!isValidHexColor(color)) return;
+        if (mode === 'light') {
+            setLightFields((current) => ({ ...current, [fieldKey]: color }));
+        } else {
+            setDarkFields((current) => ({ ...current, [fieldKey]: color }));
+        }
+        pushLiveFeedback(`Sugerencia aplicada en modo ${mode === 'light' ? 'Claro' : 'Oscuro'}.`);
+        await triggerSensoryFeedback('tapLight');
+    };
 
     const styles = useMemo(() => createThemeStudioStyles(colors), [colors]);
 
@@ -547,6 +808,8 @@ export function ThemeStudioPanel() {
     };
 
     const saveTheme = async () => {
+        if (isSavingTheme) return;
+
         const trimmedName = name.trim();
         if (!trimmedName) {
             notify.error('Nombre requerido', 'Ingresá un nombre antes de guardar el tema.');
@@ -568,120 +831,138 @@ export function ThemeStudioPanel() {
             return;
         }
 
-        const nextLightFields = applyEditorSmartDefaults(lightFields, 'light', previewLight.colors as any);
-        const nextDarkFields = applyEditorSmartDefaults(darkFields, 'dark', previewDark.colors as any);
-
-        const result = await saveThemeDraft({
-            id: selectedThemeId ?? undefined,
-            name: trimmedName,
-            lightPatch: fieldsToPatch(nextLightFields),
-            darkPatch: fieldsToPatch(nextDarkFields),
-        });
-
-        if (!result.ok) {
-            notify.error('No se pudo guardar', result.errors.join('\n'));
-            pushLiveFeedback('No se pudo guardar el tema.', 'warn');
+        if (effectiveContrastBlockersTotal > 0) {
+            notify.error(
+                'Contraste insuficiente',
+                strictContrastMode
+                    ? `Modo AA estricto: hay ${effectiveContrastBlockersTotal} chequeos sin cumplir (warnings incluidos).`
+                    : `Hay ${effectiveContrastBlockersTotal} chequeos críticos sin cumplir.`,
+            );
+            pushLiveFeedback('No se puede guardar hasta resolver bloqueos críticos de contraste.', 'warn');
+            await triggerSensoryFeedback('warning');
             return;
         }
 
-        setSelectedThemeId(result.draft.id);
-        setEditorSelectedCatalogItem({
-            id: result.draft.id,
-            name: result.draft.name,
-            source: 'community',
-            lightPatch: result.draft.lightPatch,
-            darkPatch: result.draft.darkPatch,
-            supportsLight: true,
-            supportsDark: true,
-            isCore: false,
-            isVerified: false,
-            origin: 'local',
-        });
+        setIsSavingTheme(true);
+        try {
+            const nextLightFields = applyEditorSmartDefaults(lightFields, 'light', previewLight.colors as any);
+            const nextDarkFields = applyEditorSmartDefaults(darkFields, 'dark', previewDark.colors as any);
 
-        if (!themeMetaMap[result.draft.id]) {
-            const nextMeta: Record<string, LocalThemeMeta> = {
-                ...themeMetaMap,
-                [result.draft.id]: {
-                    visibility: isEditingCoreTheme ? 'private' : editorVisibility,
-                    isBanned: false,
-                    commentsCount: 0,
-                    isCoreDerived: isEditingCoreTheme,
-                },
-            };
-            await persistThemeMeta(nextMeta);
-        } else {
-            const nextMeta: Record<string, LocalThemeMeta> = {
-                ...themeMetaMap,
-                [result.draft.id]: {
-                    ...(themeMetaMap[result.draft.id] ?? { isBanned: false, commentsCount: 0 }),
-                    visibility: isEditingCoreTheme ? 'private' : editorVisibility,
-                    isBanned: themeMetaMap[result.draft.id]?.isBanned ?? false,
-                    commentsCount: themeMetaMap[result.draft.id]?.commentsCount ?? 0,
-                    isCoreDerived: isEditingCoreTheme || themeMetaMap[result.draft.id]?.isCoreDerived === true,
-                },
-            };
-            await persistThemeMeta(nextMeta);
-        }
+            const result = await saveThemeDraft({
+                id: selectedThemeId ?? undefined,
+                name: trimmedName,
+                lightPatch: fieldsToPatch(nextLightFields),
+                darkPatch: fieldsToPatch(nextDarkFields),
+            });
 
-        const effectiveVisibility: LocalThemeMeta['visibility'] = isEditingCoreTheme ? 'private' : editorVisibility;
-
-        if (!isEditingCoreTheme && effectiveVisibility !== 'private') {
-            const linkedRemoteId = findRemoteThemeIdByLocalDraftId(result.draft.id);
-            const payload = buildMarketplacePayloadFromDraft(result.draft);
-
-            try {
-                if (!linkedRemoteId) {
-                    const created = await SocialService.createMarketplaceThemePack({
-                        name: result.draft.name,
-                        description: `Tema creado en IronTrain (${effectiveVisibility === 'friends' ? 'solo amigos' : 'público'}).`,
-                        tags: ['irontrain', 'theme'],
-                        supportsLight: true,
-                        supportsDark: true,
-                        visibility: effectiveVisibility,
-                        payload,
-                    });
-
-                    await persistRemoteThemeLinks({
-                        ...remoteThemeLinks,
-                        [created.id]: result.draft.id,
-                    });
-
-                    pushLiveFeedback(
-                        effectiveVisibility === 'friends'
-                            ? 'Tema compartido para amigos en marketplace.'
-                            : 'Tema enviado a marketplace (público).'
-                    );
-                } else {
-                    await SocialService.createMarketplaceThemeVersion(linkedRemoteId, {
-                        payload,
-                        changelog: 'Actualización desde Theme Studio móvil',
-                    });
-                    await SocialService.updateMarketplaceThemePack(linkedRemoteId, {
-                        visibility: effectiveVisibility,
-                        name: result.draft.name,
-                    });
-
-                    pushLiveFeedback(
-                        effectiveVisibility === 'friends'
-                            ? 'Tema actualizado para visibilidad de amigos.'
-                            : 'Tema actualizado para visibilidad pública.'
-                    );
-                }
-            } catch {
-                pushLiveFeedback('Guardado local OK; no se pudo sincronizar marketplace.', 'warn');
+            if (!result.ok) {
+                notify.error('No se pudo guardar', result.errors.join('\n'));
+                pushLiveFeedback('No se pudo guardar el tema.', 'warn');
+                return;
             }
-        }
 
-        if (applyOnSave === 'light' || applyOnSave === 'both') {
-            await setActiveThemePackId('light', result.draft.id);
-        }
-        if (applyOnSave === 'dark' || applyOnSave === 'both') {
-            await setActiveThemePackId('dark', result.draft.id);
-        }
+            setSelectedThemeId(result.draft.id);
+            setEditorSelectedCatalogItem({
+                id: result.draft.id,
+                name: result.draft.name,
+                source: 'community',
+                lightPatch: result.draft.lightPatch,
+                darkPatch: result.draft.darkPatch,
+                supportsLight: true,
+                supportsDark: true,
+                isCore: false,
+                isVerified: false,
+                origin: 'local',
+            });
 
-        notify.success('Tema guardado', 'El tema quedó listo y aplicado según tu selección.');
-        pushLiveFeedback('Tema guardado y aplicado correctamente.');
-        await triggerSensoryFeedback('success');
+            if (!themeMetaMap[result.draft.id]) {
+                const nextMeta: Record<string, LocalThemeMeta> = {
+                    ...themeMetaMap,
+                    [result.draft.id]: {
+                        visibility: isEditingCoreTheme ? 'private' : editorVisibility,
+                        isBanned: false,
+                        commentsCount: 0,
+                        isCoreDerived: isEditingCoreTheme,
+                    },
+                };
+                await persistThemeMeta(nextMeta);
+            } else {
+                const nextMeta: Record<string, LocalThemeMeta> = {
+                    ...themeMetaMap,
+                    [result.draft.id]: {
+                        ...(themeMetaMap[result.draft.id] ?? { isBanned: false, commentsCount: 0 }),
+                        visibility: isEditingCoreTheme ? 'private' : editorVisibility,
+                        isBanned: themeMetaMap[result.draft.id]?.isBanned ?? false,
+                        commentsCount: themeMetaMap[result.draft.id]?.commentsCount ?? 0,
+                        isCoreDerived: isEditingCoreTheme || themeMetaMap[result.draft.id]?.isCoreDerived === true,
+                    },
+                };
+                await persistThemeMeta(nextMeta);
+            }
+
+            const effectiveVisibility: LocalThemeMeta['visibility'] = isEditingCoreTheme ? 'private' : editorVisibility;
+
+            if (!isEditingCoreTheme && effectiveVisibility !== 'private') {
+                let linkedRemoteId = await ensureRemoteLinkForDraft(result.draft);
+                const payload = buildMarketplacePayloadFromDraft(result.draft);
+
+                try {
+                    if (!linkedRemoteId) {
+                        const created = await SocialService.createMarketplaceThemePack({
+                            name: result.draft.name,
+                            description: `Tema creado en IronTrain (${effectiveVisibility === 'friends' ? 'solo amigos' : 'público'}).`,
+                            tags: ['irontrain', 'theme'],
+                            supportsLight: true,
+                            supportsDark: true,
+                            visibility: effectiveVisibility,
+                            payload,
+                        });
+
+                        await persistRemoteThemeLinks({
+                            ...remoteThemeLinks,
+                            [created.id]: result.draft.id,
+                        });
+                        linkedRemoteId = created.id;
+
+                        pushLiveFeedback(
+                            effectiveVisibility === 'friends'
+                                ? 'Tema compartido para amigos en marketplace.'
+                                : 'Tema enviado a marketplace (público).'
+                        );
+                    } else {
+                        await SocialService.createMarketplaceThemeVersion(linkedRemoteId, {
+                            payload,
+                            changelog: 'Actualización desde Theme Studio móvil',
+                        });
+                        await SocialService.updateMarketplaceThemePack(linkedRemoteId, {
+                            visibility: effectiveVisibility,
+                            name: result.draft.name,
+                        });
+
+                        pushLiveFeedback(
+                            effectiveVisibility === 'friends'
+                                ? 'Tema actualizado para visibilidad de amigos.'
+                                : 'Tema actualizado para visibilidad pública.'
+                        );
+                    }
+                } catch {
+                    pushLiveFeedback('Guardado local OK; no se pudo sincronizar marketplace.', 'warn');
+                }
+            }
+
+            if (applyOnSave === 'light' || applyOnSave === 'both') {
+                await setActiveThemePackId('light', result.draft.id);
+            }
+            if (applyOnSave === 'dark' || applyOnSave === 'both') {
+                await setActiveThemePackId('dark', result.draft.id);
+            }
+
+            notify.success('Tema guardado', 'El tema quedó listo y aplicado según tu selección.');
+            pushLiveFeedback('Tema guardado y aplicado correctamente.');
+            await triggerSensoryFeedback('success');
+        } finally {
+            setIsSavingTheme(false);
+        }
     };
 
     const assignTheme = async (mode: 'light' | 'dark', item: CatalogItem) => {
@@ -728,7 +1009,13 @@ export function ThemeStudioPanel() {
         };
         await persistThemeMeta(next);
 
-        const linkedRemoteId = findRemoteThemeIdByLocalDraftId(themeId);
+        let linkedRemoteId = findRemoteThemeIdByLocalDraftId(themeId);
+        if (!linkedRemoteId && nextVisibility !== 'private') {
+            const localDraft = themeDrafts.find((draft) => draft.id === themeId) ?? null;
+            if (localDraft) {
+                linkedRemoteId = await ensureRemoteLinkForDraft(localDraft);
+            }
+        }
         if (linkedRemoteId) {
             try {
                 await SocialService.updateMarketplaceThemePack(linkedRemoteId, { visibility: nextVisibility });
@@ -898,21 +1185,26 @@ export function ThemeStudioPanel() {
 
     const renderThemeSummaryLine = (item: CatalogItem, isActiveLight: boolean, isActiveDark: boolean) => {
         const localMeta = themeMetaMap[item.id] ?? { visibility: item.isCore ? 'public' : 'private', isBanned: false, commentsCount: 0 };
-        const visibility = item.origin === 'remote'
+        const hasRemoteState = !!item.remoteId;
+        const visibility = (item.origin === 'remote' || hasRemoteState)
             ? (item.remoteVisibility ?? 'private')
             : (localMeta.isCoreDerived ? 'private' : localMeta.visibility);
-        const statusLabel = item.origin === 'remote'
+        const statusLabel = (item.origin === 'remote' || hasRemoteState)
             ? getStatusLabel(item.remoteStatus)
             : item.isVerified
                 ? 'Verificado'
                 : (localMeta.isBanned ? 'Baneado' : 'Sin verificar');
-        const commentsCount = item.origin === 'remote' ? (item.remoteRatingCount ?? 0) : localMeta.commentsCount;
-        const sourceLabel = item.isCore ? 'Core' : (localMeta.isCoreDerived ? 'Core Remix' : 'Comunidad');
+        const commentsCount = (item.origin === 'remote' || hasRemoteState) ? (item.remoteRatingCount ?? 0) : localMeta.commentsCount;
+        const sourceLabel = item.isCore
+            ? 'Core'
+            : (localMeta.isCoreDerived
+                ? 'Core Remix'
+                : (hasRemoteState ? 'Marketplace' : 'Comunidad'));
         const visibilityLabel = visibility === 'public' ? 'Público' : visibility === 'friends' ? 'Amigos' : 'Privado';
         const activeLabel = isActiveLight || isActiveDark
             ? `${isActiveLight ? 'Claro' : '-'} · ${isActiveDark ? 'Oscuro' : '-'}`
             : 'Sin activar';
-        const remoteSignals = item.origin === 'remote' ? ` · ${item.remoteDownloadsCount ?? 0} desc` : '';
+        const remoteSignals = (item.origin === 'remote' || hasRemoteState) ? ` · ${item.remoteDownloadsCount ?? 0} desc` : '';
         const text = `${sourceLabel} · ${visibilityLabel} · ${statusLabel} · ${activeLabel} · ${commentsCount} com${remoteSignals}`;
 
         return (
@@ -1018,8 +1310,16 @@ export function ThemeStudioPanel() {
             pickerField={pickerField}
             hasInvalidInputs={hasInvalidInputs}
             validColorCount={validColorCount}
+            contrastScoreAverage={contrastScoreAverage}
+            contrastBlockersTotal={contrastBlockersTotal}
+            contrastWarningsTotal={contrastWarningsTotal}
+            effectiveContrastBlockersTotal={effectiveContrastBlockersTotal}
+            strictContrastMode={strictContrastMode}
+            lightContrastReport={lightContrastReport}
+            darkContrastReport={darkContrastReport}
             isCreationFlow={isCreationFlow}
             canSaveTheme={canSaveTheme}
+            isSavingTheme={isSavingTheme}
             saveDisabledReason={saveDisabledReason}
             editorEntryReady={editorEntryReady}
             hasUnsavedNewDraft={hasUnsavedNewDraft}
@@ -1027,6 +1327,8 @@ export function ThemeStudioPanel() {
             selectedEditorThemeKey={editorSelectedCatalogItem?.id ?? selectedThemeId}
             previewLightColors={previewLight.colors}
             previewDarkColors={previewDark.colors}
+            previewLightResolvedFields={lightResolvedFields}
+            previewDarkResolvedFields={darkResolvedFields}
             onFeedbackSelection={onFeedbackSelection}
             onCreateNamedThemeFromEditor={() => {
                 void createNamedThemeFromEditor();
@@ -1053,6 +1355,16 @@ export function ThemeStudioPanel() {
             }}
             onSaveTheme={() => {
                 void saveTheme();
+            }}
+            onAutoFixContrast={() => {
+                void autoFixContrast();
+            }}
+            onToggleStrictContrast={() => {
+                void toggleStrictContrastMode();
+            }}
+            onGetSuggestedColorForField={getSuggestedColorForField}
+            onApplySuggestedColorForField={(fieldKey, mode, color) => {
+                void applySuggestedColorForField(fieldKey, mode, color);
             }}
             onSelectColorFromPicker={(fieldKey, color) => {
                 void selectColorFromPicker(fieldKey, color);

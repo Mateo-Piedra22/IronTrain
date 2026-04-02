@@ -57,6 +57,11 @@ export async function POST(
             return NextResponse.json({ error: 'not_found' }, { status: 404 });
         }
 
+        if (pack.ownerId === userId) {
+            recordMetric({ outcome: 'error', statusCode: 403, event: 'owner_cannot_report' });
+            return NextResponse.json({ error: 'owners_cannot_report_own_theme' }, { status: 403 });
+        }
+
         const canReport = await canReadThemePack(userId, pack);
         if (!canReport) {
             recordMetric({ outcome: 'error', statusCode: 403, event: 'forbidden' });

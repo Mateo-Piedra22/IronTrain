@@ -1,15 +1,51 @@
-import notifee, {
-    AndroidCategory,
-    AndroidImportance,
-    AndroidVisibility,
-    TimestampTrigger,
-    TriggerType
-} from '@notifee/react-native';
 import { Platform } from 'react-native';
 import { Colors } from '../theme';
 import { logger } from '../utils/logger';
 import { configService, NotificationPreferences } from './ConfigService';
 import { notificationPermissionsService } from './NotificationPermissionsService';
+
+type NotifeeModule = typeof import('@notifee/react-native');
+type TimestampTrigger = import('@notifee/react-native').TimestampTrigger;
+
+const notifeeModule: NotifeeModule | null = (() => {
+    try {
+        return require('@notifee/react-native') as NotifeeModule;
+    } catch {
+        return null;
+    }
+})();
+
+const notifee = (notifeeModule?.default ?? {
+    createChannel: async () => undefined,
+    setNotificationCategories: async () => undefined,
+    displayNotification: async () => undefined,
+    cancelNotification: async () => undefined,
+    createTriggerNotification: async () => undefined,
+    cancelTriggerNotification: async () => undefined,
+    cancelAllNotifications: async () => undefined,
+    getTriggerNotifications: async () => [],
+    isBatteryOptimizationEnabled: async () => false,
+    openBatteryOptimizationSettings: async () => undefined,
+}) as any;
+
+const AndroidCategory = notifeeModule?.AndroidCategory ?? {
+    PROGRESS: 'progress',
+    STOPWATCH: 'stopwatch',
+    STATUS: 'status',
+};
+
+const AndroidImportance = notifeeModule?.AndroidImportance ?? {
+    DEFAULT: 3,
+    HIGH: 4,
+};
+
+const AndroidVisibility = notifeeModule?.AndroidVisibility ?? {
+    PUBLIC: 1,
+};
+
+const TriggerType = notifeeModule?.TriggerType ?? {
+    TIMESTAMP: 0,
+};
 
 // ─── Channel IDs ─────────────────────────────────────────────────────────────
 const CHANNELS = {

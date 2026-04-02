@@ -241,7 +241,7 @@ function isHexValid(value: string): boolean {
     return !!value && isValidHexColor(value);
 }
 
-type ModeFallbackColors = {
+export type ModeFallbackColors = {
     primary: { DEFAULT: string; light: string; dark: string };
     onPrimary: string;
     background: string;
@@ -289,6 +289,178 @@ export function applyEditorSmartDefaults(fields: EditableColorFields, mode: Edit
             ? mixHex(backgroundBase, textBase, 0.18)
             : fallback.border;
     }
+
+    return next;
+}
+
+export type ContrastSeverity = 'blocker' | 'warning' | 'info';
+
+export type ContrastAuditIssue = {
+    id: string;
+    mode: EditorMode;
+    label: string;
+    ratio: number;
+    minRatio: number;
+    severity: ContrastSeverity;
+};
+
+export type ContrastAuditReport = {
+    mode: EditorMode;
+    score: number;
+    blockers: number;
+    warnings: number;
+    infos: number;
+    issues: ContrastAuditIssue[];
+};
+
+const CONTRAST_REFERENCE_BLACK = '#000000';
+const CONTRAST_REFERENCE_WHITE = '#FFFFFF';
+
+type ColorPairRule = {
+    id: string;
+    label: string;
+    fg: keyof EditableColorFields;
+    bg: keyof EditableColorFields;
+    minRatio: number;
+    severity: ContrastSeverity;
+};
+
+const CONTRAST_RULES: ColorPairRule[] = [
+    { id: 'text-on-background', label: 'Texto principal / Fondo', fg: 'text', bg: 'background', minRatio: 4.5, severity: 'blocker' },
+    { id: 'text-on-surface', label: 'Texto principal / Superficie', fg: 'text', bg: 'surface', minRatio: 4.5, severity: 'blocker' },
+    { id: 'text-on-surface-lighter', label: 'Texto principal / Superficie secundaria', fg: 'text', bg: 'surfaceLighter', minRatio: 4.5, severity: 'blocker' },
+    { id: 'onprimary-on-primary', label: 'Texto en botón / Primario', fg: 'onPrimary', bg: 'primaryDefault', minRatio: 4.5, severity: 'blocker' },
+    { id: 'muted-on-background', label: 'Texto secundario / Fondo', fg: 'textMuted', bg: 'background', minRatio: 3, severity: 'warning' },
+    { id: 'muted-on-surface', label: 'Texto secundario / Superficie', fg: 'textMuted', bg: 'surface', minRatio: 3, severity: 'warning' },
+    { id: 'primary-on-background', label: 'Primario / Fondo', fg: 'primaryDefault', bg: 'background', minRatio: 3, severity: 'warning' },
+    { id: 'primary-light-on-background', label: 'Primario claro / Fondo', fg: 'primaryLight', bg: 'background', minRatio: 3, severity: 'info' },
+    { id: 'primary-dark-on-background', label: 'Primario oscuro / Fondo', fg: 'primaryDark', bg: 'background', minRatio: 3, severity: 'info' },
+    { id: 'border-on-surface', label: 'Borde / Superficie', fg: 'border', bg: 'surface', minRatio: 1.5, severity: 'info' },
+];
+
+function normalizeHexForContrast(hex: string): string {
+    if (!isHexValid(hex)) return hex;
+    const normalized = hex.startsWith('#') ? hex.slice(1) : hex;
+    const base = normalized.length >= 6 ? normalized.slice(0, 6) : normalized;
+    return `#${base.toUpperCase()}`;
+}
+
+export function contrastRatio(foregroundHex: string, backgroundHex: string): number {
+    const fg = normalizeHexForContrast(foregroundHex);
+    const bg = normalizeHexForContrast(backgroundHex);
+    if (!isHexValid(fg) || !isHexValid(bg)) return 1;
+
+    const fgLum = relativeLuminance(fg);
+    const bgLum = relativeLuminance(bg);
+    const lighter = Math.max(fgLum, bgLum);
+    const darker = Math.min(fgLum, bgLum);
+    return Number((((lighter + 0.05) / (darker + 0.05))).toFixed(2));
+}
+
+function resolveContrastAuditFields(fields: EditableColorFields, mode: EditorMode, fallback: ModeFallbackColors): EditableColorFields {
+    return applyEditorSmartDefaults(fields, mode, fallback);
+}
+
+function countBySeverity(issues: ContrastAuditIssue[], severity: ContrastSeverity): number {
+    return issues.filter((issue) => issue.severity === severity).length;
+}
+
+function scoreFromIssues(issues: ContrastAuditIssue[]): number {
+    const deductions = issues.reduce((acc, issue) => {
+        if (issue.severity === 'blocker') return acc + 22;
+        if (issue.severity === 'warning') return acc + 10;
+        return acc + 4;
+    }, 0);
+    return Math.max(0, 100 - deductions);
+}
+
+export function evaluateThemeContrastAudit(fields: EditableColorFields, mode: EditorMode, fallback: ModeFallbackColors): ContrastAuditReport {
+    const resolved = resolveContrastAuditFields(fields, mode, fallback);
+
+    const issues: ContrastAuditIssue[] = [];
+    for (const rule of CONTRAST_RULES) {
+        const fg = resolved[rule.fg];
+        const bg = resolved[rule.bg];
+        if (!isHexValid(fg) || !isHexValid(bg)) continue;
+
+        const ratio = contrastRatio(fg, bg);
+        if (ratio < rule.minRatio) {
+            issues.push({
+                id: rule.id,
+                mode,
+                label: rule.label,
+                ratio,
+                minRatio: rule.minRatio,
+                severity: rule.severity,
+            });
+        }
+    }
+
+    return {
+        mode,
+        score: scoreFromIssues(issues),
+        blockers: countBySeverity(issues, 'blocker'),
+        warnings: countBySeverity(issues, 'warning'),
+        infos: countBySeverity(issues, 'info'),
+        issues,
+    };
+}
+
+function channelDistance(hexA: string, hexB: string): number {
+    const a = hexToRgbTuple(normalizeHexForContrast(hexA));
+    const b = hexToRgbTuple(normalizeHexForContrast(hexB));
+    if (!a || !b) return Number.MAX_SAFE_INTEGER;
+    return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+}
+
+function adjustColorForMinContrast(foregroundHex: string, backgroundHex: string, minRatio: number): string {
+    const foreground = normalizeHexForContrast(foregroundHex);
+    const background = normalizeHexForContrast(backgroundHex);
+    if (!isHexValid(foreground) || !isHexValid(background)) return foregroundHex;
+
+    const currentRatio = contrastRatio(foreground, background);
+    if (currentRatio >= minRatio) return foreground;
+
+    let best = foreground;
+    let bestRatio = currentRatio;
+    let bestDistance = Number.MAX_SAFE_INTEGER;
+
+    const targets = [CONTRAST_REFERENCE_BLACK, CONTRAST_REFERENCE_WHITE];
+    for (const target of targets) {
+        for (let step = 0; step <= 100; step += 1) {
+            const mixed = mixHex(foreground, target, step / 100);
+            const ratio = contrastRatio(mixed, background);
+            if (ratio < minRatio) continue;
+
+            const distance = channelDistance(foreground, mixed);
+            if (distance < bestDistance || (distance === bestDistance && ratio > bestRatio)) {
+                best = mixed;
+                bestRatio = ratio;
+                bestDistance = distance;
+            }
+            break;
+        }
+    }
+
+    return best;
+}
+
+export function autoFixThemeContrastFields(fields: EditableColorFields, mode: EditorMode, fallback: ModeFallbackColors): EditableColorFields {
+    const next = applyEditorSmartDefaults(fields, mode, fallback);
+
+    next.onPrimary = adjustColorForMinContrast(next.onPrimary, next.primaryDefault, 4.5);
+
+    const textCandidate = adjustColorForMinContrast(next.text, next.background, 4.5);
+    next.text = adjustColorForMinContrast(textCandidate, next.surface, 4.5);
+    next.text = adjustColorForMinContrast(next.text, next.surfaceLighter, 4.5);
+
+    next.textMuted = adjustColorForMinContrast(next.textMuted, next.background, 3);
+    next.textMuted = adjustColorForMinContrast(next.textMuted, next.surface, 3);
+
+    next.primaryDefault = adjustColorForMinContrast(next.primaryDefault, next.background, 3);
+    next.primaryLight = adjustColorForMinContrast(next.primaryLight, next.background, 3);
+    next.primaryDark = adjustColorForMinContrast(next.primaryDark, next.background, 3);
+    next.border = adjustColorForMinContrast(next.border, next.surface, 1.5);
 
     return next;
 }

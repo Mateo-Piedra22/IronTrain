@@ -55,6 +55,11 @@ export async function POST(
             return NextResponse.json({ error: 'not_found' }, { status: 404 });
         }
 
+        if (pack.ownerId === userId) {
+            recordMetric({ outcome: 'error', statusCode: 403, event: 'owner_cannot_rate' });
+            return NextResponse.json({ error: 'owners_cannot_rate' }, { status: 403 });
+        }
+
         const canRate = await canReadThemePack(userId, pack);
         if (!canRate) {
             recordMetric({ outcome: 'error', statusCode: 403, event: 'forbidden' });
@@ -63,6 +68,9 @@ export async function POST(
 
         const now = new Date();
         const ratingId = crypto.randomUUID();
+        const normalizedReview = typeof parsed.data.review === 'string' && parsed.data.review.trim().length > 0
+            ? parsed.data.review.trim()
+            : null;
 
         const aggregates = await db.transaction(async (tx: any) => {
             await tx
@@ -72,7 +80,7 @@ export async function POST(
                     themePackId: id,
                     userId,
                     rating: parsed.data.rating,
-                    review: parsed.data.review ?? null,
+                    review: normalizedReview,
                     createdAt: now,
                     updatedAt: now,
                     deletedAt: null,
@@ -81,7 +89,7 @@ export async function POST(
                     target: [schema.themePackRatings.themePackId, schema.themePackRatings.userId],
                     set: {
                         rating: parsed.data.rating,
-                        review: parsed.data.review ?? null,
+                        review: normalizedReview,
                         updatedAt: now,
                         deletedAt: null,
                     },

@@ -1,18 +1,24 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { Copy, Download, Palette } from 'lucide-react';
 import { Metadata } from 'next';
+import { headers } from 'next/headers';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { db } from '../../../../../src/db';
 import * as schema from '../../../../../src/db/schema';
+import { verifyAuthFromHeaders } from '../../../../../src/lib/server-auth';
+import { resolveThemePreview } from '../../../../../src/lib/theme-marketplace/preview';
+import { ThemeInteractionsPanel } from './ThemeInteractionsPanel';
 
 interface ThemePageProps {
     params: Promise<{ slug: string }>;
+    searchParams?: Promise<{ commentsPage?: string; feedbackPage?: string; feedbackStatus?: string }>;
 }
 
 async function getThemePackBySlug(slug: string) {
     const rows = await db.select({
         id: schema.themePacks.id,
+        ownerId: schema.themePacks.ownerId,
         slug: schema.themePacks.slug,
         name: schema.themePacks.name,
         description: schema.themePacks.description,
@@ -73,20 +79,130 @@ export async function generateMetadata({ params }: ThemePageProps): Promise<Meta
     };
 }
 
-export default async function ThemeSharePage({ params }: ThemePageProps) {
+export default async function ThemeSharePage({ params, searchParams }: ThemePageProps) {
     const { slug } = await params;
+    const sp = searchParams ? await searchParams : undefined;
+
+    const parsedCommentsPage = Number(sp?.commentsPage ?? '1');
+    const commentsPage = Number.isFinite(parsedCommentsPage) && parsedCommentsPage > 0
+        ? Math.floor(parsedCommentsPage)
+        : 1;
+    const commentsPageSize = 6;
+
+    const parsedFeedbackPage = Number(sp?.feedbackPage ?? '1');
+    const feedbackPage = Number.isFinite(parsedFeedbackPage) && parsedFeedbackPage > 0
+        ? Math.floor(parsedFeedbackPage)
+        : 1;
+    const feedbackPageSize = 5;
+    const feedbackStatusRaw = (sp?.feedbackStatus ?? 'all').toLowerCase();
+    const feedbackStatus = ['all', 'open', 'resolved', 'dismissed'].includes(feedbackStatusRaw)
+        ? feedbackStatusRaw as 'all' | 'open' | 'resolved' | 'dismissed'
+        : 'all';
+
     const data = await getThemePackBySlug(slug);
 
     if (!data) return notFound();
 
     const { pack, payload } = data;
-    const preview = (payload.preview && typeof payload.preview === 'object')
-        ? payload.preview as Record<string, string>
-        : {};
+    const { hero, surface, text } = resolveThemePreview(payload);
+    const requestHeaders = await headers();
+    const currentUserId = await verifyAuthFromHeaders(requestHeaders);
 
-    const hero = preview.hero || '#8AA0B8';
-    const surface = preview.surface || '#FFFFFF';
-    const text = preview.text || '#0F172A';
+    const reviewWhere = and(
+        eq(schema.themePackRatings.themePackId, pack.id),
+        isNull(schema.themePackRatings.deletedAt),
+        isNotNull(schema.themePackRatings.review),
+        sql`length(trim(${schema.themePackRatings.review})) > 0`,
+        or(eq(schema.userProfiles.isPublic, true), isNull(schema.userProfiles.id)),
+    );
+
+    const [{ count: totalReviews }] = await db.select({
+        count: sql<number>`count(*)::int`,
+    })
+        .from(schema.themePackRatings)
+        .leftJoin(schema.userProfiles, eq(schema.themePackRatings.userId, schema.userProfiles.id))
+        .where(reviewWhere);
+
+    const totalCommentsPages = Math.max(1, Math.ceil((totalReviews ?? 0) / commentsPageSize));
+    const currentCommentsPage = Math.min(commentsPage, totalCommentsPages);
+    const commentsOffset = (currentCommentsPage - 1) * commentsPageSize;
+
+    const recentReviews = await db.select({
+        id: schema.themePackRatings.id,
+        rating: schema.themePackRatings.rating,
+        review: schema.themePackRatings.review,
+        updatedAt: schema.themePackRatings.updatedAt,
+        username: schema.userProfiles.username,
+        displayName: schema.userProfiles.displayName,
+    })
+        .from(schema.themePackRatings)
+        .leftJoin(schema.userProfiles, eq(schema.themePackRatings.userId, schema.userProfiles.id))
+        .where(reviewWhere)
+        .orderBy(desc(schema.themePackRatings.updatedAt))
+        .limit(commentsPageSize)
+        .offset(commentsOffset);
+
+    const [userRatingRow] = currentUserId
+        ? await db.select({
+            rating: schema.themePackRatings.rating,
+            review: schema.themePackRatings.review,
+        })
+            .from(schema.themePackRatings)
+            .where(
+                and(
+                    eq(schema.themePackRatings.themePackId, pack.id),
+                    eq(schema.themePackRatings.userId, currentUserId),
+                    isNull(schema.themePackRatings.deletedAt),
+                ),
+            )
+            .limit(1)
+        : [];
+
+    const ownFeedbackRows = currentUserId
+        ? (() => {
+            const ownFeedbackWhere = and(
+                eq(schema.themePackFeedback.themePackId, pack.id),
+                eq(schema.themePackFeedback.userId, currentUserId),
+                feedbackStatus === 'all' ? sql`true` : eq(schema.themePackFeedback.status, feedbackStatus),
+            );
+
+            return Promise.all([
+                db.select({ count: sql<number>`count(*)::int` })
+                    .from(schema.themePackFeedback)
+                    .where(ownFeedbackWhere)
+                    .limit(1),
+                db.select({
+                    id: schema.themePackFeedback.id,
+                    kind: schema.themePackFeedback.kind,
+                    message: schema.themePackFeedback.message,
+                    status: schema.themePackFeedback.status,
+                    updatedAt: schema.themePackFeedback.updatedAt,
+                })
+                    .from(schema.themePackFeedback)
+                    .where(ownFeedbackWhere)
+                    .orderBy(desc(schema.themePackFeedback.updatedAt))
+                    .limit(feedbackPageSize)
+                    .offset(Math.max(0, feedbackPage - 1) * feedbackPageSize),
+            ]);
+        })()
+        : Promise.resolve([[{ count: 0 }], []] as const);
+
+    const [ownFeedbackCountRows, ownFeedbackItems] = await ownFeedbackRows;
+    const totalOwnFeedback = ownFeedbackCountRows[0]?.count ?? 0;
+    const totalOwnFeedbackPages = Math.max(1, Math.ceil(totalOwnFeedback / feedbackPageSize));
+    const currentOwnFeedbackPage = Math.min(feedbackPage, totalOwnFeedbackPages);
+
+    const buildShareHref = (
+        nextCommentsPage: number,
+        nextFeedbackStatus: 'all' | 'open' | 'resolved' | 'dismissed',
+        nextFeedbackPage: number,
+    ) => {
+        const qs = new URLSearchParams();
+        qs.set('commentsPage', String(nextCommentsPage));
+        qs.set('feedbackStatus', nextFeedbackStatus);
+        qs.set('feedbackPage', String(nextFeedbackPage));
+        return `/share/theme/${pack.slug}?${qs.toString()}`;
+    };
 
     const deepLink = `irontrain://share/theme/${pack.slug}`;
     const publicLink = `https://irontrain.motiona.xyz/share/theme/${pack.slug}`;
@@ -161,6 +277,52 @@ export default async function ThemeSharePage({ params }: ThemePageProps) {
                             </div>
                         )}
 
+                        <div className="border-t border-current/20 pt-6 space-y-4">
+                            <div className="text-[9px] font-black opacity-30 uppercase tracking-[0.3em]">COMMUNITY_COMMENTS</div>
+                            {recentReviews.length === 0 ? (
+                                <div className="text-[9px] font-black opacity-40 uppercase tracking-[0.2em]">Sin comentarios todavía.</div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {recentReviews.map((entry) => (
+                                        <div key={entry.id} className="border border-current/20 p-3">
+                                            <div className="flex items-center justify-between gap-3 mb-2">
+                                                <div className="text-[9px] font-black uppercase tracking-[0.2em]">
+                                                    @{entry.username || entry.displayName || 'user'}
+                                                </div>
+                                                <div className="text-[9px] font-black opacity-60 uppercase tracking-[0.2em]">
+                                                    {entry.rating}/5 · {new Date(entry.updatedAt || new Date()).toLocaleDateString('es-AR')}
+                                                </div>
+                                            </div>
+                                            <p className="text-[11px] font-bold leading-relaxed whitespace-pre-wrap">
+                                                {entry.review}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-[0.2em] opacity-60">
+                                <span>Page {currentCommentsPage}/{totalCommentsPages}</span>
+                                <div className="flex items-center gap-2">
+                                    {currentCommentsPage > 1 ? (
+                                        <Link
+                                            href={buildShareHref(currentCommentsPage - 1, feedbackStatus, currentOwnFeedbackPage)}
+                                            className="border border-current px-2 py-1 hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all"
+                                        >
+                                            Prev
+                                        </Link>
+                                    ) : null}
+                                    {currentCommentsPage < totalCommentsPages ? (
+                                        <Link
+                                            href={buildShareHref(currentCommentsPage + 1, feedbackStatus, currentOwnFeedbackPage)}
+                                            className="border border-current px-2 py-1 hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all"
+                                        >
+                                            Next
+                                        </Link>
+                                    ) : null}
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="mt-8 pt-10 border-t-[3px] border-current space-y-6">
                             <a
                                 href={deepLink}
@@ -193,6 +355,27 @@ export default async function ThemeSharePage({ params }: ThemePageProps) {
                                 LINK: {publicLink}
                             </div>
                         </div>
+
+                        <ThemeInteractionsPanel
+                            themeId={pack.id}
+                            isLoggedIn={!!currentUserId}
+                            isOwner={!!currentUserId && currentUserId === pack.ownerId}
+                            loginHref="/auth/sign-in"
+                            initialRating={typeof userRatingRow?.rating === 'number' ? userRatingRow.rating : null}
+                            initialReview={typeof userRatingRow?.review === 'string' ? userRatingRow.review : null}
+                            recentOwnFeedback={ownFeedbackItems.map((item) => ({
+                                id: item.id,
+                                kind: item.kind,
+                                message: item.message,
+                                status: item.status,
+                                updatedAt: item.updatedAt,
+                            }))}
+                            shareSlug={pack.slug}
+                            currentCommentsPage={currentCommentsPage}
+                            ownFeedbackStatus={feedbackStatus}
+                            ownFeedbackPage={currentOwnFeedbackPage}
+                            ownFeedbackTotalPages={totalOwnFeedbackPages}
+                        />
                     </div>
                 </div>
             </div>

@@ -1,19 +1,37 @@
-import notifee, { AndroidImportance } from '@notifee/react-native';
 import { AppState, Platform } from 'react-native';
 import { configService } from '../services/ConfigService';
 import { BannerMessage, ToastType, useNotificationStore } from '../store/notificationStore';
 import { logger } from './logger';
 import { triggerSensoryFeedback } from './sensoryFeedback';
 
-notifee.onBackgroundEvent(async ({ type, detail }) => {
+type NotifeeModule = typeof import('@notifee/react-native');
+
+const notifeeModule: NotifeeModule | null = (() => {
+    try {
+        return require('@notifee/react-native') as NotifeeModule;
+    } catch {
+        return null;
+    }
+})();
+
+const notifee = (notifeeModule?.default ?? {
+    onBackgroundEvent: () => undefined,
+    registerForegroundService: () => undefined,
+    createChannel: async () => undefined,
+    displayNotification: async () => undefined,
+}) as any;
+
+const AndroidImportance = notifeeModule?.AndroidImportance ?? { DEFAULT: 3 };
+
+notifee.onBackgroundEvent(async ({ type, detail }: { type: string; detail: unknown }) => {
     // For now, no background interactions logic like "Stop timer" handled here.
     // But this wrapper suppresses the "No background handler" warning in Notifee.
     logger.debug('Notifee background event', { type, detail });
 });
 
-if (Platform.OS === 'android' && notifee.registerForegroundService) {
+if (Platform.OS === 'android' && notifeeModule?.default?.registerForegroundService) {
     try {
-        notifee.registerForegroundService((_notification) => {
+        notifee.registerForegroundService((_notification: unknown) => {
             const enabled = !!configService.get('androidForegroundServiceNotificationsEnabled');
             if (!enabled) {
                 return Promise.resolve();

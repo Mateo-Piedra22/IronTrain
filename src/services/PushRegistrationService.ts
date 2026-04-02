@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
@@ -10,6 +11,11 @@ export class PushRegistrationService {
     }
 
     static async registerForPushNotifications(): Promise<string | null> {
+        if (Constants.appOwnership === 'expo') {
+            logger.info('Push remoto deshabilitado en Expo Go (SDK 53+). Usar development build para push notifications.');
+            return null;
+        }
+
         if (!Device.isDevice) {
             logger.info('Must use physical device for Push Notifications');
             return null;

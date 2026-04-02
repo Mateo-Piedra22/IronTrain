@@ -95,9 +95,17 @@ export function normalizeSvgXmlForColor(xml: string, color: string, accentColor:
 
 export function IronTrainLogo({ size = 100, color, accentColor }: Props) {
     const colors = useColors();
-    const defaultLogoColor = colors.isDark ? colors.iron[500] : colors.iron[700]; //THE SECOND VALUE IS FROM THE LIGHT THEME
-    const resolvedColor = color ?? defaultLogoColor;
-    const resolvedAccentColor = accentColor ?? colors.primary.DEFAULT;
+    const resolvedColor =
+        color ??
+        colors.text ??
+        (colors.isDark ? colors.iron?.[700] : colors.iron?.[700]) ??
+        colors.primary?.DEFAULT ??
+        '#9CA3AF';
+    const resolvedAccentColor =
+        accentColor ??
+        colors.primary?.DEFAULT ??
+        colors.onPrimary ??
+        resolvedColor;
     const [rawXml, setRawXml] = useState<string | null>(svgXmlCache?.xml ?? null);
     const [loadError, setLoadError] = useState<boolean>(false);
 
@@ -149,5 +157,5 @@ export function IronTrainLogo({ size = 100, color, accentColor }: Props) {
         );
     }
 
-    return <SvgXml xml={themedXml} width={size} height={size} />;
+    return <SvgXml key={`${resolvedColor}-${resolvedAccentColor}`} xml={themedXml} width={size} height={size} />;
 }
