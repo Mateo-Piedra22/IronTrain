@@ -1,6 +1,6 @@
 import { db } from '@/db';
 import * as schema from '@/db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 
 export type ThemeModerationAction = 'approve' | 'reject' | 'suspend' | 'restore';
 
@@ -25,6 +25,23 @@ export async function setThemePackSystemFlag(params: {
     themePackId: string;
     isSystem: boolean;
 }) {
+    const hasThemeIsSystemColumnResult = await db.execute(sql<{
+        exists: boolean;
+    }>`
+        select exists (
+            select 1
+            from information_schema.columns
+            where table_schema = 'public'
+              and table_name = 'theme_packs'
+              and column_name = 'is_system'
+        ) as "exists"
+    `);
+
+    const hasThemeIsSystemColumn = Boolean((hasThemeIsSystemColumnResult as any)?.rows?.[0]?.exists);
+    if (!hasThemeIsSystemColumn) {
+        throw new Error('THEME_SYSTEM_FLAG_UNAVAILABLE');
+    }
+
     const now = new Date();
     const [updated] = await db
         .update(schema.themePacks)

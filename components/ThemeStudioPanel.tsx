@@ -1,7 +1,7 @@
 import { useTheme } from '@/src/hooks/useTheme';
 import { configService } from '@/src/services/ConfigService';
 import { MarketplaceThemePackSummary, SocialService } from '@/src/services/SocialService';
-import { ThemeFx, withAlpha } from '@/src/theme';
+import { confirm } from '@/src/store/confirmStore';
 import {
     applyThemeColorPatch,
     getCoreThemeToken,
@@ -12,237 +12,38 @@ import {
 import { notify } from '@/src/utils/notify';
 import { triggerSensoryFeedback } from '@/src/utils/sensoryFeedback';
 import * as Linking from 'expo-linking';
-import { Ban, Check, CopyPlus, ExternalLink, Globe, Moon, Palette, Save, Sun, SunMoon, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-
-type EditableColorFieldKey =
-    | 'primaryDefault'
-    | 'primaryLight'
-    | 'primaryDark'
-    | 'onPrimary'
-    | 'background'
-    | 'surface'
-    | 'surfaceLighter'
-    | 'text'
-    | 'textMuted'
-    | 'border';
-
-type EditableColorFields = Record<EditableColorFieldKey, string>;
-type EditorMode = 'light' | 'dark';
-type ApplyOnSave = 'none' | 'light' | 'dark' | 'both';
-type StudioTab = 'themes' | 'editor';
-type SourceFilter = 'all' | 'core' | 'community';
-type ActiveFilter = 'all' | 'active' | 'inactive';
-type CatalogOrigin = 'core' | 'local' | 'remote';
-type MarketplaceStatusFilter = 'all' | 'approved' | 'pending_review' | 'draft' | 'rejected' | 'suspended';
-
-type LocalThemeMeta = {
-    visibility: 'private' | 'friends' | 'public';
-    isBanned: boolean;
-    commentsCount: number;
-};
-
-type CatalogItem = {
-    id: string;
-    name: string;
-    source: 'core' | 'community';
-    lightPatch: ThemeColorPatch;
-    darkPatch: ThemeColorPatch;
-    supportsLight: boolean;
-    supportsDark: boolean;
-    isCore: boolean;
-    isVerified: boolean;
-    origin: CatalogOrigin;
-    remoteId?: string;
-    remoteStatus?: MarketplaceThemePackSummary['status'];
-    remoteVisibility?: MarketplaceThemePackSummary['visibility'];
-    remoteRatingCount?: number;
-    remoteDownloadsCount?: number;
-};
-
-const META_STORAGE_KEY = 'theme_studio_meta_v1';
-const REMOTE_LINK_STORAGE_KEY = 'theme_studio_remote_links_v1';
-
-const EMPTY_FIELDS: EditableColorFields = {
-    primaryDefault: '',
-    primaryLight: '',
-    primaryDark: '',
-    onPrimary: '',
-    background: '',
-    surface: '',
-    surfaceLighter: '',
-    text: '',
-    textMuted: '',
-    border: '',
-};
-
-const COLOR_FIELD_META: Array<{ key: EditableColorFieldKey; label: string; description: string }> = [
-    { key: 'primaryDefault', label: 'Primario', description: 'Color principal de marca' },
-    { key: 'primaryLight', label: 'Primario claro', description: 'Variante clara para estados' },
-    { key: 'primaryDark', label: 'Primario oscuro', description: 'Variante oscura para foco' },
-    { key: 'onPrimary', label: 'Texto sobre primario', description: 'Color del texto en botones primarios' },
-    { key: 'background', label: 'Fondo', description: 'Fondo global de la app' },
-    { key: 'surface', label: 'Superficie', description: 'Cards y contenedores principales' },
-    { key: 'surfaceLighter', label: 'Superficie secundaria', description: 'Bloques y paneles secundarios' },
-    { key: 'text', label: 'Texto principal', description: 'Color del texto principal' },
-    { key: 'textMuted', label: 'Texto secundario', description: 'Color del texto auxiliar' },
-    { key: 'border', label: 'Bordes', description: 'Divisores y contornos' },
-];
-
-function patchToFields(patch: ThemeColorPatch): EditableColorFields {
-    return {
-        primaryDefault: patch.primary?.DEFAULT ?? '',
-        primaryLight: patch.primary?.light ?? '',
-        primaryDark: patch.primary?.dark ?? '',
-        onPrimary: patch.onPrimary ?? '',
-        background: patch.background ?? '',
-        surface: patch.surface ?? '',
-        surfaceLighter: patch.surfaceLighter ?? '',
-        text: patch.text ?? '',
-        textMuted: patch.textMuted ?? '',
-        border: patch.border ?? '',
-    };
-}
-
-function fieldsToPatch(fields: EditableColorFields): ThemeColorPatch {
-    const patch: ThemeColorPatch = {};
-
-    if (
-        isValidHexColor(fields.primaryDefault) ||
-        isValidHexColor(fields.primaryLight) ||
-        isValidHexColor(fields.primaryDark)
-    ) {
-        patch.primary = {};
-        if (isValidHexColor(fields.primaryDefault)) patch.primary.DEFAULT = fields.primaryDefault;
-        if (isValidHexColor(fields.primaryLight)) patch.primary.light = fields.primaryLight;
-        if (isValidHexColor(fields.primaryDark)) patch.primary.dark = fields.primaryDark;
-    }
-
-    if (isValidHexColor(fields.onPrimary)) patch.onPrimary = fields.onPrimary;
-    if (isValidHexColor(fields.background)) patch.background = fields.background;
-    if (isValidHexColor(fields.surface)) patch.surface = fields.surface;
-    if (isValidHexColor(fields.surfaceLighter)) patch.surfaceLighter = fields.surfaceLighter;
-    if (isValidHexColor(fields.text)) patch.text = fields.text;
-    if (isValidHexColor(fields.textMuted)) patch.textMuted = fields.textMuted;
-    if (isValidHexColor(fields.border)) patch.border = fields.border;
-
-    return patch;
-}
-
-function prettifyHexInput(raw: string): string {
-    const trimmed = raw.trim();
-    if (!trimmed) return '';
-    const normalized = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
-    return normalized.slice(0, 9).toUpperCase();
-}
-
-function clampColorChannel(value: number): number {
-    return Math.max(0, Math.min(255, Math.round(value)));
-}
-
-function toHexByte(value: number): string {
-    return clampColorChannel(value).toString(16).padStart(2, '0').toUpperCase();
-}
-
-function rgbToHex(r: number, g: number, b: number): string {
-    return `#${toHexByte(r)}${toHexByte(g)}${toHexByte(b)}`;
-}
-
-function parseRgbInput(raw: string): { ok: true; hex: string } | { ok: false } {
-    const normalized = raw
-        .trim()
-        .replace(/^rgba?\(/i, '')
-        .replace(/\)$/i, '')
-        .replace(/\s+/g, '');
-
-    if (!normalized) return { ok: false };
-
-    const parts = normalized.split(',');
-    if (parts.length < 3) return { ok: false };
-
-    const r = Number(parts[0]);
-    const g = Number(parts[1]);
-    const b = Number(parts[2]);
-
-    if ([r, g, b].some((value) => Number.isNaN(value))) return { ok: false };
-
-    return { ok: true, hex: rgbToHex(r, g, b) };
-}
-
-function hexToRgbInput(hex: string): string {
-    if (!isValidHexColor(hex)) return '';
-    const normalized = hex.slice(1);
-    if (normalized.length < 6) return '';
-    const r = Number.parseInt(normalized.slice(0, 2), 16);
-    const g = Number.parseInt(normalized.slice(2, 4), 16);
-    const b = Number.parseInt(normalized.slice(4, 6), 16);
-    return `${r}, ${g}, ${b}`;
-}
-
-function hslToHex(h: number, s: number, l: number): string {
-    const saturation = s / 100;
-    const lightness = l / 100;
-    const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
-    const hh = h / 60;
-    const x = chroma * (1 - Math.abs((hh % 2) - 1));
-
-    let r = 0;
-    let g = 0;
-    let b = 0;
-
-    if (hh >= 0 && hh < 1) {
-        r = chroma;
-        g = x;
-    } else if (hh >= 1 && hh < 2) {
-        r = x;
-        g = chroma;
-    } else if (hh >= 2 && hh < 3) {
-        g = chroma;
-        b = x;
-    } else if (hh >= 3 && hh < 4) {
-        g = x;
-        b = chroma;
-    } else if (hh >= 4 && hh < 5) {
-        r = x;
-        b = chroma;
-    } else {
-        r = chroma;
-        b = x;
-    }
-
-    const m = lightness - chroma / 2;
-    return rgbToHex((r + m) * 255, (g + m) * 255, (b + m) * 255);
-}
-
-function normalizeThemeMeta(value: unknown): Record<string, LocalThemeMeta> {
-    if (!value || typeof value !== 'object') return {};
-    const input = value as Record<string, any>;
-    const output: Record<string, LocalThemeMeta> = {};
-
-    for (const [key, raw] of Object.entries(input)) {
-        if (!key || typeof raw !== 'object' || !raw) continue;
-        const visibility: LocalThemeMeta['visibility'] =
-            raw.visibility === 'public' ? 'public' : raw.visibility === 'friends' ? 'friends' : 'private';
-        const isBanned = raw.isBanned === true;
-        const commentsCount = Number.isFinite(raw.commentsCount) ? Math.max(0, Number(raw.commentsCount)) : 0;
-        output[key] = { visibility, isBanned, commentsCount };
-    }
-
-    return output;
-}
-
-function normalizeRemoteLinkMap(value: unknown): Record<string, string> {
-    if (!value || typeof value !== 'object') return {};
-    const input = value as Record<string, unknown>;
-    const output: Record<string, string> = {};
-    for (const [remoteId, localId] of Object.entries(input)) {
-        if (typeof remoteId !== 'string' || typeof localId !== 'string') continue;
-        if (!remoteId.trim() || !localId.trim()) continue;
-        output[remoteId] = localId;
-    }
-    return output;
-}
+import { Text, TouchableOpacity, View } from 'react-native';
+import { COLOR_FIELD_META, EMPTY_FIELDS, META_STORAGE_KEY, REMOTE_LINK_STORAGE_KEY, THEMES_EXPANDED_ACTIONS_STORAGE_KEY, THEMES_FILTER_PREFS_STORAGE_KEY } from './theme-studio/constants';
+import {
+    applyEditorSmartDefaults,
+    fieldsToPatch,
+    hexToHslInput,
+    hexToRgbInput,
+    normalizeRemoteLinkMap,
+    normalizeThemeFilterPreferences,
+    normalizeThemeMeta,
+    parseHslInput,
+    parseRgbInput,
+    patchToFields,
+    prettifyHexInput,
+} from './theme-studio/helpers';
+import { createThemeStudioStyles } from './theme-studio/styles';
+import { ThemeStudioEditorTab } from './theme-studio/ThemeStudioEditorPanel';
+import { ThemeStudioThemesTab } from './theme-studio/ThemeStudioThemesTab';
+import {
+    ActiveFilter,
+    ApplyOnSave,
+    CatalogItem,
+    EditableColorFieldKey,
+    EditableColorFields,
+    EditorMode,
+    LocalThemeMeta,
+    MarketplaceStatusFilter,
+    SourceFilter,
+    StudioTab,
+    ThemesFilterPreferences,
+} from './theme-studio/types';
 
 export function ThemeStudioPanel() {
     const {
@@ -267,6 +68,14 @@ export function ThemeStudioPanel() {
     const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all');
     const [statusFilter, setStatusFilter] = useState<MarketplaceStatusFilter>('all');
     const [themeSearch, setThemeSearch] = useState('');
+    const [filtersExpanded, setFiltersExpanded] = useState(false);
+    const [editorThemeListExpanded, setEditorThemeListExpanded] = useState(false);
+    const [editorAdvancedExpanded, setEditorAdvancedExpanded] = useState(false);
+    const [editorVisibilityExpanded, setEditorVisibilityExpanded] = useState(false);
+    const [editorEntryReady, setEditorEntryReady] = useState(false);
+    const [editorSelectedCatalogItem, setEditorSelectedCatalogItem] = useState<CatalogItem | null>(null);
+    const [newThemeNameInput, setNewThemeNameInput] = useState('');
+    const [editorVisibility, setEditorVisibility] = useState<LocalThemeMeta['visibility']>('private');
     const [pickerField, setPickerField] = useState<EditableColorFieldKey | null>(null);
     const [liveFeedback, setLiveFeedback] = useState<{ message: string; tone: 'ok' | 'warn' } | null>(null);
     const [themeMetaMap, setThemeMetaMap] = useState<Record<string, LocalThemeMeta>>({});
@@ -274,6 +83,7 @@ export function ThemeStudioPanel() {
     const [remoteThemes, setRemoteThemes] = useState<MarketplaceThemePackSummary[]>([]);
     const [isLoadingRemoteThemes, setIsLoadingRemoteThemes] = useState(false);
     const [remoteThemeError, setRemoteThemeError] = useState<string | null>(null);
+    const [expandedActionsThemeId, setExpandedActionsThemeId] = useState<string | null>(null);
     const [lightFields, setLightFields] = useState<EditableColorFields>(themeDrafts[0] ? patchToFields(themeDrafts[0].lightPatch) : EMPTY_FIELDS);
     const [darkFields, setDarkFields] = useState<EditableColorFields>(themeDrafts[0] ? patchToFields(themeDrafts[0].darkPatch) : EMPTY_FIELDS);
 
@@ -286,6 +96,17 @@ export function ThemeStudioPanel() {
         const storedRemoteLinks = configService.get(REMOTE_LINK_STORAGE_KEY as any);
         setRemoteThemeLinks(normalizeRemoteLinkMap(storedRemoteLinks));
 
+        const storedFilterPrefs = configService.get(THEMES_FILTER_PREFS_STORAGE_KEY as any);
+        const filterPrefs = normalizeThemeFilterPreferences(storedFilterPrefs);
+        setSourceFilter(filterPrefs.sourceFilter);
+        setActiveFilter(filterPrefs.activeFilter);
+        setStatusFilter(filterPrefs.statusFilter);
+        setThemeSearch(filterPrefs.themeSearch);
+        setFiltersExpanded(filterPrefs.filtersExpanded);
+
+        const storedExpanded = configService.get(THEMES_EXPANDED_ACTIONS_STORAGE_KEY as any);
+        setExpandedActionsThemeId(typeof storedExpanded === 'string' && storedExpanded.trim().length > 0 ? storedExpanded : null);
+
         return () => {
             if (liveFeedbackTimeoutRef.current) {
                 clearTimeout(liveFeedbackTimeoutRef.current);
@@ -293,14 +114,57 @@ export function ThemeStudioPanel() {
         };
     }, []);
 
+    useEffect(() => {
+        const preferences: ThemesFilterPreferences = {
+            sourceFilter,
+            activeFilter,
+            statusFilter,
+            themeSearch,
+            filtersExpanded,
+        };
+        void configService.set(THEMES_FILTER_PREFS_STORAGE_KEY as any, preferences as any);
+    }, [sourceFilter, activeFilter, statusFilter, themeSearch, filtersExpanded]);
+
+    useEffect(() => {
+        if (!expandedActionsThemeId) {
+            void configService.set(THEMES_EXPANDED_ACTIONS_STORAGE_KEY as any, '' as any);
+            return;
+        }
+        void configService.set(THEMES_EXPANDED_ACTIONS_STORAGE_KEY as any, expandedActionsThemeId as any);
+    }, [expandedActionsThemeId]);
+
     const persistRemoteThemeLinks = async (next: Record<string, string>) => {
         setRemoteThemeLinks(next);
         await configService.set(REMOTE_LINK_STORAGE_KEY as any, next as any);
     };
 
+    const findRemoteThemeIdByLocalDraftId = (localDraftId: string): string | null => {
+        for (const [remoteId, linkedLocalId] of Object.entries(remoteThemeLinks)) {
+            if (linkedLocalId === localDraftId) return remoteId;
+        }
+        return null;
+    };
+
+    const buildMarketplacePayloadFromDraft = (draft: ThemeDraft) => ({
+        schemaVersion: 1 as const,
+        base: { light: 'core-light' as const, dark: 'core-dark' as const },
+        lightPatch: draft.lightPatch,
+        darkPatch: draft.darkPatch,
+        meta: {
+            name: draft.name,
+        },
+    });
+
     const loadRemoteThemes = async (query?: string) => {
         setIsLoadingRemoteThemes(true);
         try {
+            const token = await SocialService.getToken();
+            if (!token) {
+                setRemoteThemes([]);
+                setRemoteThemeError(null);
+                return;
+            }
+
             const items = await SocialService.listMarketplaceThemes({
                 scope: 'owned',
                 mode: 'both',
@@ -312,8 +176,15 @@ export function ThemeStudioPanel() {
             });
             setRemoteThemes(items);
             setRemoteThemeError(null);
+            if (query !== undefined) {
+                pushLiveFeedback('Catálogo del marketplace actualizado.');
+            }
         } catch {
-            setRemoteThemeError('No se pudo sincronizar el catálogo del marketplace.');
+            setRemoteThemeError('Marketplace no disponible en este momento.');
+            setRemoteThemes([]);
+            if (query !== undefined) {
+                pushLiveFeedback('No se pudo actualizar marketplace ahora.', 'warn');
+            }
         } finally {
             setIsLoadingRemoteThemes(false);
         }
@@ -401,8 +272,31 @@ export function ThemeStudioPanel() {
     }, [remoteThemes]);
 
     const catalog = useMemo(() => [...coreThemes, ...localThemes, ...remoteCatalogThemes], [coreThemes, localThemes, remoteCatalogThemes]);
+    const editorSelectableThemes = useMemo(() => [...coreThemes, ...localThemes], [coreThemes, localThemes]);
+    const localMarketplaceStateByDraftId = useMemo(() => {
+        const map: Record<string, { visibility: 'private' | 'friends' | 'public'; status: string }> = {};
+        for (const remoteItem of remoteCatalogThemes) {
+            if (!remoteItem.remoteId) continue;
+            const linkedLocalId = remoteThemeLinks[remoteItem.remoteId];
+            if (!linkedLocalId) continue;
+            map[linkedLocalId] = {
+                visibility: remoteItem.remoteVisibility ?? 'private',
+                status: remoteItem.remoteStatus ?? 'draft',
+            };
+        }
+        return map;
+    }, [remoteCatalogThemes, remoteThemeLinks]);
 
     const selectedDraft = useMemo(() => themeDrafts.find((draft) => draft.id === selectedThemeId) ?? null, [themeDrafts, selectedThemeId]);
+
+    useEffect(() => {
+        if (!selectedDraft) {
+            setEditorVisibility('private');
+            return;
+        }
+        const current = themeMetaMap[selectedDraft.id];
+        setEditorVisibility(current?.visibility ?? 'private');
+    }, [selectedDraft, themeMetaMap]);
 
     const activeFields = editorMode === 'light' ? lightFields : darkFields;
     const setActiveFields = (next: EditableColorFields) => {
@@ -434,28 +328,41 @@ export function ThemeStudioPanel() {
         return values.some((value) => value.length > 0 && !isValidHexColor(value));
     }, [lightFields, darkFields]);
 
-    const swatchOptions = useMemo(() => {
-        const generated = Array.from({ length: 12 }, (_, index) => hslToHex((index * 360) / 12, 78, 52));
-        const grayscale = Array.from({ length: 6 }, (_, index) => {
-            const channel = Math.round((index / 5) * 255);
-            return rgbToHex(channel, channel, channel);
-        });
+    const validColorCount = useMemo(() => {
+        const values = [...Object.values(lightFields), ...Object.values(darkFields)];
+        return values.filter((value) => value.length > 0 && isValidHexColor(value)).length;
+    }, [lightFields, darkFields]);
 
-        const themed = [
-            colors.primary.DEFAULT,
-            colors.primary.light,
-            colors.primary.dark,
-            colors.background,
-            colors.surface,
-            colors.surfaceLighter,
-            colors.text,
-            colors.textMuted,
-            colors.border,
-            colors.onPrimary,
-        ];
+    const hasAnyValidColor = validColorCount > 0;
+    const isCreationFlow = !selectedThemeId;
+    const hasUnsavedNewDraft = isCreationFlow && (name.trim().length > 0 || hasAnyValidColor);
+    const selectedThemeMeta = selectedThemeId ? themeMetaMap[selectedThemeId] : null;
+    const isEditingCoreTheme = editorSelectedCatalogItem?.isCore === true || selectedThemeMeta?.isCoreDerived === true;
 
-        return [...themed, ...generated, ...grayscale].filter((value, index, list) => list.indexOf(value) === index);
-    }, [colors]);
+    const saveDisabledReason = useMemo(() => {
+        if (!name.trim()) return 'Definí un nombre antes de guardar.';
+        if (hasInvalidInputs) return 'Corregí los colores inválidos antes de guardar.';
+        if (isCreationFlow && !hasAnyValidColor) return 'Agregá al menos 1 color válido para crear el tema.';
+        return null;
+    }, [name, hasInvalidInputs, isCreationFlow, hasAnyValidColor]);
+
+    const canSaveTheme = saveDisabledReason === null;
+
+    const requestThemeSwitch = () => {
+        if (hasUnsavedNewDraft) {
+            confirm.destructive(
+                'Cambiar tema',
+                'Tenés cambios de un tema nuevo sin guardar. Si cambiás de tema se perderán. ¿Querés continuar?',
+                () => {
+                    setEditorEntryReady(false);
+                },
+                'Cambiar igual'
+            );
+            return;
+        }
+
+        setEditorEntryReady(false);
+    };
 
     const previewLight = useMemo(() => {
         return applyThemeColorPatch(getCoreThemeToken('light'), fieldsToPatch(lightFields), { id: 'preview-light', label: name || 'Preview Light' });
@@ -465,221 +372,7 @@ export function ThemeStudioPanel() {
         return applyThemeColorPatch(getCoreThemeToken('dark'), fieldsToPatch(darkFields), { id: 'preview-dark', label: name || 'Preview Dark' });
     }, [darkFields, name]);
 
-    const styles = useMemo(() => StyleSheet.create({
-        container: {
-            borderRadius: 14,
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            backgroundColor: colors.surfaceLighter,
-            padding: 10,
-            gap: 10,
-        },
-        sectionLabel: {
-            color: colors.textMuted,
-            fontSize: 10,
-            fontWeight: '800',
-            textTransform: 'uppercase',
-            letterSpacing: 0.8,
-        },
-        row: { flexDirection: 'row', gap: 6 },
-        grow: { flex: 1 },
-        tabBtn: {
-            flex: 1,
-            borderRadius: 10,
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            backgroundColor: colors.surface,
-            paddingVertical: 9,
-            alignItems: 'center',
-            justifyContent: 'center',
-        },
-        tabBtnActive: {
-            borderColor: colors.primary.DEFAULT,
-            backgroundColor: withAlpha(colors.primary.DEFAULT, '18'),
-        },
-        tabBtnText: { color: colors.textMuted, fontSize: 12, fontWeight: '800' },
-        tabBtnTextActive: { color: colors.primary.DEFAULT },
-        chip: {
-            borderRadius: 999,
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            paddingHorizontal: 9,
-            paddingVertical: 6,
-            backgroundColor: colors.surface,
-        },
-        chipActive: {
-            borderColor: colors.primary.DEFAULT,
-            backgroundColor: withAlpha(colors.primary.DEFAULT, '18'),
-        },
-        chipText: { color: colors.textMuted, fontSize: 11, fontWeight: '800' },
-        chipTextActive: { color: colors.primary.DEFAULT },
-        compactInput: {
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            borderRadius: 10,
-            backgroundColor: colors.surface,
-            color: colors.text,
-            fontSize: 12,
-            fontWeight: '700',
-            paddingHorizontal: 10,
-            paddingVertical: 8,
-        },
-        card: {
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            borderRadius: 12,
-            backgroundColor: colors.surface,
-            padding: 9,
-            gap: 6,
-        },
-        cardTitle: { color: colors.text, fontWeight: '900', fontSize: 13 },
-        cardSub: { color: colors.textMuted, fontSize: 11 },
-        badge: {
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: 999,
-            paddingHorizontal: 7,
-            paddingVertical: 3,
-            backgroundColor: colors.surfaceLighter,
-        },
-        badgeText: {
-            fontSize: 9,
-            fontWeight: '900',
-            color: colors.textMuted,
-            textTransform: 'uppercase',
-            letterSpacing: 0.6,
-        },
-        actionBtn: {
-            borderRadius: 9,
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            backgroundColor: colors.surfaceLighter,
-            paddingVertical: 7,
-            paddingHorizontal: 8,
-            alignItems: 'center',
-            justifyContent: 'center',
-        },
-        actionBtnPrimary: {
-            borderColor: colors.primary.DEFAULT,
-            backgroundColor: withAlpha(colors.primary.DEFAULT, '18'),
-        },
-        actionBtnText: { color: colors.text, fontSize: 10, fontWeight: '800' },
-        actionBtnTextPrimary: { color: colors.primary.DEFAULT },
-        helperError: { color: colors.red, fontSize: 11, fontWeight: '700' },
-        helperOk: { color: colors.green, fontSize: 11, fontWeight: '700' },
-        input: {
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            borderRadius: 12,
-            backgroundColor: colors.surface,
-            color: colors.text,
-            fontSize: 14,
-            fontWeight: '700',
-            paddingHorizontal: 12,
-            paddingVertical: 9,
-        },
-        modeBtn: {
-            borderRadius: 10,
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            paddingVertical: 9,
-            paddingHorizontal: 10,
-            backgroundColor: colors.surface,
-            alignItems: 'center',
-        },
-        modeBtnActive: {
-            borderColor: colors.primary.DEFAULT,
-            backgroundColor: withAlpha(colors.primary.DEFAULT, '18'),
-        },
-        modeBtnText: { color: colors.textMuted, fontSize: 12, fontWeight: '800' },
-        modeBtnTextActive: { color: colors.primary.DEFAULT },
-        colorRow: {
-            borderRadius: 12,
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            backgroundColor: colors.surface,
-            padding: 9,
-            gap: 7,
-        },
-        colorRowTitle: { color: colors.text, fontSize: 12, fontWeight: '800' },
-        colorRowSub: { color: colors.textMuted, fontSize: 11 },
-        swatch: {
-            width: 24,
-            height: 24,
-            borderRadius: 8,
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            backgroundColor: colors.surfaceLighter,
-        },
-        pickerWrap: {
-            borderRadius: 10,
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            backgroundColor: colors.surface,
-            padding: 8,
-            gap: 6,
-        },
-        swatchGrid: {
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            gap: 7,
-        },
-        swatchOption: {
-            width: 22,
-            height: 22,
-            borderRadius: 8,
-            borderWidth: 1.5,
-            borderColor: colors.border,
-        },
-        swatchOptionSelected: {
-            borderColor: colors.primary.DEFAULT,
-            borderWidth: 2,
-        },
-        previewTitle: { color: colors.text, fontSize: 12, fontWeight: '900', marginBottom: 6 },
-        previewCard: {
-            borderRadius: 12,
-            borderWidth: 1.5,
-            padding: 9,
-            minHeight: 124,
-            justifyContent: 'space-between',
-            ...ThemeFx.shadowSm,
-        },
-        previewBtn: {
-            alignSelf: 'flex-start',
-            paddingHorizontal: 10,
-            paddingVertical: 5,
-            borderRadius: 999,
-            borderWidth: 1,
-        },
-        previewBtnText: { fontSize: 10, fontWeight: '900' },
-        statusCard: {
-            borderRadius: 11,
-            borderWidth: 1.5,
-            borderColor: colors.border,
-            backgroundColor: colors.surface,
-            padding: 9,
-            gap: 3,
-        },
-        liveFeedbackBanner: {
-            borderRadius: 10,
-            borderWidth: 1.5,
-            paddingHorizontal: 10,
-            paddingVertical: 7,
-            backgroundColor: colors.surface,
-        },
-        liveFeedbackOk: {
-            borderColor: withAlpha(colors.green, '66'),
-            backgroundColor: withAlpha(colors.green, '14'),
-        },
-        liveFeedbackWarn: {
-            borderColor: withAlpha(colors.yellow, '66'),
-            backgroundColor: withAlpha(colors.yellow, '14'),
-        },
-        liveFeedbackText: {
-            fontSize: 11,
-            fontWeight: '800',
-        },
-    }), [colors]);
+    const styles = useMemo(() => createThemeStudioStyles(colors), [colors]);
 
     const getStatusLabel = (status?: MarketplaceThemePackSummary['status']) => {
         switch (status) {
@@ -734,11 +427,13 @@ export function ThemeStudioPanel() {
     };
 
     const selectThemeForEdit = async (item: CatalogItem) => {
+        setEditorSelectedCatalogItem(item);
         if (item.isCore) {
             setSelectedThemeId(null);
             setName(item.name === 'Core Claro' ? 'Core Claro Remix' : 'Core Oscuro Remix');
             setLightFields(EMPTY_FIELDS);
             setDarkFields(EMPTY_FIELDS);
+            setEditorVisibility('private');
         } else {
             const draft = await ensureLocalDraftForItem(item);
             if (!draft) return;
@@ -747,19 +442,46 @@ export function ThemeStudioPanel() {
             setLightFields(patchToFields(draft.lightPatch));
             setDarkFields(patchToFields(draft.darkPatch));
         }
+        setEditorEntryReady(true);
         setStudioTab('editor');
         pushLiveFeedback(`Tema "${item.name}" listo para editar.`);
         await triggerSensoryFeedback('selection');
     };
 
     const createBlankTheme = async () => {
+        setEditorSelectedCatalogItem(null);
         setSelectedThemeId(null);
         setName('');
         setLightFields(EMPTY_FIELDS);
         setDarkFields(EMPTY_FIELDS);
+        setEditorVisibility('private');
         setApplyOnSave('both');
+        setEditorEntryReady(true);
         setStudioTab('editor');
         pushLiveFeedback('Nuevo tema en blanco listo para crear.', 'warn');
+        await triggerSensoryFeedback('selection');
+    };
+
+    const createNamedThemeFromEditor = async () => {
+        const nextName = newThemeNameInput.trim();
+        if (!nextName) {
+            notify.info('Nombre requerido', 'Ingresá un nombre para crear el tema.');
+            pushLiveFeedback('Ingresá un nombre antes de crear el tema.', 'warn');
+            await triggerSensoryFeedback('warning');
+            return;
+        }
+
+        setEditorSelectedCatalogItem(null);
+        setSelectedThemeId(null);
+        setName(nextName);
+        setLightFields(EMPTY_FIELDS);
+        setDarkFields(EMPTY_FIELDS);
+        setApplyOnSave('both');
+        setEditorVisibility('private');
+        setEditorEntryReady(true);
+        setNewThemeNameInput('');
+        setEditorThemeListExpanded(false);
+        pushLiveFeedback(`Nuevo tema "${nextName}" listo para editar.`);
         await triggerSensoryFeedback('selection');
     };
 
@@ -769,13 +491,26 @@ export function ThemeStudioPanel() {
             return;
         }
 
-        setSelectedThemeId(null);
-        setName(`${selectedDraft.name} Copy`);
-        setLightFields(patchToFields(selectedDraft.lightPatch));
-        setDarkFields(patchToFields(selectedDraft.darkPatch));
-        setStudioTab('editor');
-        pushLiveFeedback(`Copia preparada desde "${selectedDraft.name}".`);
-        await triggerSensoryFeedback('selection');
+        const proceed = async () => {
+            setEditorSelectedCatalogItem(null);
+            setSelectedThemeId(null);
+            setName(`${selectedDraft.name} Copy`);
+            setLightFields(patchToFields(selectedDraft.lightPatch));
+            setDarkFields(patchToFields(selectedDraft.darkPatch));
+            setEditorVisibility(themeMetaMap[selectedDraft.id]?.visibility ?? 'private');
+            setStudioTab('editor');
+            pushLiveFeedback(`Copia preparada desde "${selectedDraft.name}".`);
+            await triggerSensoryFeedback('selection');
+        };
+
+        confirm.ask(
+            'Duplicar tema',
+            `Se va a crear una copia editable de "${selectedDraft.name}".`,
+            () => {
+                void proceed();
+            },
+            'Duplicar'
+        );
     };
 
     const removeTheme = async () => {
@@ -784,33 +519,63 @@ export function ThemeStudioPanel() {
             return;
         }
 
-        await deleteThemeDraft(selectedDraft.id);
-        setSelectedThemeId(null);
-        setName('');
-        setLightFields(EMPTY_FIELDS);
-        setDarkFields(EMPTY_FIELDS);
+        const proceed = async () => {
+            await deleteThemeDraft(selectedDraft.id);
+            setEditorSelectedCatalogItem(null);
+            setSelectedThemeId(null);
+            setName('');
+            setLightFields(EMPTY_FIELDS);
+            setDarkFields(EMPTY_FIELDS);
 
-        const nextMeta = { ...themeMetaMap };
-        delete nextMeta[selectedDraft.id];
-        await persistThemeMeta(nextMeta);
+            const nextMeta = { ...themeMetaMap };
+            delete nextMeta[selectedDraft.id];
+            await persistThemeMeta(nextMeta);
 
-        notify.success('Tema eliminado', 'Se eliminó el tema local y se limpiaron asignaciones activas si aplicaba.');
-        pushLiveFeedback('Tema eliminado del catálogo local.', 'warn');
-        await triggerSensoryFeedback('warning');
+            notify.success('Tema eliminado', 'Se eliminó el tema local y se limpiaron asignaciones activas si aplicaba.');
+            pushLiveFeedback('Tema eliminado del catálogo local.', 'warn');
+            await triggerSensoryFeedback('warning');
+        };
+
+        confirm.destructive(
+            'Eliminar tema',
+            `Se eliminará "${selectedDraft.name}" y no se puede deshacer.`,
+            () => {
+                void proceed();
+            },
+            'Eliminar'
+        );
     };
 
     const saveTheme = async () => {
+        const trimmedName = name.trim();
+        if (!trimmedName) {
+            notify.error('Nombre requerido', 'Ingresá un nombre antes de guardar el tema.');
+            pushLiveFeedback('Falta nombre del tema.', 'warn');
+            await triggerSensoryFeedback('warning');
+            return;
+        }
+
         if (hasInvalidInputs) {
             notify.error('Color inválido', 'Corregí los valores HEX o RGB antes de guardar.');
             pushLiveFeedback('Hay colores inválidos en el editor.', 'warn');
             return;
         }
 
+        if (!selectedThemeId && !hasAnyValidColor) {
+            notify.info('Definí al menos un color', 'Para crear un tema nuevo, agregá al menos un color válido.');
+            pushLiveFeedback('Agregá al menos un color válido para crear el tema.', 'warn');
+            await triggerSensoryFeedback('warning');
+            return;
+        }
+
+        const nextLightFields = applyEditorSmartDefaults(lightFields, 'light', previewLight.colors as any);
+        const nextDarkFields = applyEditorSmartDefaults(darkFields, 'dark', previewDark.colors as any);
+
         const result = await saveThemeDraft({
             id: selectedThemeId ?? undefined,
-            name,
-            lightPatch: fieldsToPatch(lightFields),
-            darkPatch: fieldsToPatch(darkFields),
+            name: trimmedName,
+            lightPatch: fieldsToPatch(nextLightFields),
+            darkPatch: fieldsToPatch(nextDarkFields),
         });
 
         if (!result.ok) {
@@ -820,17 +585,91 @@ export function ThemeStudioPanel() {
         }
 
         setSelectedThemeId(result.draft.id);
+        setEditorSelectedCatalogItem({
+            id: result.draft.id,
+            name: result.draft.name,
+            source: 'community',
+            lightPatch: result.draft.lightPatch,
+            darkPatch: result.draft.darkPatch,
+            supportsLight: true,
+            supportsDark: true,
+            isCore: false,
+            isVerified: false,
+            origin: 'local',
+        });
 
         if (!themeMetaMap[result.draft.id]) {
             const nextMeta: Record<string, LocalThemeMeta> = {
                 ...themeMetaMap,
                 [result.draft.id]: {
-                    visibility: 'private',
+                    visibility: isEditingCoreTheme ? 'private' : editorVisibility,
                     isBanned: false,
                     commentsCount: 0,
+                    isCoreDerived: isEditingCoreTheme,
                 },
             };
             await persistThemeMeta(nextMeta);
+        } else {
+            const nextMeta: Record<string, LocalThemeMeta> = {
+                ...themeMetaMap,
+                [result.draft.id]: {
+                    ...(themeMetaMap[result.draft.id] ?? { isBanned: false, commentsCount: 0 }),
+                    visibility: isEditingCoreTheme ? 'private' : editorVisibility,
+                    isBanned: themeMetaMap[result.draft.id]?.isBanned ?? false,
+                    commentsCount: themeMetaMap[result.draft.id]?.commentsCount ?? 0,
+                    isCoreDerived: isEditingCoreTheme || themeMetaMap[result.draft.id]?.isCoreDerived === true,
+                },
+            };
+            await persistThemeMeta(nextMeta);
+        }
+
+        const effectiveVisibility: LocalThemeMeta['visibility'] = isEditingCoreTheme ? 'private' : editorVisibility;
+
+        if (!isEditingCoreTheme && effectiveVisibility !== 'private') {
+            const linkedRemoteId = findRemoteThemeIdByLocalDraftId(result.draft.id);
+            const payload = buildMarketplacePayloadFromDraft(result.draft);
+
+            try {
+                if (!linkedRemoteId) {
+                    const created = await SocialService.createMarketplaceThemePack({
+                        name: result.draft.name,
+                        description: `Tema creado en IronTrain (${effectiveVisibility === 'friends' ? 'solo amigos' : 'público'}).`,
+                        tags: ['irontrain', 'theme'],
+                        supportsLight: true,
+                        supportsDark: true,
+                        visibility: effectiveVisibility,
+                        payload,
+                    });
+
+                    await persistRemoteThemeLinks({
+                        ...remoteThemeLinks,
+                        [created.id]: result.draft.id,
+                    });
+
+                    pushLiveFeedback(
+                        effectiveVisibility === 'friends'
+                            ? 'Tema compartido para amigos en marketplace.'
+                            : 'Tema enviado a marketplace (público).'
+                    );
+                } else {
+                    await SocialService.createMarketplaceThemeVersion(linkedRemoteId, {
+                        payload,
+                        changelog: 'Actualización desde Theme Studio móvil',
+                    });
+                    await SocialService.updateMarketplaceThemePack(linkedRemoteId, {
+                        visibility: effectiveVisibility,
+                        name: result.draft.name,
+                    });
+
+                    pushLiveFeedback(
+                        effectiveVisibility === 'friends'
+                            ? 'Tema actualizado para visibilidad de amigos.'
+                            : 'Tema actualizado para visibilidad pública.'
+                    );
+                }
+            } catch {
+                pushLiveFeedback('Guardado local OK; no se pudo sincronizar marketplace.', 'warn');
+            }
         }
 
         if (applyOnSave === 'light' || applyOnSave === 'both') {
@@ -862,6 +701,22 @@ export function ThemeStudioPanel() {
 
     const toggleVisibility = async (themeId: string) => {
         const current = themeMetaMap[themeId] ?? { visibility: 'private', isBanned: false, commentsCount: 0 };
+
+        if (current.isCoreDerived) {
+            const next = {
+                ...themeMetaMap,
+                [themeId]: {
+                    ...current,
+                    visibility: 'private' as const,
+                    isCoreDerived: true,
+                },
+            };
+            await persistThemeMeta(next);
+            pushLiveFeedback('Los temas derivados de core mantienen visibilidad privada.', 'warn');
+            await triggerSensoryFeedback('warning');
+            return;
+        }
+
         const nextVisibility: LocalThemeMeta['visibility'] =
             current.visibility === 'private' ? 'friends' : current.visibility === 'friends' ? 'public' : 'private';
         const next = {
@@ -872,6 +727,16 @@ export function ThemeStudioPanel() {
             },
         };
         await persistThemeMeta(next);
+
+        const linkedRemoteId = findRemoteThemeIdByLocalDraftId(themeId);
+        if (linkedRemoteId) {
+            try {
+                await SocialService.updateMarketplaceThemePack(linkedRemoteId, { visibility: nextVisibility });
+            } catch {
+                pushLiveFeedback('Visibilidad local actualizada; marketplace pendiente de sincronizar.', 'warn');
+            }
+        }
+
         const visibilityLabel = next[themeId].visibility === 'public' ? 'público' : next[themeId].visibility === 'friends' ? 'amigos' : 'privado';
         pushLiveFeedback(`Visibilidad cambiada a ${visibilityLabel}.`);
         await triggerSensoryFeedback('selection');
@@ -879,16 +744,27 @@ export function ThemeStudioPanel() {
 
     const toggleBanned = async (themeId: string) => {
         const current = themeMetaMap[themeId] ?? { visibility: 'private', isBanned: false, commentsCount: 0 };
-        const next = {
-            ...themeMetaMap,
-            [themeId]: {
-                ...current,
-                isBanned: !current.isBanned,
+        confirm.ask(
+            current.isBanned ? 'Quitar baneo' : 'Marcar baneado',
+            current.isBanned
+                ? 'Se quitará la marca de baneo para este tema.'
+                : 'Se marcará este tema como baneado en tu catálogo local.',
+            () => {
+                void (async () => {
+                    const next = {
+                        ...themeMetaMap,
+                        [themeId]: {
+                            ...current,
+                            isBanned: !current.isBanned,
+                        },
+                    };
+                    await persistThemeMeta(next);
+                    pushLiveFeedback(next[themeId].isBanned ? 'Tema marcado como baneado.' : 'Tema restaurado.');
+                    await triggerSensoryFeedback(next[themeId].isBanned ? 'warning' : 'selection');
+                })();
             },
-        };
-        await persistThemeMeta(next);
-        pushLiveFeedback(next[themeId].isBanned ? 'Tema marcado como baneado.' : 'Tema restaurado.');
-        await triggerSensoryFeedback(next[themeId].isBanned ? 'warning' : 'selection');
+            current.isBanned ? 'Quitar baneo' : 'Marcar'
+        );
     };
 
     const openMarketplaceForTheme = async (item: CatalogItem) => {
@@ -936,8 +812,65 @@ export function ThemeStudioPanel() {
         await triggerSensoryFeedback('tapLight');
     };
 
+    const updateFieldFromHsl = async (fieldKey: EditableColorFieldKey, rawValue: string) => {
+        if (!rawValue.trim()) {
+            setActiveFields({ ...activeFields, [fieldKey]: '' });
+            pushLiveFeedback(`${fieldKey} limpiado.`, 'warn');
+            await triggerSensoryFeedback('tapLight');
+            return;
+        }
+
+        const parsed = parseHslInput(rawValue);
+        if (!parsed.ok) {
+            pushLiveFeedback('HSL inválido. Usá formato 210, 60, 50.', 'warn');
+            return;
+        }
+
+        setActiveFields({ ...activeFields, [fieldKey]: parsed.hex });
+        pushLiveFeedback(`${fieldKey} actualizado desde HSL.`);
+        await triggerSensoryFeedback('tapLight');
+    };
+
+    const setEditorThemeVisibility = async (visibility: LocalThemeMeta['visibility']) => {
+        if (isEditingCoreTheme) {
+            if (selectedThemeId) {
+                const current = themeMetaMap[selectedThemeId] ?? { visibility: 'private', isBanned: false, commentsCount: 0, isCoreDerived: true };
+                const next = {
+                    ...themeMetaMap,
+                    [selectedThemeId]: {
+                        ...current,
+                        visibility: 'private' as const,
+                        isCoreDerived: true,
+                    },
+                };
+                await persistThemeMeta(next);
+            }
+            setEditorVisibility('private');
+            pushLiveFeedback('La visibilidad del tema core es fija y no se puede cambiar.', 'warn');
+            await triggerSensoryFeedback('warning');
+            return;
+        }
+
+        setEditorVisibility(visibility);
+        if (selectedDraft) {
+            const current = themeMetaMap[selectedDraft.id] ?? { visibility: 'private', isBanned: false, commentsCount: 0 };
+            const next = {
+                ...themeMetaMap,
+                [selectedDraft.id]: {
+                    ...current,
+                    visibility,
+                },
+            };
+            await persistThemeMeta(next);
+        }
+        const label = visibility === 'public' ? 'público' : visibility === 'friends' ? 'amigos' : 'privado';
+        pushLiveFeedback(`Visibilidad del editor: ${label}.`);
+        await triggerSensoryFeedback('selection');
+    };
+
     const selectColorFromPicker = async (fieldKey: EditableColorFieldKey, value: string) => {
         setActiveFields({ ...activeFields, [fieldKey]: value });
+        setPickerField(null);
         pushLiveFeedback(`${fieldKey} seleccionado desde picker.`);
         await triggerSensoryFeedback('selection');
     };
@@ -963,476 +896,172 @@ export function ThemeStudioPanel() {
         );
     };
 
-    const renderThemeBadges = (item: CatalogItem, isActiveLight: boolean, isActiveDark: boolean) => {
+    const renderThemeSummaryLine = (item: CatalogItem, isActiveLight: boolean, isActiveDark: boolean) => {
         const localMeta = themeMetaMap[item.id] ?? { visibility: item.isCore ? 'public' : 'private', isBanned: false, commentsCount: 0 };
-        const visibility = item.origin === 'remote' ? (item.remoteVisibility ?? 'private') : localMeta.visibility;
+        const visibility = item.origin === 'remote'
+            ? (item.remoteVisibility ?? 'private')
+            : (localMeta.isCoreDerived ? 'private' : localMeta.visibility);
         const statusLabel = item.origin === 'remote'
             ? getStatusLabel(item.remoteStatus)
             : item.isVerified
                 ? 'Verificado'
                 : (localMeta.isBanned ? 'Baneado' : 'Sin verificar');
         const commentsCount = item.origin === 'remote' ? (item.remoteRatingCount ?? 0) : localMeta.commentsCount;
+        const sourceLabel = item.isCore ? 'Core' : (localMeta.isCoreDerived ? 'Core Remix' : 'Comunidad');
+        const visibilityLabel = visibility === 'public' ? 'Público' : visibility === 'friends' ? 'Amigos' : 'Privado';
+        const activeLabel = isActiveLight || isActiveDark
+            ? `${isActiveLight ? 'Claro' : '-'} · ${isActiveDark ? 'Oscuro' : '-'}`
+            : 'Sin activar';
+        const remoteSignals = item.origin === 'remote' ? ` · ${item.remoteDownloadsCount ?? 0} desc` : '';
+        const text = `${sourceLabel} · ${visibilityLabel} · ${statusLabel} · ${activeLabel} · ${commentsCount} com${remoteSignals}`;
 
         return (
-            <View style={[styles.row, { flexWrap: 'wrap' }]}>
-                <View style={styles.badge}><Text style={styles.badgeText}>{item.isCore ? 'Core' : 'Comunidad'}</Text></View>
-                <View style={styles.badge}><Text style={styles.badgeText}>{visibility === 'public' ? 'Público' : visibility === 'friends' ? 'Amigos' : 'Privado'}</Text></View>
-                <View style={styles.badge}><Text style={styles.badgeText}>{statusLabel}</Text></View>
-                {isActiveLight || isActiveDark ? <View style={styles.badge}><Text style={styles.badgeText}>{isActiveLight ? 'Claro' : '-'} · {isActiveDark ? 'Oscuro' : '-'}</Text></View> : null}
-                <View style={styles.badge}><Text style={styles.badgeText}>{commentsCount} comentarios</Text></View>
-            </View>
+            <Text numberOfLines={1} style={styles.compactMetaLine}>{text}</Text>
         );
     };
 
+    const activeFiltersCount =
+        (sourceFilter !== 'all' ? 1 : 0) +
+        (activeFilter !== 'all' ? 1 : 0) +
+        (statusFilter !== 'all' ? 1 : 0) +
+        (themeSearch.trim().length > 0 ? 1 : 0);
+
+    const onFeedbackSelection = () => {
+        void triggerSensoryFeedback('selection');
+    };
+
     const renderThemesTab = () => (
-        <View style={{ gap: 9 }}>
-            <View style={styles.statusCard}>
-                <Text style={styles.sectionLabel}>Estado</Text>
-                <Text style={styles.cardSub}>Tema seleccionado: {selectedDraft?.name ?? 'Nuevo tema sin guardar'}</Text>
-                <Text style={styles.cardSub}>Claro activo: {activeThemePackIdLight ? (themeDrafts.find((value) => value.id === activeThemePackIdLight)?.name ?? 'Custom') : 'Core'}</Text>
-                <Text style={styles.cardSub}>Oscuro activo: {activeThemePackIdDark ? (themeDrafts.find((value) => value.id === activeThemePackIdDark)?.name ?? 'Custom') : 'Core'}</Text>
-                <Text style={styles.cardSub}>Marketplace sincronizado: {isLoadingRemoteThemes ? 'actualizando...' : `${remoteThemes.length} temas`}</Text>
-            </View>
-
-            <View style={{ gap: 7 }}>
-                <Text style={styles.sectionLabel}>Filtros de catálogo</Text>
-                <View style={styles.row}>
-                    {([
-                        { id: 'all', label: 'Todo' },
-                        { id: 'core', label: 'Core' },
-                        { id: 'community', label: 'Comunidad' },
-                    ] as const).map((option) => (
-                        <TouchableOpacity
-                            key={option.id}
-                            style={[styles.chip, sourceFilter === option.id && styles.chipActive]}
-                            activeOpacity={0.85}
-                            onPress={() => {
-                                setSourceFilter(option.id);
-                                void triggerSensoryFeedback('selection');
-                            }}
-                        >
-                            <Text style={[styles.chipText, sourceFilter === option.id && styles.chipTextActive]}>{option.label}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-                <View style={styles.row}>
-                    {([
-                        { id: 'all', label: 'Todos' },
-                        { id: 'active', label: 'Activos' },
-                        { id: 'inactive', label: 'Inactivos' },
-                    ] as const).map((option) => (
-                        <TouchableOpacity
-                            key={option.id}
-                            style={[styles.chip, activeFilter === option.id && styles.chipActive]}
-                            activeOpacity={0.85}
-                            onPress={() => {
-                                setActiveFilter(option.id);
-                                void triggerSensoryFeedback('selection');
-                            }}
-                        >
-                            <Text style={[styles.chipText, activeFilter === option.id && styles.chipTextActive]}>{option.label}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-                <View style={[styles.row, { flexWrap: 'wrap' }]}>
-                    {([
-                        { id: 'all', label: 'Estado: todos' },
-                        { id: 'approved', label: 'Aprobados' },
-                        { id: 'pending_review', label: 'En revisión' },
-                        { id: 'draft', label: 'Borrador' },
-                        { id: 'suspended', label: 'Suspendido' },
-                    ] as const).map((option) => (
-                        <TouchableOpacity
-                            key={option.id}
-                            style={[styles.chip, statusFilter === option.id && styles.chipActive]}
-                            activeOpacity={0.85}
-                            onPress={() => {
-                                setStatusFilter(option.id);
-                                void triggerSensoryFeedback('selection');
-                            }}
-                        >
-                            <Text style={[styles.chipText, statusFilter === option.id && styles.chipTextActive]}>{option.label}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-                <TextInput
-                    value={themeSearch}
-                    onChangeText={setThemeSearch}
-                    style={styles.compactInput}
-                    placeholder="Buscar tema por nombre"
-                    placeholderTextColor={colors.textMuted}
-                />
-                <View style={styles.row}>
-                    <TouchableOpacity
-                        style={[styles.actionBtn, styles.grow]}
-                        activeOpacity={0.85}
-                        onPress={() => {
-                            void loadRemoteThemes(themeSearch);
-                        }}
-                    >
-                        <Text style={styles.actionBtnText}>{isLoadingRemoteThemes ? 'Sincronizando...' : 'Sincronizar marketplace'}</Text>
-                    </TouchableOpacity>
-                    {remoteThemeError ? <Text style={[styles.helperError, { flex: 1 }]}>{remoteThemeError}</Text> : null}
-                </View>
-            </View>
-
-            <View style={{ gap: 7 }}>
-                {filteredCatalog.map((item) => {
-                    const linkedDraftId = item.remoteId ? remoteThemeLinks[item.remoteId] : null;
-                    const candidateThemeId = linkedDraftId ?? item.id;
-                    const isActiveLight = item.isCore ? item.id === 'core-light' && activeThemePackIdLight === null : activeThemePackIdLight === candidateThemeId;
-                    const isActiveDark = item.isCore ? item.id === 'core-dark' && activeThemePackIdDark === null : activeThemePackIdDark === candidateThemeId;
-                    const isSelected = selectedThemeId === item.id || (linkedDraftId ? selectedThemeId === linkedDraftId : false);
-                    const meta = themeMetaMap[item.id] ?? { visibility: item.isCore ? 'public' : 'private', isBanned: false, commentsCount: 0 };
-
-                    return (
-                        <View key={item.id} style={styles.card}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Text style={styles.cardTitle}>{item.name}</Text>
-                                <Text style={styles.cardSub}>{isActiveLight ? 'Claro' : '-'} · {isActiveDark ? 'Oscuro' : '-'}</Text>
-                            </View>
-
-                            {renderThemeBadges(item, isActiveLight, isActiveDark)}
-
-                            <View style={styles.row}>
-                                <TouchableOpacity
-                                    style={[styles.actionBtn, styles.grow, isSelected && styles.actionBtnPrimary]}
-                                    activeOpacity={0.85}
-                                    onPress={() => {
-                                        void selectThemeForEdit(item);
-                                    }}
-                                >
-                                    <Text style={[styles.actionBtnText, isSelected && styles.actionBtnTextPrimary]}>Editar</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.actionBtn, styles.grow, isActiveLight && styles.actionBtnPrimary]}
-                                    activeOpacity={0.85}
-                                    onPress={() => {
-                                        void assignTheme('light', item);
-                                    }}
-                                >
-                                    <Text style={[styles.actionBtnText, isActiveLight && styles.actionBtnTextPrimary]}>Activar Claro</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.actionBtn, styles.grow, isActiveDark && styles.actionBtnPrimary]}
-                                    activeOpacity={0.85}
-                                    onPress={() => {
-                                        void assignTheme('dark', item);
-                                    }}
-                                >
-                                    <Text style={[styles.actionBtnText, isActiveDark && styles.actionBtnTextPrimary]}>Activar Oscuro</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            <View style={styles.row}>
-                                <TouchableOpacity
-                                    style={styles.actionBtn}
-                                    activeOpacity={0.85}
-                                    onPress={() => {
-                                        void openMarketplaceForTheme(item);
-                                    }}
-                                >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <ExternalLink size={12} color={colors.textMuted} />
-                                        <Text style={styles.actionBtnText}>Marketplace</Text>
-                                    </View>
-                                </TouchableOpacity>
-
-                                {!item.isCore && item.origin !== 'remote' ? (
-                                    <>
-                                        <TouchableOpacity
-                                            style={styles.actionBtn}
-                                            activeOpacity={0.85}
-                                            onPress={() => {
-                                                void toggleVisibility(item.id);
-                                            }}
-                                        >
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                <Globe size={12} color={colors.textMuted} />
-                                                <Text style={styles.actionBtnText}>
-                                                    {meta.visibility === 'private'
-                                                        ? 'Pasar a amigos'
-                                                        : meta.visibility === 'friends'
-                                                            ? 'Pasar a público'
-                                                            : 'Pasar a privado'}
-                                                </Text>
-                                            </View>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={styles.actionBtn}
-                                            activeOpacity={0.85}
-                                            onPress={() => {
-                                                void toggleBanned(item.id);
-                                            }}
-                                        >
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                <Ban size={12} color={colors.textMuted} />
-                                                <Text style={styles.actionBtnText}>{meta.isBanned ? 'Quitar baneo' : 'Marcar baneado'}</Text>
-                                            </View>
-                                        </TouchableOpacity>
-                                    </>
-                                ) : null}
-
-                                {!item.isCore && item.origin === 'remote' ? (
-                                    <View style={{ justifyContent: 'center' }}>
-                                        <Text style={styles.colorRowSub}>Estado y visibilidad tomados del backend.</Text>
-                                    </View>
-                                ) : null}
-                            </View>
-                        </View>
-                    );
-                })}
-            </View>
-
-            <View style={styles.row}>
-                <TouchableOpacity style={[styles.actionBtn, styles.grow]} activeOpacity={0.85} onPress={() => { void createBlankTheme(); }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Palette size={12} color={colors.textMuted} />
-                        <Text style={styles.actionBtnText}>Nuevo tema</Text>
-                    </View>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionBtn, styles.grow]} activeOpacity={0.85} onPress={() => { void duplicateTheme(); }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <CopyPlus size={12} color={colors.textMuted} />
-                        <Text style={styles.actionBtnText}>Duplicar tema</Text>
-                    </View>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionBtn, styles.grow]} activeOpacity={0.85} onPress={() => { void removeTheme(); }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Trash2 size={12} color={colors.red} />
-                        <Text style={styles.actionBtnText}>Eliminar tema</Text>
-                    </View>
-                </TouchableOpacity>
-            </View>
-        </View>
+        <ThemeStudioThemesTab
+            styles={styles}
+            colors={colors}
+            selectedDraft={selectedDraft}
+            themeDrafts={themeDrafts}
+            activeThemePackIdLight={activeThemePackIdLight}
+            activeThemePackIdDark={activeThemePackIdDark}
+            isLoadingRemoteThemes={isLoadingRemoteThemes}
+            remoteThemesCount={remoteThemes.length}
+            sourceFilter={sourceFilter}
+            activeFilter={activeFilter}
+            statusFilter={statusFilter}
+            themeSearch={themeSearch}
+            filtersExpanded={filtersExpanded}
+            activeFiltersCount={activeFiltersCount}
+            remoteThemeError={remoteThemeError}
+            filteredCatalog={filteredCatalog}
+            remoteThemeLinks={remoteThemeLinks}
+            selectedThemeId={selectedThemeId}
+            themeMetaMap={themeMetaMap}
+            expandedActionsThemeId={expandedActionsThemeId}
+            localMarketplaceStateByDraftId={localMarketplaceStateByDraftId}
+            onFeedbackSelection={onFeedbackSelection}
+            onLoadRemoteThemes={(query) => {
+                void loadRemoteThemes(query);
+            }}
+            onSetFiltersExpanded={setFiltersExpanded}
+            onSetSourceFilter={setSourceFilter}
+            onSetActiveFilter={setActiveFilter}
+            onSetStatusFilter={setStatusFilter}
+            onSetThemeSearch={setThemeSearch}
+            onSelectThemeForEdit={(item) => {
+                void selectThemeForEdit(item);
+            }}
+            onAssignTheme={(mode, item) => {
+                void assignTheme(mode, item);
+            }}
+            onSetExpandedActionsThemeId={setExpandedActionsThemeId}
+            onOpenMarketplaceForTheme={(item) => {
+                void openMarketplaceForTheme(item);
+            }}
+            onToggleVisibility={(themeId) => {
+                void toggleVisibility(themeId);
+            }}
+            onToggleBanned={(themeId) => {
+                void toggleBanned(themeId);
+            }}
+            onCreateBlankTheme={() => {
+                void createBlankTheme();
+            }}
+            onDuplicateTheme={() => {
+                void duplicateTheme();
+            }}
+            onRemoveTheme={() => {
+                void removeTheme();
+            }}
+            renderThemeSummaryLine={renderThemeSummaryLine}
+        />
     );
 
     const renderEditorTab = () => (
-        <View style={{ gap: 9 }}>
-            <View style={styles.card}>
-                <Text style={styles.sectionLabel}>Editor del tema</Text>
-                <Text style={styles.cardSub}>Definí nombre, paleta y aplicación automática al guardar.</Text>
-
-                <View style={{ gap: 6 }}>
-                    <Text style={styles.colorRowSub}>Selector de tema</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                        <TouchableOpacity
-                            style={[styles.chip, selectedThemeId === null && styles.chipActive]}
-                            onPress={() => { void createBlankTheme(); }}
-                            activeOpacity={0.85}
-                        >
-                            <Text style={[styles.chipText, selectedThemeId === null && styles.chipTextActive]}>Nuevo</Text>
-                        </TouchableOpacity>
-                        {themeDrafts.map((draft) => {
-                            const selected = selectedThemeId === draft.id;
-                            return (
-                                <TouchableOpacity
-                                    key={draft.id}
-                                    style={[styles.chip, selected && styles.chipActive]}
-                                    onPress={() => {
-                                        const item: CatalogItem = {
-                                            id: draft.id,
-                                            name: draft.name,
-                                            source: 'community',
-                                            lightPatch: draft.lightPatch,
-                                            darkPatch: draft.darkPatch,
-                                            supportsLight: true,
-                                            supportsDark: true,
-                                            isCore: false,
-                                            isVerified: false,
-                                            origin: 'local',
-                                        };
-                                        void selectThemeForEdit(item);
-                                    }}
-                                    activeOpacity={0.85}
-                                >
-                                    <Text style={[styles.chipText, selected && styles.chipTextActive]}>{draft.name}</Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </ScrollView>
-                </View>
-
-                <TextInput
-                    value={name}
-                    onChangeText={setName}
-                    style={styles.input}
-                    placeholder="Nombre del tema"
-                    placeholderTextColor={colors.textMuted}
-                />
-
-                <View style={styles.row}>
-                    <TouchableOpacity
-                        style={[styles.modeBtn, styles.grow, editorMode === 'light' && styles.modeBtnActive]}
-                        onPress={() => {
-                            setEditorMode('light');
-                            void triggerSensoryFeedback('selection');
-                        }}
-                        activeOpacity={0.85}
-                    >
-                        <Sun size={15} color={editorMode === 'light' ? colors.primary.DEFAULT : colors.textMuted} />
-                        <Text style={[styles.modeBtnText, editorMode === 'light' && styles.modeBtnTextActive]}>Modo Claro</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.modeBtn, styles.grow, editorMode === 'dark' && styles.modeBtnActive]}
-                        onPress={() => {
-                            setEditorMode('dark');
-                            void triggerSensoryFeedback('selection');
-                        }}
-                        activeOpacity={0.85}
-                    >
-                        <Moon size={15} color={editorMode === 'dark' ? colors.primary.DEFAULT : colors.textMuted} />
-                        <Text style={[styles.modeBtnText, editorMode === 'dark' && styles.modeBtnTextActive]}>Modo Oscuro</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View style={[styles.statusCard, { marginTop: 2 }]}> 
-                    <Text style={styles.cardSub}>Editando ahora: {editorMode === 'light' ? 'Paleta clara' : 'Paleta oscura'}</Text>
-                    <Text style={styles.cardSub}>
-                        Al guardar: {applyOnSave === 'both' ? 'aplicar en claro + oscuro' : applyOnSave === 'light' ? 'aplicar en claro' : applyOnSave === 'dark' ? 'aplicar en oscuro' : 'solo guardar'}
-                    </Text>
-                </View>
-            </View>
-
-            <View style={{ gap: 7 }}>
-                {COLOR_FIELD_META.map((field) => {
-                    const value = activeFields[field.key];
-                    const valid = !value || isValidHexColor(value);
-                    const rgbText = hexToRgbInput(value);
-                    const pickerOpen = pickerField === field.key;
-
-                    return (
-                        <View key={field.key} style={styles.colorRow}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.colorRowTitle}>{field.label}</Text>
-                                    <Text style={styles.colorRowSub}>{field.description}</Text>
-                                </View>
-                                <TouchableOpacity
-                                    style={[styles.swatch, { backgroundColor: valid && value ? value : colors.surfaceLighter }]}
-                                    activeOpacity={0.85}
-                                    onPress={() => {
-                                        setPickerField((current) => (current === field.key ? null : field.key));
-                                        void triggerSensoryFeedback('selection');
-                                    }}
-                                />
-                            </View>
-
-                            <View style={styles.row}>
-                                <View style={styles.grow}>
-                                    <Text style={[styles.colorRowSub, { marginBottom: 4 }]}>HEX</Text>
-                                    <TextInput
-                                        value={value}
-                                        onChangeText={(next) => { void updateFieldFromHex(field.key, next); }}
-                                        style={styles.compactInput}
-                                        autoCapitalize="characters"
-                                        autoCorrect={false}
-                                        placeholder="#RRGGBB"
-                                        placeholderTextColor={colors.textMuted}
-                                    />
-                                </View>
-                                <View style={styles.grow}>
-                                    <Text style={[styles.colorRowSub, { marginBottom: 4 }]}>RGB</Text>
-                                    <TextInput
-                                        value={rgbText}
-                                        onChangeText={(next) => { void updateFieldFromRgb(field.key, next); }}
-                                        style={styles.compactInput}
-                                        autoCapitalize="none"
-                                        autoCorrect={false}
-                                        placeholder="255, 255, 255"
-                                        placeholderTextColor={colors.textMuted}
-                                    />
-                                </View>
-                            </View>
-
-                            {pickerOpen ? (
-                                <View style={styles.pickerWrap}>
-                                    <Text style={styles.colorRowSub}>Picker rápido</Text>
-                                    <View style={styles.swatchGrid}>
-                                        {swatchOptions.map((swatchValue) => {
-                                            const selected = value.toUpperCase() === swatchValue.toUpperCase();
-                                            return (
-                                                <TouchableOpacity
-                                                    key={`${field.key}-${swatchValue}`}
-                                                    style={[styles.swatchOption, { backgroundColor: swatchValue }, selected && styles.swatchOptionSelected]}
-                                                    activeOpacity={0.8}
-                                                    onPress={() => {
-                                                        void selectColorFromPicker(field.key, swatchValue);
-                                                    }}
-                                                />
-                                            );
-                                        })}
-                                    </View>
-                                </View>
-                            ) : null}
-
-                            <Text style={valid ? styles.helperOk : styles.helperError}>
-                                {valid ? 'Formato válido' : 'Formato inválido. Usá #RRGGBB, #RRGGBBAA o RGB'}
-                            </Text>
-                        </View>
-                    );
-                })}
-            </View>
-
-            <View style={{ gap: 7 }}>
-                <Text style={styles.sectionLabel}>Vista previa en vivo</Text>
-                <View style={styles.row}>
-                    {renderPreviewCard('light', 'Preview Claro', previewLight.colors)}
-                    {renderPreviewCard('dark', 'Preview Oscuro', previewDark.colors)}
-                </View>
-            </View>
-
-            <View style={{ gap: 7 }}>
-                <Text style={styles.sectionLabel}>Al guardar</Text>
-                <View style={[styles.row, { flexWrap: 'wrap' }]}>
-                    {([
-                        { id: 'none', label: 'Solo guardar', icon: SunMoon },
-                        { id: 'light', label: 'Activar Claro', icon: Sun },
-                        { id: 'dark', label: 'Activar Oscuro', icon: Moon },
-                        { id: 'both', label: 'Activar ambos', icon: SunMoon },
-                    ] as const).map((option) => {
-                        const Icon = option.icon;
-                        const isActive = applyOnSave === option.id;
-                        return (
-                            <TouchableOpacity
-                                key={option.id}
-                                style={[styles.chip, isActive && styles.chipActive]}
-                                onPress={() => {
-                                    setApplyOnSave(option.id);
-                                    void triggerSensoryFeedback('selection');
-                                }}
-                                activeOpacity={0.85}
-                            >
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Icon size={12} color={isActive ? colors.primary.DEFAULT : colors.textMuted} />
-                                    <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{option.label}</Text>
-                                </View>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </View>
-            </View>
-
-            <TouchableOpacity
-                onPress={() => { void saveTheme(); }}
-                style={{
-                    borderRadius: 11,
-                    backgroundColor: colors.primary.DEFAULT,
-                    borderWidth: 1.5,
-                    borderColor: colors.primary.dark,
-                    paddingVertical: 12,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'row',
-                    gap: 8,
-                }}
-                activeOpacity={0.86}
-            >
-                <Save size={15} color={colors.onPrimary} />
-                <Text style={{ color: colors.onPrimary, fontWeight: '900', fontSize: 14 }}>Guardar tema</Text>
-                <Check size={13} color={colors.onPrimary} />
-            </TouchableOpacity>
-        </View>
+        <ThemeStudioEditorTab
+            styles={styles}
+            colors={colors}
+            name={name}
+            setName={setName}
+            editorThemeListExpanded={editorThemeListExpanded}
+            setEditorThemeListExpanded={setEditorThemeListExpanded}
+            newThemeNameInput={newThemeNameInput}
+            setNewThemeNameInput={setNewThemeNameInput}
+            editorSelectableThemes={editorSelectableThemes}
+            selectedThemeId={selectedThemeId}
+            editorMode={editorMode}
+            setEditorMode={setEditorMode}
+            applyOnSave={applyOnSave}
+            setApplyOnSave={setApplyOnSave}
+            editorAdvancedExpanded={editorAdvancedExpanded}
+            setEditorAdvancedExpanded={setEditorAdvancedExpanded}
+            editorVisibilityExpanded={editorVisibilityExpanded}
+            setEditorVisibilityExpanded={setEditorVisibilityExpanded}
+            editorVisibility={editorVisibility}
+            selectedDraft={selectedDraft}
+            colorFieldMeta={COLOR_FIELD_META}
+            activeFields={activeFields}
+            pickerField={pickerField}
+            hasInvalidInputs={hasInvalidInputs}
+            validColorCount={validColorCount}
+            isCreationFlow={isCreationFlow}
+            canSaveTheme={canSaveTheme}
+            saveDisabledReason={saveDisabledReason}
+            editorEntryReady={editorEntryReady}
+            hasUnsavedNewDraft={hasUnsavedNewDraft}
+            isEditingCoreTheme={isEditingCoreTheme}
+            selectedEditorThemeKey={editorSelectedCatalogItem?.id ?? selectedThemeId}
+            previewLightColors={previewLight.colors}
+            previewDarkColors={previewDark.colors}
+            onFeedbackSelection={onFeedbackSelection}
+            onCreateNamedThemeFromEditor={() => {
+                void createNamedThemeFromEditor();
+            }}
+            onCreateBlankTheme={() => {
+                void createBlankTheme();
+            }}
+            onRequestThemeSwitch={requestThemeSwitch}
+            onSelectThemeForEdit={(item) => {
+                void selectThemeForEdit(item);
+            }}
+            onSetEditorThemeVisibility={(visibility) => {
+                void setEditorThemeVisibility(visibility);
+            }}
+            onSetPickerField={setPickerField}
+            onUpdateFieldFromHex={(fieldKey, next) => {
+                void updateFieldFromHex(fieldKey, next);
+            }}
+            onUpdateFieldFromRgb={(fieldKey, next) => {
+                void updateFieldFromRgb(fieldKey, next);
+            }}
+            onUpdateFieldFromHsl={(fieldKey, next) => {
+                void updateFieldFromHsl(fieldKey, next);
+            }}
+            onSaveTheme={() => {
+                void saveTheme();
+            }}
+            onSelectColorFromPicker={(fieldKey, color) => {
+                void selectColorFromPicker(fieldKey, color);
+            }}
+            hexToRgbInput={hexToRgbInput}
+            hexToHslInput={hexToHslInput}
+            isValidHexColor={isValidHexColor}
+            renderPreviewCard={renderPreviewCard}
+        />
     );
 
     return (
@@ -1471,50 +1100,6 @@ export function ThemeStudioPanel() {
             <View style={styles.statusCard}>
                 <Text style={styles.sectionLabel}>Modo de app actual</Text>
                 <Text style={styles.cardSub}>{effectiveMode === 'light' ? 'Claro' : 'Oscuro'}</Text>
-                <View style={styles.row}>
-                    <TouchableOpacity
-                        style={[styles.actionBtn, styles.grow]}
-                        activeOpacity={0.85}
-                        onPress={() => {
-                            const coreLight = {
-                                id: 'core-light',
-                                name: 'Core Claro',
-                                source: 'core' as const,
-                                lightPatch: {},
-                                darkPatch: {},
-                                supportsLight: true,
-                                supportsDark: false,
-                                isCore: true,
-                                isVerified: true,
-                                origin: 'core' as const,
-                            };
-                            void assignTheme('light', coreLight);
-                        }}
-                    >
-                        <Text style={styles.actionBtnText}>Restablecer Claro</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.actionBtn, styles.grow]}
-                        activeOpacity={0.85}
-                        onPress={() => {
-                            const coreDark = {
-                                id: 'core-dark',
-                                name: 'Core Oscuro',
-                                source: 'core' as const,
-                                lightPatch: {},
-                                darkPatch: {},
-                                supportsLight: false,
-                                supportsDark: true,
-                                isCore: true,
-                                isVerified: true,
-                                origin: 'core' as const,
-                            };
-                            void assignTheme('dark', coreDark);
-                        }}
-                    >
-                        <Text style={styles.actionBtnText}>Restablecer Oscuro</Text>
-                    </TouchableOpacity>
-                </View>
             </View>
         </View>
     );

@@ -127,6 +127,11 @@ export async function POST(req: NextRequest) {
         const slugBase = slugifyThemeName(parsed.data.name);
         const slug = await resolveUniqueThemeSlug(slugBase);
         const tags = normalizeTags(parsed.data.tags ?? []);
+        const initialStatus = parsed.data.visibility === 'public'
+            ? 'pending_review'
+            : parsed.data.visibility === 'friends'
+                ? 'approved'
+                : 'draft';
 
         await db.transaction(async (tx: any) => {
             await tx.insert(schema.themePacks).values({
@@ -139,7 +144,7 @@ export async function POST(req: NextRequest) {
                 supportsLight: parsed.data.supportsLight,
                 supportsDark: parsed.data.supportsDark,
                 visibility: parsed.data.visibility,
-                status: 'draft',
+                status: initialStatus,
                 currentVersion: 1,
                 createdAt: now,
                 updatedAt: now,

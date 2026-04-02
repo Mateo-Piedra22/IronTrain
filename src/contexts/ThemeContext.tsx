@@ -127,8 +127,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const setActiveThemePackId = async (mode: 'light' | 'dark', themePackId: string | null) => {
         const normalized = typeof themePackId === 'string' && themePackId.trim() ? themePackId.trim() : null;
-        const knownIds = new Set(sanitizedThemeDrafts.map((draft) => draft.id));
-        const validated = normalized && knownIds.has(normalized) ? normalized : null;
+        const validated = normalized;
 
         if (mode === 'light') {
             setActiveThemePackIdLight(validated);

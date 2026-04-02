@@ -120,6 +120,7 @@ function GlobalConfirmModal() {
 
 function MainAppContent({ dbInitialized, fontsLoaded, fontError, installedVersion, latestVersion, downloadUrl, notesUrl, initError, onRetryInit }: any) {
   const { activeTheme, currentNavTheme, statusBarStyle } = useTheme();
+  const themeRenderKey = `${activeTheme.id}-${activeTheme.mode}`;
   const updateStatus = useUpdateStore((state) => state.status);
   const { needsInitialSync, setNeedsInitialSync, token: authToken } = useAuthStore();
   const [syncModalVisible, setSyncModalVisible] = useState(false);
@@ -253,7 +254,7 @@ function MainAppContent({ dbInitialized, fontsLoaded, fontError, installedVersio
   }
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <NavigationThemeProvider value={currentNavTheme}>
+      <NavigationThemeProvider key={themeRenderKey} value={currentNavTheme}>
         <StatusBar style={statusBarStyle} backgroundColor={activeTheme.colors.background} />
         <SyncingOverlay
           visible={isSyncingInitial}

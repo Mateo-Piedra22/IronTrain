@@ -1,7 +1,8 @@
 'use client';
 
 import { AlertTriangle, CheckCircle2, Clock3, Shield, Slash, Undo2 } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import { handleThemeModerationAction } from '../actions';
 
 type ThemePackModerationItem = {
@@ -56,12 +57,40 @@ function shortDate(value: string | null): string {
 }
 
 export default function ThemesModerationPanel({ themes, reports }: ThemesModerationPanelProps) {
+    const router = useRouter();
     const searchParams = useSearchParams();
+    const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+    const [refreshSeconds, setRefreshSeconds] = useState(12);
+    const [lastRefreshAt, setLastRefreshAt] = useState<Date>(new Date());
     const activeSection = (searchParams.get('section') as 'queue' | 'reports') || 'queue';
     const activeSource = (searchParams.get('source') as 'all' | 'system' | 'community') || 'all';
 
     const pendingQueue = themes.filter((item) => item.status === 'pending_review');
     const systemCount = themes.filter((item) => item.isSystem).length;
+
+    useEffect(() => {
+        setLastRefreshAt(new Date());
+    }, [themes, reports]);
+
+    useEffect(() => {
+        if (!autoRefreshEnabled) return;
+
+        const timer = setInterval(() => {
+            router.refresh();
+        }, refreshSeconds * 1000);
+
+        return () => clearInterval(timer);
+    }, [autoRefreshEnabled, refreshSeconds, router]);
+
+    const lastRefreshLabel = useMemo(
+        () =>
+            lastRefreshAt.toLocaleTimeString('es-AR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            }),
+        [lastRefreshAt],
+    );
 
     return (
         <div className="space-y-10">
@@ -99,6 +128,36 @@ export default function ThemesModerationPanel({ themes, reports }: ThemesModerat
                 >
                     COMMUNITY ({themes.length - systemCount})
                 </a>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 border border-[#1a1a2e]/20 bg-white p-2">
+                <button
+                    type="button"
+                    onClick={() => setAutoRefreshEnabled((value) => !value)}
+                    className={`h-8 px-3 border font-black uppercase text-[9px] tracking-wider transition-all ${autoRefreshEnabled ? 'border-[#1a1a2e] bg-[#1a1a2e] text-[#f5f1e8]' : 'border-[#1a1a2e]/30 bg-white text-[#1a1a2e]'}`}
+                >
+                    {autoRefreshEnabled ? 'REALTIME_ON' : 'REALTIME_OFF'}
+                </button>
+
+                <select
+                    value={refreshSeconds}
+                    onChange={(event) => setRefreshSeconds(Number(event.target.value))}
+                    className="h-8 px-2 border border-[#1a1a2e]/30 text-[10px] font-black uppercase bg-white"
+                >
+                    <option value={8}>8s</option>
+                    <option value={12}>12s</option>
+                    <option value={20}>20s</option>
+                </select>
+
+                <button
+                    type="button"
+                    onClick={() => router.refresh()}
+                    className="h-8 px-3 border border-[#1a1a2e] bg-[#f5f1e8] hover:bg-[#1a1a2e] hover:text-[#f5f1e8] font-black uppercase text-[9px] tracking-wider transition-all"
+                >
+                    REFRESH_NOW
+                </button>
+
+                <span className="text-[9px] font-black uppercase tracking-wider text-[#1a1a2e]/60">LAST_SYNC {lastRefreshLabel}</span>
             </div>
 
             {activeSection === 'queue' && (

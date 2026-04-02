@@ -228,11 +228,28 @@ export default async function AdminPage({
         officialCategoriesRaw = categories;
         officialBadgesRaw = badges;
     } else if (activeTab === 'themes-moderation') {
-        const sourceFilterSql = themeSourceFilter === 'system'
-            ? eq(schema.themePacks.isSystem, true)
-            : themeSourceFilter === 'community'
-                ? eq(schema.themePacks.isSystem, false)
-                : sql`1=1`;
+        const hasThemeIsSystemColumnResult = await db.execute(sql<{
+            exists: boolean;
+        }>`
+            select exists (
+                select 1
+                from information_schema.columns
+                where table_schema = 'public'
+                  and table_name = 'theme_packs'
+                  and column_name = 'is_system'
+            ) as "exists"
+        `);
+
+        const hasThemeIsSystemColumn = Boolean((hasThemeIsSystemColumnResult as any)?.rows?.[0]?.exists);
+        const themeIsSystemExpr = hasThemeIsSystemColumn ? schema.themePacks.isSystem : sql<boolean>`false`;
+
+        const sourceFilterSql = !hasThemeIsSystemColumn
+            ? (themeSourceFilter === 'all' ? sql`1=1` : sql`false`)
+            : themeSourceFilter === 'system'
+                ? eq(schema.themePacks.isSystem, true)
+                : themeSourceFilter === 'community'
+                    ? eq(schema.themePacks.isSystem, false)
+                    : sql`1=1`;
 
         const [packs, reports] = await Promise.all([
             db.select({
@@ -241,7 +258,7 @@ export default async function AdminPage({
                 ownerId: schema.themePacks.ownerId,
                 ownerUsername: schema.userProfiles.username,
                 name: schema.themePacks.name,
-                isSystem: schema.themePacks.isSystem,
+                isSystem: themeIsSystemExpr,
                 visibility: schema.themePacks.visibility,
                 status: schema.themePacks.status,
                 moderationMessage: schema.themePacks.moderationMessage,
@@ -275,7 +292,7 @@ export default async function AdminPage({
                 themeSlug: schema.themePacks.slug,
                 themeName: schema.themePacks.name,
                 themeStatus: schema.themePacks.status,
-                themeIsSystem: schema.themePacks.isSystem,
+                themeIsSystem: themeIsSystemExpr,
                 ownerId: schema.themePacks.ownerId,
             })
                 .from(schema.themePackReports)

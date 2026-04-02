@@ -392,6 +392,16 @@ export interface MarketplaceThemePackDetail extends MarketplaceThemePackSummary 
     moderationMessage?: string | null;
 }
 
+export interface CreateMarketplaceThemePackInput {
+    name: string;
+    description?: string;
+    tags?: string[];
+    supportsLight: boolean;
+    supportsDark: boolean;
+    visibility: MarketplaceThemeVisibility;
+    payload: MarketplaceThemePackPayload;
+}
+
 export class SocialApiError extends Error {
     status: number;
     code?: string;
@@ -1152,6 +1162,50 @@ export class SocialService {
         const data = await this.request<{ item: MarketplaceThemePackDetail }>(
             `${API_URL}/api/social/themes/${encodeURIComponent(themeId)}`,
             { headers },
+        );
+        return data.item;
+    }
+
+    static async createMarketplaceThemePack(input: CreateMarketplaceThemePackInput): Promise<MarketplaceThemePackSummary> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ item: MarketplaceThemePackSummary }>(
+            `${API_URL}/api/social/themes`,
+            {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(input),
+            },
+        );
+        return data.item;
+    }
+
+    static async createMarketplaceThemeVersion(themeId: string, input: { payload: MarketplaceThemePackPayload; changelog?: string }): Promise<{ success: boolean; version: number }> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ success: boolean; version: number }>(
+            `${API_URL}/api/social/themes/${encodeURIComponent(themeId)}/version`,
+            {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(input),
+            },
+        );
+        return data;
+    }
+
+    static async updateMarketplaceThemePack(themeId: string, input: {
+        visibility?: MarketplaceThemeVisibility;
+        name?: string;
+        description?: string;
+        tags?: string[];
+    }): Promise<MarketplaceThemePackSummary> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ item: MarketplaceThemePackSummary }>(
+            `${API_URL}/api/social/themes/${encodeURIComponent(themeId)}`,
+            {
+                method: 'PATCH',
+                headers,
+                body: JSON.stringify(input),
+            },
         );
         return data.item;
     }
