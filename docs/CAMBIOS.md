@@ -1,6 +1,22 @@
-# Cambios
+# Política de cambios
 
-Este archivo queda deprecado a favor de:
-- [CHANGELOG.md](file:///c:/Users/mateo/OneDrive/Escritorio/Work/Programas/IronTrain/docs/CHANGELOG.md)
+Este documento define cómo introducir cambios en IronTrain sin degradar estabilidad.
 
-Si necesitás registrar cambios con mayor granularidad (por versión), extender el changelog con secciones `vX.Y.Z`.
+## Reglas
+
+1. Todo cambio entra por PR.
+2. Toda PR debe pasar CI y checks de seguridad.
+3. Cambios de datos requieren estrategia de rollback.
+4. Cambios visibles al usuario requieren documentación.
+
+## Tipos de cambio
+
+- **Patch:** fixes sin cambio de comportamiento público relevante.
+- **Minor:** nuevas capacidades backward-compatible.
+- **Major:** cambios con impacto de compatibilidad o migración.
+
+## Checklist previo a merge
+
+- Tests + typecheck en verde.
+- Riesgos documentados.
+- Docs actualizadas.

@@ -63,7 +63,7 @@ export default function ShareRoutineScreen() {
 
         setImporting(true);
         try {
-            await routineService.importSharedRoutine(payload);
+            await routineService.syncSharedRoutinePayload(payload);
             analytics.capture('routine_imported', { source: 'link', routine_id: id });
             notify.success('Rutina Importada', 'Se ha guardado en tus rutinas exitosamente.');
             router.dismissAll();

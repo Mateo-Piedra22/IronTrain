@@ -1,228 +1,158 @@
-# Runbook (Enterprise) – IronTrain
+# Runbook operacional
 
-Este documento define el flujo operativo estándar para mantener **App** y **Website** en producción.
+## Documentos relacionados
 
-## Principios
+- [Arquitectura](ARCHITECTURE.md)
+- [Seguridad y privacidad](SECURITY_PRIVACY.md)
 
-- Una sola fuente de verdad para el changelog: `docs/CHANGELOG.md`.
-- La web se despliega en Vercel y se actualiza por push a git.
-- La app detecta updates vía `https://irontrain.motiona.xyz/releases.json`.
+## 1) Propósito
 
----
+Este runbook define cómo diagnosticar, contener y recuperar incidentes operativos en IronTrain, con foco en:
 
-# App (IronTrain)
+- CI/CD.
+- Releases Android.
+- Sincronización social/rutinas compartidas.
+- Seguridad.
 
-## Comandos (dev)
+## 2) Convenciones de respuesta
 
-- Instalar dependencias: `npm install`
-- Levantar (watch changelog + expo): `npm start`
-- Levantar Android: `npm run android`
-- Levantar iOS: `npm run ios`
-- Levantar web: `npm run web`
-- Reiniciar Metro (limpiar cache): `npx expo start -c`
-- Doctor (salud del proyecto): `npx expo-doctor`
+## 2.1 Severidad
 
-## Comandos (calidad)
+- **SEV-1:** bloqueo total de release o fallo crítico de seguridad activa.
+- **SEV-2:** falla funcional importante con workaround parcial.
+- **SEV-3:** degradación menor sin impacto crítico inmediato.
 
-- Tests: `npm test`
-- Generar changelog JSON (app): `npm run generate-changelog`
-- TypeScript (diagnóstico editor/CI): `npx tsc -p tsconfig.json --noEmit`
+## 2.2 Flujo de gestión
 
-## Gestión de versión y changelog (release)
+1. Detectar y clasificar severidad.
+2. Contener para frenar propagación.
+3. Identificar causa raíz.
+4. Aplicar fix mínimo seguro.
+5. Validar y cerrar con post-mortem breve.
 
-### Preparar una nueva versión
+## 3) Incidente: fallas de CI
 
-Actualiza versión de app + package y asegura sección Unreleased:
+## 3.1 Síntomas
 
-- `npm run release:prepare -- 1.2.0`
+- PR bloqueadas por checks rojos.
+- Jobs de `ci.yml` o `security.yml` fallando de forma repetida.
 
-Esto:
+## 3.2 Diagnóstico rápido
 
-- actualiza `app.json` y `package.json` a `1.2.0`
-- asegura `## 1.2.0 (Unreleased)` en `docs/CHANGELOG.md`
-- regenera `src/changelog.generated.json`
+1. Identificar job exacto y step fallido.
+2. Verificar si es falla determinística o intermitente.
+3. Reproducir localmente con el mismo comando del workflow.
 
-### Cerrar una versión (publicar)
+Comandos frecuentes:
 
-Cuando ya está lista y vas a distribuir un build:
+```bash
+npm test -- --watch=false
+npx tsc --noEmit
+cd website && npm run build
+```
 
-- `npm run release:finalize`
+## 3.3 Contención
 
-Esto:
+- Evitar mergear mientras el check requerido esté inestable.
+- Si es falla externa/transitoria, re-run controlado y documentado.
 
-- convierte `## <version> (Unreleased)` en `## <version> (YYYY-MM-DD)`
-- crea automáticamente el siguiente patch `Unreleased` (ej. `1.2.1 (Unreleased)`)
-- regenera `src/changelog.generated.json`
+## 3.4 Recuperación
 
-## Distribución sin Play Store (recomendado)
+- Aplicar fix puntual en la causa raíz.
+- Re-ejecutar pipeline completo.
+- Documentar en PR qué falló y cómo se corrigió.
 
-Flujo pro sin tienda:
+## 4) Incidente: fallas de release Android
 
-1. Cierra el release: `npm run release:finalize`
-2. Genera el APK/AAB (según tu flujo Expo/EAS).
-3. Publica el APK en GitHub Releases (o storage estable).
-4. La web toma automáticamente el APK desde GitHub Releases (si está configurado en Vercel), o desde `docs/DOWNLOADS.json`.
+## 4.1 Síntomas
 
-### Comandos EAS (Android)
+- `release-android.yml` falla en preflight/build/publicación.
 
-- Login: `npx eas login`
-- Usuario actual: `npx eas whoami`
-- Build APK interno (recomendado para distribución directa): `npx eas build --platform android --profile preview --wait`
-- Build AAB (solo si vas a Play Store): `npx eas build --platform android --profile production --wait`
+## 4.2 Diagnóstico por etapas
 
-### Flujo 100% automático (CI/CD)
+1. **Tag:** validar `vMAJOR.MINOR.PATCH`.
+2. **Secretos:** validar `EXPO_TOKEN` y credenciales asociadas.
+3. **Preflight:** tests/typecheck.
+4. **Build EAS:** revisar output JSON y artefactos.
+5. **Release upload:** revisar permisos `contents: write`.
 
-Trigger recomendado: push de tag `vX.Y.Z`. El pipeline:
+## 4.3 Contención
 
-- corre `eas build` (preview APK)
-- descarga el `.apk` desde EAS
-- crea un GitHub Release y sube assets
+- No forzar nuevos tags hasta cerrar causa raíz.
+- Si hubo artefacto parcial, invalidar comunicación de release hasta confirmación.
 
-Documento: `docs/DISTRIBUTION.md` y workflow: `.github/workflows/release-android.yml`.
+## 4.4 Recuperación
 
----
+- Corregir problema específico.
+- Re-lanzar por `workflow_dispatch` o nuevo tag controlado.
+- Validar APK + checksum antes de anunciar release.
 
-# Website (irontrain.motiona.xyz)
+## 5) Incidente: sincronización social / workspaces
 
-## Comandos (dev / prod)
+## 5.1 Síntomas
 
-Desde `website/`:
+- Import/sync no aplica cambios.
+- Conflictos de revisión (HTTP 409).
+- Duplicación inesperada de rutinas.
 
-- Instalar dependencias: `npm install`
-- Dev: `npm run dev`
-- Build producción: `npm run build`
-- Start producción local: `npm run start`
-- Migraciones DB producción (Drizzle): `npm run db:migrate:prod`
+## 5.2 Diagnóstico rápido
 
-## Fuentes de datos
+1. Confirmar si el problema es local, remoto o de contrato.
+2. Revisar `shared_routine_links` y snapshot/revision aplicada.
+3. Verificar estrategia usada (baseRevision/force/manual decision).
 
-- Changelog: `docs/CHANGELOG.md`
-- Descargas (fallback): `docs/DOWNLOADS.json`
-- Descargas (recomendado): GitHub Releases vía env vars en Vercel
+## 5.3 Contención
 
-## Endpoint de updates para la app
+- Evitar operaciones destructivas en cascada.
+- Pedir recarga de estado y reintento con revisión actualizada.
 
-- Feed: `/releases.json`
-- Producción: `https://irontrain.motiona.xyz/releases.json`
+## 5.4 Recuperación
 
-El feed:
+- Resolver conflicto con ruta explícita (aprobación/forzado/rollback según rol).
+- Validar que rutina local quede enlazada correctamente.
+- Confirmar ausencia de duplicados post-fix.
 
-- Nunca promueve “Unreleased” como release estable.
-- Solo incluye `downloadUrl` si existe un APK para esa versión.
+## 6) Incidente: seguridad
 
-## Deploy (Vercel)
+## 6.1 Síntomas
 
-1. Importa repo en Vercel.
-2. Root Directory: `website`
-3. Conecta dominio: `irontrain.motiona.xyz`
-4. Variables de entorno (opcional pero recomendado):
-   - `GITHUB_RELEASES_OWNER`
-   - `GITHUB_RELEASES_REPO`
-   - `GITHUB_RELEASES_TOKEN` (opcional)
+- Hallazgo CodeQL alto/crítico.
+- Vulnerabilidad de dependencia en `npm audit`.
+- Sospecha de secreto expuesto.
 
-## Social Integrity Ops (scoring/streak/weather)
+## 6.2 Diagnóstico y contención
 
-Endpoints nuevos para auditoría y auto-reconciliación de integridad social:
+1. Clasificar impacto y superficie afectada.
+2. Si hay secreto expuesto: rotar inmediatamente.
+3. Si es dependencia crítica: bloquear merge y preparar parche.
 
-- Admin (audit/reconcile manual): `/api/admin/social-integrity`
-- Cron (reconcile programada): `/api/cron/social-integrity`
+## 6.3 Recuperación
 
-### Variables de entorno requeridas
+- Aplicar fix o update de dependencia.
+- Revalidar `security.yml` completo.
+- Documentar incidente y mitigación en PR + nota operativa.
 
-- `ADMIN_USER_IDS` (ya existente): usuarios habilitados para endpoints admin.
-- `ADMIN_EDITOR_USER_IDS` / `ADMIN_MODERATOR_USER_IDS` / `ADMIN_SUPER_USER_IDS`: control de rol admin.
-- `SOCIAL_INTEGRITY_CRON_SECRET`: secreto compartido para el endpoint cron.
+## 7) Checklist de cierre de incidente
 
-### 1) Auditoría manual (solo lectura)
+- [ ] Causa raíz identificada.
+- [ ] Fix validado en entorno CI.
+- [ ] Impacto y alcance documentados.
+- [ ] Riesgo residual aceptado o mitigado.
+- [ ] Acción preventiva definida (test, regla, guardrail o doc).
 
-Requiere sesión admin web válida (cookie de sesión) y usuario en lista admin.
+## 8) Post-mortem mínimo (plantilla)
 
-Ejemplo:
+- **Fecha/hora:**
+- **Severidad:**
+- **Síntoma observado:**
+- **Causa raíz:**
+- **Fix aplicado:**
+- **Cómo prevenir repetición:**
+- **Owner de seguimiento:**
 
-- `curl "https://irontrain.motiona.xyz/api/admin/social-integrity?limit=200" -H "Cookie: <SESSION_COOKIE>"`
+## 9) Escalamiento recomendado
 
-Opcional (subset de usuarios):
-
-- `curl "https://irontrain.motiona.xyz/api/admin/social-integrity?users=userA,userB,userC&limit=50" -H "Cookie: <SESSION_COOKIE>"`
-
-### 2) Reconciliación manual (con escritura)
-
-`POST` con `reconcile=true` (si no, devuelve 400).
-
-Ejemplo:
-
-- `curl -X POST "https://irontrain.motiona.xyz/api/admin/social-integrity" -H "Content-Type: application/json" -H "Cookie: <SESSION_COOKIE>" --data "{\"reconcile\":true,\"limit\":200}"`
-
-Subset de usuarios:
-
-- `curl -X POST "https://irontrain.motiona.xyz/api/admin/social-integrity" -H "Content-Type: application/json" -H "Cookie: <SESSION_COOKIE>" --data "{\"reconcile\":true,\"userIds\":[\"userA\",\"userB\"]}"`
-
-### 3) Reconciliación programada (cron-like)
-
-Endpoint protegido por header `x-cron-secret`.
-
-Ejemplo:
-
-- `curl "https://irontrain.motiona.xyz/api/cron/social-integrity?limit=200" -H "x-cron-secret: $SOCIAL_INTEGRITY_CRON_SECRET"`
-
-Para Vercel Cron, el endpoint también acepta `Authorization: Bearer <secret>`.
-
-### 4) Vercel Cron (automático)
-
-Estado actual:
-
-- **Desactivado** en este entorno (plan actual de Vercel sin soporte de cron jobs).
-- `website/vercel.json` se mantiene sin `crons` para evitar ejecuciones automáticas.
-
-Cuando quieras activarlo (plan con cron):
-
-- Agregar en `website/vercel.json`:
-  - path: `/api/cron/social-integrity?limit=200`
-  - schedule: `*/30 * * * *` (cada 30 minutos)
-
-Configurar en Vercel:
-
-- `CRON_SECRET` (o `SOCIAL_INTEGRITY_CRON_SECRET`) con el mismo valor del scheduler.
-- Proyecto apuntando a `Root Directory = website`.
-
-### Cadencia recomendada
-
-- Producción: cada `15–30 min` con `limit=200` (ajustar según volumen).
-- Pico de tráfico o backlog: cada `10–15 min` temporalmente.
-- Mantenimiento puntual (post-incidente): ejecutar una pasada manual con `limit` alto y/o por `userIds` focalizados.
-
-### Guardrails operativos
-
-- Mantener `limit` entre `100` y `400` para evitar picos de carga innecesarios.
-- Monitorear `scoreDriftUsers`, `staleStreakUsers`, `weekRecalcUsers` y `reconciledUsers` en la respuesta.
-- Si hay drift recurrente alto, revisar primero `/api/sync/push` y colas de sincronización antes de subir frecuencia del cron.
-
-## Vendor / Branding
-
-- Empresa desarrolladora: MotionA
-- Sitio oficial: <https://motiona.xyz>
-
----
-
-# GitHub Releases (publicación del APK)
-
-## Estándar de tags y assets
-
-- Tag recomendado: `vX.Y.Z` (ej. `v1.2.0`)
-- Asset recomendado:
-  - `IronTrain-v1.2.0.apk`
-  - opcional: `IronTrain-v1.2.0.sha256.txt`
-
-## Publicar (manual)
-
-- Crea un release en GitHub con el tag `vX.Y.Z`.
-- Sube el APK como asset del release.
-- La web detecta el último release y usa su APK.
-
-## Publicar (con GitHub CLI, si la tienes instalada)
-
-Ejemplo:
-
-- `gh release create v1.2.0 ./path/IronTrain-v1.2.0.apk --title "IronTrain v1.2.0" --notes-file docs/CHANGELOG.md`
-
-Ajusta el archivo de notas si quieres un extracto en lugar de todo el changelog.
+- Escalar a owner técnico cuando:
+  - existe impacto en release productivo,
+  - hay evidencia de riesgo de seguridad,
+  - o no hay diagnóstico claro tras primer ciclo de contención.

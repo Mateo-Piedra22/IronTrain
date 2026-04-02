@@ -1,42 +1,57 @@
-# CI/CD (Enterprise) – Android APK + GitHub Releases + Vercel
+# CI/CD
 
-## Objetivo
-Con un tag `vX.Y.Z`, generar un APK (EAS), publicar un GitHub Release con assets y dejar la web lista para servir:
-- Descarga APK
-- Feed de updates `/releases.json`
+## Documentos relacionados
 
-## Componentes
-- GitHub Actions: `.github/workflows/release-android.yml`
-- Expo/EAS: `eas.json` (perfil `preview` genera `apk`)
-- Website (Vercel): obtiene el APK desde GitHub Releases si tiene env vars
+- [DevOps y guardrails](DEVOPS_GUARDRAILS.md)
+- [Testing](TESTING.md)
+- [Release](RELEASE.md)
+- [Runbook operacional](RUNBOOK.md)
 
-## Requisitos (GitHub)
-### Secrets
-- `EXPO_TOKEN`: token de Expo con permiso para ejecutar `eas build`
-  - Crear token: Expo Dashboard → Settings → Access Tokens
+## Pipelines activos
 
-## Requisitos (Vercel)
-### Environment Variables
-- `GITHUB_RELEASES_OWNER`
-- `GITHUB_RELEASES_REPO`
-- `GITHUB_RELEASES_TOKEN` (opcional, recomendado)
+- `ci.yml`: calidad mobile + build/typecheck web + dependency review.
+- `security.yml`: CodeQL + npm audit (root y website).
+- `release-android.yml`: release Android por tag semver o trigger manual.
 
-## Flujo recomendado (operación)
-1. Preparar versión:
-   - `npm run release:prepare -- 1.2.0`
-2. Cambios + tests:
-   - `npm test`
-3. Finalizar changelog:
-   - `npm run release:finalize`
-4. Crear tag y push:
-   - Tag: `v1.2.0`
-5. GitHub Actions construye y publica Release con:
-   - `IronTrain-v1.2.0.apk`
-   - `IronTrain-v1.2.0.sha256.txt`
-6. Vercel sirve automáticamente:
-   - `/downloads`
-   - `/releases.json`
+## Responsabilidad de cada workflow
 
-## Notas operativas
-- Las env vars de Vercel **no** construyen APK. Solo consumen releases ya publicados.
-- El pipeline de GitHub es el que automatiza build + release.
+- `ci.yml`: protege calidad funcional/técnica previa al merge.
+- `security.yml`: reduce riesgo de vulnerabilidades en código y dependencias.
+- `release-android.yml`: publica artefactos Android de forma repetible y auditable.
+
+## Objetivo del flujo
+
+- Bloquear merges con calidad insuficiente.
+- Detectar riesgo de dependencia/código temprano.
+- Estandarizar release Android reproducible.
+
+## Triggers recomendados
+
+- Pull request a `main`: ejecutar CI + Security.
+- Push a `main`: confirmar estabilidad en rama protegida.
+- Tag semver: disparar release Android.
+
+## Recomendaciones GitHub Settings
+
+- Branch protection para `main`.
+- Required checks: CI + Security.
+- Require PR review y resolución de conversaciones.
+
+## Configuración de branch protection (mínima)
+
+- Requerir checks antes de merge.
+- Bloquear bypass para colaboradores estándar.
+- Requerir branch actualizada antes de merge cuando el riesgo lo justifique.
+
+## Convención de release Android
+
+- Tags: `vMAJOR.MINOR.PATCH`.
+- El workflow valida formato antes de construir.
+
+## Política de fallback ante fallas de pipeline
+
+1. Identificar job/step exacto.
+2. Confirmar si es falla determinística o transitoria.
+3. Aplicar fix mínimo y reproducible.
+4. Re-ejecutar pipeline completo.
+5. Documentar causa raíz en PR/incidente.

@@ -33,3 +33,12 @@ export function shouldDeferWorkoutSetUpsert(params: {
     if (params.parentExistsInDb) return false;
     return params.incomingWorkouts.has(params.workoutId);
 }
+
+export function shouldDeferRoutineExerciseUpsert(params: {
+    routineDayId: string;
+    parentExistsInDb: boolean;
+    incomingRoutineDays: Set<string>;
+}): boolean {
+    if (params.parentExistsInDb) return false;
+    return params.incomingRoutineDays.has(params.routineDayId);
+}

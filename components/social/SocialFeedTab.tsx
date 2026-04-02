@@ -1,9 +1,10 @@
+import { SocialColors, SocialHeaderRenderer, SocialStyles } from '@/components/social/types';
 import { SocialInboxItem, SocialProfile } from '@/src/services/SocialService';
+import { feedbackSelection, feedbackSoftImpact } from '@/src/social/feedback';
 import { ActivityVisualSummary, SocialStory, buildActivityVisualSummary } from '@/src/social/socialSelectors';
 import { FlashList } from '@shopify/flash-list';
-import * as Haptics from 'expo-haptics';
-import { Flame, Heart, Layers, Sparkles, Trophy } from 'lucide-react-native';
-import React, { memo, useMemo, useRef } from 'react';
+import { CloudRain, Eye, Flame, Heart, Layers, Sparkles, Trophy, Users } from 'lucide-react-native';
+import React, { memo, useMemo, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 type SocialFeedTabProps = {
@@ -13,15 +14,18 @@ type SocialFeedTabProps = {
     isLive?: boolean;
     liveSource?: 'idle' | 'sse' | 'polling';
     lastLiveSyncAt?: number | null;
-    renderHeader?: () => React.ReactNode;
+    renderHeader?: SocialHeaderRenderer;
     refreshing?: boolean;
     onRefresh?: () => void;
     onToggleKudo: (feedId: string) => Promise<void> | void;
     onMarkAsSeen: (id: string, feedType: 'activity_log' | 'direct_share') => Promise<void> | void;
     onOpenStory?: (story: SocialStory) => void;
     onCopyRoutine?: (item: SocialInboxItem) => void;
-    colors: any;
-    styles: any;
+    showScoreRail?: boolean;
+    showStories?: boolean;
+    emptyText?: string;
+    colors: SocialColors;
+    styles: SocialStyles;
 };
 
 const DOUBLE_TAP_THRESHOLD_MS = 280;
@@ -39,17 +43,7 @@ const timeAgo = (value: unknown): string => {
     return `hace ${days}d`;
 };
 
-const syncLabel = (value: number | null | undefined): string => {
-    if (!value) return 'sincronizando…';
-    const diffMs = Date.now() - value;
-    if (diffMs < 15000) return 'actualizado ahora';
-    const seconds = Math.floor(diffMs / 1000);
-    if (seconds < 60) return `actualizado hace ${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    return `actualizado hace ${minutes}m`;
-};
-
-const StoryStrip = memo(({ stories, onOpenStory, colors, styles }: { stories: SocialStory[]; onOpenStory?: (story: SocialStory) => void; colors: any; styles: any }) => {
+const StoryStrip = memo(({ stories, onOpenStory, colors, styles }: { stories: SocialStory[]; onOpenStory?: (story: SocialStory) => void; colors: SocialColors; styles: SocialStyles }) => {
     if (!stories.length) return null;
 
     return (
@@ -60,8 +54,12 @@ const StoryStrip = memo(({ stories, onOpenStory, colors, styles }: { stories: So
                     <TouchableOpacity
                         key={story.userId}
                         activeOpacity={0.85}
-                        onPress={() => onOpenStory?.(story)}
+                        onPress={() => {
+                            feedbackSelection();
+                            onOpenStory?.(story);
+                        }}
                         style={{ alignItems: 'center', width: 72 }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
                         <View
                             style={{
@@ -89,47 +87,82 @@ const StoryStrip = memo(({ stories, onOpenStory, colors, styles }: { stories: So
     );
 });
 
-const ScoreRail = memo(({ profile, colors }: { profile: SocialProfile | null; colors: any }) => {
+const ScoreRail = memo(({ profile, colors }: { profile: SocialProfile | null; colors: SocialColors }) => {
     if (!profile) return null;
 
+    const [expanded, setExpanded] = useState(false);
+
     const score = Math.round(profile.scoreLifetime || 0);
-    const streak = profile.streakWeeks || 0;
+    const streakDaily = profile.currentStreak || 0;
     const weatherMultiplier = profile.weatherBonus?.multiplier || 1;
     const friendsCount = profile.socialSummary?.friendsCount ?? 0;
     const activityCount = profile.socialSummary?.activityCount ?? 0;
     const engagementScore = profile.socialSummary?.engagementScore ?? 0;
 
     return (
-        <View style={{ marginBottom: 14 }}>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-                <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: 10 }}>
-                    <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>IRONPOINTS</Text>
-                    <Text style={{ color: colors.text, fontSize: 16, fontWeight: '900', marginTop: 2 }}>{score}</Text>
-                </View>
-                <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: 10 }}>
-                    <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>RACHA</Text>
-                    <Text style={{ color: colors.text, fontSize: 16, fontWeight: '900', marginTop: 2 }}>{streak} sem</Text>
-                </View>
-                <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: 10 }}>
-                    <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>CLIMA</Text>
-                    <Text style={{ color: colors.text, fontSize: 16, fontWeight: '900', marginTop: 2 }}>x{weatherMultiplier.toFixed(2)}</Text>
-                </View>
+        <View style={{ marginBottom: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: 10, gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ color: colors.text, fontSize: 13, fontWeight: '900' }}>Tu progreso</Text>
+                <TouchableOpacity
+                    style={{ paddingHorizontal: 10, minHeight: 30, borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, justifyContent: 'center' }}
+                    onPress={() => {
+                        feedbackSoftImpact();
+                        setExpanded((prev) => !prev);
+                    }}
+                >
+                    <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '800' }}>{expanded ? 'Ver menos' : 'Ver más'}</Text>
+                </TouchableOpacity>
             </View>
 
             <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, paddingVertical: 8, paddingHorizontal: 10 }}>
-                    <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>AMIGOS</Text>
-                    <Text style={{ color: colors.text, fontSize: 13, fontWeight: '900', marginTop: 2 }}>{friendsCount}</Text>
+                <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, padding: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Trophy size={12} color={colors.yellow} />
+                        <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>IRONPOINTS</Text>
+                    </View>
+                    <Text style={{ color: colors.text, fontSize: 16, fontWeight: '900', marginTop: 3 }}>{score}</Text>
                 </View>
-                <View style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, paddingVertical: 8, paddingHorizontal: 10 }}>
-                    <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>ACTIVIDAD</Text>
-                    <Text style={{ color: colors.text, fontSize: 13, fontWeight: '900', marginTop: 2 }}>{activityCount}</Text>
+                <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, padding: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Flame size={12} color={colors.red} />
+                        <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>RACHA DIARIA</Text>
+                    </View>
+                    <Text style={{ color: colors.text, fontSize: 16, fontWeight: '900', marginTop: 3 }}>{streakDaily} días</Text>
                 </View>
-                <View style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, paddingVertical: 8, paddingHorizontal: 10 }}>
-                    <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>ENG</Text>
-                    <Text style={{ color: colors.text, fontSize: 13, fontWeight: '900', marginTop: 2 }}>{engagementScore}</Text>
+                <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, padding: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <CloudRain size={12} color={colors.primary.DEFAULT} />
+                        <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>MULT</Text>
+                    </View>
+                    <Text style={{ color: colors.text, fontSize: 16, fontWeight: '900', marginTop: 3 }}>x{weatherMultiplier.toFixed(2)}</Text>
                 </View>
             </View>
+
+            {expanded && (
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                    <View style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, paddingVertical: 8, paddingHorizontal: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Users size={12} color={colors.textMuted} />
+                            <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>AMIGOS</Text>
+                        </View>
+                        <Text style={{ color: colors.text, fontSize: 13, fontWeight: '900', marginTop: 2 }}>{friendsCount}</Text>
+                    </View>
+                    <View style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, paddingVertical: 8, paddingHorizontal: 10 }}>
+                        <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>ACTIVIDAD SOCIAL</Text>
+                        <Text style={{ color: colors.text, fontSize: 13, fontWeight: '900', marginTop: 2 }}>{activityCount}</Text>
+                    </View>
+                    <View style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, paddingVertical: 8, paddingHorizontal: 10 }}>
+                        <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>INTERACCIÓN</Text>
+                        <Text style={{ color: colors.text, fontSize: 13, fontWeight: '900', marginTop: 2 }}>{engagementScore}</Text>
+                    </View>
+                </View>
+            )}
+
+            {expanded && (
+                <Text style={{ marginTop: 4, color: colors.textMuted, fontSize: 11, fontWeight: '600', backgroundColor: colors.surfaceLighter, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 }}>
+                    Racha diaria: días consecutivos entrenando. Clima: multiplicador activo por condiciones climáticas.
+                </Text>
+            )}
         </View>
     );
 });
@@ -150,8 +183,8 @@ const ActivityCard = memo(({
     onToggleKudo: (feedId: string) => Promise<void> | void;
     onMarkAsSeen: (id: string, feedType: 'activity_log' | 'direct_share') => Promise<void> | void;
     onCopyRoutine?: (item: SocialInboxItem) => void;
-    colors: any;
-    styles: any;
+    colors: SocialColors;
+    styles: SocialStyles;
 }) => {
     const lastTapRef = useRef<number>(0);
     const isOwn = profile?.id && item.senderId === profile.id;
@@ -159,7 +192,7 @@ const ActivityCard = memo(({
     const onDoubleTapKudo = () => {
         const now = Date.now();
         if (now - lastTapRef.current < DOUBLE_TAP_THRESHOLD_MS && !isOwn) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+            feedbackSoftImpact();
             onToggleKudo(item.id);
         }
         lastTapRef.current = now;
@@ -172,8 +205,8 @@ const ActivityCard = memo(({
             : <Sparkles size={14} color={colors.primary.DEFAULT} />;
 
     return (
-        <View style={[styles.activityRow, { marginBottom: 18 }]}> 
-            <View style={[styles.activityHeader, { marginBottom: 10 }]}> 
+        <View style={[styles.activityRow, { marginBottom: 10, padding: 12, borderColor: colors.border }]}> 
+            <View style={[styles.activityHeader, { marginBottom: 6 }]}> 
                 <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: colors.surfaceLighter, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }}>
                     <Text style={{ color: colors.text, fontWeight: '900' }}>{(item.senderName || 'U').slice(0, 1).toUpperCase()}</Text>
                 </View>
@@ -187,29 +220,43 @@ const ActivityCard = memo(({
                 </View>
             </View>
 
-            <Pressable onPress={onDoubleTapKudo} style={{ borderRadius: 16, overflow: 'hidden' }}>
-                <View style={{ borderRadius: 16, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface, padding: 16 }}>
-                    <Text style={{ color: colors.text, fontWeight: '900', fontSize: 18 }}>{summary.headline}</Text>
-                    <Text style={{ color: colors.textMuted, marginTop: 4, fontWeight: '700' }}>{summary.subline}</Text>
+            {!item.seenAt && (
+                <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, borderWidth: 1, borderColor: colors.primary.DEFAULT, backgroundColor: colors.surface, paddingHorizontal: 8, paddingVertical: 4, marginBottom: 8 }}>
+                    <Eye size={11} color={colors.primary.DEFAULT} />
+                    <Text style={{ color: colors.primary.DEFAULT, fontSize: 10, fontWeight: '900', textTransform: 'uppercase' }}>Nuevo</Text>
+                </View>
+            )}
 
-                    <View style={{ marginTop: 14, borderRadius: 12, backgroundColor: colors.surfaceLighter, borderWidth: 1, borderColor: colors.border, padding: 14 }}>
-                        <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 }}>{summary.highlightLabel.toUpperCase()}</Text>
-                        <Text style={{ color: colors.text, fontSize: 22, fontWeight: '900', marginTop: 4 }}>{summary.highlightValue}</Text>
+            <Pressable onPress={onDoubleTapKudo} style={{ borderRadius: 16, overflow: 'hidden' }}>
+                <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: 12 }}>
+                    <Text style={{ color: colors.text, fontWeight: '900', fontSize: 15 }}>{summary.headline}</Text>
+                    <Text style={{ color: colors.textMuted, marginTop: 3, fontWeight: '700', fontSize: 12 }}>{summary.subline}</Text>
+
+                    <View style={{ marginTop: 10, borderRadius: 10, backgroundColor: colors.surfaceLighter, borderWidth: 1, borderColor: colors.border, padding: 10 }}>
+                        <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>{summary.highlightLabel.toUpperCase()}</Text>
+                        <Text style={{ color: colors.text, fontSize: 18, fontWeight: '900', marginTop: 2 }}>{summary.highlightValue}</Text>
                     </View>
                 </View>
             </Pressable>
 
-            <View style={[styles.activityFooter, { marginTop: 10 }]}> 
+            {!isOwn && !item.hasKudoed && (
+                <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '600', marginTop: 6 }}>
+                    Tip: doble toque en la tarjeta para dar Kudo más rápido.
+                </Text>
+            )}
+
+            <View style={[styles.activityFooter, { marginTop: 8 }]}> 
                 <TouchableOpacity
                     style={[styles.kudoBtn, item.hasKudoed && styles.kudoBtnActive, isOwn && styles.kudoBtnDisabled]}
                     onPress={() => {
                         if (!isOwn) {
-                            Haptics.selectionAsync().catch(() => undefined);
+                            feedbackSelection();
                             onToggleKudo(item.id);
                         }
                     }}
                     disabled={!!isOwn}
                     activeOpacity={0.85}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                     {item.hasKudoed ? (
                         <Heart size={16} color={colors.yellow} fill={colors.yellow} />
@@ -217,7 +264,7 @@ const ActivityCard = memo(({
                         <Flame size={16} color={colors.textMuted} />
                     )}
                     <Text style={[styles.kudoText, item.hasKudoed && styles.kudoTextActive]}>
-                        {item.kudosCount || 0} Kudos
+                        {item.kudosCount || 0} {item.kudosCount === 1 ? 'Kudo' : 'Kudos'}
                     </Text>
                 </TouchableOpacity>
 
@@ -226,10 +273,11 @@ const ActivityCard = memo(({
                         <TouchableOpacity
                             style={[styles.archiveToggle, { borderColor: colors.border }]}
                             onPress={() => {
-                                Haptics.selectionAsync().catch(() => undefined);
+                                feedbackSelection();
                                 onCopyRoutine?.(item);
                             }}
                             activeOpacity={0.85}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
                             <Text style={styles.archiveToggleText}>Guardar rutina</Text>
                         </TouchableOpacity>
@@ -238,10 +286,11 @@ const ActivityCard = memo(({
                         <TouchableOpacity
                             style={[styles.archiveToggle, { borderColor: colors.border }]}
                             onPress={() => {
-                                Haptics.selectionAsync().catch(() => undefined);
+                                feedbackSelection();
                                 onMarkAsSeen(item.id, 'activity_log');
                             }}
                             activeOpacity={0.85}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
                             <Text style={styles.archiveToggleText}>Marcar visto</Text>
                         </TouchableOpacity>
@@ -252,7 +301,7 @@ const ActivityCard = memo(({
     );
 });
 
-export const SocialFeedTab = memo(({ items, profile, stories, isLive, liveSource, lastLiveSyncAt, renderHeader, refreshing, onRefresh, onToggleKudo, onMarkAsSeen, onOpenStory, onCopyRoutine, colors, styles }: SocialFeedTabProps) => {
+export const SocialFeedTab = memo(({ items, profile, stories, renderHeader, refreshing, onRefresh, onToggleKudo, onMarkAsSeen, onOpenStory, onCopyRoutine, showScoreRail = true, showStories = true, emptyText = 'Todavía no hay actividad en tu feed.', colors, styles }: SocialFeedTabProps) => {
     const preparedItems = useMemo(() => {
         return items.map((item) => ({ item, summary: buildActivityVisualSummary(item) }));
     }, [items]);
@@ -274,25 +323,21 @@ export const SocialFeedTab = memo(({ items, profile, stories, isLive, liveSource
                 />
             )}
             ListHeaderComponent={
-                <View style={{ paddingTop: 8 }}>
+                <View style={{ paddingTop: 2 }}>
                     {renderHeader?.()}
-                    <View style={{ marginBottom: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isLive ? colors.green : colors.red }} />
-                            <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>
-                                {isLive ? `LIVE · ${liveSource === 'sse' ? 'SSE' : 'POLLING'}` : 'RECONNECTING'}
-                            </Text>
-                        </View>
-                        <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 11 }}>
-                            {syncLabel(lastLiveSyncAt)}
-                        </Text>
-                    </View>
-                    <ScoreRail profile={profile} colors={colors} />
-                    <StoryStrip stories={stories} onOpenStory={onOpenStory} colors={colors} styles={styles} />
+                    {showScoreRail && <ScoreRail profile={profile} colors={colors} />}
+                    {showStories && <StoryStrip stories={stories} onOpenStory={onOpenStory} colors={colors} styles={styles} />}
                 </View>
             }
             refreshControl={<RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.primary.DEFAULT} />}
-            ListEmptyComponent={<Text style={styles.emptyText}>Todavía no hay actividad en tu feed.</Text>}
+            ListEmptyComponent={(
+                <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, paddingVertical: 18, paddingHorizontal: 14, marginTop: 10 }}>
+                    <Text style={styles.emptyText}>{emptyText}</Text>
+                    <Text style={{ color: colors.textMuted, textAlign: 'center', fontSize: 12, marginTop: 4, fontWeight: '600' }}>
+                        Compartí una rutina o agregá amigos para activar movimiento en tu feed.
+                    </Text>
+                </View>
+            )}
             contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}
         />
     );

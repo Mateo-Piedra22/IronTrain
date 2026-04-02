@@ -426,67 +426,75 @@ export const GlobalNoticeHandler: React.FC = () => {
 
             {/* 3. Custom BroadCast Toast */}
             {activeAnnouncement && activeAnnouncement.uiType === 'toast' && showToast && (
-                <Animated.View
-                    entering={SlideInUp}
-                    exiting={SlideOutUp}
-                    style={ss.toastContainer}
-                >
-                    <View style={ss.toastIcon}>
-                        <Bell size={16} color={colors.primary.DEFAULT} />
+                <Modal transparent visible animationType="none" statusBarTranslucent presentationStyle="overFullScreen" onRequestClose={handleCloseNotification}>
+                    <View pointerEvents="box-none" style={{ flex: 1 }}>
+                        <Animated.View
+                            entering={SlideInUp}
+                            exiting={SlideOutUp}
+                            style={ss.toastContainer}
+                        >
+                            <View style={ss.toastIcon}>
+                                <Bell size={16} color={colors.primary.DEFAULT} />
+                            </View>
+                            <TouchableOpacity
+                                style={ss.toastContent}
+                                onPress={handleNotifPress}
+                                accessibilityRole="button"
+                                accessibilityLabel="Abrir notificación rápida"
+                            >
+                                <Text style={ss.toastTitle}>{activeAnnouncement.title}</Text>
+                                <Text style={ss.toastMessage} numberOfLines={2}>{activeAnnouncement.body}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={handleCloseNotification}
+                                style={ss.toastClose}
+                                accessibilityRole="button"
+                                accessibilityLabel="Cerrar notificación rápida"
+                            >
+                                <X size={16} color={colors.textMuted} />
+                            </TouchableOpacity>
+                        </Animated.View>
                     </View>
-                    <TouchableOpacity
-                        style={ss.toastContent}
-                        onPress={handleNotifPress}
-                        accessibilityRole="button"
-                        accessibilityLabel="Abrir notificación rápida"
-                    >
-                        <Text style={ss.toastTitle}>{activeAnnouncement.title}</Text>
-                        <Text style={ss.toastMessage} numberOfLines={2}>{activeAnnouncement.body}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={handleCloseNotification}
-                        style={ss.toastClose}
-                        accessibilityRole="button"
-                        accessibilityLabel="Cerrar notificación rápida"
-                    >
-                        <X size={16} color={colors.textMuted} />
-                    </TouchableOpacity>
-                </Animated.View>
+                </Modal>
             )}
 
             {/* 4. Global Server Status Banner */}
             {bannerConfig && (
-                <Animated.View
-                    entering={SlideInUp}
-                    exiting={SlideOutUp}
-                    style={[
-                        ss.toastContainer,
-                        ss.serverBanner,
-                        {
-                            backgroundColor: bannerConfig.bg,
-                            borderColor: bannerConfig.borderColor,
-                        }
-                    ]}
-                >
-                    <View style={[
-                        ss.toastIcon,
-                        ss.serverBannerIcon,
-                        { backgroundColor: bannerConfig.iconBg }
-                    ]}>
-                        <Bell size={16} color={bannerConfig.fg} />
-                    </View>
-                    <View style={ss.toastContent}>
-                        <Text style={[ss.toastTitle, { color: bannerConfig.fg }]}>
-                            {bannerConfig.title}
-                        </Text>
-                        <Text
-                            style={[ss.toastMessage, { color: bannerConfig.textOpacity }]}
-                            numberOfLines={2}
+                <Modal transparent visible animationType="none" statusBarTranslucent presentationStyle="overFullScreen" onRequestClose={() => undefined}>
+                    <View pointerEvents="box-none" style={{ flex: 1 }}>
+                        <Animated.View
+                            entering={SlideInUp}
+                            exiting={SlideOutUp}
+                            style={[
+                                ss.toastContainer,
+                                ss.serverBanner,
+                                {
+                                    backgroundColor: bannerConfig.bg,
+                                    borderColor: bannerConfig.borderColor,
+                                }
+                            ]}
                         >
-                            {bannerConfig.message}
-                        </Text>
+                            <View style={[
+                                ss.toastIcon,
+                                ss.serverBannerIcon,
+                                { backgroundColor: bannerConfig.iconBg }
+                            ]}>
+                                <Bell size={16} color={bannerConfig.fg} />
+                            </View>
+                            <View style={ss.toastContent}>
+                                <Text style={[ss.toastTitle, { color: bannerConfig.fg }]}>
+                                    {bannerConfig.title}
+                                </Text>
+                                <Text
+                                    style={[ss.toastMessage, { color: bannerConfig.textOpacity }]}
+                                    numberOfLines={2}
+                                >
+                                    {bannerConfig.message}
+                                </Text>
+                            </View>
+                        </Animated.View>
                     </View>
-                </Animated.View>
+                </Modal>
             )}
         </>
     );

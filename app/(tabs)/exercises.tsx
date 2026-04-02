@@ -3,11 +3,15 @@ import { CreateRoutineModal } from '@/components/CreateRoutineModal';
 import { DuplicateResolutionModal } from '@/components/DuplicateResolutionModal';
 import { ExerciseList } from '@/components/ExerciseList';
 import { RoutineDetailModal } from '@/components/RoutineDetailModal';
+import { SharedSpaceHubModal } from '@/components/social/SharedSpaceHubModal';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { useDataReload } from '@/src/hooks/useDataReload';
+import { useSharedSpaceSummary } from '@/src/hooks/useSharedSpaceSummary';
 import { configService } from '@/src/services/ConfigService';
 import { DuplicateResolutionService } from '@/src/services/DuplicateResolutionService';
 import { routineService } from '@/src/services/RoutineService';
+import { sharedSpaceCopy } from '@/src/social/sharedSpaceCopy';
+import { sharedSpaceFeedback } from '@/src/social/sharedSpaceFeedback';
 import { confirm } from '@/src/store/confirmStore';
 import { Routine } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
@@ -15,9 +19,9 @@ import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { FlashList } from '@shopify/flash-list';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
-import { AlertTriangle, BookOpen, Pencil, Plus, Trash2 } from 'lucide-react-native';
+import { AlertTriangle, BookOpen, Pencil, Plus, Trash2, Users } from 'lucide-react-native';
 import React, { useCallback, useContext, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IronTrainLogo } from '../../components/IronTrainLogo';
 import { useColors } from '../../src/hooks/useColors';
@@ -26,13 +30,14 @@ import { ThemeFx, withAlpha } from '../../src/theme';
 type SegmentMode = 'exercises' | 'categories' | 'routines';
 
 // Optimized Card Component
-const RoutineCard = React.memo(({ item, colors, ss, onPress, onEdit, onDelete }: {
+const RoutineCard = React.memo(({ item, colors, ss, onPress, onEdit, onDelete, isShared }: {
     item: Routine;
     colors: any;
     ss: any;
     onPress: (id: string) => void;
     onEdit: (item: Routine) => void;
     onDelete: (item: Routine) => void;
+    isShared: boolean;
 }) => (
     <TouchableOpacity
         onPress={() => onPress(item.id)}
@@ -57,6 +62,11 @@ const RoutineCard = React.memo(({ item, colors, ss, onPress, onEdit, onDelete }:
                     <Text style={ss.cardMeta} numberOfLines={1}>{item.description}</Text>
                 ) : (
                     <Text style={ss.cardMeta}>RUTINA</Text>
+                )}
+                {isShared && (
+                    <View style={{ marginTop: 6, alignSelf: 'flex-start', backgroundColor: withAlpha(colors.primary.DEFAULT, '15'), borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: withAlpha(colors.primary.DEFAULT, '35') }}>
+                        <Text style={{ color: colors.primary.DEFAULT, fontSize: 9, fontWeight: '900', letterSpacing: 0.4 }}>{sharedSpaceCopy.cardBadge}</Text>
+                    </View>
                 )}
             </View>
         </View>
@@ -97,6 +107,41 @@ export default function LibraryScreen() {
     // Detail modal
     const [detailRoutineId, setDetailRoutineId] = useState<string | null>(null);
     const [detailVisible, setDetailVisible] = useState(false);
+    const [workspaceHubVisible, setWorkspaceHubVisible] = useState(false);
+    const [openingWorkspaceHub, setOpeningWorkspaceHub] = useState(false);
+
+    const { workspaceCount, linkedRoutineIds, reload: reloadSharedWorkspaces } = useSharedSpaceSummary();
+    const showWorkspaceBadge = workspaceCount > 0;
+    const workspaceBadgeAnim = React.useRef(new Animated.Value(showWorkspaceBadge ? 1 : 0)).current;
+    const workspaceBadgeCountAnim = React.useRef(new Animated.Value(1)).current;
+
+    React.useEffect(() => {
+        Animated.timing(workspaceBadgeAnim, {
+            toValue: showWorkspaceBadge ? 1 : 0,
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+        }).start();
+    }, [showWorkspaceBadge, workspaceBadgeAnim]);
+
+    React.useEffect(() => {
+        if (!showWorkspaceBadge) return;
+        workspaceBadgeCountAnim.setValue(0.92);
+        Animated.sequence([
+            Animated.timing(workspaceBadgeCountAnim, {
+                toValue: 1.12,
+                duration: 130,
+                easing: Easing.out(Easing.quad),
+                useNativeDriver: true,
+            }),
+            Animated.timing(workspaceBadgeCountAnim, {
+                toValue: 1,
+                duration: 140,
+                easing: Easing.out(Easing.quad),
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, [workspaceCount, showWorkspaceBadge, workspaceBadgeCountAnim]);
 
     const insets = useSafeAreaInsets();
     const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
@@ -284,17 +329,21 @@ export default function LibraryScreen() {
 
     useFocusEffect(useCallback(() => {
         loadDuplicateCount();
+        reloadSharedWorkspaces();
         if (mode === 'routines') {
             loadRoutines();
         }
-    }, [mode, loadRoutines, loadDuplicateCount]));
+    }, [mode, loadRoutines, loadDuplicateCount, reloadSharedWorkspaces]));
 
     useDataReload(() => {
         loadDuplicateCount();
+        reloadSharedWorkspaces();
         if (mode === 'routines') {
             loadRoutines();
         }
     });
+
+    const sharedRoutineIds = useMemo(() => new Set(linkedRoutineIds), [linkedRoutineIds]);
 
     const handleDeleteRoutine = useCallback((routine: Routine) => {
         confirm.destructive(
@@ -331,13 +380,22 @@ export default function LibraryScreen() {
             onPress={openRoutineDetail}
             onEdit={handleEditRoutine}
             onDelete={handleDeleteRoutine}
+            isShared={sharedRoutineIds.has(item.id)}
         />
-    ), [colors, ss, openRoutineDetail, handleEditRoutine, handleDeleteRoutine]);
+    ), [colors, ss, openRoutineDetail, handleEditRoutine, handleDeleteRoutine, sharedRoutineIds]);
 
     const handleCreateRoutine = useCallback(() => {
         setEditingRoutine(null);
         setCreateModalVisible(true);
     }, []);
+
+    const handleOpenWorkspaceHub = useCallback(() => {
+        if (openingWorkspaceHub) return;
+        sharedSpaceFeedback.openHub();
+        setOpeningWorkspaceHub(true);
+        setWorkspaceHubVisible(true);
+        setTimeout(() => setOpeningWorkspaceHub(false), 220);
+    }, [openingWorkspaceHub]);
 
     return (
         <SafeAreaWrapper style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
@@ -350,6 +408,54 @@ export default function LibraryScreen() {
                     <IronTrainLogo size={60} />
                 </View>
                 <View style={{ zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <TouchableOpacity
+                        onPress={handleOpenWorkspaceHub}
+                        disabled={openingWorkspaceHub}
+                        style={{
+                            width: 42,
+                            height: 42,
+                            borderRadius: 21,
+                            backgroundColor: colors.surface,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1.5,
+                            borderColor: workspaceCount > 0 ? withAlpha(colors.primary.DEFAULT, '66') : colors.border,
+                            ...ThemeFx.shadowSm,
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Abrir espacios compartidos"
+                    >
+                        {openingWorkspaceHub ? (
+                            <ActivityIndicator size="small" color={colors.primary.DEFAULT} />
+                        ) : (
+                            <Users size={18} color={workspaceCount > 0 ? colors.primary.DEFAULT : colors.textMuted} />
+                        )}
+                        {showWorkspaceBadge && (
+                            <Animated.View
+                                style={{
+                                    position: 'absolute',
+                                    top: -2,
+                                    right: -2,
+                                    minWidth: 18,
+                                    height: 18,
+                                    paddingHorizontal: 5,
+                                    borderRadius: 9,
+                                    backgroundColor: colors.primary.DEFAULT,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderWidth: 1.5,
+                                    borderColor: colors.background,
+                                    opacity: workspaceBadgeAnim,
+                                    transform: [
+                                        { scale: workspaceBadgeAnim.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }) },
+                                        { scale: workspaceBadgeCountAnim },
+                                    ],
+                                }}
+                            >
+                                <Text style={{ color: colors.onPrimary, fontSize: 10, fontWeight: '900' }}>{workspaceCount}</Text>
+                            </Animated.View>
+                        )}
+                    </TouchableOpacity>
                     <TouchableOpacity
                         onPress={() => setDuplicatesVisible(true)}
                         disabled={duplicateCount <= 0}
@@ -506,6 +612,19 @@ export default function LibraryScreen() {
                 onClose={() => {
                     setDuplicatesVisible(false);
                     loadDuplicateCount();
+                }}
+            />
+
+            <SharedSpaceHubModal
+                visible={workspaceHubVisible}
+                onClose={() => {
+                    setWorkspaceHubVisible(false);
+                    setOpeningWorkspaceHub(false);
+                    reloadSharedWorkspaces();
+                }}
+                onOpenRoutine={(routineId) => {
+                    setMode('routines');
+                    openRoutineDetail(routineId);
                 }}
             />
         </SafeAreaWrapper>

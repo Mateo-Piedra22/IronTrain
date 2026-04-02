@@ -1,4 +1,6 @@
+import { SocialColors, SocialHeaderRenderer, SocialStyles } from '@/components/social/types';
 import { SocialInboxItem, SocialProfile } from '@/src/services/SocialService';
+import { feedbackSelection, feedbackSoftImpact } from '@/src/social/feedback';
 import { withAlpha } from '@/src/theme';
 import { getInboxKey } from '@/src/utils/dedupe';
 import { FlashList } from '@shopify/flash-list';
@@ -6,10 +8,29 @@ import { CheckCircle, ChevronDown, ChevronUp, Dumbbell, Eye, EyeOff, Filter, Fla
 import React, { useCallback, useMemo, useState } from 'react';
 import { LayoutAnimation, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
-const safeDate = (dateStr: any): Date => {
+type FeedFilter = 'all' | 'pr' | 'workout' | 'routine';
+
+interface PrGroupItem {
+    id: string;
+    type: 'pr_group';
+    senderId: string;
+    senderName: string;
+    senderUsername?: string | null;
+    createdAt: string | number | Date;
+    items: SocialInboxItem[];
+    unseenCount: number;
+}
+
+type InboxRenderItem = SocialInboxItem | PrGroupItem;
+
+const safeDate = (dateStr: unknown): Date => {
     try {
         if (!dateStr) return new Date();
-        const d = new Date(dateStr);
+        const d = dateStr instanceof Date
+            ? dateStr
+            : typeof dateStr === 'string' || typeof dateStr === 'number'
+                ? new Date(dateStr)
+                : new Date();
         return isNaN(d.getTime()) ? new Date() : d;
     } catch {
         return new Date();
@@ -22,32 +43,22 @@ interface InboxTabProps {
     setShowSeen: (show: boolean) => void;
     hideOwnActivity: boolean;
     setHideOwnActivity: (hide: boolean) => void;
-    typeFilter: 'all' | 'pr' | 'workout' | 'routine';
-    setTypeFilter: (type: 'all' | 'pr' | 'workout' | 'routine') => void;
-    handleInboxResponse: any;
-    handleMarkAsSeen: any;
+    typeFilter: FeedFilter;
+    setTypeFilter: (type: FeedFilter) => void;
+    handleInboxResponse: (inboxId: string, action: 'accept' | 'reject', payload?: unknown) => void;
+    handleMarkAsSeen: (id: string, feedType: 'direct_share' | 'activity_log') => void;
     handleMarkAllAsSeen?: () => void;
-    handleToggleKudo: any;
+    handleToggleKudo: (feedId: string) => void;
     profile: SocialProfile | null;
-    colors: any;
-    styles: any;
-    renderHeader?: any;
+    colors: SocialColors;
+    styles: SocialStyles;
+    renderHeader?: SocialHeaderRenderer;
     refreshing?: boolean;
     onRefresh?: () => void;
     isLive?: boolean;
     liveSource?: 'idle' | 'sse' | 'polling';
     lastLiveSyncAt?: number | null;
 }
-
-const syncLabel = (value: number | null | undefined): string => {
-    if (!value) return 'sincronizando…';
-    const diffMs = Date.now() - value;
-    if (diffMs < 15000) return 'actualizado ahora';
-    const seconds = Math.floor(diffMs / 1000);
-    if (seconds < 60) return `actualizado hace ${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    return `actualizado hace ${minutes}m`;
-};
 
 const getActivityDescription = (item: SocialInboxItem): string => {
     const isPr = item.actionType === 'pr_broken';
@@ -70,7 +81,19 @@ const getActivityDescription = (item: SocialInboxItem): string => {
     return 'Completó un Entrenamiento';
 };
 
-const DirectShareItem = React.memo(({ item, onResponse, onMarkAsSeen, colors, styles }: any) => {
+const DirectShareItem = React.memo(({
+    item,
+    onResponse,
+    onMarkAsSeen,
+    colors,
+    styles,
+}: {
+    item: SocialInboxItem;
+    onResponse: (inboxId: string, action: 'accept' | 'reject', payload?: unknown) => void;
+    onMarkAsSeen: (id: string, feedType: 'direct_share' | 'activity_log') => void;
+    colors: SocialColors;
+    styles: SocialStyles;
+}) => {
     return (
         <View style={styles.premiumCard}>
             <View style={styles.premiumHeader}>
@@ -86,7 +109,7 @@ const DirectShareItem = React.memo(({ item, onResponse, onMarkAsSeen, colors, st
                         {safeDate(item.createdAt).toLocaleDateString()}
                     </Text>
                     {!item.seenAt && (
-                        <TouchableOpacity style={styles.markSeenBtn} onPress={() => onMarkAsSeen(item.id, 'direct_share')}>
+                        <TouchableOpacity onPress={() => onMarkAsSeen(item.id, 'direct_share')}>
                             <EyeOff size={14} color={colors.textMuted} />
                         </TouchableOpacity>
                     )}
@@ -129,7 +152,23 @@ const DirectShareItem = React.memo(({ item, onResponse, onMarkAsSeen, colors, st
     );
 });
 
-const ActivityItem = React.memo(({ item, onToggleKudo, onMarkAsSeen, profileId, colors, styles, isGrouped = false }: any) => {
+const ActivityItem = React.memo(({
+    item,
+    onToggleKudo,
+    onMarkAsSeen,
+    profileId,
+    colors,
+    styles,
+    isGrouped = false,
+}: {
+    item: SocialInboxItem;
+    onToggleKudo: (feedId: string) => void;
+    onMarkAsSeen: (id: string, feedType: 'direct_share' | 'activity_log') => void;
+    profileId?: string;
+    colors: SocialColors;
+    styles: SocialStyles;
+    isGrouped?: boolean;
+}) => {
     const isOwn = item.senderId === profileId;
     const senderLabel = isOwn ? 'Tú' : (item.senderUsername ? `@${item.senderUsername}` : item.senderName);
     const isPr = item.actionType === 'pr_broken';
@@ -170,6 +209,7 @@ const ActivityItem = React.memo(({ item, onToggleKudo, onMarkAsSeen, profileId, 
                     style={[styles.kudoBtn, item.hasKudoed && styles.kudoBtnActive, isOwn && styles.kudoBtnDisabled]}
                     onPress={() => !isOwn && onToggleKudo(item.id)}
                     disabled={isOwn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                     <Flame size={16} color={item.hasKudoed ? colors.yellow : colors.textMuted} fill={item.hasKudoed ? colors.yellow : 'none'} />
                     <Text style={[styles.kudoText, item.hasKudoed && styles.kudoTextActive]}>
@@ -179,7 +219,7 @@ const ActivityItem = React.memo(({ item, onToggleKudo, onMarkAsSeen, profileId, 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                     {isOwn && <Text style={styles.ownActivityHint}>Tu actividad</Text>}
                     {!item.seenAt && (
-                        <TouchableOpacity style={styles.markSeenBtn} onPress={() => onMarkAsSeen(item.id, 'activity_log')}>
+                        <TouchableOpacity onPress={() => onMarkAsSeen(item.id, 'activity_log')}>
                             <Eye size={18} color={colors.textMuted} />
                         </TouchableOpacity>
                     )}
@@ -214,6 +254,7 @@ const InboxTab = React.memo(({
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
     const toggleGroup = (groupId: string) => {
+        feedbackSoftImpact();
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setExpandedGroups((prev: Record<string, boolean>) => ({ ...prev, [groupId]: !prev[groupId] }));
     };
@@ -241,7 +282,7 @@ const InboxTab = React.memo(({
         });
 
         // 2. Grouping PRs
-        const result: any[] = [];
+        const result: InboxRenderItem[] = [];
         const prGroups: Record<string, SocialInboxItem[]> = {};
 
         filtered.forEach(item => {
@@ -277,7 +318,7 @@ const InboxTab = React.memo(({
         return result.sort((a, b) => safeDate(b.createdAt).getTime() - safeDate(a.createdAt).getTime());
     }, [inbox, showSeen, profile?.id, hideOwnActivity, typeFilter]);
 
-    const renderGroupItem = (group: any) => {
+    const renderGroupItem = (group: PrGroupItem) => {
         const isExpanded = !!expandedGroups[group.id];
         const isOwn = group.senderId === profile?.id;
         const senderLabel = isOwn ? 'Tú' : (group.senderUsername ? `@${group.senderUsername}` : group.senderName);
@@ -330,8 +371,12 @@ const InboxTab = React.memo(({
         );
     };
 
-    const renderItem = useCallback(({ item }: { item: any }) => {
-        if (item.feedType === 'direct_share' || !item.feedType && item.type !== 'pr_group') {
+    const renderItem = useCallback(({ item }: { item: InboxRenderItem }) => {
+        if (item.type === 'pr_group') {
+            return renderGroupItem(item);
+        }
+
+        if (item.feedType === 'direct_share') {
             return (
                 <View style={{ marginBottom: 16 }}>
                     <DirectShareItem
@@ -343,10 +388,6 @@ const InboxTab = React.memo(({
                     />
                 </View>
             );
-        }
-
-        if (item.type === 'pr_group') {
-            return renderGroupItem(item);
         }
 
         return (
@@ -373,16 +414,20 @@ const InboxTab = React.memo(({
                     <View style={{ paddingTop: 8 }}>
                         {renderHeader && renderHeader()}
 
-                        <View style={{ marginBottom: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isLive ? colors.green : colors.red }} />
-                                <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>
-                                    {isLive ? `LIVE · ${liveSource === 'sse' ? 'SSE' : 'POLLING'}` : 'RECONNECTING'}
+                        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+                            <View style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, paddingVertical: 8, paddingHorizontal: 10 }}>
+                                <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>PUBLICACIONES</Text>
+                                <Text style={{ color: colors.text, fontWeight: '900', marginTop: 2 }}>{organizedData.length}</Text>
+                            </View>
+                            <View style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, paddingVertical: 8, paddingHorizontal: 10 }}>
+                                <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>PENDIENTES</Text>
+                                <Text style={{ color: colors.text, fontWeight: '900', marginTop: 2 }}>
+                                    {organizedData.reduce((total, entry) => {
+                                        if (entry.type === 'pr_group') return total + entry.unseenCount;
+                                        return total + (entry.seenAt ? 0 : 1);
+                                    }, 0)}
                                 </Text>
                             </View>
-                            <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 11 }}>
-                                {syncLabel(lastLiveSyncAt)}
-                            </Text>
                         </View>
 
                         {/* 1. Global Filters Bar (Always at top) */}
@@ -390,7 +435,11 @@ const InboxTab = React.memo(({
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 4, gap: 10 }}>
                                 <TouchableOpacity
                                     style={[styles.filterChip, hideOwnActivity && styles.filterChipActive]}
-                                    onPress={() => setHideOwnActivity(!hideOwnActivity)}
+                                    onPress={() => {
+                                        feedbackSelection();
+                                        setHideOwnActivity(!hideOwnActivity);
+                                    }}
+                                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                 >
                                     <User size={14} color={hideOwnActivity ? colors.onPrimary : colors.textMuted} />
                                     <Text style={[styles.filterChipText, hideOwnActivity && styles.filterChipTextActive]}>
@@ -404,7 +453,11 @@ const InboxTab = React.memo(({
                                     <TouchableOpacity
                                         key={type}
                                         style={[styles.filterChip, typeFilter === type && styles.filterChipActive]}
-                                        onPress={() => setTypeFilter(type)}
+                                        onPress={() => {
+                                            feedbackSelection();
+                                            setTypeFilter(type);
+                                        }}
+                                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                     >
                                         {type === 'all' && <Filter size={14} color={typeFilter === type ? colors.onPrimary : colors.textMuted} />}
                                         {type === 'workout' && <Dumbbell size={14} color={typeFilter === type ? colors.onPrimary : colors.textMuted} />}
@@ -422,7 +475,7 @@ const InboxTab = React.memo(({
                         <View style={[styles.inboxSecondaryHeader, { marginBottom: 16, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 }]}>
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.inboxStatusTitle}>
-                                    {showSeen ? 'Historial de Notificaciones' : 'Notificaciones Recientes'}
+                                    {showSeen ? 'Historial de notificaciones' : 'Notificaciones recientes'}
                                 </Text>
                                 <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2, fontWeight: '600' }}>
                                     {showSeen ? 'Actividad guardada' : 'Nuevas interacciones'}
@@ -430,7 +483,11 @@ const InboxTab = React.memo(({
                             </View>
                             <TouchableOpacity
                                 style={[styles.archiveToggle, showSeen && styles.archiveToggleActive]}
-                                onPress={() => setShowSeen(!showSeen)}
+                                onPress={() => {
+                                    feedbackSelection();
+                                    setShowSeen(!showSeen);
+                                }}
+                                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                             >
                                 {showSeen ? <Eye size={16} color={colors.onPrimary} /> : <EyeOff size={16} color={colors.textMuted} />}
                                 <Text style={[styles.archiveToggleText, showSeen && styles.archiveToggleTextActive]}>
@@ -442,9 +499,10 @@ const InboxTab = React.memo(({
                                 <TouchableOpacity
                                     style={[styles.archiveToggle, { marginLeft: 10, borderColor: colors.border }]}
                                     onPress={handleMarkAllAsSeen}
+                                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                 >
                                     <CheckCircle size={16} color={colors.textMuted} />
-                                    <Text style={[styles.archiveToggleText, { marginLeft: 6 }]}>Leído</Text>
+                                    <Text style={[styles.archiveToggleText, { marginLeft: 6 }]}>Marcar todo</Text>
                                 </TouchableOpacity>
                             )}
                         </View>

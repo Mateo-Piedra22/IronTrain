@@ -66,6 +66,7 @@ const SOCIAL_METRIC_THROTTLE_MS = 60000;
 let socialRealtimeTimer: ReturnType<typeof setInterval> | null = null;
 let socialRealtimeHealthTimer: ReturnType<typeof setInterval> | null = null;
 let socialPulseInFlight = false;
+let socialLoadInFlight: Promise<void> | null = null;
 let socialStreamAbortController: AbortController | null = null;
 let socialStreamConnecting = false;
 let socialSseUpgradeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -162,6 +163,11 @@ export const useSocialStore = create<SocialState>((set, get) => ({
     lastDomainVersions: EMPTY_DOMAIN_VERSIONS,
 
     loadData: async (force = false, silent = false) => {
+        if (socialLoadInFlight) {
+            await socialLoadInFlight;
+            return;
+        }
+
         const { lastFetched } = get();
         const now = Date.now();
 
@@ -171,7 +177,7 @@ export const useSocialStore = create<SocialState>((set, get) => ({
 
         if (!silent) set({ loading: true });
 
-        try {
+        socialLoadInFlight = (async () => {
             const [profile, leaderboard, friends, feedInbox, notificationInbox] = await Promise.all([
                 SocialService.getProfile(),
                 SocialService.getAnalytics(),
@@ -212,10 +218,15 @@ export const useSocialStore = create<SocialState>((set, get) => ({
                     lastRealtimeSyncAt: now,
                 };
             });
+        })();
+
+        try {
+            await socialLoadInFlight;
         } catch (err) {
             logger.captureException(err, { scope: 'useSocialStore.loadData' });
             set({ realtimeConnected: false });
         } finally {
+            socialLoadInFlight = null;
             if (!silent) set({ loading: false });
         }
     },

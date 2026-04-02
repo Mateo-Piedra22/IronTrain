@@ -1,4 +1,6 @@
+import { SocialColors, SocialStyles } from '@/components/social/types';
 import { SocialProfile } from '@/src/services/SocialService';
+import { feedbackSelection, feedbackSoftImpact } from '@/src/social/feedback';
 import { CalendarCheck, CalendarDays, ChevronDown, ChevronUp, CloudRain, Copy, Flame, Globe, LayoutDashboard, Lock as LockIcon, MapPin, MapPinOff, Shield as ShieldIcon, Trophy, Zap } from 'lucide-react-native';
 import React from 'react';
 import { ActivityIndicator, LayoutAnimation, Platform, Text, TouchableOpacity, UIManager, View } from 'react-native';
@@ -23,8 +25,8 @@ interface ProfileCardProps {
     locationPermissionDenied: boolean;
     lastKnownLocation: string | null;
     refreshingLocation: boolean;
-    colors: any;
-    styles: any;
+    colors: SocialColors;
+    styles: SocialStyles;
 }
 
 export const ProfileCard = React.memo(({
@@ -48,15 +50,23 @@ export const ProfileCard = React.memo(({
 }: ProfileCardProps) => {
     if (!profile) return null;
 
+    const baseWorkoutPoints = profile.scoreConfig?.workoutCompletePoints ?? 0;
+    const weatherMultiplier = profile.weatherBonus?.multiplier ?? 1;
+    const eventMultiplier = profile.activeEvent?.multiplier ?? 1;
+    const streakMultiplier = profile.streakMultiplier ?? 1;
+    const effectiveWorkoutPoints = Math.round(baseWorkoutPoints * weatherMultiplier * eventMultiplier * streakMultiplier);
+
     return (
         <View style={styles.profileCard}>
             {/* Main Header / Trigger */}
             <TouchableOpacity
                 onPress={() => {
+                    feedbackSoftImpact();
                     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                     setIsProfileExpanded(!isProfileExpanded);
                 }}
                 activeOpacity={0.9}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
                 <View style={[styles.profileHeader, isProfileExpanded && styles.profileHeaderExpanded]}>
                     <View style={styles.profileInfoWrapper}>
@@ -66,12 +76,14 @@ export const ProfileCard = React.memo(({
                         )}
                     </View>
 
-                    <View style={styles.bonusColumn}>
+                    <View style={styles.profileBadgesRow}>
                         {profile.activeEvent && (
                             <TouchableOpacity
                                 style={styles.eventBadge}
                                 onPress={onShowEventModal}
                                 activeOpacity={0.7}
+                                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                                onPressIn={feedbackSelection}
                             >
                                 <Zap size={10} color={colors.text} fill={colors.text} />
                                 <Text style={styles.eventBadgeText}>Evento {profile.activeEvent.multiplier}x</Text>
@@ -82,6 +94,8 @@ export const ProfileCard = React.memo(({
                             onPress={onShowWeatherModal}
                             activeOpacity={0.7}
                             disabled={refreshingLocation}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                            onPressIn={feedbackSelection}
                         >
                             {refreshingLocation ? (
                                 <ActivityIndicator size={10} color={colors.textMuted} />
@@ -111,11 +125,11 @@ export const ProfileCard = React.memo(({
                         </View>
                         <View style={styles.statMiniItem}>
                             <Flame size={14} color={colors.red} />
-                            <Text style={styles.statMiniText}>{profile.currentStreak || 0}</Text>
+                            <Text style={styles.statMiniText}>{profile.currentStreak || 0} d</Text>
                         </View>
                         <View style={styles.statMiniItem}>
-                            <CalendarCheck size={14} color={colors.primary.DEFAULT} />
-                            <Text style={styles.statMiniText}>{profile.streakWeeks || 0} sem</Text>
+                            <CloudRain size={14} color={colors.primary.DEFAULT} />
+                            <Text style={styles.statMiniText}>x{weatherMultiplier.toFixed(2)}</Text>
                         </View>
                     </View>
                 )}
@@ -159,19 +173,23 @@ export const ProfileCard = React.memo(({
                         {profile.scoreConfig && (
                             <View style={styles.infoBadge}>
                                 <Zap size={14} color={colors.textMuted} />
-                                <Text style={styles.infoBadgeText}>+{profile.scoreConfig.workoutCompletePoints} pts/ent</Text>
+                                <Text style={styles.infoBadgeText}>+{effectiveWorkoutPoints} pts/ent</Text>
                             </View>
                         )}
                     </View>
+
+                    <Text style={[styles.friendStatus, { marginBottom: 10 }]}>Estado social: {(profile.is_public === 0 || profile.is_public === false || profile.isPublic === 0 || profile.isPublic === false) ? 'perfil privado' : 'perfil visible a la comunidad'}</Text>
 
                     {/* Weekly Meta Card */}
                     <TouchableOpacity
                         style={styles.goalCard}
                         onPress={() => {
+                            feedbackSoftImpact();
                             LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
                             setIsGoalsExpanded(!isGoalsExpanded);
                         }}
                         activeOpacity={0.8}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
                         <View style={styles.goalCardLeft}>
                             <CalendarDays size={22} color={colors.primary.DEFAULT} />
@@ -201,9 +219,13 @@ export const ProfileCard = React.memo(({
                                     return (
                                         <TouchableOpacity
                                             key={day.id}
-                                            onPress={() => onToggleTrainingDay(day.id)}
+                                            onPress={() => {
+                                                feedbackSelection();
+                                                onToggleTrainingDay(day.id);
+                                            }}
                                             style={[styles.dayChip, isSelected && styles.dayChipActive]}
                                             activeOpacity={0.7}
+                                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                                         >
                                             <Text style={[styles.dayChipText, isSelected && styles.dayChipTextActive]}>{day.label}</Text>
                                         </TouchableOpacity>
@@ -226,14 +248,14 @@ export const ProfileCard = React.memo(({
                             </Text>
                         </View>
 
-                        <TouchableOpacity style={styles.profileEditBtn} onPress={onEditProfile} activeOpacity={0.8}>
+                        <TouchableOpacity style={styles.profileEditBtn} onPress={onEditProfile} activeOpacity={0.8} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }} onPressIn={feedbackSelection}>
                             <ShieldIcon size={18} color={colors.onPrimary} />
                             <Text style={styles.profileEditBtnText}>Configurar Perfil</Text>
                         </TouchableOpacity>
                     </View>
 
                     {/* Footer Utility */}
-                    <TouchableOpacity style={styles.idFooter} onPress={onCopyId} activeOpacity={0.6}>
+                    <TouchableOpacity style={styles.idFooter} onPress={onCopyId} activeOpacity={0.6} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }} onPressIn={feedbackSelection}>
                         <Text style={styles.idFooterText}>ID: {profile.id.toUpperCase()}</Text>
                         <Copy size={12} color={colors.textMuted} />
                     </TouchableOpacity>
@@ -243,11 +265,13 @@ export const ProfileCard = React.memo(({
             {/* Bottom Collapse Trigger */}
             <TouchableOpacity
                 onPress={() => {
+                    feedbackSoftImpact();
                     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                     setIsProfileExpanded(!isProfileExpanded);
                 }}
                 activeOpacity={0.7}
                 style={styles.toggleCollapseWrapper}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
                 {isProfileExpanded ? <ChevronUp size={18} color={colors.textMuted} /> : <ChevronDown size={18} color={colors.textMuted} />}
             </TouchableOpacity>

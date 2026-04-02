@@ -1,46 +1,42 @@
-# Distribución (Enterprise) – Android sin Play Store
+# Distribución
 
-## Qué hacen (y qué NO hacen) las env vars de Vercel
-Configurar env vars en Vercel **NO construye** la APK automáticamente.
+## Documentos relacionados
 
-Lo que sí hace:
-- Permite que la web lea el **último GitHub Release** (tag + assets) y use el asset `.apk` como link de descarga.
-- Hace que `/releases.json` apunte a ese APK y la app pueda decir “Actualización disponible”.
+- [Release](RELEASE.md)
+- [Runbook operacional](RUNBOOK.md)
+- [Troubleshooting](TROUBLESHOOTING.md)
 
-Lo que no hace:
-- No ejecuta builds de Expo/EAS.
-- No crea releases en GitHub.
+## Android
 
-## Flujo recomendado (manual pero profesional)
-1. Preparar versión:
-   - `npm run release:prepare -- 1.2.0`
-2. Implementar cambios y correr calidad:
-   - `npm test`
-3. Finalizar changelog (poner fecha):
-   - `npm run release:finalize`
-4. Generar APK (EAS recomendado):
-   - `npx eas build --platform android`
-5. Publicar en GitHub Releases:
-   - Tag: `v1.2.0`
-   - Asset: `IronTrain-v1.2.0.apk`
-6. Push a git:
-   - Vercel redeploy → `irontrain.motiona.xyz` se actualiza solo
-   - La app detecta update vía `https://irontrain.motiona.xyz/releases.json`
+- Pipeline oficial por GitHub Actions (`release-android.yml`).
+- Build con EAS y publicación en GitHub Release.
+- Integridad básica con archivo checksum `.sha256.txt`.
 
-## Flujo 100% automático (CI/CD)
-Si quieres que “hago push/tag y se construye + publica solo”, se implementa un pipeline en GitHub Actions:
-- Trigger: push de tag `v*`
-- Pasos:
-  1) instalar deps
-  2) autenticar Expo/EAS (EXPO_TOKEN)
-  3) correr `eas build`
-  4) descargar artifact
-  5) crear GitHub Release y subir `.apk`
+## Objetivo de distribución
 
-Requisitos típicos (secrets en GitHub):
-- `EXPO_TOKEN` (token de Expo con permiso para EAS build)
+- Entregar artefactos trazables y verificables.
+- Separar canales de prueba y producción para reducir riesgo.
+- Facilitar validación por QA o stakeholders antes de promoción amplia.
 
-## Nota sobre “build a Expo”
-“Subir una nueva build a Expo” crea un build en EAS, pero eso por sí solo no actualiza tu web
-si la web está tomando APK desde GitHub Releases. Para automatizarlo, el pipeline debe publicar también el asset al Release.
+## Canales sugeridos
 
+- Interno (QA/canary): tags de pruebas controladas.
+- Producción: tags estables semver.
+
+## Estrategia de promoción
+
+1. Publicar en canal interno para validación inicial.
+2. Confirmar criterios de calidad y ausencia de regresiones críticas.
+3. Promover a canal de producción con tag semver estable.
+
+## Requisitos de distribución
+
+- Changelog generado.
+- Tests/typecheck en verde.
+- Secretos de build configurados en GitHub.
+
+## Verificación post-publicación
+
+- Descarga correcta del artefacto desde release.
+- Checksum coincide con archivo publicado.
+- Notas de release describen cambios y riesgos conocidos.

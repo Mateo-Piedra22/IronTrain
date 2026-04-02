@@ -4,7 +4,10 @@ import { BookOpen, ChevronDown, ChevronRight, Dumbbell, X } from 'lucide-react-n
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useColors } from '../src/hooks/useColors';
+import { useSharedSpaceSummary } from '../src/hooks/useSharedSpaceSummary';
 import { RoutineDayWithExercises, RoutineWithDays, routineService } from '../src/services/RoutineService';
+import { sharedSpaceCopy } from '../src/social/sharedSpaceCopy';
+import { ToastContainer } from './ui/ToastContainer';
 
 interface LoadRoutineModalProps {
     visible: boolean;
@@ -126,9 +129,15 @@ export function LoadRoutineModal({ visible, onClose, onLoadDay }: LoadRoutineMod
     const [routines, setRoutines] = useState<RoutineWithDays[]>([]);
     const [loading, setLoading] = useState(false);
     const [expandedRoutineId, setExpandedRoutineId] = useState<string | null>(null);
+    const { linkedRoutineIds, reload: reloadSharedSummary } = useSharedSpaceSummary();
 
     useEffect(() => {
-        if (visible) { loadRoutines(); } else { setExpandedRoutineId(null); }
+        if (visible) {
+            loadRoutines();
+            void reloadSharedSummary();
+        } else {
+            setExpandedRoutineId(null);
+        }
     }, [visible]);
 
     const loadRoutines = async () => {
@@ -205,6 +214,11 @@ export function LoadRoutineModal({ visible, onClose, onLoadDay }: LoadRoutineMod
                                                         <Text style={st.cardMeta}>
                                                             {routine.days.length} {routine.days.length === 1 ? 'DÍA' : 'DÍAS'}
                                                         </Text>
+                                                        {linkedRoutineIds.includes(routine.id) && (
+                                                            <View style={{ marginTop: 6, alignSelf: 'flex-start', backgroundColor: withAlpha(colors.primary.DEFAULT, '15'), borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: withAlpha(colors.primary.DEFAULT, '35') }}>
+                                                                <Text style={{ color: colors.primary.DEFAULT, fontSize: 9, fontWeight: '900', letterSpacing: 0.4 }}>{sharedSpaceCopy.cardBadge}</Text>
+                                                            </View>
+                                                        )}
                                                     </View>
                                                 </View>
                                                 {isExpanded
@@ -249,6 +263,7 @@ export function LoadRoutineModal({ visible, onClose, onLoadDay }: LoadRoutineMod
                         </View>
                     </ScrollView>
                 </View>
+                <ToastContainer />
             </View>
         </Modal>
     );

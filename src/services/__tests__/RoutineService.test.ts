@@ -16,6 +16,12 @@ jest.mock('../../utils/uuid', () => ({
   uuidV4: jest.fn(),
 }));
 
+jest.mock('../../store/authStore', () => ({
+  useAuthStore: {
+    getState: jest.fn(() => ({ user: { id: 'user-1' } })),
+  },
+}));
+
 describe('RoutineService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -143,5 +149,86 @@ describe('RoutineService', () => {
     expect(Array.isArray(result.categories)).toBe(true);
     expect(result.categories).toHaveLength(1);
     expect(result.categories[0].id).toBe('c1');
+  });
+
+  it('does not reapply when same snapshot is already linked', async () => {
+    (dbService.getFirst as jest.Mock).mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM shared_routine_links')) {
+        return { local_routine_id: 'routine-linked', last_snapshot_id: 'snap-1' };
+      }
+      return null;
+    });
+
+    const result = await routineService.syncSharedRoutinePayload({
+      routine: { name: 'Rutina C' },
+      routine_days: [{ id: 'd1', name: 'Día 1', order_index: 0 }],
+      routine_exercises: [{ routine_day_id: 'd1', exercise_id: 'e1', order_index: 0 }],
+      exercises: [{ id: 'e1', name: 'Press', type: 'weight_reps', origin_id: 'orig-3' }],
+    }, {
+      sharedRoutineId: 'shared-1',
+      snapshotId: 'snap-1',
+      revision: 2,
+    });
+
+    expect(result).toEqual({ routineId: 'routine-linked', applied: false });
+    expect(dbService.run).not.toHaveBeenCalled();
+    expect(dbService.queueSyncMutation).not.toHaveBeenCalled();
+  });
+
+  it('reuses linked local routine for new snapshot without creating duplicate routine', async () => {
+    (uuidV4 as jest.Mock)
+      .mockReturnValueOnce('day-new')
+      .mockReturnValueOnce('re-new');
+
+    (dbService.getFirst as jest.Mock).mockImplementation(async (sql: string) => {
+      if (sql.includes('SELECT local_routine_id, last_snapshot_id FROM shared_routine_links')) {
+        return { local_routine_id: 'routine-linked', last_snapshot_id: 'snap-1' };
+      }
+      if (sql.includes('SELECT id FROM routines WHERE id = ?')) {
+        return { id: 'routine-linked' };
+      }
+      if (sql.includes('SELECT id FROM categories ORDER BY')) {
+        return { id: 'cat-default' };
+      }
+      if (sql.includes('SELECT id FROM exercises WHERE origin_id')) {
+        return { id: 'ex-existing' };
+      }
+      if (sql.includes('SELECT id FROM shared_routine_links')) {
+        return { id: 'srl:shared-1:user-1' };
+      }
+      return null;
+    });
+
+    (dbService.getAll as jest.Mock).mockImplementation(async (sql: string) => {
+      if (sql.includes('SELECT id FROM routine_days WHERE routine_id = ?')) {
+        return [{ id: 'day-old' }];
+      }
+      return [];
+    });
+
+    const result = await routineService.syncSharedRoutinePayload({
+      routine: { name: 'Rutina Actualizada' },
+      routine_days: [{ id: 'd1', name: 'Día 1', order_index: 0 }],
+      routine_exercises: [{ routine_day_id: 'd1', exercise_id: 'e1', order_index: 0, notes: 'x' }],
+      exercises: [{ id: 'e1', name: 'Press', type: 'weight_reps', origin_id: 'orig-4' }],
+    }, {
+      sharedRoutineId: 'shared-1',
+      snapshotId: 'snap-2',
+      revision: 3,
+    });
+
+    expect(result.routineId).toBe('routine-linked');
+    expect(result.applied).toBe(true);
+
+    expect(dbService.run).toHaveBeenCalledWith(
+      'UPDATE routines SET name = ?, description = ?, updated_at = ? WHERE id = ?',
+      ['Rutina Actualizada', null, expect.any(Number), 'routine-linked']
+    );
+    expect(dbService.run).toHaveBeenCalledWith('DELETE FROM routine_days WHERE id = ?', ['day-old']);
+
+    const routineInsertCalls = (dbService.run as jest.Mock).mock.calls.filter((call) =>
+      typeof call[0] === 'string' && call[0].includes('INSERT INTO routines')
+    );
+    expect(routineInsertCalls).toHaveLength(0);
   });
 });

@@ -65,6 +65,8 @@ const asNumber = (value: unknown): number | null => {
 
 export const buildActivityVisualSummary = (item: SocialInboxItem): ActivityVisualSummary => {
     const meta = parseMeta(item.metadata);
+    const payload = (item.payload && typeof item.payload === 'object') ? (item.payload as Record<string, unknown>) : {};
+    const mergedMeta = { ...payload, ...meta };
     const kind = getActivityKind(item);
 
     if (kind === 'pr') {
@@ -107,14 +109,23 @@ export const buildActivityVisualSummary = (item: SocialInboxItem): ActivityVisua
     }
 
     if (kind === 'workout') {
-        const volume = asNumber(meta.totalVolume ?? meta.volume);
-        const exercises = asNumber(meta.exercisesCount ?? meta.totalExercises);
+        const volume = asNumber(
+            mergedMeta.totalVolume ?? mergedMeta.volume ?? mergedMeta.total_volume ?? mergedMeta.workoutVolume
+        );
+        const exercises = asNumber(
+            mergedMeta.exercisesCount ??
+            mergedMeta.totalExercises ??
+            mergedMeta.exerciseCount ??
+            mergedMeta.exercises ??
+            mergedMeta.movementsCount
+        );
+        const validExercises = exercises && exercises > 0 ? Math.round(exercises) : null;
 
         return {
             headline: 'Entrenamiento completo',
             subline: 'Sesión finalizada',
-            highlightLabel: volume ? 'Volumen' : 'Ejercicios',
-            highlightValue: volume ? `${Math.round(volume)} kg` : `${exercises ?? 0}`,
+            highlightLabel: volume ? 'Volumen' : validExercises ? 'Ejercicios' : 'Estado',
+            highlightValue: volume ? `${Math.round(volume)} kg` : validExercises ? `${validExercises}` : 'Completado',
             badge: 'WORKOUT',
             activityKind: kind,
         };

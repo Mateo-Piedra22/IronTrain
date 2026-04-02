@@ -1,3 +1,4 @@
+import { useAuthStore } from '../store/authStore';
 import { Badge, Routine, RoutineDay, RoutineExercise } from '../types/db';
 import { logger } from '../utils/logger';
 import { capitalizeWords } from '../utils/text';
@@ -69,6 +70,19 @@ type SharedCategory = {
     is_system?: unknown;
 };
 
+type SharedRoutineImportOptions = {
+    targetRoutineId?: string | null;
+    sharedRoutineId?: string;
+    snapshotId?: string | null;
+    revision?: number | null;
+    title?: string | null;
+};
+
+type SharedRoutineSyncResult = {
+    routineId: string;
+    applied: boolean;
+};
+
 const toArray = <T>(value: unknown): T[] => Array.isArray(value) ? value as T[] : [];
 
 const getString = (value: unknown): string | null =>
@@ -81,6 +95,7 @@ class RoutineService {
     private cache = new Map<string, { value: any; timestamp: number }>();
     private CACHE_TTL = 300000; // 5 minutes
     private isSubscribed = false;
+    private sharedRoutineSyncLocks = new Map<string, Promise<void>>();
 
     private init() {
         if (this.isSubscribed) return;
@@ -300,8 +315,13 @@ class RoutineService {
         this.clearCache();
     }
 
-    // --- P2P IMPORTATION ---
-    public async importSharedRoutine(payload: SharedRoutinePayload): Promise<string> {
+    // --- P2P IMPORTATION / SHARED SYNC ---
+    public async importSharedRoutine(payload: SharedRoutinePayload, options: SharedRoutineImportOptions = {}): Promise<string> {
+        const result = await this.syncSharedRoutinePayload(payload, options);
+        return result.routineId;
+    }
+
+    public async syncSharedRoutinePayload(payload: SharedRoutinePayload, options: SharedRoutineImportOptions = {}): Promise<SharedRoutineSyncResult> {
         const routine = payload?.routine;
         const routineDays = toArray<SharedRoutineDay>(payload?.routine_days);
         const routineExercises = toArray<SharedRoutineExercise>(payload?.routine_exercises);
@@ -314,12 +334,65 @@ class RoutineService {
             throw new Error('La rutina compartida no contiene ejercicios.');
         }
 
+        const normalizedSharedRoutineIdForLock = getString(options.sharedRoutineId);
+        const normalizedTargetRoutineIdForLock = getString(options.targetRoutineId);
+        const currentUserId = useAuthStore.getState().user?.id || 'anon';
+        const lockKey = normalizedSharedRoutineIdForLock
+            ? `shared:${normalizedSharedRoutineIdForLock}`
+            : normalizedTargetRoutineIdForLock
+                ? `routine:${normalizedTargetRoutineIdForLock}`
+                : `user:${currentUserId}`;
+
+        while (this.sharedRoutineSyncLocks.has(lockKey)) {
+            await this.sharedRoutineSyncLocks.get(lockKey);
+        }
+
+        let releaseLock: (() => void) | null = null;
+        const lockPromise = new Promise<void>((resolve) => {
+            releaseLock = resolve;
+        });
+        this.sharedRoutineSyncLocks.set(lockKey, lockPromise);
+
         const routineName = getString(routine?.name) || 'Rutina importada';
         const routineDescription = getString(routine?.description);
 
         try {
-            let newRoutineId = '';
+            let syncedRoutineId = '';
+            let appliedChanges = false;
+            const normalizedSnapshotId = getString(options.snapshotId);
+            const normalizedSharedRoutineId = getString(options.sharedRoutineId);
+            const userId = useAuthStore.getState().user?.id || null;
+            const now = Date.now();
+
             await dbService.withTransaction(async () => {
+                let targetRoutineId = getString(options.targetRoutineId) || null;
+
+                if (!targetRoutineId && normalizedSharedRoutineId) {
+                    const existingLink = await dbService.getFirst<{ local_routine_id: string; last_snapshot_id: string | null }>(
+                        'SELECT local_routine_id, last_snapshot_id FROM shared_routine_links WHERE shared_routine_id = ? AND ((user_id = ?) OR (user_id IS NULL AND ? IS NULL)) LIMIT 1',
+                        [normalizedSharedRoutineId, userId, userId]
+                    );
+
+                    if (existingLink?.local_routine_id) {
+                        targetRoutineId = existingLink.local_routine_id;
+                        if (normalizedSnapshotId && existingLink.last_snapshot_id === normalizedSnapshotId) {
+                            syncedRoutineId = targetRoutineId;
+                            appliedChanges = false;
+                            return;
+                        }
+                    }
+                }
+
+                if (targetRoutineId) {
+                    const existingRoutine = await dbService.getFirst<{ id: string }>(
+                        'SELECT id FROM routines WHERE id = ? AND deleted_at IS NULL',
+                        [targetRoutineId]
+                    );
+                    if (!existingRoutine?.id) {
+                        targetRoutineId = null;
+                    }
+                }
+
                 const ensureDefaultCategoryId = async (): Promise<string> => {
                     const existing = await dbService.getFirst<{ id: string }>('SELECT id FROM categories ORDER BY sort_order ASC LIMIT 1');
                     if (existing?.id) return existing.id;
@@ -500,9 +573,23 @@ class RoutineService {
                 }
 
                 // 2. Insert Routine (New ID to avoid overriding user's own if it's identical UUID)
-                newRoutineId = uuidV4();
-                await dbService.run('INSERT INTO routines (id, name, description) VALUES (?, ?, ?)', [newRoutineId, routineName, routineDescription]);
-                await dbService.queueSyncMutation('routines', newRoutineId, 'INSERT', { id: newRoutineId, name: routineName, description: routineDescription });
+                if (targetRoutineId) {
+                    syncedRoutineId = targetRoutineId;
+                    await dbService.run('UPDATE routines SET name = ?, description = ?, updated_at = ? WHERE id = ?', [routineName, routineDescription, now, syncedRoutineId]);
+                    await dbService.queueSyncMutation('routines', syncedRoutineId, 'UPDATE', { name: routineName, description: routineDescription, updated_at: now });
+
+                    const existingDays = await dbService.getAll<{ id: string }>('SELECT id FROM routine_days WHERE routine_id = ?', [syncedRoutineId]);
+                    for (const day of existingDays) {
+                        await dbService.run('DELETE FROM routine_days WHERE id = ?', [day.id]);
+                        await dbService.queueSyncMutation('routine_days', day.id, 'DELETE');
+                    }
+                } else {
+                    syncedRoutineId = uuidV4();
+                    await dbService.run('INSERT INTO routines (id, name, description, updated_at) VALUES (?, ?, ?, ?)', [syncedRoutineId, routineName, routineDescription, now]);
+                    await dbService.queueSyncMutation('routines', syncedRoutineId, 'INSERT', { id: syncedRoutineId, name: routineName, description: routineDescription, updated_at: now });
+                }
+
+                appliedChanges = true;
 
                 // 3. Insert Days
                 const dayMap = new Map<string, string>();
@@ -512,8 +599,8 @@ class RoutineService {
                     const orderIndex = getNumber(day.order_index);
                     if (!remoteDayId || !dayName || orderIndex === null) continue;
                     const newDayId = uuidV4();
-                    await dbService.run('INSERT INTO routine_days (id, routine_id, name, order_index) VALUES (?, ?, ?, ?)', [newDayId, newRoutineId, dayName, orderIndex]);
-                    await dbService.queueSyncMutation('routine_days', newDayId, 'INSERT', { id: newDayId, routine_id: newRoutineId, name: dayName, order_index: orderIndex });
+                    await dbService.run('INSERT INTO routine_days (id, routine_id, name, order_index) VALUES (?, ?, ?, ?)', [newDayId, syncedRoutineId, dayName, orderIndex]);
+                    await dbService.queueSyncMutation('routine_days', newDayId, 'INSERT', { id: newDayId, routine_id: syncedRoutineId, name: dayName, order_index: orderIndex });
                     dayMap.set(remoteDayId, newDayId);
                 }
 
@@ -542,6 +629,26 @@ class RoutineService {
                         });
                     }
                 }
+
+                if (normalizedSharedRoutineId) {
+                    const linkId = `srl:${normalizedSharedRoutineId}:${userId ?? 'anon'}`;
+                    const existingLink = await dbService.getFirst<{ id: string }>(
+                        'SELECT id FROM shared_routine_links WHERE shared_routine_id = ? AND ((user_id = ?) OR (user_id IS NULL AND ? IS NULL)) LIMIT 1',
+                        [normalizedSharedRoutineId, userId, userId]
+                    );
+
+                    if (existingLink?.id) {
+                        await dbService.run(
+                            'UPDATE shared_routine_links SET local_routine_id = ?, last_snapshot_id = ?, last_revision = ?, last_synced_at = ?, updated_at = ? WHERE id = ?',
+                            [syncedRoutineId, normalizedSnapshotId, options.revision ?? null, now, now, existingLink.id]
+                        );
+                    } else {
+                        await dbService.run(
+                            'INSERT INTO shared_routine_links (id, shared_routine_id, local_routine_id, last_snapshot_id, last_revision, last_synced_at, updated_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                            [linkId, normalizedSharedRoutineId, syncedRoutineId, normalizedSnapshotId, options.revision ?? null, now, now, userId]
+                        );
+                    }
+                }
             });
 
             // Emit event for real-time UI updates across tabs (e.g. Social -> Library)
@@ -551,10 +658,15 @@ class RoutineService {
                 logger.captureException(e, { scope: 'RoutineService.importRoutine.emitDataUpdated' });
             }
 
-            return newRoutineId;
+            return { routineId: syncedRoutineId, applied: appliedChanges };
 
         } catch (e) {
             throw e;
+        } finally {
+            if (this.sharedRoutineSyncLocks.get(lockKey) === lockPromise) {
+                this.sharedRoutineSyncLocks.delete(lockKey);
+                releaseLock?.();
+            }
         }
     }
 

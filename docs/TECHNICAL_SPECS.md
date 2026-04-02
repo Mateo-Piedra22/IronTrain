@@ -1,26 +1,22 @@
 # Especificaciones técnicas
 
-Este documento resume decisiones técnicas y reglas del sistema (no es un manual de uso).
+## Mobile
 
-## Arquitectura
-Referencia: [ARCHITECTURE.md](file:///c:/Users/mateo/OneDrive/Escritorio/Work/Programas/IronTrain/docs/ARCHITECTURE.md)
+- Expo SDK: 54.
+- React Native: 0.81.x.
+- React: 19.x.
+- Router: Expo Router.
+- DB local: expo-sqlite.
 
-## Modelo de datos (resumen)
-### Workout
-- `status`: `in_progress` o `completed`.
-- `is_template`: 1 indica plantilla (editable como template, no como sesión).
-- Regla: cuando `status = completed`, el workout es read-only en UI y store.
+## Website
 
-### WorkoutSet
-- Validación: no negativos.
-- Ghost values: al crear sets, se sugiere desde el set previo (workout actual) o historial.
+- Next.js 15.
+- TypeScript 5.9.
+- Drizzle ORM.
+- Postgres (Neon).
 
-### Plate inventory
-- La PK incluye `unit` para permitir kg y lbs simultáneamente.
+## Calidad
 
-## Unidades
-Referencia: [UNITS_TIMERS_WORKOUT_STATUS.md](file:///c:/Users/mateo/OneDrive/Escritorio/Work/Programas/IronTrain/docs/UNITS_TIMERS_WORKOUT_STATUS.md)
-
-## Timers
-- Rest timer: por timestamp de fin (sin drift).
-- Workout timer: por delta real (resistente a background).
+- Tests mobile por Jest.
+- Tests website por Vitest.
+- Typecheck obligatorio en CI.

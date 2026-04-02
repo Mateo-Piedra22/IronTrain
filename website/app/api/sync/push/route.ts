@@ -9,7 +9,7 @@ import { logger } from '../../../../src/lib/logger';
 import { RATE_LIMITS } from '../../../../src/lib/rate-limit';
 import { applyWorkoutScoring, reconcileScoreLifetimeForUser, revertWorkoutScoring } from '../../../../src/lib/social-scoring';
 import { coalescePushOperations } from '../../../../src/lib/sync-push-coalesce';
-import { collectIncomingRecordIdsByTable, shouldDeferWorkoutSetUpsert, type PushOperation } from '../../../../src/lib/sync-push-defer';
+import { collectIncomingRecordIdsByTable, shouldDeferRoutineExerciseUpsert, shouldDeferWorkoutSetUpsert, type PushOperation } from '../../../../src/lib/sync-push-defer';
 import { isClientSyncReadOnlyTable } from '../../../../src/lib/sync/sync-write-policy';
 import { SyncMapper } from '../../../../src/lib/sync/SyncMapper';
 
@@ -155,6 +155,7 @@ export async function POST(req: NextRequest) {
 
         const incomingIdsByTable = collectIncomingRecordIdsByTable(coalescedIncomingOps);
         const incomingWorkouts = incomingIdsByTable.get('workouts') ?? new Set<string>();
+        const incomingRoutineDays = incomingIdsByTable.get('routine_days') ?? new Set<string>();
         const deferredOps: IncomingPushOperation[] = [];
 
         // Efficient single transaction for the entire batch
@@ -236,6 +237,32 @@ export async function POST(req: NextRequest) {
                             if (!parentExists && shouldDeferWorkoutSetUpsert({ workoutId: wId, parentExistsInDb: false, incomingWorkouts })) {
                                 deferredOps.push(op);
                                 return null; // Process later
+                            }
+                        }
+
+                        if (tableName === 'routine_exercises') {
+                            const routineDayId = typeof filteredData.routineDayId === 'string' ? filteredData.routineDayId : '';
+                            if (!routineDayId) throw new Error('Missing routineDayId');
+
+                            const parentExists = (
+                                await tx
+                                    .select({ id: schema.routineDays.id })
+                                    .from(schema.routineDays)
+                                    .where(and(eq(schema.routineDays.id, routineDayId), eq(schema.routineDays.userId, userId)))
+                                    .limit(1)
+                            ).length > 0;
+
+                            if (!parentExists && shouldDeferRoutineExerciseUpsert({
+                                routineDayId,
+                                parentExistsInDb: false,
+                                incomingRoutineDays,
+                            })) {
+                                deferredOps.push(op);
+                                return null;
+                            }
+
+                            if (!parentExists) {
+                                throw new Error('Missing routine day parent for routine_exercises');
                             }
                         }
 

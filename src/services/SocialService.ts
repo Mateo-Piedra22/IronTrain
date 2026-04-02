@@ -180,6 +180,147 @@ export interface SocialPulse {
     serverTimeMs: number;
 }
 
+export interface SharedRoutineItem {
+    id: string;
+    title: string;
+    ownerId: string;
+    editMode: 'owner_only' | 'collaborative';
+    approvalMode?: 'none' | 'owner_review';
+    currentRevision: number;
+    sourceRoutineId?: string | null;
+    pendingReviewsCount?: number;
+    pendingInvitationsCount?: number;
+    updatedAt?: string | number | Date;
+    membership: {
+        role: 'owner' | 'editor' | 'viewer';
+        canEdit: boolean;
+    };
+}
+
+export interface SharedRoutineInvitationItem {
+    id: string;
+    sharedRoutineId: string;
+    invitedUserId: string;
+    invitedBy: string;
+    proposedRole: 'editor' | 'viewer';
+    status: 'pending' | 'accepted' | 'rejected' | 'cancelled';
+    createdAt?: string | number | Date;
+    workspace: {
+        id: string;
+        title: string;
+        ownerId: string;
+        editMode: 'owner_only' | 'collaborative';
+        approvalMode?: 'none' | 'owner_review';
+        currentRevision: number;
+        sourceRoutineId?: string | null;
+    };
+}
+
+export interface SharedRoutineDetail {
+    workspace: {
+        id: string;
+        title: string;
+        ownerId: string;
+        editMode: 'owner_only' | 'collaborative';
+        approvalMode?: 'none' | 'owner_review';
+        currentRevision: number;
+        sourceRoutineId?: string | null;
+        updatedAt?: string | number | Date;
+    };
+    membership: {
+        role: 'owner' | 'editor' | 'viewer';
+        canEdit: boolean;
+    };
+    members?: Array<{
+        userId: string;
+        role: 'owner' | 'editor' | 'viewer';
+        canEdit: boolean;
+        joinedAt?: string | number | Date;
+        displayName?: string | null;
+        username?: string | null;
+    }>;
+    pendingInvitations?: Array<{
+        id: string;
+        invitedUserId: string;
+        invitedBy: string;
+        proposedRole: 'editor' | 'viewer';
+        status: 'pending' | 'accepted' | 'rejected' | 'cancelled';
+        createdAt?: string | number | Date;
+        displayName?: string | null;
+        username?: string | null;
+    }>;
+    snapshot: {
+        id: string;
+        revision: number;
+        payload: any;
+        createdBy: string;
+        createdAt?: string | number | Date;
+    };
+}
+
+export interface SharedRoutineSyncResult {
+    success: boolean;
+    snapshotId: string | null;
+    revision: number | null;
+    forced?: boolean;
+    reviewRequired?: boolean;
+    reviewRequestId?: string | null;
+}
+
+export interface SharedRoutineChangeItem {
+    id: string;
+    actionType: string;
+    actorId: string;
+    snapshotId?: string | null;
+    metadata?: Record<string, unknown> | null;
+    createdAt?: string | number | Date;
+}
+
+export interface SharedRoutineRollbackResult {
+    success: boolean;
+    sharedRoutineId: string;
+    revision: number;
+    targetRevision: number;
+    snapshotId: string;
+    forced?: boolean;
+}
+
+export interface SharedRoutineComment {
+    id: string;
+    actorId: string;
+    snapshotId?: string | null;
+    message: string;
+    createdAt?: string | number | Date;
+    updatedAt?: string | number | Date;
+}
+
+export interface SharedRoutineReviewRequest {
+    id: string;
+    requesterId: string;
+    requestedBaseRevision: number;
+    sourceRoutineId?: string | null;
+    status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+    decidedBy?: string | null;
+    decidedAt?: string | number | Date | null;
+    decisionNote?: string | null;
+    createdAt?: string | number | Date;
+    updatedAt?: string | number | Date;
+}
+
+export class SocialApiError extends Error {
+    status: number;
+    code?: string;
+    payload?: Record<string, unknown>;
+
+    constructor(message: string, status: number, code?: string, payload?: Record<string, unknown>) {
+        super(message);
+        this.name = 'SocialApiError';
+        this.status = status;
+        this.code = code;
+        this.payload = payload;
+    }
+}
+
 export class SocialService {
     private static cache = new Map<string, { value: any; timestamp: number }>();
     private static CACHE_TTL = 60000; // 60 seconds
@@ -254,7 +395,7 @@ export class SocialService {
         // Try to parse JSON safely
         let data: unknown;
         try {
-            data = JSON.parse(text);
+            data = text ? JSON.parse(text) : {};
         } catch {
             logger.error('[SocialService] Failed to parse JSON response', {
                 url,
@@ -272,7 +413,8 @@ export class SocialService {
                 : typeof responsePayload.message === 'string'
                     ? responsePayload.message
                     : `Error en la solicitud (${res.status})`;
-            throw new Error(errorMessage);
+            const errorCode = typeof responsePayload.code === 'string' ? responsePayload.code : undefined;
+            throw new SocialApiError(errorMessage, res.status, errorCode, responsePayload);
         }
 
         return data as T;
@@ -480,6 +622,231 @@ export class SocialService {
         return data.success;
     }
 
+    static async listSharedRoutines(): Promise<SharedRoutineItem[]> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ success: boolean; items: SharedRoutineItem[] }>(
+            `${API_URL}/api/social/shared-routines`,
+            { headers }
+        );
+        return Array.isArray(data.items) ? data.items : [];
+    }
+
+    static async createSharedRoutine(input: {
+        routineId: string;
+        title?: string;
+        memberIds?: string[];
+        memberRoles?: Record<string, 'editor' | 'viewer'>;
+        removeMissingMembers?: boolean;
+        editMode?: 'owner_only' | 'collaborative';
+        approvalMode?: 'none' | 'owner_review';
+    }): Promise<{ sharedRoutineId: string; revision: number; members: number; pendingInvitations?: number; reused?: boolean }> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ success: boolean; sharedRoutineId: string; revision: number; members: number; pendingInvitations?: number; reused?: boolean }>(
+            `${API_URL}/api/social/shared-routines`,
+            {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    routineId: input.routineId,
+                    title: input.title,
+                    memberIds: input.memberIds ?? [],
+                    memberRoles: input.memberRoles ?? {},
+                    removeMissingMembers: input.removeMissingMembers ?? true,
+                    editMode: input.editMode ?? 'owner_only',
+                    approvalMode: input.approvalMode ?? 'none',
+                }),
+            }
+        );
+        return {
+            sharedRoutineId: data.sharedRoutineId,
+            revision: data.revision,
+            members: data.members,
+            pendingInvitations: data.pendingInvitations ?? 0,
+            reused: !!data.reused,
+        };
+    }
+
+    static async listSharedRoutineInvitations(): Promise<SharedRoutineInvitationItem[]> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ success: boolean; items: SharedRoutineInvitationItem[] }>(
+            `${API_URL}/api/social/shared-routines/invitations`,
+            { headers }
+        );
+        return Array.isArray(data.items) ? data.items : [];
+    }
+
+    static async decideSharedRoutineInvitation(
+        invitationId: string,
+        decision: 'accept' | 'reject',
+    ): Promise<{ success: boolean; decision: 'accept' | 'reject'; invitationId: string; sharedRoutineId: string }> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ success: boolean; decision: 'accept' | 'reject'; invitationId: string; sharedRoutineId: string }>(
+            `${API_URL}/api/social/shared-routines/invitations/${encodeURIComponent(invitationId)}/decision`,
+            {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ decision }),
+            }
+        );
+        return data;
+    }
+
+    static async getSharedRoutine(id: string): Promise<SharedRoutineDetail> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ success: boolean } & SharedRoutineDetail>(
+            `${API_URL}/api/social/shared-routines/${encodeURIComponent(id)}`,
+            { headers }
+        );
+        return {
+            workspace: data.workspace,
+            membership: data.membership,
+            members: data.members,
+            snapshot: data.snapshot,
+        };
+    }
+
+    static async ownerSyncSharedRoutine(
+        id: string,
+        sourceRoutineId?: string,
+        baseRevision?: number,
+    ): Promise<{ success: boolean; snapshotId: string; revision: number }> {
+        const headers = await this.getHeaders();
+        const body: Record<string, unknown> = {};
+        if (typeof sourceRoutineId === 'string' && sourceRoutineId.trim()) {
+            body.sourceRoutineId = sourceRoutineId;
+        }
+        if (typeof baseRevision === 'number') {
+            body.baseRevision = baseRevision;
+        }
+
+        const data = await this.request<{ success: boolean; snapshotId: string; revision: number }>(
+            `${API_URL}/api/social/shared-routines/${encodeURIComponent(id)}/owner-sync`,
+            {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body),
+            }
+        );
+        return data;
+    }
+
+    static async syncSharedRoutine(
+        id: string,
+        input: {
+            payload: Record<string, unknown>;
+            baseRevision: number;
+            sourceRoutineId?: string;
+            force?: boolean;
+        },
+    ): Promise<SharedRoutineSyncResult> {
+        const headers = await this.getHeaders();
+        const data = await this.request<SharedRoutineSyncResult>(
+            `${API_URL}/api/social/shared-routines/${encodeURIComponent(id)}/sync`,
+            {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    payload: input.payload,
+                    baseRevision: input.baseRevision,
+                    sourceRoutineId: input.sourceRoutineId,
+                    force: !!input.force,
+                }),
+            }
+        );
+        return data;
+    }
+
+    static async listSharedRoutineChanges(id: string): Promise<SharedRoutineChangeItem[]> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ success: boolean; items: SharedRoutineChangeItem[] }>(
+            `${API_URL}/api/social/shared-routines/${encodeURIComponent(id)}/changes`,
+            { headers }
+        );
+        return Array.isArray(data.items) ? data.items : [];
+    }
+
+    static async listSharedRoutineComments(id: string): Promise<SharedRoutineComment[]> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ success: boolean; items: SharedRoutineComment[] }>(
+            `${API_URL}/api/social/shared-routines/${encodeURIComponent(id)}/comments`,
+            { headers }
+        );
+        return Array.isArray(data.items) ? data.items : [];
+    }
+
+    static async addSharedRoutineComment(
+        id: string,
+        input: { message: string; snapshotId?: string },
+    ): Promise<SharedRoutineComment> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ success: boolean; item: SharedRoutineComment }>(
+            `${API_URL}/api/social/shared-routines/${encodeURIComponent(id)}/comments`,
+            {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    message: input.message,
+                    snapshotId: input.snapshotId,
+                }),
+            }
+        );
+        return data.item;
+    }
+
+    static async listSharedRoutineReviews(id: string): Promise<SharedRoutineReviewRequest[]> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ success: boolean; items: SharedRoutineReviewRequest[] }>(
+            `${API_URL}/api/social/shared-routines/${encodeURIComponent(id)}/reviews`,
+            { headers }
+        );
+        return Array.isArray(data.items) ? data.items : [];
+    }
+
+    static async decideSharedRoutineReview(
+        id: string,
+        reviewId: string,
+        input: { decision: 'approve' | 'reject'; note?: string; force?: boolean },
+    ): Promise<{ success: boolean; decision: 'approve' | 'reject'; reviewId: string; revision: number | null; snapshotId: string | null }> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ success: boolean; decision: 'approve' | 'reject'; reviewId: string; revision: number | null; snapshotId: string | null }>(
+            `${API_URL}/api/social/shared-routines/${encodeURIComponent(id)}/reviews/${encodeURIComponent(reviewId)}/decision`,
+            {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    decision: input.decision,
+                    note: input.note,
+                    force: !!input.force,
+                }),
+            }
+        );
+        return data;
+    }
+
+    static async rollbackSharedRoutine(
+        id: string,
+        input: {
+            targetRevision: number;
+            baseRevision?: number;
+            force?: boolean;
+        },
+    ): Promise<SharedRoutineRollbackResult> {
+        const headers = await this.getHeaders();
+        const data = await this.request<SharedRoutineRollbackResult>(
+            `${API_URL}/api/social/shared-routines/${encodeURIComponent(id)}/rollback`,
+            {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    targetRevision: input.targetRevision,
+                    baseRevision: input.baseRevision,
+                    force: !!input.force,
+                }),
+            }
+        );
+        return data;
+    }
+
     static async markAsSeen(id: string, feedType: 'direct_share' | 'activity_log') {
         const now = Date.now();
         const userId = useAuthStore.getState().user?.id;
@@ -491,19 +858,21 @@ export class SocialService {
                 await dbService.run('UPDATE activity_feed SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
                 
                 // New: Local activity_seen entry for per-user status (Server parity)
-                const seenId = `seen:${userId}:${id}`;
-                await dbService.run(
-                    'INSERT OR REPLACE INTO activity_seen (id, user_id, activity_id, seen_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-                    [seenId, userId, id, now, now]
-                );
-                
-                // Project as a separate sync event for the new table
-                await dbService.queueSyncMutation('activity_seen', seenId, 'INSERT', { 
-                    user_id: userId, 
-                    activity_id: id, 
-                    seen_at: now, 
-                    updated_at: now 
-                });
+                if (userId) {
+                    const seenId = `seen:${userId}:${id}`;
+                    await dbService.run(
+                        'INSERT OR REPLACE INTO activity_seen (id, user_id, activity_id, seen_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+                        [seenId, userId, id, now, now]
+                    );
+
+                    // Project as a separate sync event for the new table
+                    await dbService.queueSyncMutation('activity_seen', seenId, 'INSERT', {
+                        user_id: userId,
+                        activity_id: id,
+                        seen_at: now,
+                        updated_at: now
+                    });
+                }
 
             } else {
                 await dbService.run('UPDATE shares_inbox SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
@@ -558,19 +927,21 @@ export class SocialService {
 
                     if (feedType === 'activity_log') {
                         await dbService.run('UPDATE activity_feed SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
-                        
-                        const seenId = `seen:${userId}:${id}`;
-                        await dbService.run(
-                            'INSERT OR REPLACE INTO activity_seen (id, user_id, activity_id, seen_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-                            [seenId, userId, id, now, now]
-                        );
-                        
-                        await dbService.queueSyncMutation('activity_seen', seenId, 'INSERT', { 
-                            user_id: userId, 
-                            activity_id: id, 
-                            seen_at: now, 
-                            updated_at: now 
-                        });
+
+                        if (userId) {
+                            const seenId = `seen:${userId}:${id}`;
+                            await dbService.run(
+                                'INSERT OR REPLACE INTO activity_seen (id, user_id, activity_id, seen_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+                                [seenId, userId, id, now, now]
+                            );
+
+                            await dbService.queueSyncMutation('activity_seen', seenId, 'INSERT', {
+                                user_id: userId,
+                                activity_id: id,
+                                seen_at: now,
+                                updated_at: now
+                            });
+                        }
 
                     } else {
                         await dbService.run('UPDATE shares_inbox SET seen_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);

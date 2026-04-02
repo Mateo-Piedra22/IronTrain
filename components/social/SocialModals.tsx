@@ -1,8 +1,70 @@
+import { SocialColors, SocialStyles } from '@/components/social/types';
+import { GlobalEvent, SocialComparisonEntry, SocialFriend, SocialLeaderboardEntry, SocialProfile, WeatherLog } from '@/src/services/SocialService';
+import { feedbackSelection } from '@/src/social/feedback';
 import { withAlpha } from '@/src/theme';
 import * as Clipboard from 'expo-clipboard';
 import { Award, CheckCircle, CloudRain, Copy, Droplets, Flame, Info as InfoIcon, MapPin, RefreshCcw, Scale, Thermometer, TrendingUp, Trophy, UserMinus as UserMinusIcon, Wind, XCircle, X as XIcon, Zap } from 'lucide-react-native';
-import React from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+
+interface ProfileEditModalProps {
+    visible: boolean;
+    onClose: () => void;
+    displayName: string;
+    setDisplayName: (value: string) => void;
+    username: string;
+    setUsername: (value: string) => void;
+    isPublic: boolean;
+    setIsPublic: (value: boolean) => void;
+    onSave: () => Promise<void> | void;
+    saving: boolean;
+    profile: SocialProfile | null;
+    colors: SocialColors;
+    styles: SocialStyles;
+}
+
+type FriendModalAction = 'accept' | 'reject' | 'remove' | 'block';
+
+interface FriendDetailModalProps {
+    visible: boolean;
+    onClose: () => void;
+    friend: SocialFriend | null;
+    friendLeaderboardEntry?: SocialLeaderboardEntry | null;
+    friendComparisonPreview?: SocialComparisonEntry[];
+    onAction?: (action: FriendModalAction) => Promise<void> | void;
+    onOpenComparison?: (friendUserId: string) => Promise<void> | void;
+    loading: boolean;
+    colors: SocialColors;
+    styles: SocialStyles;
+}
+
+interface ScoreInfoModalProps {
+    visible: boolean;
+    onClose: () => void;
+    profile: SocialProfile | null;
+    colors: SocialColors;
+    styles: SocialStyles;
+}
+
+interface GlobalEventModalProps {
+    visible: boolean;
+    onClose: () => void;
+    event: GlobalEvent | null | undefined;
+    colors: SocialColors;
+    styles: SocialStyles;
+}
+
+interface WeatherBonusModalProps {
+    visible: boolean;
+    onClose: () => void;
+    profile: SocialProfile | null;
+    refreshingLocation: boolean;
+    onRefreshLocation?: (silent?: boolean) => Promise<void> | void;
+    weatherHistory?: WeatherLog[];
+    onLoadHistory?: () => Promise<void> | void;
+    colors: SocialColors;
+    styles: SocialStyles;
+}
 
 export const ProfileEditModal = React.memo(({
     visible,
@@ -18,7 +80,36 @@ export const ProfileEditModal = React.memo(({
     profile,
     colors,
     styles
-}: any) => {
+}: ProfileEditModalProps) => {
+    const normalizedUsername = (username || profile?.username || '')
+        .replace(/^@+/, '')
+        .trim()
+        .toLowerCase();
+    const publicProfileUrl = normalizedUsername
+        ? `https://irontrain.motiona.xyz/user/${encodeURIComponent(normalizedUsername)}`
+        : 'https://irontrain.motiona.xyz/profile';
+    const accountSecurityUrl = 'https://irontrain.motiona.xyz/auth/forgot-password';
+
+    const confirmOpenExternal = (url: string, label: string) => {
+        Alert.alert(
+            'Abrir enlace externo',
+            `Vas a salir de la app para abrir ${label}.`,
+            [
+                {
+                    text: 'Cancelar',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Abrir',
+                    onPress: () => {
+                        Linking.openURL(url);
+                    },
+                },
+            ],
+            { cancelable: true },
+        );
+    };
+
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
             <Pressable style={styles.modalOverlay} onPress={onClose}>
@@ -26,7 +117,7 @@ export const ProfileEditModal = React.memo(({
                     <Pressable style={styles.modalCard} onPress={() => { }}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Perfil Social</Text>
-                            <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
+                            <TouchableOpacity onPress={() => { feedbackSelection(); onClose(); }} style={styles.modalCloseBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                                 <XIcon size={18} color={colors.textMuted} />
                             </TouchableOpacity>
                         </View>
@@ -104,14 +195,38 @@ export const ProfileEditModal = React.memo(({
                                     thumbColor={isPublic ? colors.primary.DEFAULT : colors.textMuted}
                                 />
                             </View>
+
+                            <View style={styles.profileQuickActionsCard}>
+                                <Text style={styles.profileQuickActionsTitle}>Perfil web y seguridad</Text>
+
+                                <TouchableOpacity
+                                    style={styles.profileQuickActionBtn}
+                                    onPress={() => {
+                                        feedbackSelection();
+                                        confirmOpenExternal(publicProfileUrl, 'tu perfil público');
+                                    }}
+                                >
+                                    <Text style={styles.profileQuickActionBtnText}>Ver perfil público</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.profileQuickActionBtn}
+                                    onPress={() => {
+                                        feedbackSelection();
+                                        confirmOpenExternal(accountSecurityUrl, 'la página de seguridad de cuenta');
+                                    }}
+                                >
+                                    <Text style={styles.profileQuickActionBtnText}>Seguridad: email y contraseña</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
                         <View style={styles.modalActions}>
-                            <TouchableOpacity style={styles.modalCancelBtn} onPress={onClose}>
-                                <Text style={styles.modalCancelText}>CANCELAR</Text>
+                            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => { feedbackSelection(); onClose(); }} activeOpacity={0.85}>
+                                <Text style={styles.modalCancelText}>Cancelar</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.modalPrimaryBtn} onPress={onSave} disabled={saving}>
-                                {saving ? <ActivityIndicator size="small" color={colors.onPrimary} /> : <Text style={styles.modalPrimaryText}>GUARDAR</Text>}
+                            <TouchableOpacity style={styles.modalPrimaryBtn} onPress={() => { feedbackSelection(); onSave(); }} disabled={saving} activeOpacity={0.85}>
+                                {saving ? <ActivityIndicator size="small" color={colors.onPrimary} /> : <Text style={styles.modalPrimaryText}>Guardar</Text>}
                             </TouchableOpacity>
                         </View>
                     </Pressable>
@@ -125,85 +240,213 @@ export const FriendDetailModal = React.memo(({
     visible,
     onClose,
     friend,
+    friendLeaderboardEntry,
+    friendComparisonPreview,
     onAction,
     onOpenComparison,
     loading,
     colors,
     styles
-}: any) => {
+}: FriendDetailModalProps) => {
+    const [copiedId, setCopiedId] = useState(false);
+    const cardOpacity = useRef(new Animated.Value(0)).current;
+    const cardTranslateY = useRef(new Animated.Value(10)).current;
+    const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(cardOpacity, {
+                toValue: visible ? 1 : 0,
+                duration: visible ? 180 : 120,
+                useNativeDriver: true,
+            }),
+            Animated.timing(cardTranslateY, {
+                toValue: visible ? 0 : 10,
+                duration: visible ? 180 : 120,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, [cardOpacity, cardTranslateY, visible]);
+
+    useEffect(() => {
+        if (!copiedId) return;
+        const timeout = setTimeout(() => setCopiedId(false), 1500);
+        return () => clearTimeout(timeout);
+    }, [copiedId]);
+
     if (!friend) return null;
+
+    const relationLabel =
+        friend.status === 'pending'
+            ? friend.isSender
+                ? 'Solicitud enviada'
+                : 'Solicitud recibida'
+            : friend.status === 'blocked'
+                ? 'Contacto bloqueado'
+                : 'Amistad aceptada';
+
+    const statusColor =
+        friend.status === 'accepted'
+            ? colors.green
+            : friend.status === 'blocked'
+                ? colors.red
+                : colors.yellow;
+
+    const commonExercises = friendComparisonPreview?.length ?? 0;
+    const comparisonDelta = (friendComparisonPreview ?? []).reduce((acc, entry) => acc + (entry.user1RMKg - entry.friend1RMKg), 0);
+    const hasComparisonData = commonExercises > 0;
+    const modalMaxWidth = Math.min(430, windowWidth - 24);
+    const modalMaxHeight = Math.max(360, Math.round(windowHeight * 0.92));
+    const actionAreaEstimate = friend.status === 'pending' && friend.isSender ? 138 : 118;
+    const bodyMaxHeight = Math.max(220, modalMaxHeight - 66 - actionAreaEstimate);
 
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-            <Pressable style={styles.modalOverlay} onPress={onClose}>
-                <Pressable style={styles.modalCard} onPress={() => { }}>
+            <View style={styles.modalOverlay}>
+                <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+                <View style={{ width: '100%', alignItems: 'center' }}>
+                    <Animated.View style={[styles.modalCard, { width: '100%', maxWidth: modalMaxWidth, maxHeight: modalMaxHeight, opacity: cardOpacity, transform: [{ translateY: cardTranslateY }] }]}>
                     <View style={styles.modalHeader}>
                         <Text style={styles.modalTitle}>{friend.displayName || 'Amigo'}</Text>
-                        <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
+                        <TouchableOpacity onPress={() => { feedbackSelection(); onClose(); }} style={styles.modalCloseBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                             <XIcon size={18} color={colors.textMuted} />
                         </TouchableOpacity>
                     </View>
 
-                    <View style={styles.modalBody}>
-                        {friend.username ? (
-                            <Text style={styles.friendModalUsername}>@{friend.username}</Text>
-                        ) : null}
+                    <ScrollView
+                        style={{ width: '100%', maxHeight: bodyMaxHeight, flexGrow: 0 }}
+                        contentContainerStyle={[styles.modalBody, { paddingHorizontal: 16, paddingVertical: 16, paddingBottom: 20 }]}
+                        showsVerticalScrollIndicator={true}
+                        bounces={true}
+                        nestedScrollEnabled={true}
+                        keyboardShouldPersistTaps="handled"
+                    >
+                        <View style={styles.friendModalHero}>
+                            <View style={styles.friendModalAvatar}>
+                                <Text style={styles.friendModalAvatarText}>
+                                    {(friend.displayName || 'A').charAt(0).toUpperCase()}
+                                </Text>
+                            </View>
 
-                        <Text style={styles.friendModalStatus}>
-                            {friend.status === 'pending'
-                                ? friend.isSender
-                                    ? 'Solicitud enviada'
-                                    : 'Solicitud recibida'
-                                : 'Amistad aceptada'}
-                        </Text>
+                            {friend.username ? (
+                                <Text style={styles.friendModalUsername}>@{friend.username}</Text>
+                            ) : null}
+
+                            <Text style={styles.friendModalDisplayName}>{friend.displayName || 'Amigo'}</Text>
+
+                            <View style={styles.friendModalBadgeRow}>
+                                <View style={[styles.friendModalBadge, { borderColor: withAlpha(statusColor, '35'), backgroundColor: withAlpha(statusColor, '12') }]}>
+                                    <CheckCircle size={13} color={statusColor} />
+                                    <Text style={[styles.friendModalBadgeText, { color: statusColor }]}>{relationLabel}</Text>
+                                </View>
+                                {friendLeaderboardEntry ? (
+                                    <View style={styles.friendModalBadge}>
+                                        <Trophy size={13} color={colors.yellow} />
+                                        <Text style={styles.friendModalBadgeText}>IronScore {friendLeaderboardEntry.scores.lifetime}</Text>
+                                    </View>
+                                ) : null}
+                            </View>
+                        </View>
+
+                        {friendLeaderboardEntry ? (
+                            <View style={styles.friendModalMetricsGrid}>
+                                <View style={styles.friendModalMetricCard}>
+                                    <Text style={styles.friendModalMetricLabel}>Racha actual</Text>
+                                    <Text style={styles.friendModalMetricValue}>{friendLeaderboardEntry.stats.currentStreak}</Text>
+                                </View>
+                                <View style={styles.friendModalMetricCard}>
+                                    <Text style={styles.friendModalMetricLabel}>Mejor racha</Text>
+                                    <Text style={styles.friendModalMetricValue}>{friendLeaderboardEntry.stats.highestStreak}</Text>
+                                </View>
+                                <View style={styles.friendModalMetricCard}>
+                                    <Text style={styles.friendModalMetricLabel}>Entrenos (mes)</Text>
+                                    <Text style={styles.friendModalMetricValue}>{friendLeaderboardEntry.stats.workoutsMonthly}</Text>
+                                </View>
+                                <View style={styles.friendModalMetricCard}>
+                                    <Text style={styles.friendModalMetricLabel}>Interacción</Text>
+                                    <Text style={styles.friendModalMetricValue}>{friendLeaderboardEntry.stats.engagementScore ?? 0}</Text>
+                                </View>
+                            </View>
+                        ) : null}
 
                         <View style={styles.friendInfoCard}>
                             <Text style={styles.friendInfoLabel}>ID Social</Text>
                             <TouchableOpacity
                                 style={styles.friendInfoCopyBtn}
                                 onPress={async () => {
+                                    feedbackSelection();
                                     await Clipboard.setStringAsync(friend.friendId ?? friend.id);
+                                    setCopiedId(true);
                                 }}
                             >
                                 <Text style={styles.friendInfoId} numberOfLines={1} ellipsizeMode="middle">{friend.friendId ?? friend.id}</Text>
                                 <Copy size={14} color={colors.textMuted} />
                             </TouchableOpacity>
 
+                            {copiedId ? (
+                                <Text style={[styles.friendInfoMetaText, { color: colors.green }]}>ID copiado al portapapeles</Text>
+                            ) : null}
+
+                            <View style={styles.friendInfoMetaRow}>
+                                <Text style={styles.friendInfoMetaText}>Ejercicios comunes 1RM: {commonExercises}</Text>
+                                {hasComparisonData ? (
+                                    <Text style={[styles.friendInfoMetaText, { color: comparisonDelta >= 0 ? colors.green : colors.red }]}> 
+                                        {comparisonDelta >= 0 ? 'Ventaja total:' : 'Desventaja total:'} {Math.abs(comparisonDelta).toFixed(1)} kg
+                                    </Text>
+                                ) : (
+                                    <Text style={styles.friendInfoMetaText}>Aún no hay base para comparar fuerza.</Text>
+                                )}
+                            </View>
+
                             {friend.status === 'accepted' && onOpenComparison ? (
-                                <TouchableOpacity style={styles.friendInfoActionBtn} onPress={() => onOpenComparison(friend.friendId ?? friend.id)}>
+                                <TouchableOpacity style={styles.friendInfoActionBtn} onPress={() => {
+                                    feedbackSelection();
+                                    onOpenComparison(friend.friendId ?? friend.id);
+                                }}>
                                     <Scale size={14} color={colors.onPrimary} />
-                                    <Text style={styles.friendInfoActionText}>Ver comparación en ranking</Text>
+                                    <Text style={styles.friendInfoActionText}>{hasComparisonData ? 'Abrir comparación en ranking' : 'Comparar 1RM en ranking'}</Text>
                                 </TouchableOpacity>
                             ) : null}
                         </View>
-                    </View>
 
-                    <View style={styles.modalActionsStack}>
+                        <View style={styles.friendModalHintBox}>
+                            <InfoIcon size={14} color={colors.textMuted} />
+                            <Text style={styles.friendModalHintText}>
+                                Consejo: desde Ranking podés expandir la comparación por ejercicio para detectar fortalezas y debilidades reales.
+                            </Text>
+                        </View>
+                    </ScrollView>
+
+                    <View style={[styles.modalActionsStackCompact, friend.status === 'pending' && friend.isSender && { paddingBottom: 30 }]}> 
                         {friend.status === 'pending' && !friend.isSender && (
-                            <View style={styles.dualActionRow}>
-                                <TouchableOpacity style={styles.modalPrimaryBtn} disabled={loading} onPress={() => onAction?.('accept')}>
+                            <View style={styles.dualActionRowCompact}>
+                                <TouchableOpacity style={[styles.modalPrimaryBtn, styles.modalActionBtnCompact]} disabled={loading} onPress={() => { feedbackSelection(); onAction?.('accept'); }}>
                                     <Text style={styles.modalPrimaryText}>Aceptar</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.modalDangerBtn} disabled={loading} onPress={() => onAction?.('reject')}>
+                                <TouchableOpacity style={[styles.modalDangerBtn, styles.modalActionBtnCompact]} disabled={loading} onPress={() => { feedbackSelection(); onAction?.('reject'); }}>
                                     <Text style={styles.modalDangerText}>Rechazar</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
 
                         {friend.status === 'pending' && friend.isSender && (
-                            <TouchableOpacity style={styles.modalSecondaryBtn} disabled={loading} onPress={() => onAction?.('reject')}>
-                                <XCircle size={14} color={colors.text} />
+                            <TouchableOpacity
+                                style={[styles.modalSecondaryBtn, styles.modalActionBtnCompact, { minHeight: 48, paddingTop: 12, paddingBottom: 12 }]}
+                                disabled={loading}
+                                onPress={() => { feedbackSelection(); onAction?.('reject'); }}
+                            >
+                                <XCircle size={14} color={colors.textMuted} />
                                 <Text style={styles.modalSecondaryText}>Cancelar solicitud</Text>
                             </TouchableOpacity>
                         )}
 
                         {friend.status === 'accepted' && (
-                            <View style={styles.dualActionRow}>
-                                <TouchableOpacity style={styles.modalSecondaryBtn} disabled={loading} onPress={() => onAction?.('remove')}>
+                            <View style={styles.dualActionRowCompact}>
+                                <TouchableOpacity style={[styles.modalSecondaryBtn, styles.modalActionBtnCompact, { minHeight: 48, paddingTop: 12, paddingBottom: 12 }]} disabled={loading} onPress={() => { feedbackSelection(); onAction?.('remove'); }}>
                                     <UserMinusIcon size={14} color={colors.textMuted} />
                                     <Text style={styles.modalSecondaryText}>Eliminar amigo</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.modalDangerBtn} disabled={loading} onPress={() => onAction?.('block')}>
+                                <TouchableOpacity style={[styles.modalDangerBtn, styles.modalActionBtnCompact]} disabled={loading} onPress={() => { feedbackSelection(); onAction?.('block'); }}>
                                     <Text style={styles.modalDangerText}>Bloquear</Text>
                                 </TouchableOpacity>
                             </View>
@@ -211,8 +454,9 @@ export const FriendDetailModal = React.memo(({
 
                         {loading ? <ActivityIndicator size="small" color={colors.primary.DEFAULT} style={{ marginTop: 4 }} /> : null}
                     </View>
-                </Pressable>
-            </Pressable>
+                    </Animated.View>
+                </View>
+            </View>
         </Modal>
     );
 });
@@ -223,7 +467,7 @@ export const ScoreInfoModal = React.memo(({
     profile,
     colors,
     styles
-}: any) => {
+}: ScoreInfoModalProps) => {
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
             <View style={styles.modalOverlay}>
@@ -234,7 +478,7 @@ export const ScoreInfoModal = React.memo(({
                             <TrendingUp size={22} color={colors.primary.DEFAULT} />
                             <Text style={styles.modalTitle}>Sistema IronScore</Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
+                        <TouchableOpacity onPress={() => { feedbackSelection(); onClose(); }} style={styles.modalCloseBtn}>
                             <XIcon size={18} color={colors.textMuted} />
                         </TouchableOpacity>
                     </View>
@@ -355,7 +599,7 @@ export const GlobalEventModal = React.memo(({
     event,
     colors,
     styles
-}: any) => {
+}: GlobalEventModalProps) => {
     if (!event) return null;
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -389,7 +633,7 @@ export const GlobalEventModal = React.memo(({
                         ) : null}
                     </View>
 
-                    <TouchableOpacity style={styles.detailCloseBtn} onPress={onClose}>
+                    <TouchableOpacity style={styles.detailCloseBtn} onPress={() => { feedbackSelection(); onClose(); }}>
                         <Text style={styles.detailCloseText}>Entendido</Text>
                     </TouchableOpacity>
                 </View>
@@ -408,12 +652,12 @@ export const WeatherBonusModal = React.memo(({
     onLoadHistory,
     colors,
     styles
-}: any) => {
+}: WeatherBonusModalProps) => {
     React.useEffect(() => {
         if (visible && onLoadHistory) {
             onLoadHistory();
         }
-    }, [visible]);
+    }, [visible, onLoadHistory]);
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
             <View style={styles.modalOverlay}>
@@ -439,7 +683,10 @@ export const WeatherBonusModal = React.memo(({
 
                     <TouchableOpacity
                         style={styles.refreshBadgeBtn}
-                        onPress={() => onRefreshLocation?.(false)}
+                        onPress={() => {
+                            feedbackSelection();
+                            onRefreshLocation?.(false);
+                        }}
                         disabled={refreshingLocation}
                     >
                         {refreshingLocation ? (
@@ -485,7 +732,7 @@ export const WeatherBonusModal = React.memo(({
                                 showsVerticalScrollIndicator={false}
                                 nestedScrollEnabled={true}
                             >
-                                {weatherHistory.map((log: any, idx: number) => (
+                                {weatherHistory.map((log: WeatherLog) => (
                                     <View key={log.id} style={{
                                         flexDirection: 'row',
                                         alignItems: 'center',
@@ -547,7 +794,7 @@ export const WeatherBonusModal = React.memo(({
                         </View>
                     )}
 
-                    <TouchableOpacity style={styles.detailCloseBtn} onPress={onClose}>
+                    <TouchableOpacity style={styles.detailCloseBtn} onPress={() => { feedbackSelection(); onClose(); }}>
                         <Text style={styles.detailCloseText}>{profile?.weatherBonus?.isActive ? '¡A darle!' : 'Entendido'}</Text>
                     </TouchableOpacity>
                 </View>

@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { SocialService } from '../SocialService';
+import { SocialApiError, SocialService } from '../SocialService';
 
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(),
@@ -51,6 +51,104 @@ describe('SocialService', () => {
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('friendId=id%20with%20spaces'),
       expect.any(Object)
+    );
+  });
+
+  it('should throw SocialApiError with 409 payload details', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 409,
+      text: async () => JSON.stringify({
+        success: false,
+        code: 'SHARED_ROUTINE_REVISION_CONFLICT',
+        message: 'Revision conflict',
+        serverRevision: 12,
+        baseRevision: 10,
+      }),
+    });
+
+    await expect(
+      SocialService.syncSharedRoutine('workspace-1', {
+        payload: { routine: { id: 'r1' } },
+        baseRevision: 10,
+      })
+    ).rejects.toMatchObject({
+      name: 'SocialApiError',
+      status: 409,
+      code: 'SHARED_ROUTINE_REVISION_CONFLICT',
+      payload: expect.objectContaining({
+        serverRevision: 12,
+        baseRevision: 10,
+      }),
+    });
+  });
+
+  it('should handle empty non-ok body as SocialApiError', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: async () => '',
+    });
+
+    try {
+      await SocialService.getProfile();
+      throw new Error('Expected SocialService.getProfile to throw');
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(SocialApiError);
+      expect(error).toMatchObject({ status: 500 });
+    }
+  });
+
+  it('should send force flag when deciding shared routine review', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({
+        success: true,
+        decision: 'approve',
+        reviewId: 'review-1',
+        revision: 13,
+        snapshotId: 'snap-13',
+      }),
+    });
+
+    await SocialService.decideSharedRoutineReview('workspace-1', 'review-1', {
+      decision: 'approve',
+      force: true,
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/social/shared-routines/workspace-1/reviews/review-1/decision'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ decision: 'approve', note: undefined, force: true }),
+      })
+    );
+  });
+
+  it('should send baseRevision and force when rolling back shared routine', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({
+        success: true,
+        sharedRoutineId: 'workspace-1',
+        revision: 14,
+        targetRevision: 12,
+        snapshotId: 'snap-14',
+      }),
+    });
+
+    await SocialService.rollbackSharedRoutine('workspace-1', {
+      targetRevision: 12,
+      baseRevision: 13,
+      force: true,
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/social/shared-routines/workspace-1/rollback'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ targetRevision: 12, baseRevision: 13, force: true }),
+      })
     );
   });
 });

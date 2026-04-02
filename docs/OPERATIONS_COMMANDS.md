@@ -1,75 +1,65 @@
-# Comandos (Enterprise) – App y Website
+# Comandos operativos
 
-Este documento lista **comandos oficiales** para desarrollo, QA y producción.
+## Documentos relacionados
 
----
+- [Runbook operacional](RUNBOOK.md)
+- [Troubleshooting](TROUBLESHOOTING.md)
+- [CI/CD](CI_CD.md)
 
-# App
+## Calidad (root)
 
-## Instalación
-- `npm install`
+```bash
+npm test -- --watch=false
+npx tsc --noEmit
+```
 
-## Desarrollo
-- `npm start` (dev + watcher CHANGELOG)
-- `npm run android`
-- `npm run ios`
-- `npm run web`
-- `npx expo start -c` (limpiar cache Metro)
-- `npx expo-doctor` (diagnóstico Expo)
+Uso recomendado: ejecutar antes de abrir PR o luego de tocar lógica compartida.
 
-## Calidad
-- `npm test`
-- `npm run generate-changelog`
-- `npx tsc -p tsconfig.json --noEmit`
+## Ejecución app
 
-## Releases
-- Preparar versión: `npm run release:prepare -- <x.y.z>`
-- Finalizar (poner fecha + crear siguiente Unreleased): `npm run release:finalize`
+```bash
+npm start
+npm run android
+npm run ios
+npm run web
+```
 
-## EAS (builds)
-- Login: `npx eas login`
-- Usuario actual: `npx eas whoami`
-- Build APK (distribución directa): `npx eas build --platform android --profile preview --wait`
-- Build AAB (Play Store): `npx eas build --platform android --profile production --wait`
+Uso recomendado: validar flujos funcionales básicos tras cambios de UI/estado.
 
----
+## Release helpers
 
-# Website
+```bash
+npm run generate-changelog
+npm run release:prepare
+npm run release:finalize
+```
 
-## Instalación
-Desde `website/`:
-- `npm install`
+Uso recomendado: preparar releases con trazabilidad de cambios y versión.
 
-## Desarrollo
-- `npm run dev`
-- Puerto alternativo: `npx next dev -p 3005`
+## Website
 
-## Producción
-- `npm run build`
-- `npm run start`
+```bash
+cd website
+npm run dev
+npm run build
+npm test
+```
 
-## Deploy (Vercel)
-- Root Directory: `website`
-- Build: `npm run build`
+Uso recomendado: ejecutar `build` cuando se modifiquen rutas o lógica de producción web.
 
-Variables env recomendadas (Vercel):
-- `GITHUB_RELEASES_OWNER`
-- `GITHUB_RELEASES_REPO`
-- `GITHUB_RELEASES_TOKEN` (opcional)
+## Comandos para diagnóstico rápido
 
----
+```bash
+npm ci
+npm test -- --watch=false
+npx tsc --noEmit
+cd website && npm run build
+```
 
-# GitHub Releases (APK)
+Uso recomendado: primer barrido ante incidentes de CI o regressions no claras.
 
-## Manual
-1. Crear tag `vX.Y.Z`
-2. Crear release con ese tag
-3. Subir asset `.apk`
+## Buenas prácticas operativas
 
-## GitHub CLI (si disponible)
-- `gh release create vX.Y.Z ./ruta/IronTrain-vX.Y.Z.apk --title "IronTrain vX.Y.Z" --notes "Release vX.Y.Z"`
-
-## CI/CD (recomendado)
-- Trigger: `git tag vX.Y.Z && git push --tags`
-- Workflow: `.github/workflows/release-android.yml`
-- Secret requerido: `EXPO_TOKEN`
+- Ejecutar comandos desde la raíz correcta del módulo (root vs `website/`).
+- Evitar mezclar validaciones parciales con decisiones de merge/release.
+- Registrar en PR qué comandos fueron corridos en cambios de riesgo medio/alto.

@@ -1,6 +1,9 @@
 import { ExerciseList } from '@/components/ExerciseList';
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
+import { RoutineSharedSpaceManagerModal } from '@/components/social/RoutineSharedSpaceManagerModal';
+import { useSharedSpaceSummary } from '@/src/hooks/useSharedSpaceSummary';
+import { configService } from '@/src/services/ConfigService';
 import { RoutineDayWithExercises, routineService } from '@/src/services/RoutineService';
 import { SocialService } from '@/src/services/SocialService';
 import { useAuthStore } from '@/src/store/authStore';
@@ -335,6 +338,24 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
     const [friendPickerVisible, setFriendPickerVisible] = useState(false);
     const [friends, setFriends] = useState<any[]>([]);
     const [sendingRoutine, setSendingRoutine] = useState(false);
+    const [teamModalVisible, setTeamModalVisible] = useState(false);
+    const [showTeamCoachmark, setShowTeamCoachmark] = useState(false);
+    const [sharedAutoSyncState, setSharedAutoSyncState] = useState<'idle' | 'syncing' | 'updated' | 'up_to_date' | 'error'>('idle');
+    const [lastAutoSyncedSpaceId, setLastAutoSyncedSpaceId] = useState<string | null>(null);
+    const { linkedRoutineIds, workspaces, reload: reloadSharedSummary } = useSharedSpaceSummary();
+    const isSharedRoutine = useMemo(() => !!routineId && linkedRoutineIds.includes(routineId), [linkedRoutineIds, routineId]);
+    const routineSharedSpace = useMemo(
+        () => workspaces.find((space) => space.sourceRoutineId === routineId) ?? null,
+        [workspaces, routineId],
+    );
+    const sharedRole = routineSharedSpace?.membership.role ?? null;
+    const sharedCanEdit = !!routineSharedSpace?.membership.canEdit;
+    const sharedApprovalMode = routineSharedSpace?.approvalMode ?? 'none';
+
+    const dismissTeamCoachmark = useCallback(async () => {
+        setShowTeamCoachmark(false);
+        await configService.setGeneric('sharedSpaceTeamCoachmarkSeen', true);
+    }, []);
 
     const loadRoutine = useCallback(async () => {
         if (!routineId) return;
@@ -364,8 +385,17 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
             setViewMode('routine');
             setSelectedDay(null);
             loadRoutine();
+            void reloadSharedSummary();
+            setSharedAutoSyncState('idle');
+            setLastAutoSyncedSpaceId(null);
         }
-    }, [visible, routineId]);
+    }, [visible, routineId, loadRoutine, reloadSharedSummary]);
+
+    useEffect(() => {
+        if (!visible) return;
+        const seen = !!configService.getGeneric<boolean>('sharedSpaceTeamCoachmarkSeen');
+        setShowTeamCoachmark(isSharedRoutine && !seen);
+    }, [visible, isSharedRoutine]);
 
     const handleAddDay = async () => {
         if (!routineId) return;
@@ -571,6 +601,53 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
         }
     };
 
+    const handleOpenTeamModal = async () => {
+        if (!routineId) return;
+        await dismissTeamCoachmark();
+        setTeamModalVisible(true);
+    };
+
+    useEffect(() => {
+        if (!visible || !routineId || !routineSharedSpace) return;
+        if (lastAutoSyncedSpaceId === routineSharedSpace.id) return;
+
+        if (routineSharedSpace.membership.canEdit) {
+            setSharedAutoSyncState('idle');
+            setLastAutoSyncedSpaceId(routineSharedSpace.id);
+            return;
+        }
+
+        let cancelled = false;
+
+        const runAutoSync = async () => {
+            setSharedAutoSyncState('syncing');
+            try {
+                const detail = await SocialService.getSharedRoutine(routineSharedSpace.id);
+                const result = await routineService.syncSharedRoutinePayload(detail.snapshot.payload, {
+                    sharedRoutineId: routineSharedSpace.id,
+                    snapshotId: detail.snapshot.id,
+                    revision: detail.snapshot.revision,
+                    targetRoutineId: routineId,
+                    title: routine?.name || routineSharedSpace.title,
+                });
+
+                if (cancelled) return;
+                setSharedAutoSyncState(result.applied ? 'updated' : 'up_to_date');
+                setLastAutoSyncedSpaceId(routineSharedSpace.id);
+            } catch {
+                if (cancelled) return;
+                setSharedAutoSyncState('error');
+                setLastAutoSyncedSpaceId(routineSharedSpace.id);
+            }
+        };
+
+        void runAutoSync();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [visible, routineId, routineSharedSpace?.id, routineSharedSpace?.membership.canEdit]);
+
     const renderDayItem = ({ item, drag, isActive }: RenderItemParams<RoutineDayWithExercises>) => (
         <ScaleDecorator>
             <View style={[ss.dayBlockOuter, isActive && ss.dayBlockActive]}>
@@ -731,6 +808,12 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                                 </TouchableOpacity>
                                             </View>
                                             <View style={ss.btnCol}>
+                                                <TouchableOpacity style={ss.smallBtn} onPress={handleOpenTeamModal}>
+                                                    <Users size={12} color={colors.primary.DEFAULT} />
+                                                    <Text style={ss.smallBtnText}>Equipo</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                            <View style={ss.btnCol}>
                                                 <TouchableOpacity style={ss.smallBtn} onPress={() => {
                                                     setEditRoutineName(routine?.name || '');
                                                     setEditRoutineDesc(routine?.description || '');
@@ -748,6 +831,67 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                                 </TouchableOpacity>
                                             </View>
                                         </View>
+
+                                        {showTeamCoachmark && (
+                                            <View style={[ss.infoCard, { marginTop: 12, borderLeftColor: colors.primary.DEFAULT }]}> 
+                                                <Text style={[ss.warningLabel, { color: colors.primary.DEFAULT }]}>TIP RÁPIDO · EQUIPO</Text>
+                                                <Text style={ss.infoCardText}>
+                                                    Tocá “Equipo” para configurar cómo colaboran, invitar personas y decidir si los cambios se publican directo o con revisión del owner.
+                                                </Text>
+                                                <TouchableOpacity
+                                                    onPress={() => { void dismissTeamCoachmark(); }}
+                                                    style={{ marginTop: 10, alignSelf: 'flex-start', borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, paddingHorizontal: 10, paddingVertical: 6 }}
+                                                >
+                                                    <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '800' }}>Entendido</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        )}
+
+                                        {isSharedRoutine && (
+                                            <View style={[ss.infoCard, { marginTop: 12, borderLeftColor: colors.primary.DEFAULT }]}> 
+                                                <Text style={[ss.warningLabel, { color: colors.primary.DEFAULT }]}>ESPACIO COMPARTIDO ACTIVO</Text>
+                                                <Text style={ss.infoCardText}>
+                                                    Uso diario: 1) Entrená/edita normalmente. 2) En Equipo podés publicar cambios o traer la última revisión. 3) Las importaciones reutilizan la rutina local para evitar duplicados.
+                                                </Text>
+
+                                                {!!routineSharedSpace && (
+                                                    <>
+                                                        <View style={{ marginTop: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, padding: 10 }}>
+                                                            <Text style={[ss.warningLabel, { color: colors.textMuted }]}>TU ROL EN ESTE ESPACIO: {(sharedRole || 'viewer').toUpperCase()}</Text>
+                                                            {sharedRole === 'owner' ? (
+                                                                <Text style={ss.infoCardText}>
+                                                                    Como owner: definís reglas, invitás usuarios y decidís si las propuestas se aprueban manualmente o se publican directo.
+                                                                </Text>
+                                                            ) : sharedCanEdit ? (
+                                                                <Text style={ss.infoCardText}>
+                                                                    Como editor: podés modificar tu rutina local y publicar versión local. {sharedApprovalMode === 'owner_review' ? 'Tu propuesta queda pendiente del owner.' : 'Tus cambios se publican al instante.'}
+                                                                </Text>
+                                                            ) : (
+                                                                <Text style={ss.infoCardText}>
+                                                                    Como viewer: no publicás cambios. La rutina se sincroniza automáticamente al abrir esta pantalla y también podés usar Equipo para traer manualmente.
+                                                                </Text>
+                                                            )}
+                                                        </View>
+
+                                                        {!sharedCanEdit && (
+                                                            <View style={{ marginTop: 8, alignSelf: 'flex-start', borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, paddingHorizontal: 10, paddingVertical: 6 }}>
+                                                                <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '800' }}>
+                                                                    {sharedAutoSyncState === 'syncing'
+                                                                        ? 'Sincronizando automáticamente…'
+                                                                        : sharedAutoSyncState === 'updated'
+                                                                            ? 'Auto-sync aplicado en esta apertura'
+                                                                            : sharedAutoSyncState === 'up_to_date'
+                                                                                ? 'Ya estabas en la última revisión'
+                                                                                : sharedAutoSyncState === 'error'
+                                                                                    ? 'No se pudo auto-sincronizar (podés traer revisión manualmente en Equipo)'
+                                                                                    : 'Auto-sync listo'}
+                                                                </Text>
+                                                            </View>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </View>
+                                        )}
 
                                         <Text style={ss.sectionLabel}>Días de entrenamiento</Text>
                                     </View>
@@ -962,6 +1106,13 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                     </GestureHandlerRootView>
                 </Modal>
             )}
+
+            <RoutineSharedSpaceManagerModal
+                visible={teamModalVisible}
+                routineId={routineId}
+                routineName={routine?.name}
+                onClose={() => setTeamModalVisible(false)}
+            />
         </Modal>
     );
 }

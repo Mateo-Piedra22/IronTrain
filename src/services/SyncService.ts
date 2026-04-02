@@ -646,6 +646,7 @@ export class SyncService {
 
     private async pullRemoteChanges(token: string, forcePull: boolean = false, schemas?: Map<string, Set<string>>): Promise<number> {
         let totalCount = 0;
+        const skippedFkRowsByTable: Record<string, number> = {};
         const userId = useAuthStore.getState().user?.id;
         const syncKey = userId ? `last_pull_sync_${userId}` : 'last_pull_sync';
         const cursorKey = userId ? `last_pull_cursor_${userId}` : 'last_pull_cursor';
@@ -706,6 +707,10 @@ export class SyncService {
                     const tableHasDeletedAt = this.hasColumn(tableSchemas, table, 'deleted_at');
                     const validColumns = tableSchemas.get(table) || new Set<string>();
                     const pkField = table === 'settings' ? 'key' : 'id';
+                    const isForeignKeyError = (error: unknown): boolean => {
+                        const message = error instanceof Error ? error.message : String(error);
+                        return message.includes('FOREIGN KEY');
+                    };
                     const ids = tableChanges.map((c) => {
                         const p = c?.payload;
                         if (!p || typeof p !== 'object') return null;
@@ -746,17 +751,45 @@ export class SyncService {
                             if (local && localUA >= remoteUA) continue;
                             const keys = Object.keys(normalized);
                             if (keys.length === 0) continue;
-                            if (local) {
-                                const uKeys = keys.filter(k => k !== pkField);
-                                if (uKeys.length === 0) continue;
-                                await dbService.run(`UPDATE ${table} SET ${uKeys.map(k => `${k}=?`).join(',')} WHERE ${pkField}=?`, [...uKeys.map(k => normalized[k]), recordId]);
-                            } else {
-                                await dbService.run(`INSERT INTO ${table} (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`, Object.values(normalized));
+                            try {
+                                if (local) {
+                                    const uKeys = keys.filter(k => k !== pkField);
+                                    if (uKeys.length === 0) continue;
+                                    await dbService.run(`UPDATE ${table} SET ${uKeys.map(k => `${k}=?`).join(',')} WHERE ${pkField}=?`, [...uKeys.map(k => normalized[k]), recordId]);
+                                } else {
+                                    await dbService.run(`INSERT INTO ${table} (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`, Object.values(normalized));
+                                }
+                            } catch (e) {
+                                if (isForeignKeyError(e)) {
+                                    skippedFkRowsByTable[table] = (skippedFkRowsByTable[table] || 0) + 1;
+                                    logger.warn('[Sync] Skipping row due to FK violation while applying remote change', {
+                                        scope: 'SyncService.pullRemoteChanges.applyForTable',
+                                        table,
+                                        operation: change.operation,
+                                        recordId,
+                                    });
+                                    continue;
+                                }
+                                throw e;
                             }
                         } else if (change.operation === 'DELETE') {
-                            if (TABLES_WITH_SOFT_DELETE.has(table) && tableHasDeletedAt) {
-                                await dbService.run(`UPDATE ${table} SET deleted_at=?, updated_at=? WHERE ${pkField}=?`, [remoteUA || Date.now(), remoteUA || Date.now(), recordId]);
-                            } else await dbService.run(`DELETE FROM ${table} WHERE ${pkField}=?`, [recordId]);
+                            try {
+                                if (TABLES_WITH_SOFT_DELETE.has(table) && tableHasDeletedAt) {
+                                    await dbService.run(`UPDATE ${table} SET deleted_at=?, updated_at=? WHERE ${pkField}=?`, [remoteUA || Date.now(), remoteUA || Date.now(), recordId]);
+                                } else await dbService.run(`DELETE FROM ${table} WHERE ${pkField}=?`, [recordId]);
+                            } catch (e) {
+                                if (isForeignKeyError(e)) {
+                                    skippedFkRowsByTable[table] = (skippedFkRowsByTable[table] || 0) + 1;
+                                    logger.warn('[Sync] Skipping delete due to FK violation while applying remote change', {
+                                        scope: 'SyncService.pullRemoteChanges.applyForTable',
+                                        table,
+                                        operation: change.operation,
+                                        recordId,
+                                    });
+                                    continue;
+                                }
+                                throw e;
+                            }
                         }
                     }
                 };
@@ -819,6 +852,12 @@ export class SyncService {
         if (anyTableChanged) {
             if (settingsModified) await configService.reload();
             dataEventService.emit('DATA_UPDATED');
+        }
+        if (Object.keys(skippedFkRowsByTable).length > 0) {
+            logger.warn('[Sync] Pull completed with skipped FK-invalid rows', {
+                scope: 'SyncService.pullRemoteChanges',
+                skippedFkRowsByTable,
+            });
         }
         if (userId) await dbService.repairDataConsistency(userId);
         return totalCount;

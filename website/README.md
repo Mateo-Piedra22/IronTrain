@@ -1,26 +1,28 @@
-# IronTrain Web
+# IronTrain Website
 
-Web estática/SSR para:
-- Landing
-- Descargas
-- Changelog
-- FAQ
-- Donaciones
-- Feed de updates para la app: `/releases.json`
+## Resumen
 
-## Requisitos
-- Node >= 18.18
+Sitio web basado en Next.js 15 para funcionalidades web y contenido complementario de IronTrain.
 
-## Desarrollo
-Desde `website/`:
+## Stack
 
-- `npm install`
-- Copia variables: crea `website/.env.local` a partir de `website/.env.example`
-- `npm run dev`
+- Next.js 15
+- React 19
+- TypeScript
+- Drizzle ORM
+- Postgres/Neon
 
-## Deploy (Vercel)
-Configura Root Directory = `website`.
+## Comandos
 
-El contenido se actualiza automáticamente al hacer push, porque lee:
-- `../docs/CHANGELOG.md`
-- `../docs/DOWNLOADS.json`
+```bash
+npm install
+npm run dev
+npm run build
+npm test
+```
+
+## Scripts relevantes
+
+- `dev`: sincroniza contenido y arranca servidor.
+- `build`: sincroniza contenido y genera build de producción.
+- `db:generate` / `db:push`: utilidades de esquema con Drizzle.

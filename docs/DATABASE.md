@@ -1,24 +1,68 @@
-# Base de datos (SQLite)
+# Base de datos
 
-## Motor
-- Expo SQLite (local).
-- Inicialización/migraciones en [DatabaseService.ts](file:///c:/Users/mateo/OneDrive/Escritorio/Work/Programas/IronTrain/src/services/DatabaseService.ts).
+## Documentos relacionados
 
-## Tablas principales
-- `categories`
-- `exercises`
-- `workouts`
-- `workout_sets`
-- `settings`
-- `measurements`
-- `plate_inventory`
+- [Arquitectura](ARCHITECTURE.md)
+- [Runbook operacional](RUNBOOK.md)
+- [Troubleshooting](TROUBLESHOOTING.md)
 
-## Migraciones relevantes
-- `workout_sets`: columnas legacy (`rpe`) y `superset_id`.
-- `plate_inventory`: la clave primaria incluye `unit` para soportar kg y lbs:
-  - PK: `(weight, type, unit)`.
+## Mobile (SQLite)
 
-## Reglas de integridad
-- Escrituras multi-step (p.ej. update de inventario) deben usar transacción.
-- `workout_sets` se borra con `ON DELETE CASCADE` al borrar un workout.
+- DB local: `irontrain_v1.db`.
+- Servicio central: `src/services/DatabaseService.ts`.
+- Esquema evolutivo con migraciones controladas.
 
+## Principios de persistencia mobile
+
+- La app usa enfoque local-first como fuente principal de lectura/escritura.
+- Las operaciones remotas no deben bloquear el flujo principal de entrenamiento.
+- El esquema local debe tolerar upgrades graduales sin romper instalaciones existentes.
+
+## Puntos importantes actuales
+
+- Persistencia de entrenamientos, rutinas, ejercicios, categorías y analítica local.
+- Soporte para social feed/cache local.
+- Tabla `shared_routine_links` para enlazar rutina local con rutina compartida remota.
+
+## `shared_routine_links`: propósito operativo
+
+- Evitar crear duplicados de rutinas cuando llega contenido compartido.
+- Mantener trazabilidad entre entidad remota y entidad local.
+- Permitir resolver conflictos de revisión en sincronización social/rutinas compartidas.
+
+## Reglas de migración
+
+- Siempre idempotentes.
+- No romper instalaciones existentes.
+- Evitar cambios destructivos sin estrategia de recuperación.
+
+## Política de migraciones
+
+1. Diseñar migración compatible con estado previo.
+2. Probar migración sobre base existente y base nueva.
+3. Registrar impacto funcional esperado.
+4. Definir rollback lógico cuando aplique.
+
+## Qué evitar en cambios de esquema
+
+- Eliminar columnas/tablas sin plan de recuperación.
+- Reusar campos con significado distinto sin migración explícita.
+- Acoplar lógica de UI a detalles internos de storage.
+
+## Website
+
+- Persistencia en Postgres (Neon) con Drizzle.
+- Scripts de schema y migración en `website/`.
+
+## Contraste mobile vs website
+
+- Mobile: SQLite orientado a resiliencia offline.
+- Website: Postgres orientado a servicios web y consultas remotas.
+- Ambos módulos evolucionan de forma independiente y requieren compatibilidad a nivel de contratos.
+
+## Checklist al tocar datos
+
+- ¿Hay impacto en migraciones existentes?
+- ¿El cambio mantiene comportamiento local-first?
+- ¿Afecta sincronización social/rutinas compartidas?
+- ¿Se actualizó documentación operativa si cambió el flujo?

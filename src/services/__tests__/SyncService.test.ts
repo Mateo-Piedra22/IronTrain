@@ -308,6 +308,52 @@ describe('SyncService', () => {
     expect(runCalls.some(c => String(c[0]).includes('INSERT INTO workout_sets') || String(c[0]).includes('UPDATE workout_sets'))).toBe(true);
   });
 
+  it('skips permanently FK-invalid rows without crashing pull', async () => {
+    (dbService.getFirst as jest.Mock).mockResolvedValue({ value: '0' });
+
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        changes: [
+          {
+            table: 'routine_exercises',
+            operation: 'INSERT',
+            payload: {
+              id: 're-orphan',
+              routine_day_id: 'missing-day',
+              exercise_id: 'ex-1',
+              order_index: 0,
+              updated_at: 1,
+              deleted_at: null,
+            },
+          },
+          {
+            table: 'exercises',
+            operation: 'INSERT',
+            payload: {
+              id: 'ex-1',
+              category_id: 'uncategorized',
+              name: 'Press',
+              type: 'weight_reps',
+              updated_at: 1,
+              deleted_at: null,
+            },
+          },
+        ],
+        serverTime: 2,
+      }),
+    });
+
+    (dbService.run as jest.Mock).mockImplementation(async (sql: string) => {
+      if (sql.includes('INSERT INTO routine_exercises')) {
+        throw new Error('FOREIGN KEY constraint failed');
+      }
+      return {} as any;
+    });
+
+    await expect((syncService as any).pullRemoteChanges('token-1')).resolves.toBeGreaterThanOrEqual(0);
+  });
+
   it('normalizes scoped cloud settings keys to local keys during pull', async () => {
     (dbService.getFirst as jest.Mock).mockResolvedValue({ value: '0' });
     // mockSchema() handles this

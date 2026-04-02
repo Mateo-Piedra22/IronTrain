@@ -417,6 +417,17 @@ export class DatabaseService {
         updated_at INTEGER NOT NULL
       );
 
+            CREATE TABLE IF NOT EXISTS shared_routine_links (
+                id TEXT PRIMARY KEY NOT NULL,
+                shared_routine_id TEXT NOT NULL,
+                local_routine_id TEXT NOT NULL,
+                last_snapshot_id TEXT,
+                last_revision INTEGER,
+                last_synced_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                user_id TEXT
+            );
+
       CREATE INDEX IF NOT EXISTS idx_exercises_category ON exercises(category_id);
       CREATE INDEX IF NOT EXISTS idx_sets_exercise ON workout_sets(exercise_id);
       CREATE INDEX IF NOT EXISTS idx_sets_workout ON workout_sets(workout_id);
@@ -435,6 +446,7 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_activity_feed_user ON activity_feed(user_id);
       CREATE INDEX IF NOT EXISTS idx_activity_seen_user ON activity_seen(user_id);
       CREATE INDEX IF NOT EXISTS idx_activity_seen_activity ON activity_seen(activity_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_shared_routine_links_unique ON shared_routine_links(shared_routine_id, ifnull(user_id, '__anon__'));
       CREATE INDEX IF NOT EXISTS idx_shares_receiver ON shares_inbox(receiver_id);
       CREATE INDEX IF NOT EXISTS idx_notif_reactions_notif ON notification_reactions (notification_id);
       CREATE INDEX IF NOT EXISTS idx_notif_reactions_user ON notification_reactions (user_id);
@@ -1886,13 +1898,46 @@ export class DatabaseService {
 
             // 6. Routine Day Deduplication (User Aware)
             await safeStep('routineDays', async () => {
-                const dupeDays = await this.getAll<{ id: string }>(`
-                    SELECT id FROM routine_days
-                    WHERE user_id = ? AND rowid NOT IN (
+                const dupeDays = await this.getAll<{ id: string; keep_id: string }>(`
+                    SELECT rd.id,
+                           (
+                               SELECT id FROM routine_days rd_keep
+                               WHERE rd_keep.user_id = rd.user_id
+                                 AND rd_keep.routine_id = rd.routine_id
+                                 AND rd_keep.order_index = rd.order_index
+                               ORDER BY rd_keep.rowid ASC
+                               LIMIT 1
+                           ) AS keep_id
+                    FROM routine_days rd
+                    WHERE rd.user_id = ?
+                      AND rd.rowid NOT IN (
                         SELECT MIN(rowid) FROM routine_days WHERE user_id = ? GROUP BY routine_id, order_index
                     )
                 `, [userId, userId]);
+
+                const now = Date.now();
                 for (const d of dupeDays) {
+                    if (d.keep_id && d.keep_id !== d.id) {
+                        const childRows = await this.getAll<{ id: string }>(
+                            'SELECT id FROM routine_exercises WHERE routine_day_id = ?',
+                            [d.id],
+                        );
+
+                        if (childRows.length > 0) {
+                            await this.run(
+                                'UPDATE routine_exercises SET routine_day_id = ?, updated_at = ? WHERE routine_day_id = ?',
+                                [d.keep_id, now, d.id],
+                            );
+
+                            for (const row of childRows) {
+                                await this.queueSyncMutation('routine_exercises', row.id, 'UPDATE', {
+                                    routine_day_id: d.keep_id,
+                                    updated_at: now,
+                                });
+                            }
+                        }
+                    }
+
                     await this.run('DELETE FROM routine_days WHERE id = ?', [d.id]);
                     await queueDelete('routine_days', d.id);
                 }
