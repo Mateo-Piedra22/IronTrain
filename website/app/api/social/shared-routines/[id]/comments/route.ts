@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '../../../../../../src/db';
@@ -56,12 +56,57 @@ export async function GET(
             .orderBy(asc(schema.sharedRoutineComments.createdAt))
             .limit(200);
 
+        const actorIds = Array.from(
+            new Set(comments.map((comment) => comment.actorId).filter((id): id is string => typeof id === 'string' && id.length > 0)),
+        );
+
+        const snapshotIds = Array.from(
+            new Set(comments.map((comment) => comment.snapshotId).filter((id): id is string => typeof id === 'string' && id.length > 0)),
+        );
+
+        const [profiles, snapshots] = await Promise.all([
+            actorIds.length > 0
+                ? db
+                    .select({
+                        id: schema.userProfiles.id,
+                        displayName: schema.userProfiles.displayName,
+                        username: schema.userProfiles.username,
+                    })
+                    .from(schema.userProfiles)
+                    .where(inArray(schema.userProfiles.id, actorIds))
+                : Promise.resolve([]),
+            snapshotIds.length > 0
+                ? db
+                    .select({
+                        id: schema.sharedRoutineSnapshots.id,
+                        revision: schema.sharedRoutineSnapshots.revision,
+                    })
+                    .from(schema.sharedRoutineSnapshots)
+                    .where(inArray(schema.sharedRoutineSnapshots.id, snapshotIds))
+                : Promise.resolve([]),
+        ]);
+
+        const profileById = new Map(
+            profiles.map((profile) => [
+                profile.id,
+                { displayName: profile.displayName, username: profile.username },
+            ]),
+        );
+
+        const revisionBySnapshotId = new Map(snapshots.map((snapshot) => [snapshot.id, snapshot.revision]));
+
         return NextResponse.json({
             success: true,
             items: comments.map((comment) => ({
                 id: comment.id,
                 actorId: comment.actorId,
+                actorDisplayName: profileById.get(comment.actorId)?.displayName ?? null,
+                actorUsername: profileById.get(comment.actorId)?.username ?? null,
                 snapshotId: comment.snapshotId,
+                snapshotRevision:
+                    comment.snapshotId && revisionBySnapshotId.has(comment.snapshotId)
+                        ? revisionBySnapshotId.get(comment.snapshotId)
+                        : null,
                 message: comment.message,
                 createdAt: comment.createdAt,
                 updatedAt: comment.updatedAt,

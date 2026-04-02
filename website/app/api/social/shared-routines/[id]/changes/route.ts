@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../../../src/db';
 import * as schema from '../../../../../../src/db/schema';
@@ -48,12 +48,36 @@ export async function GET(
             .orderBy(desc(schema.sharedRoutineChanges.createdAt))
             .limit(50);
 
+        const actorIds = Array.from(
+            new Set(changes.map((change) => change.actorId).filter((id): id is string => typeof id === 'string' && id.length > 0)),
+        );
+
+        const profiles = actorIds.length > 0
+            ? await db
+                .select({
+                    id: schema.userProfiles.id,
+                    displayName: schema.userProfiles.displayName,
+                    username: schema.userProfiles.username,
+                })
+                .from(schema.userProfiles)
+                .where(inArray(schema.userProfiles.id, actorIds))
+            : [];
+
+        const profileById = new Map(
+            profiles.map((profile) => [
+                profile.id,
+                { displayName: profile.displayName, username: profile.username },
+            ]),
+        );
+
         return NextResponse.json({
             success: true,
             items: changes.map((change) => ({
                 id: change.id,
                 actionType: change.actionType,
                 actorId: change.actorId,
+                actorDisplayName: profileById.get(change.actorId)?.displayName ?? null,
+                actorUsername: profileById.get(change.actorId)?.username ?? null,
                 snapshotId: change.snapshotId,
                 metadata: change.metadata,
                 createdAt: change.createdAt,

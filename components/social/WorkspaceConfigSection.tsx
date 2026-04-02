@@ -103,6 +103,9 @@ export function WorkspaceConfigSection({
     onToggleFriendSelection,
     onSaveWorkspace,
 }: WorkspaceConfigSectionProps) {
+    const visibleCount = visibleActiveWorkspaceMembers.length;
+    const totalMembers = activeWorkspaceMembers.length;
+
     return (
         <View style={{ backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, borderRadius: 16, padding: 12, marginBottom: 12 }}>
             <Text style={{ color: colors.text, fontWeight: '900', marginBottom: 4, fontSize: 15 }}>
@@ -229,6 +232,10 @@ export function WorkspaceConfigSection({
                         Se muestran primero owner, luego editores y viewers. Podés cambiar rol, quitar o volver a agregar (owner protegido).
                     </Text>
 
+                    <Text style={{ color: colors.textMuted, fontSize: 10, marginBottom: 8 }}>
+                        Mostrando {visibleCount} de {totalMembers} miembro(s).
+                    </Text>
+
                     <IronInput label="Buscar persona" value={memberSearch} onChangeText={onSetMemberSearch} />
 
                     <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -312,7 +319,7 @@ export function WorkspaceConfigSection({
 
                         {visibleActiveWorkspaceMembers.length === 0 && (
                             <Text style={{ color: colors.textMuted, fontSize: 11 }}>
-                                No encontramos personas con esa búsqueda o filtro.
+                                No encontramos miembros con ese filtro. Probá con “Todos” o limpiá la búsqueda.
                             </Text>
                         )}
                     </View>
@@ -327,7 +334,9 @@ export function WorkspaceConfigSection({
                 </View>
             )}
             {inviteableFriends.length === 0 ? (
-                <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 8 }}>No hay personas nuevas para invitar.</Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 8 }}>
+                    No hay personas nuevas para invitar (tus contactos ya están dentro o no hay amistades disponibles).
+                </Text>
             ) : (
                 <View style={{ gap: 8, marginBottom: 10 }}>
                     {inviteableFriends.map((friend) => {

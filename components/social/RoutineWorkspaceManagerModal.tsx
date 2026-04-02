@@ -1,5 +1,8 @@
 import { WorkspaceActionsSection } from '@/components/social/WorkspaceActionsSection';
+import { WorkspaceCommentsModal } from '@/components/social/WorkspaceCommentsModal';
 import { WorkspaceConfigSection } from '@/components/social/WorkspaceConfigSection';
+import { WorkspaceHistoryModal } from '@/components/social/WorkspaceHistoryModal';
+import { WorkspaceReviewsModal } from '@/components/social/WorkspaceReviewsModal';
 import { ToastContainer } from '@/components/ui/ToastContainer';
 import { useColors } from '@/src/hooks/useColors';
 import { configService } from '@/src/services/ConfigService';
@@ -52,6 +55,10 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
     const [memberRoleFilter, setMemberRoleFilter] = useState<'all' | 'owner' | 'editor' | 'viewer'>('all');
     const [membersSeededWorkspaceId, setMembersSeededWorkspaceId] = useState<string | null>(null);
     const [autoSyncForEditorsEnabled, setAutoSyncForEditorsEnabled] = useState(false);
+    const [historyModalVisible, setHistoryModalVisible] = useState(false);
+    const [reviewsModalVisible, setReviewsModalVisible] = useState(false);
+    const [commentsModalVisible, setCommentsModalVisible] = useState(false);
+    const [workspacePanel, setWorkspacePanel] = useState<'config' | 'actions'>('actions');
 
     const defaultWorkspaceTitle = useMemo(
         () => (routineName ? `${routineName} (Equipo)` : 'Rutina compartida'),
@@ -580,22 +587,7 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                 ...prev,
                 [workspace.id]: changes,
             }));
-
-            if (changes.length === 0) {
-                workspaceFeedback.success('Historial', 'No hay cambios registrados todavía.');
-                return;
-            }
-
-            const lines = changes.slice(0, 8).map((change, index) => {
-                const revision =
-                    change.metadata && typeof change.metadata.revision === 'number'
-                        ? change.metadata.revision
-                        : null;
-
-                return `${index + 1}. ${change.actionType}${revision ? ` (rev ${revision})` : ''}`;
-            });
-
-            confirm.info('Historial reciente', lines.join('\n'));
+            setHistoryModalVisible(true);
         } catch (e: any) {
             workspaceFeedback.error('Error', e?.message || 'No se pudo cargar el historial.');
         } finally {
@@ -608,14 +600,7 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
         try {
             const comments = await SocialService.listSharedRoutineComments(workspace.id);
             setSelectedWorkspaceComments((prev) => ({ ...prev, [workspace.id]: comments }));
-
-            if (comments.length === 0) {
-                workspaceFeedback.success('Comentarios', 'No hay comentarios todavía.');
-                return;
-            }
-
-            const preview = comments.slice(-6).map((comment, idx) => `${idx + 1}. ${comment.message}`).join('\n');
-            confirm.info('Comentarios recientes', preview);
+            setCommentsModalVisible(true);
         } catch (e: any) {
             workspaceFeedback.error('Error', e?.message || 'No se pudieron cargar los comentarios.');
         } finally {
@@ -648,18 +633,7 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
         try {
             const reviews = await SocialService.listSharedRoutineReviews(workspace.id);
             setSelectedWorkspaceReviews((prev) => ({ ...prev, [workspace.id]: reviews }));
-
-            if (reviews.length === 0) {
-                workspaceFeedback.success('Revisiones', 'No hay revisiones registradas.');
-                return;
-            }
-
-            const summary = reviews
-                .slice(0, 8)
-                .map((review, index) => `${index + 1}. ${review.status} • base rev ${review.requestedBaseRevision}`)
-                .join('\n');
-
-            confirm.info('Revisiones recientes', summary);
+            setReviewsModalVisible(true);
         } catch (e: any) {
             workspaceFeedback.error('Error', e?.message || 'No se pudieron cargar las revisiones.');
         } finally {
@@ -778,7 +752,71 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
         }
     };
 
+    const renderWorkspaceSelector = useCallback((opts: { title: string; subtitle: string; allowCreateNew: boolean }) => (
+        <View style={{ backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, borderRadius: 16, padding: 12, marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text style={{ color: colors.text, fontWeight: '900', fontSize: 15 }}>{opts.title}</Text>
+                {opts.allowCreateNew && (
+                    <TouchableOpacity
+                        onPress={() => selectWorkspace(null)}
+                        style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.surfaceLighter }}
+                    >
+                        <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '800' }}>Crear espacio</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+
+            <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: 10 }}>{opts.subtitle}</Text>
+
+            {teamLoading && teamWorkspaces.length === 0 ? (
+                <View style={{ paddingVertical: 14, alignItems: 'center' }}>
+                    <ActivityIndicator color={colors.primary.DEFAULT} />
+                </View>
+            ) : teamWorkspaces.length === 0 ? (
+                <Text style={{ color: colors.textMuted, fontSize: 12 }}>Todavía no hay espacios para esta rutina.</Text>
+            ) : (
+                <View style={{ gap: 8 }}>
+                    {teamWorkspaces.map((workspace) => {
+                        const isSelected = activeWorkspaceId === workspace.id;
+                        return (
+                            <TouchableOpacity
+                                key={`selector-${opts.title}-${workspace.id}`}
+                                onPress={() => selectWorkspace(workspace)}
+                                style={{
+                                    borderWidth: 1.5,
+                                    borderColor: isSelected ? colors.primary.DEFAULT : colors.border,
+                                    borderRadius: 12,
+                                    padding: 10,
+                                    backgroundColor: isSelected ? withAlpha(colors.primary.DEFAULT, '10') : colors.surfaceLighter,
+                                }}
+                            >
+                                <Text style={{ color: isSelected ? colors.primary.DEFAULT : colors.text, fontWeight: '900', fontSize: 13 }}>
+                                    {workspace.title}
+                                </Text>
+                                <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 3 }}>
+                                    Rev {workspace.currentRevision} • {workspace.membership.role} • {workspace.editMode === 'collaborative' ? 'Colaborativa' : 'Solo propietario'}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            )}
+        </View>
+    ), [
+        colors.border,
+        colors.primary.DEFAULT,
+        colors.surface,
+        colors.surfaceLighter,
+        colors.text,
+        colors.textMuted,
+        teamLoading,
+        teamWorkspaces,
+        activeWorkspaceId,
+        selectWorkspace,
+    ]);
+
     return (
+        <>
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                 <GestureHandlerRootView style={{ flex: 1 }}>
@@ -807,7 +845,7 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                             <View style={{ flex: 1 }}>
                                 <Text style={{ color: colors.text, fontWeight: '900', fontSize: isCompact ? 15 : 17, letterSpacing: -0.4 }}>Rutinas compartidas</Text>
                                 <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '700', marginTop: 2 }}>
-                                    Equipo, sincronización e importación de revisiones
+                                    Configurá equipo, publicá cambios y validá revisiones
                                 </Text>
                             </View>
                             <TouchableOpacity
@@ -889,7 +927,7 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                             <View style={{ backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, borderRadius: 16, padding: 12, marginBottom: 12 }}>
                                 <Text style={{ color: colors.text, fontWeight: '900', fontSize: 13 }}>Guía rápida</Text>
                                 <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 4, lineHeight: 16 }}>
-                                    1) Elegí un espacio. 2) Configurá permisos e invitados. 3) Sincronizá, revisá actividad o deshacé la última versión.
+                                    1) Elegí un espacio. 2) Ajustá permisos e invitados en “Configurar”. 3) Publicá, revisá o comentá desde “Acciones”.
                                 </Text>
                                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                                     <View style={{ borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: withAlpha(colors.primary.DEFAULT, '12') }}>
@@ -907,133 +945,136 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                             </View>
 
                             <View style={{ backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, borderRadius: 16, padding: 12, marginBottom: 12 }}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                    <Text style={{ color: colors.text, fontWeight: '900', fontSize: 15 }}>1) Elegí el espacio</Text>
+                                <Text style={{ color: colors.text, fontWeight: '900', fontSize: 13, marginBottom: 8 }}>Flujo de trabajo</Text>
+                                <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: 8 }}>
+                                    Separá configuración de operaciones diarias para trabajar más rápido.
+                                </Text>
+                                <View style={{ flexDirection: 'row', gap: 8 }}>
                                     <TouchableOpacity
-                                        onPress={() => selectWorkspace(null)}
-                                        style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: colors.surfaceLighter }}
+                                        onPress={() => setWorkspacePanel('config')}
+                                        style={{ flex: 1, borderWidth: 1.5, borderColor: workspacePanel === 'config' ? colors.primary.DEFAULT : colors.border, borderRadius: 12, paddingVertical: 10, alignItems: 'center', backgroundColor: workspacePanel === 'config' ? withAlpha(colors.primary.DEFAULT, '12') : colors.surfaceLighter }}
                                     >
-                                        <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '800' }}>Nuevo espacio</Text>
+                                        <Text style={{ color: workspacePanel === 'config' ? colors.primary.DEFAULT : colors.textMuted, fontWeight: '800', fontSize: 12 }}>Configurar espacio</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={() => setWorkspacePanel('actions')}
+                                        style={{ flex: 1, borderWidth: 1.5, borderColor: workspacePanel === 'actions' ? colors.primary.DEFAULT : colors.border, borderRadius: 12, paddingVertical: 10, alignItems: 'center', backgroundColor: workspacePanel === 'actions' ? withAlpha(colors.primary.DEFAULT, '12') : colors.surfaceLighter }}
+                                    >
+                                        <Text style={{ color: workspacePanel === 'actions' ? colors.primary.DEFAULT : colors.textMuted, fontWeight: '800', fontSize: 12 }}>Acciones activas</Text>
                                     </TouchableOpacity>
                                 </View>
-                                <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: 10 }}>
-                                    Elegí uno para editarlo. Si creás uno nuevo, se usa esta rutina y no se duplican espacios.
-                                </Text>
-
-                                {teamLoading && teamWorkspaces.length === 0 ? (
-                                    <View style={{ paddingVertical: 14, alignItems: 'center' }}>
-                                        <ActivityIndicator color={colors.primary.DEFAULT} />
-                                    </View>
-                                ) : teamWorkspaces.length === 0 ? (
-                                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>Todavía no hay espacios para esta rutina.</Text>
-                                ) : (
-                                    <View style={{ gap: 8 }}>
-                                        {teamWorkspaces.map((workspace) => {
-                                            const isSelected = activeWorkspaceId === workspace.id;
-                                            return (
-                                                <TouchableOpacity
-                                                    key={workspace.id}
-                                                    onPress={() => selectWorkspace(workspace)}
-                                                    style={{
-                                                        borderWidth: 1.5,
-                                                        borderColor: isSelected ? colors.primary.DEFAULT : colors.border,
-                                                        borderRadius: 12,
-                                                        padding: 10,
-                                                        backgroundColor: isSelected ? withAlpha(colors.primary.DEFAULT, '10') : colors.surfaceLighter,
-                                                    }}
-                                                >
-                                                    <Text style={{ color: isSelected ? colors.primary.DEFAULT : colors.text, fontWeight: '900', fontSize: 13 }}>
-                                                        {workspace.title}
-                                                    </Text>
-                                                    <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 3 }}>
-                                                        Rev {workspace.currentRevision} • {workspace.membership.role} • {workspace.editMode === 'collaborative' ? 'Colaborativa' : 'Solo propietario'}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            );
-                                        })}
-                                    </View>
-                                )}
                             </View>
 
-                            <WorkspaceConfigSection
-                                colors={colors}
-                                teamLoading={teamLoading}
-                                routineId={routineId}
-                                isEditingConfig={isEditingConfig}
-                                canEditConfig={canEditConfig}
-                                activeWorkspace={activeWorkspace}
-                                activeWorkspaceMembers={activeWorkspaceMembers}
-                                activeWorkspaceInvitations={activeWorkspaceInvitations}
-                                visibleActiveWorkspaceMembers={visibleActiveWorkspaceMembers}
-                                inviteableFriends={inviteableFriends}
-                                selectedTeamFriendIds={selectedTeamFriendIds}
-                                memberSearch={memberSearch}
-                                memberRoleFilter={memberRoleFilter}
-                                teamTitle={teamTitle}
-                                teamEditMode={teamEditMode}
-                                teamApprovalMode={teamApprovalMode}
-                                autoSyncForEditorsEnabled={autoSyncForEditorsEnabled}
-                                resolveMemberRole={resolveMemberRole}
-                                onToggleAutoSync={handleToggleEditorAutoSync}
-                                onSetTeamTitle={setTeamTitle}
-                                onSetTeamEditMode={setTeamEditMode}
-                                onSetTeamApprovalMode={setTeamApprovalMode}
-                                onSetMemberSearch={setMemberSearch}
-                                onSetMemberRoleFilter={setMemberRoleFilter}
-                                onSetMemberRole={(memberId, role) => {
-                                    setMemberRoleOverrides((prev) => ({ ...prev, [memberId]: role }));
-                                }}
-                                onAddMember={(memberId, role) => {
-                                    setSelectedTeamFriendIds((prev) => (prev.includes(memberId) ? prev : [...prev, memberId]));
-                                    setMemberRoleOverrides((prev) => ({ ...prev, [memberId]: role }));
-                                }}
-                                onRemoveMember={(memberId) => {
-                                    setSelectedTeamFriendIds((prev) => prev.filter((id) => id !== memberId));
-                                    setMemberRoleOverrides((prev) => {
-                                        const next = { ...prev };
-                                        delete next[memberId];
-                                        return next;
-                                    });
-                                }}
-                                onToggleFriendSelection={(friendId) => {
-                                    setSelectedTeamFriendIds((prev) => (
-                                        prev.includes(friendId)
-                                            ? prev.filter((id) => id !== friendId)
-                                            : [...prev, friendId]
-                                    ));
-                                }}
-                                onSaveWorkspace={handleCreateTeamWorkspace}
-                            />
+                            {workspacePanel === 'config' ? (
+                                <>
+                                    {renderWorkspaceSelector({
+                                        title: '1) Elegí espacio para configurar',
+                                        subtitle: 'Seleccioná el espacio para crear/editar reglas e invitaciones. Si creás uno nuevo, se reutiliza esta rutina.',
+                                        allowCreateNew: true,
+                                    })}
 
-                            {!!activeWorkspace && (
-                                <WorkspaceActionsSection
-                                    colors={colors}
-                                    activeWorkspace={activeWorkspace}
-                                    activePendingReviewsCount={activePendingReviewsCount}
-                                    autoSyncingWorkspaceId={autoSyncingWorkspaceId}
-                                    teamLoading={teamLoading}
-                                    workspaceCommentDraft={workspaceCommentDrafts[activeWorkspace.id] || ''}
-                                    selectedWorkspaceChanges={selectedWorkspaceChanges[activeWorkspace.id] ?? []}
-                                    pendingWorkspaceReviews={(selectedWorkspaceReviews[activeWorkspace.id] ?? []).filter((review) => review.status === 'pending')}
-                                    runExplainedAction={runExplainedAction}
-                                    onImportWorkspaceSnapshot={() => handleImportWorkspaceSnapshot(activeWorkspace)}
-                                    onPublishWorkspaceChanges={() => handlePublishWorkspaceChanges(activeWorkspace)}
-                                    onOwnerSyncWorkspace={() => handleOwnerSyncWorkspace(activeWorkspace)}
-                                    onViewWorkspaceHistory={() => handleViewWorkspaceHistory(activeWorkspace)}
-                                    onLoadWorkspaceComments={() => handleLoadWorkspaceComments(activeWorkspace)}
-                                    onLoadWorkspaceReviews={() => handleLoadWorkspaceReviews(activeWorkspace)}
-                                    onRollbackWorkspace={() => {
-                                        confirm.destructive(
-                                            'Rollback de workspace',
-                                            `Vas a crear una nueva revisión restaurando la versión anterior (rev ${Math.max(1, activeWorkspace.currentRevision - 1)}).`,
-                                            () => { void handleRollbackWorkspace(activeWorkspace); },
-                                            'Aplicar rollback',
-                                        );
-                                    }}
-                                    onCommentDraftChange={(value) => setWorkspaceCommentDrafts((prev) => ({ ...prev, [activeWorkspace.id]: value }))}
-                                    onAddWorkspaceComment={() => handleAddWorkspaceComment(activeWorkspace)}
-                                    onDecideReview={(review, decision) => handleDecideReview(activeWorkspace, review, decision)}
-                                />
+                                    <WorkspaceConfigSection
+                                        colors={colors}
+                                        teamLoading={teamLoading}
+                                        routineId={routineId}
+                                        isEditingConfig={isEditingConfig}
+                                        canEditConfig={canEditConfig}
+                                        activeWorkspace={activeWorkspace}
+                                        activeWorkspaceMembers={activeWorkspaceMembers}
+                                        activeWorkspaceInvitations={activeWorkspaceInvitations}
+                                        visibleActiveWorkspaceMembers={visibleActiveWorkspaceMembers}
+                                        inviteableFriends={inviteableFriends}
+                                        selectedTeamFriendIds={selectedTeamFriendIds}
+                                        memberSearch={memberSearch}
+                                        memberRoleFilter={memberRoleFilter}
+                                        teamTitle={teamTitle}
+                                        teamEditMode={teamEditMode}
+                                        teamApprovalMode={teamApprovalMode}
+                                        autoSyncForEditorsEnabled={autoSyncForEditorsEnabled}
+                                        resolveMemberRole={resolveMemberRole}
+                                        onToggleAutoSync={handleToggleEditorAutoSync}
+                                        onSetTeamTitle={setTeamTitle}
+                                        onSetTeamEditMode={setTeamEditMode}
+                                        onSetTeamApprovalMode={setTeamApprovalMode}
+                                        onSetMemberSearch={setMemberSearch}
+                                        onSetMemberRoleFilter={setMemberRoleFilter}
+                                        onSetMemberRole={(memberId, role) => {
+                                            setMemberRoleOverrides((prev) => ({ ...prev, [memberId]: role }));
+                                        }}
+                                        onAddMember={(memberId, role) => {
+                                            setSelectedTeamFriendIds((prev) => (prev.includes(memberId) ? prev : [...prev, memberId]));
+                                            setMemberRoleOverrides((prev) => ({ ...prev, [memberId]: role }));
+                                        }}
+                                        onRemoveMember={(memberId) => {
+                                            setSelectedTeamFriendIds((prev) => prev.filter((id) => id !== memberId));
+                                            setMemberRoleOverrides((prev) => {
+                                                const next = { ...prev };
+                                                delete next[memberId];
+                                                return next;
+                                            });
+                                        }}
+                                        onToggleFriendSelection={(friendId) => {
+                                            setSelectedTeamFriendIds((prev) => (
+                                                prev.includes(friendId)
+                                                    ? prev.filter((id) => id !== friendId)
+                                                    : [...prev, friendId]
+                                            ));
+                                        }}
+                                        onSaveWorkspace={handleCreateTeamWorkspace}
+                                    />
+                                </>
+                            ) : (
+                                <>
+                                    {renderWorkspaceSelector({
+                                        title: '1) Elegí espacio para operar',
+                                        subtitle: 'Seleccioná el espacio activo para sincronizar, revisar propuestas, ver historial y comentar.',
+                                        allowCreateNew: false,
+                                    })}
+
+                                    {!!activeWorkspace ? (
+                                        <WorkspaceActionsSection
+                                            colors={colors}
+                                            activeWorkspace={activeWorkspace}
+                                            activePendingReviewsCount={activePendingReviewsCount}
+                                            autoSyncingWorkspaceId={autoSyncingWorkspaceId}
+                                            teamLoading={teamLoading}
+                                            workspaceCommentDraft={workspaceCommentDrafts[activeWorkspace.id] || ''}
+                                            selectedWorkspaceChanges={selectedWorkspaceChanges[activeWorkspace.id] ?? []}
+                                            pendingWorkspaceReviews={(selectedWorkspaceReviews[activeWorkspace.id] ?? []).filter((review) => review.status === 'pending')}
+                                            runExplainedAction={runExplainedAction}
+                                            onImportWorkspaceSnapshot={() => handleImportWorkspaceSnapshot(activeWorkspace)}
+                                            onPublishWorkspaceChanges={() => handlePublishWorkspaceChanges(activeWorkspace)}
+                                            onOwnerSyncWorkspace={() => handleOwnerSyncWorkspace(activeWorkspace)}
+                                            onViewWorkspaceHistory={() => handleViewWorkspaceHistory(activeWorkspace)}
+                                            onLoadWorkspaceComments={() => handleLoadWorkspaceComments(activeWorkspace)}
+                                            onLoadWorkspaceReviews={() => handleLoadWorkspaceReviews(activeWorkspace)}
+                                            onRollbackWorkspace={() => {
+                                                confirm.destructive(
+                                                    'Rollback de workspace',
+                                                    `Vas a crear una nueva revisión restaurando la versión anterior (rev ${Math.max(1, activeWorkspace.currentRevision - 1)}).`,
+                                                    () => { void handleRollbackWorkspace(activeWorkspace); },
+                                                    'Aplicar rollback',
+                                                );
+                                            }}
+                                            onCommentDraftChange={(value) => setWorkspaceCommentDrafts((prev) => ({ ...prev, [activeWorkspace.id]: value }))}
+                                            onAddWorkspaceComment={() => handleAddWorkspaceComment(activeWorkspace)}
+                                            onDecideReview={(review, decision) => handleDecideReview(activeWorkspace, review, decision)}
+                                        />
+                                    ) : (
+                                        <View style={{ backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, borderRadius: 16, padding: 12, marginBottom: 12 }}>
+                                            <Text style={{ color: colors.text, fontWeight: '900', fontSize: 13 }}>Sin espacio activo seleccionado</Text>
+                                            <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 4 }}>
+                                                Elegí un espacio para habilitar las acciones de revisión, historial, comentarios y sincronización.
+                                            </Text>
+                                            <TouchableOpacity
+                                                onPress={() => setWorkspacePanel('config')}
+                                                style={{ alignSelf: 'flex-start', marginTop: 10, borderWidth: 1, borderColor: withAlpha(colors.primary.DEFAULT, '35'), borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: withAlpha(colors.primary.DEFAULT, '12') }}
+                                            >
+                                                <Text style={{ color: colors.primary.DEFAULT, fontSize: 11, fontWeight: '900' }}>Ir a configuración</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </>
                             )}
                         </ScrollView>
                     </View>
@@ -1042,5 +1083,43 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                 </GestureHandlerRootView>
             </KeyboardAvoidingView>
         </Modal>
+        <WorkspaceReviewsModal
+            visible={reviewsModalVisible}
+            colors={colors}
+            workspace={activeWorkspace}
+            reviews={activeWorkspace ? (selectedWorkspaceReviews[activeWorkspace.id] ?? []) : []}
+            loading={teamLoading}
+            onClose={() => setReviewsModalVisible(false)}
+            onRefresh={() => activeWorkspace ? handleLoadWorkspaceReviews(activeWorkspace) : undefined}
+            onDecideReview={(review, decision) => {
+                if (!activeWorkspace) return;
+                void handleDecideReview(activeWorkspace, review, decision);
+            }}
+        />
+        <WorkspaceHistoryModal
+            visible={historyModalVisible}
+            colors={colors}
+            workspace={activeWorkspace}
+            changes={activeWorkspace ? (selectedWorkspaceChanges[activeWorkspace.id] ?? []) : []}
+            loading={teamLoading}
+            onClose={() => setHistoryModalVisible(false)}
+            onRefresh={() => activeWorkspace ? handleViewWorkspaceHistory(activeWorkspace) : undefined}
+        />
+        <WorkspaceCommentsModal
+            visible={commentsModalVisible}
+            colors={colors}
+            workspace={activeWorkspace}
+            comments={activeWorkspace ? (selectedWorkspaceComments[activeWorkspace.id] ?? []) : []}
+            loading={teamLoading}
+            draft={activeWorkspace ? (workspaceCommentDrafts[activeWorkspace.id] || '') : ''}
+            onClose={() => setCommentsModalVisible(false)}
+            onRefresh={() => activeWorkspace ? handleLoadWorkspaceComments(activeWorkspace) : undefined}
+            onDraftChange={(value) => {
+                if (!activeWorkspace) return;
+                setWorkspaceCommentDrafts((prev) => ({ ...prev, [activeWorkspace.id]: value }));
+            }}
+            onSendComment={() => activeWorkspace ? handleAddWorkspaceComment(activeWorkspace) : undefined}
+        />
+        </>
     );
 }

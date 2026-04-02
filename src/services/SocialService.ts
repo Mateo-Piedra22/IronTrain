@@ -271,6 +271,8 @@ export interface SharedRoutineChangeItem {
     id: string;
     actionType: string;
     actorId: string;
+    actorDisplayName?: string | null;
+    actorUsername?: string | null;
     snapshotId?: string | null;
     metadata?: Record<string, unknown> | null;
     createdAt?: string | number | Date;
@@ -288,19 +290,56 @@ export interface SharedRoutineRollbackResult {
 export interface SharedRoutineComment {
     id: string;
     actorId: string;
+    actorDisplayName?: string | null;
+    actorUsername?: string | null;
     snapshotId?: string | null;
+    snapshotRevision?: number | null;
     message: string;
     createdAt?: string | number | Date;
     updatedAt?: string | number | Date;
 }
 
+export interface SharedRoutineEntitySummary {
+    routineDays: number;
+    routineExercises: number;
+    exercises: number;
+    categories: number;
+    badges: number;
+    exerciseBadges: number;
+}
+
+export interface SharedRoutineEntityDeltaRow {
+    added: number;
+    removed: number;
+    net: number;
+}
+
+export interface SharedRoutineEntityDelta {
+    previous: SharedRoutineEntitySummary;
+    next: SharedRoutineEntitySummary;
+    delta: {
+        routineDays: SharedRoutineEntityDeltaRow;
+        routineExercises: SharedRoutineEntityDeltaRow;
+        exercises: SharedRoutineEntityDeltaRow;
+        categories: SharedRoutineEntityDeltaRow;
+        badges: SharedRoutineEntityDeltaRow;
+        exerciseBadges: SharedRoutineEntityDeltaRow;
+    };
+}
+
 export interface SharedRoutineReviewRequest {
     id: string;
     requesterId: string;
+    requesterDisplayName?: string | null;
+    requesterUsername?: string | null;
     requestedBaseRevision: number;
     sourceRoutineId?: string | null;
+    candidateSummary?: SharedRoutineEntitySummary | null;
+    candidateDelta?: SharedRoutineEntityDelta | null;
     status: 'pending' | 'approved' | 'rejected' | 'cancelled';
     decidedBy?: string | null;
+    decidedByDisplayName?: string | null;
+    decidedByUsername?: string | null;
     decidedAt?: string | number | Date | null;
     decisionNote?: string | null;
     createdAt?: string | number | Date;

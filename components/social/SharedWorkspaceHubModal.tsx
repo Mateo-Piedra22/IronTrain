@@ -133,7 +133,7 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                             <View>
                                 <Text style={{ color: colors.text, fontSize: 16, fontWeight: '900', letterSpacing: -0.3 }}>{sharedWorkspaceCopy.title}</Text>
                                 <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700' }}>
-                                    {formatWorkspaceStatus(workspaces.length, pendingTotal)}
+                                    Estado: {formatWorkspaceStatus(workspaces.length, pendingTotal)}
                                 </Text>
                             </View>
                         </View>
@@ -176,7 +176,7 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                             >
                                 <Text style={{ color: colors.text, fontWeight: '900', fontSize: 13 }}>Qué podés hacer acá</Text>
                                 <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 4, lineHeight: 16 }}>
-                                    Revisá estado, actualizá pendientes y abrí la rutina vinculada para editar o entrenar sin duplicar datos.
+                                    Revisá el estado de tus espacios, actualizá pendientes y abrí la rutina vinculada sin duplicar datos.
                                 </Text>
                                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                                     <View style={{ borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: withAlpha(colors.primary.DEFAULT, '12') }}>
@@ -186,6 +186,10 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                                         <Text style={{ color: colors.yellow, fontSize: 10, fontWeight: '900' }}>{pendingTotal} pendientes</Text>
                                     </View>
                                 </View>
+
+                                <Text style={{ color: colors.textMuted, fontSize: 10, marginTop: 8 }}>
+                                    Mostrando {workspaces.length} espacio(s) en total.
+                                </Text>
                             </View>
 
                             {workspaces.length === 0 ? (
@@ -313,7 +317,7 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                                             ) : (
                                                 <>
                                                     <ClipboardList size={14} color={colors.textMuted} />
-                                                    <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '800' }}>Actualizar pendientes</Text>
+                                                    <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '800' }}>Recontar pendientes</Text>
                                                 </>
                                             )}
                                         </TouchableOpacity>

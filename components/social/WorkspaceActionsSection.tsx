@@ -58,6 +58,8 @@ export function WorkspaceActionsSection({
     onAddWorkspaceComment,
     onDecideReview,
 }: WorkspaceActionsSectionProps) {
+    const recentChange = selectedWorkspaceChanges[0] ?? null;
+
     return (
         <View style={{ backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, borderRadius: 16, padding: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -73,11 +75,28 @@ export function WorkspaceActionsSection({
                 )}
             </View>
 
+            <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: 8 }}>
+                Operá sobre el espacio seleccionado: sincronizar, revisar actividad y colaborar con comentarios.
+            </Text>
+
             <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 10, backgroundColor: colors.surface }}>
                 <Text style={{ color: colors.text, fontWeight: '900', fontSize: 13 }}>{activeWorkspace.title}</Text>
                 <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 3 }}>
                     Rev {activeWorkspace.currentRevision} • {activeWorkspace.membership.role} • {activeWorkspace.editMode === 'collaborative' ? 'Colaborativa' : 'Solo propietario'} • {activeWorkspace.approvalMode === 'owner_review' ? 'Con aprobación de propietario' : 'Sin aprobación'}
                 </Text>
+
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                    <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: withAlpha(colors.primary.DEFAULT, '12') }}>
+                        <Text style={{ color: colors.primary.DEFAULT, fontSize: 10, fontWeight: '900' }}>
+                            {activePendingReviewsCount} pendientes
+                        </Text>
+                    </View>
+                    <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+                        <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '900' }}>
+                            {selectedWorkspaceChanges.length} cambios registrados
+                        </Text>
+                    </View>
+                </View>
 
                 <View style={{ marginTop: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: 8 }}>
                     <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '900', marginBottom: 3 }}>
@@ -115,12 +134,12 @@ export function WorkspaceActionsSection({
                         )}
                         disabled={teamLoading}
                     >
-                        <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>Traer última versión</Text>
+                        <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>Traer revisión actual</Text>
                     </TouchableOpacity>
 
                     {activeWorkspace.membership.canEdit && (
                         <TouchableOpacity
-                            style={{ borderWidth: 1, borderColor: colors.primary.DEFAULT, borderRadius: 10, alignItems: 'center', justifyContent: 'center', minHeight: 34, backgroundColor: withAlpha(colors.primary.DEFAULT, '12'), paddingHorizontal: 10 }}
+                            style={{ borderWidth: 1.5, borderColor: colors.primary.DEFAULT, borderRadius: 10, alignItems: 'center', justifyContent: 'center', minHeight: 34, backgroundColor: withAlpha(colors.primary.DEFAULT, '18'), paddingHorizontal: 10 }}
                             onPress={() => runExplainedAction(
                                 'Publicar tus cambios',
                                 'Sube tu versión local como nueva propuesta para el equipo. Si el espacio requiere aprobación, quedará pendiente del owner.',
@@ -135,7 +154,7 @@ export function WorkspaceActionsSection({
 
                     {activeWorkspace.membership.role === 'owner' && (
                         <TouchableOpacity
-                            style={{ borderWidth: 1, borderColor: colors.primary.DEFAULT, borderRadius: 10, alignItems: 'center', justifyContent: 'center', minHeight: 34, backgroundColor: withAlpha(colors.primary.DEFAULT, '12'), paddingHorizontal: 10 }}
+                            style={{ borderWidth: 1, borderColor: withAlpha(colors.primary.DEFAULT, '35'), borderRadius: 10, alignItems: 'center', justifyContent: 'center', minHeight: 34, backgroundColor: colors.surface, paddingHorizontal: 10 }}
                             onPress={() => runExplainedAction(
                                 'Actualizar desde rutina base',
                                 'Reemplaza el contenido actual del espacio con tu rutina base local y genera una nueva revisión.',
@@ -166,7 +185,7 @@ export function WorkspaceActionsSection({
                         )}
                         disabled={teamLoading}
                     >
-                        <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>Ver historial</Text>
+                        <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>Abrir historial</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -179,7 +198,7 @@ export function WorkspaceActionsSection({
                         )}
                         disabled={teamLoading}
                     >
-                        <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>Ver comentarios</Text>
+                        <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>Abrir comentarios</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -192,7 +211,7 @@ export function WorkspaceActionsSection({
                         )}
                         disabled={teamLoading}
                     >
-                        <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>Ver revisiones</Text>
+                        <Text style={{ color: colors.text, fontWeight: '800', fontSize: 11 }}>Abrir revisiones</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -233,16 +252,16 @@ export function WorkspaceActionsSection({
                     </View>
                 </View>
 
-                {selectedWorkspaceChanges.length > 0 && (
+                {!!recentChange && (
                     <Text style={{ color: colors.textMuted, fontSize: 10, marginTop: 8 }}>
-                        Último cambio: {selectedWorkspaceChanges[0]?.actionType}
+                        Último cambio: {recentChange.actionType}
                     </Text>
                 )}
 
                 {pendingWorkspaceReviews.length > 0 && activeWorkspace.membership.role === 'owner' && (
                     <View style={{ marginTop: 8 }}>
                         <Text style={{ color: colors.textMuted, fontSize: 10, marginBottom: 6 }}>
-                            Tenés propuestas pendientes de decisión.
+                            Tenés {pendingWorkspaceReviews.length} propuesta(s) pendiente(s) de decisión.
                         </Text>
                         {pendingWorkspaceReviews.slice(0, 1).map((review) => (
                             <View key={`pending-review-${review.id}`} style={{ flexDirection: 'row', gap: 8 }}>
