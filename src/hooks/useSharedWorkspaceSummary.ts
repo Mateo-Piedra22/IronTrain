@@ -20,7 +20,7 @@ interface SharedWorkspaceSummary {
 export function useSharedWorkspaceSummary(options: UseSharedWorkspaceSummaryOptions = {}): SharedWorkspaceSummary {
     const { includePendingReviews = false } = options;
     const [loading, setLoading] = useState(false);
-    const [sharedSpaces, setSharedSpaces] = useState<SharedRoutineItem[]>([]);
+    const [workspaces, setWorkspaces] = useState<SharedRoutineItem[]>([]);
     const [pendingReviewsCount, setPendingReviewsCount] = useState(0);
     const [localLinkedRoutineIds, setLocalLinkedRoutineIds] = useState<string[]>([]);
 
@@ -28,7 +28,7 @@ export function useSharedWorkspaceSummary(options: UseSharedWorkspaceSummaryOpti
         setLoading(true);
         try {
             const items = await SocialService.listSharedRoutines();
-            setSharedSpaces(items);
+            setWorkspaces(items);
 
             try {
                 const userId = useAuthStore.getState().user?.id || null;
@@ -51,7 +51,7 @@ export function useSharedWorkspaceSummary(options: UseSharedWorkspaceSummaryOpti
             }
         } catch (error) {
             logger.captureException(error, { scope: 'useSharedWorkspaceSummary.reload' });
-            setSharedSpaces([]);
+            setWorkspaces([]);
             setPendingReviewsCount(0);
             setLocalLinkedRoutineIds([]);
         } finally {
@@ -61,16 +61,16 @@ export function useSharedWorkspaceSummary(options: UseSharedWorkspaceSummaryOpti
 
     const linkedRoutineIds = useMemo(
         () => Array.from(new Set([
-            ...sharedSpaces.map((sharedSpace) => sharedSpace.sourceRoutineId).filter((id): id is string => !!id),
+            ...workspaces.map((workspace) => workspace.sourceRoutineId).filter((id): id is string => !!id),
             ...localLinkedRoutineIds,
         ])),
-        [sharedSpaces, localLinkedRoutineIds]
+        [workspaces, localLinkedRoutineIds]
     );
 
     return {
         loading,
-        workspaces: sharedSpaces,
-        workspaceCount: sharedSpaces.length,
+        workspaces,
+        workspaceCount: workspaces.length,
         pendingReviewsCount,
         linkedRoutineIds,
         reload,

@@ -1,8 +1,8 @@
 import { ExerciseList } from '@/components/ExerciseList';
 import { IronButton } from '@/components/IronButton';
 import { IronInput } from '@/components/IronInput';
-import { RoutineSharedSpaceManagerModal } from '@/components/social/RoutineSharedSpaceManagerModal';
-import { useSharedSpaceSummary } from '@/src/hooks/useSharedSpaceSummary';
+import { RoutineWorkspaceManagerModal } from '@/components/social/RoutineWorkspaceManagerModal';
+import { useSharedWorkspaceSummary } from '@/src/hooks/useSharedWorkspaceSummary';
 import { configService } from '@/src/services/ConfigService';
 import { RoutineDayWithExercises, routineService } from '@/src/services/RoutineService';
 import { SocialService } from '@/src/services/SocialService';
@@ -334,6 +334,8 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
     const [addExerciseVisible, setAddExerciseVisible] = useState(false);
 
     // Social Flow
+    const WORKSPACE_TEAM_COACHMARK_SEEN_KEY = 'workspaceTeamCoachmarkSeen';
+    const LEGACY_SHARED_SPACE_TEAM_COACHMARK_SEEN_KEY = 'sharedSpaceTeamCoachmarkSeen';
     const authState = useAuthStore();
     const [friendPickerVisible, setFriendPickerVisible] = useState(false);
     const [friends, setFriends] = useState<any[]>([]);
@@ -342,19 +344,22 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
     const [showTeamCoachmark, setShowTeamCoachmark] = useState(false);
     const [sharedAutoSyncState, setSharedAutoSyncState] = useState<'idle' | 'syncing' | 'updated' | 'up_to_date' | 'error'>('idle');
     const [lastAutoSyncedSpaceId, setLastAutoSyncedSpaceId] = useState<string | null>(null);
-    const { linkedRoutineIds, workspaces, reload: reloadSharedSummary } = useSharedSpaceSummary();
+    const { linkedRoutineIds, workspaces, reload: reloadSharedSummary } = useSharedWorkspaceSummary();
     const isSharedRoutine = useMemo(() => !!routineId && linkedRoutineIds.includes(routineId), [linkedRoutineIds, routineId]);
-    const routineSharedSpace = useMemo(
+    const routineWorkspace = useMemo(
         () => workspaces.find((space) => space.sourceRoutineId === routineId) ?? null,
         [workspaces, routineId],
     );
-    const sharedRole = routineSharedSpace?.membership.role ?? null;
-    const sharedCanEdit = !!routineSharedSpace?.membership.canEdit;
-    const sharedApprovalMode = routineSharedSpace?.approvalMode ?? 'none';
+    const sharedRole = routineWorkspace?.membership.role ?? null;
+    const sharedCanEdit = !!routineWorkspace?.membership.canEdit;
+    const sharedApprovalMode = routineWorkspace?.approvalMode ?? 'none';
 
     const dismissTeamCoachmark = useCallback(async () => {
         setShowTeamCoachmark(false);
-        await configService.setGeneric('sharedSpaceTeamCoachmarkSeen', true);
+        await Promise.all([
+            configService.setGeneric(WORKSPACE_TEAM_COACHMARK_SEEN_KEY, true),
+            configService.setGeneric(LEGACY_SHARED_SPACE_TEAM_COACHMARK_SEEN_KEY, true),
+        ]);
     }, []);
 
     const loadRoutine = useCallback(async () => {
@@ -393,7 +398,10 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
 
     useEffect(() => {
         if (!visible) return;
-        const seen = !!configService.getGeneric<boolean>('sharedSpaceTeamCoachmarkSeen');
+        const seen = !!(
+            configService.getGeneric<boolean>(WORKSPACE_TEAM_COACHMARK_SEEN_KEY)
+            ?? configService.getGeneric<boolean>(LEGACY_SHARED_SPACE_TEAM_COACHMARK_SEEN_KEY)
+        );
         setShowTeamCoachmark(isSharedRoutine && !seen);
     }, [visible, isSharedRoutine]);
 
@@ -608,12 +616,12 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
     };
 
     useEffect(() => {
-        if (!visible || !routineId || !routineSharedSpace) return;
-        if (lastAutoSyncedSpaceId === routineSharedSpace.id) return;
+        if (!visible || !routineId || !routineWorkspace) return;
+        if (lastAutoSyncedSpaceId === routineWorkspace.id) return;
 
-        if (routineSharedSpace.membership.canEdit) {
+        if (routineWorkspace.membership.canEdit) {
             setSharedAutoSyncState('idle');
-            setLastAutoSyncedSpaceId(routineSharedSpace.id);
+            setLastAutoSyncedSpaceId(routineWorkspace.id);
             return;
         }
 
@@ -622,22 +630,22 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
         const runAutoSync = async () => {
             setSharedAutoSyncState('syncing');
             try {
-                const detail = await SocialService.getSharedRoutine(routineSharedSpace.id);
+                const detail = await SocialService.getSharedRoutine(routineWorkspace.id);
                 const result = await routineService.syncSharedRoutinePayload(detail.snapshot.payload, {
-                    sharedRoutineId: routineSharedSpace.id,
+                    sharedRoutineId: routineWorkspace.id,
                     snapshotId: detail.snapshot.id,
                     revision: detail.snapshot.revision,
                     targetRoutineId: routineId,
-                    title: routine?.name || routineSharedSpace.title,
+                    title: routine?.name || routineWorkspace.title,
                 });
 
                 if (cancelled) return;
                 setSharedAutoSyncState(result.applied ? 'updated' : 'up_to_date');
-                setLastAutoSyncedSpaceId(routineSharedSpace.id);
+                setLastAutoSyncedSpaceId(routineWorkspace.id);
             } catch {
                 if (cancelled) return;
                 setSharedAutoSyncState('error');
-                setLastAutoSyncedSpaceId(routineSharedSpace.id);
+                setLastAutoSyncedSpaceId(routineWorkspace.id);
             }
         };
 
@@ -646,7 +654,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
         return () => {
             cancelled = true;
         };
-    }, [visible, routineId, routineSharedSpace?.id, routineSharedSpace?.membership.canEdit]);
+    }, [visible, routineId, routineWorkspace?.id, routineWorkspace?.membership.canEdit]);
 
     const renderDayItem = ({ item, drag, isActive }: RenderItemParams<RoutineDayWithExercises>) => (
         <ScaleDecorator>
@@ -854,7 +862,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                                     Uso diario: 1) Entrená/edita normalmente. 2) En Equipo podés publicar cambios o traer la última revisión. 3) Las importaciones reutilizan la rutina local para evitar duplicados.
                                                 </Text>
 
-                                                {!!routineSharedSpace && (
+                                                {!!routineWorkspace && (
                                                     <>
                                                         <View style={{ marginTop: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, padding: 10 }}>
                                                             <Text style={[ss.warningLabel, { color: colors.textMuted }]}>TU ROL EN ESTE ESPACIO: {(sharedRole || 'viewer').toUpperCase()}</Text>
@@ -1107,7 +1115,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                 </Modal>
             )}
 
-            <RoutineSharedSpaceManagerModal
+            <RoutineWorkspaceManagerModal
                 visible={teamModalVisible}
                 routineId={routineId}
                 routineName={routine?.name}

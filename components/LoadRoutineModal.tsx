@@ -4,9 +4,9 @@ import { BookOpen, ChevronDown, ChevronRight, Dumbbell, X } from 'lucide-react-n
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useColors } from '../src/hooks/useColors';
-import { useSharedSpaceSummary } from '../src/hooks/useSharedSpaceSummary';
+import { useSharedWorkspaceSummary } from '../src/hooks/useSharedWorkspaceSummary';
 import { RoutineDayWithExercises, RoutineWithDays, routineService } from '../src/services/RoutineService';
-import { sharedSpaceCopy } from '../src/social/sharedSpaceCopy';
+import { sharedWorkspaceCopy } from '../src/social/sharedWorkspaceCopy';
 import { ToastContainer } from './ui/ToastContainer';
 
 interface LoadRoutineModalProps {
@@ -129,7 +129,7 @@ export function LoadRoutineModal({ visible, onClose, onLoadDay }: LoadRoutineMod
     const [routines, setRoutines] = useState<RoutineWithDays[]>([]);
     const [loading, setLoading] = useState(false);
     const [expandedRoutineId, setExpandedRoutineId] = useState<string | null>(null);
-    const { linkedRoutineIds, reload: reloadSharedSummary } = useSharedSpaceSummary();
+    const { linkedRoutineIds, reload: reloadSharedSummary } = useSharedWorkspaceSummary();
 
     useEffect(() => {
         if (visible) {
@@ -216,7 +216,7 @@ export function LoadRoutineModal({ visible, onClose, onLoadDay }: LoadRoutineMod
                                                         </Text>
                                                         {linkedRoutineIds.includes(routine.id) && (
                                                             <View style={{ marginTop: 6, alignSelf: 'flex-start', backgroundColor: withAlpha(colors.primary.DEFAULT, '15'), borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: withAlpha(colors.primary.DEFAULT, '35') }}>
-                                                                <Text style={{ color: colors.primary.DEFAULT, fontSize: 9, fontWeight: '900', letterSpacing: 0.4 }}>{sharedSpaceCopy.cardBadge}</Text>
+                                                                <Text style={{ color: colors.primary.DEFAULT, fontSize: 9, fontWeight: '900', letterSpacing: 0.4 }}>{sharedWorkspaceCopy.cardBadge}</Text>
                                                             </View>
                                                         )}
                                                     </View>

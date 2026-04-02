@@ -83,6 +83,32 @@ describe('SocialService', () => {
     });
   });
 
+  it('should throw SocialApiError with 409 payload details on owner sync', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 409,
+      text: async () => JSON.stringify({
+        success: false,
+        code: 'SHARED_ROUTINE_REVISION_CONFLICT',
+        message: 'Revision conflict',
+        serverRevision: 20,
+        baseRevision: 19,
+      }),
+    });
+
+    await expect(
+      SocialService.ownerSyncSharedRoutine('workspace-1', 'routine-1', 19)
+    ).rejects.toMatchObject({
+      name: 'SocialApiError',
+      status: 409,
+      code: 'SHARED_ROUTINE_REVISION_CONFLICT',
+      payload: expect.objectContaining({
+        serverRevision: 20,
+        baseRevision: 19,
+      }),
+    });
+  });
+
   it('should handle empty non-ok body as SocialApiError', async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: false,
@@ -125,6 +151,34 @@ describe('SocialService', () => {
     );
   });
 
+  it('should throw SocialApiError with 409 payload details on review decision', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 409,
+      text: async () => JSON.stringify({
+        success: false,
+        code: 'SHARED_ROUTINE_REVISION_CONFLICT',
+        message: 'Revision conflict',
+        serverRevision: 33,
+        baseRevision: 31,
+      }),
+    });
+
+    await expect(
+      SocialService.decideSharedRoutineReview('workspace-1', 'review-1', {
+        decision: 'approve',
+      })
+    ).rejects.toMatchObject({
+      name: 'SocialApiError',
+      status: 409,
+      code: 'SHARED_ROUTINE_REVISION_CONFLICT',
+      payload: expect.objectContaining({
+        serverRevision: 33,
+        baseRevision: 31,
+      }),
+    });
+  });
+
   it('should send baseRevision and force when rolling back shared routine', async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
@@ -150,5 +204,34 @@ describe('SocialService', () => {
         body: JSON.stringify({ targetRevision: 12, baseRevision: 13, force: true }),
       })
     );
+  });
+
+  it('should throw SocialApiError with 409 payload details on rollback', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 409,
+      text: async () => JSON.stringify({
+        success: false,
+        code: 'SHARED_ROUTINE_REVISION_CONFLICT',
+        message: 'Revision conflict',
+        serverRevision: 40,
+        baseRevision: 38,
+      }),
+    });
+
+    await expect(
+      SocialService.rollbackSharedRoutine('workspace-1', {
+        targetRevision: 37,
+        baseRevision: 38,
+      })
+    ).rejects.toMatchObject({
+      name: 'SocialApiError',
+      status: 409,
+      code: 'SHARED_ROUTINE_REVISION_CONFLICT',
+      payload: expect.objectContaining({
+        serverRevision: 40,
+        baseRevision: 38,
+      }),
+    });
   });
 });

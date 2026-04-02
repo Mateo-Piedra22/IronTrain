@@ -1,10 +1,12 @@
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '../../../../../../../../src/db';
 import * as schema from '../../../../../../../../src/db/schema';
 import { verifyAuth } from '../../../../../../../../src/lib/auth';
+import { recordEndpointMetric } from '../../../../../../../../src/lib/endpoint-metrics';
 import { RATE_LIMITS } from '../../../../../../../../src/lib/rate-limit';
+import { lockSharedRoutineWorkspace } from '../../../../../../../../src/lib/shared-routine-lock';
 import { checkSharedRoutineRevision } from '../../../../../../../../src/lib/shared-routine-sync-policy';
 
 const decisionSchema = z.object({
@@ -31,10 +33,14 @@ export async function POST(
 ) {
     try {
         const userId = await verifyAuth(req);
-        if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        if (!userId) {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'error', statusCode: 401, event: 'unauthorized' });
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
 
         const rateLimit = await RATE_LIMITS.SOCIAL_SHARED_ROUTINES_WRITE(userId);
         if (!rateLimit.ok) {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'error', statusCode: 429, event: 'rate_limited' });
             return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
         }
 
@@ -42,6 +48,7 @@ export async function POST(
         const body = await req.json().catch(() => null);
         const parsed = decisionSchema.safeParse(body ?? {});
         if (!parsed.success) {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'error', statusCode: 400, event: 'invalid_body' });
             return NextResponse.json({ error: 'Invalid body', details: parsed.error.flatten() }, { status: 400 });
         }
 
@@ -50,7 +57,7 @@ export async function POST(
         let nextRevision = 0;
 
         await db.transaction(async (tx) => {
-            await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${id}))`);
+            await lockSharedRoutineWorkspace(tx, id);
 
             const [workspace] = await tx
                 .select()
@@ -142,6 +149,13 @@ export async function POST(
             });
         });
 
+        recordEndpointMetric({
+            endpoint: 'social.shared_routines.review_decision',
+            outcome: 'success',
+            statusCode: 200,
+            event: parsed.data.decision === 'approve' ? 'approved' : 'rejected',
+        });
+
         return NextResponse.json({
             success: true,
             decision: parsed.data.decision,
@@ -151,6 +165,7 @@ export async function POST(
         });
     } catch (error) {
         if (error instanceof RevisionConflictError) {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'conflict', statusCode: 409, event: 'revision_conflict' });
             return NextResponse.json(
                 {
                     error: error.message,
@@ -163,11 +178,24 @@ export async function POST(
         }
 
         const message = error instanceof Error ? error.message : 'Internal server error';
-        if (message === 'Shared routine not found') return NextResponse.json({ error: message }, { status: 404 });
-        if (message === 'Only owner can decide reviews') return NextResponse.json({ error: message }, { status: 403 });
-        if (message === 'Review request not found') return NextResponse.json({ error: message }, { status: 404 });
-        if (message === 'Review request is not pending') return NextResponse.json({ error: message }, { status: 409 });
+        if (message === 'Shared routine not found') {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'error', statusCode: 404, event: 'workspace_not_found' });
+            return NextResponse.json({ error: message }, { status: 404 });
+        }
+        if (message === 'Only owner can decide reviews') {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'error', statusCode: 403, event: 'forbidden' });
+            return NextResponse.json({ error: message }, { status: 403 });
+        }
+        if (message === 'Review request not found') {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'error', statusCode: 404, event: 'review_not_found' });
+            return NextResponse.json({ error: message }, { status: 404 });
+        }
+        if (message === 'Review request is not pending') {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'conflict', statusCode: 409, event: 'review_not_pending' });
+            return NextResponse.json({ error: message }, { status: 409 });
+        }
 
+        recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'error', statusCode: 500, event: 'internal_error' });
         return NextResponse.json({ error: message }, { status: 500 });
     }
 }

@@ -1,11 +1,13 @@
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '../../../../../../src/db';
 import * as schema from '../../../../../../src/db/schema';
 import { verifyAuth } from '../../../../../../src/lib/auth';
+import { recordEndpointMetric } from '../../../../../../src/lib/endpoint-metrics';
 import { RATE_LIMITS } from '../../../../../../src/lib/rate-limit';
 import { summarizeSharedRoutinePayload } from '../../../../../../src/lib/shared-routine-diff';
+import { lockSharedRoutineWorkspace } from '../../../../../../src/lib/shared-routine-lock';
 import { checkSharedRoutineRevision } from '../../../../../../src/lib/shared-routine-sync-policy';
 import { buildRoutineSharePayloadForUser } from '../../../../../../src/lib/social-routine-share-payload';
 
@@ -32,10 +34,14 @@ export async function POST(
 ) {
     try {
         const userId = await verifyAuth(req);
-        if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        if (!userId) {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.owner_sync', outcome: 'error', statusCode: 401, event: 'unauthorized' });
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
 
         const rateLimit = await RATE_LIMITS.SOCIAL_SHARED_ROUTINES_WRITE(userId);
         if (!rateLimit.ok) {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.owner_sync', outcome: 'error', statusCode: 429, event: 'rate_limited' });
             return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
         }
 
@@ -43,6 +49,7 @@ export async function POST(
         const body = await req.json().catch(() => null);
         const parsed = ownerSyncSchema.safeParse(body ?? {});
         if (!parsed.success) {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.owner_sync', outcome: 'error', statusCode: 400, event: 'invalid_body' });
             return NextResponse.json({ error: 'Invalid body', details: parsed.error.flatten() }, { status: 400 });
         }
 
@@ -58,16 +65,19 @@ export async function POST(
             .limit(1);
 
         if (!workspace) {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.owner_sync', outcome: 'error', statusCode: 404, event: 'not_found' });
             return NextResponse.json({ error: 'Shared routine not found' }, { status: 404 });
         }
 
         if (workspace.ownerId !== userId) {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.owner_sync', outcome: 'error', statusCode: 403, event: 'forbidden' });
             return NextResponse.json({ error: 'Only owner can sync updates' }, { status: 403 });
         }
 
         const sourceRoutineId = parsed.data.sourceRoutineId ?? workspace.sourceRoutineId;
         const baseRevision = parsed.data.baseRevision;
         if (!sourceRoutineId) {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.owner_sync', outcome: 'error', statusCode: 400, event: 'missing_source_routine_id' });
             return NextResponse.json({ error: 'Missing source routine id' }, { status: 400 });
         }
 
@@ -75,6 +85,7 @@ export async function POST(
         const payloadSummary = summarizeSharedRoutinePayload(payload as Record<string, unknown>);
 
         if (!Array.isArray(payload.routine_exercises) || payload.routine_exercises.length === 0) {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.owner_sync', outcome: 'error', statusCode: 400, event: 'empty_routine' });
             return NextResponse.json({ error: 'Routine must contain at least one exercise' }, { status: 400 });
         }
 
@@ -84,7 +95,7 @@ export async function POST(
         let nextRevision = workspace.currentRevision + 1;
 
         await db.transaction(async (tx) => {
-            await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${id}))`);
+            await lockSharedRoutineWorkspace(tx, id);
 
             const [freshWorkspace] = await tx
                 .select()
@@ -148,6 +159,8 @@ export async function POST(
             });
         });
 
+        recordEndpointMetric({ endpoint: 'social.shared_routines.owner_sync', outcome: 'success', statusCode: 200, event: 'owner_published' });
+
         return NextResponse.json({
             success: true,
             sharedRoutineId: id,
@@ -156,6 +169,7 @@ export async function POST(
         });
     } catch (error) {
         if (error instanceof RevisionConflictError) {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.owner_sync', outcome: 'conflict', statusCode: 409, event: 'revision_conflict' });
             return NextResponse.json(
                 {
                     error: error.message,
@@ -168,6 +182,7 @@ export async function POST(
         }
 
         const message = error instanceof Error ? error.message : 'Internal server error';
+        recordEndpointMetric({ endpoint: 'social.shared_routines.owner_sync', outcome: 'error', statusCode: 500, event: 'internal_error' });
         return NextResponse.json({ error: message }, { status: 500 });
     }
 }

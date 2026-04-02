@@ -1,6 +1,6 @@
 import { useColors } from '@/src/hooks/useColors';
 import { useDataReload } from '@/src/hooks/useDataReload';
-import { useSharedSpaceSummary } from '@/src/hooks/useSharedSpaceSummary';
+import { useSharedWorkspaceSummary } from '@/src/hooks/useSharedWorkspaceSummary';
 import { configService } from '@/src/services/ConfigService';
 import { SocialFriend, SocialService } from '@/src/services/SocialService';
 import { feedbackSelection, feedbackSoftImpact } from '@/src/social/feedback';
@@ -28,7 +28,7 @@ import { FriendsTab } from '@/components/social/FriendsTab';
 import { LeaderboardTab } from '@/components/social/LeaderboardTab';
 import { ProfileCard } from '@/components/social/ProfileCard';
 import { SearchTab } from '@/components/social/SearchTab';
-import { SharedSpaceHubModal } from '@/components/social/SharedSpaceHubModal';
+import { SharedWorkspaceHubModal } from '@/components/social/SharedWorkspaceHubModal';
 import { useSocialStyles } from '@/components/social/social.styles';
 import SocialFeedTab from '@/components/social/SocialFeedTab';
 import {
@@ -40,8 +40,8 @@ import {
 } from '@/components/social/SocialModals';
 import SocialNotificationsModal from '@/components/social/SocialNotificationsModal';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
-import { formatSharedSpaceStatus, sharedSpaceCopy } from '@/src/social/sharedSpaceCopy';
-import { sharedSpaceFeedback } from '@/src/social/sharedSpaceFeedback';
+import { formatWorkspaceStatus, sharedWorkspaceCopy } from '@/src/social/sharedWorkspaceCopy';
+import { workspaceFeedback } from '@/src/social/workspaceFeedback';
 import { IronTrainLogo } from '../../components/IronTrainLogo';
 
 const FEED_FILTERS_KEY = 'social_feed_filters_v1';
@@ -127,7 +127,7 @@ export default function SocialTab() {
         workspaceCount,
         pendingReviewsCount,
         reload: reloadSharedWorkspaceSummary,
-    } = useSharedSpaceSummary({ includePendingReviews: true });
+    } = useSharedWorkspaceSummary({ includePendingReviews: true });
 
     // Leaderboard state
     const [rankingSegment, setRankingSegment] = useState<'weekly' | 'monthly' | 'lifetime'>('weekly');
@@ -527,7 +527,7 @@ export default function SocialTab() {
 
     const handleOpenWorkspaceHub = useCallback(() => {
         if (openingWorkspaceHub) return;
-        sharedSpaceFeedback.openHub();
+        workspaceFeedback.openHub();
         setOpeningWorkspaceHub(true);
         setIsWorkspaceHubVisible(true);
         setTimeout(() => setOpeningWorkspaceHub(false), 220);
@@ -960,14 +960,14 @@ export default function SocialTab() {
                                     disabled={openingWorkspaceHub}
                                 >
                                     <View>
-                                        <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>{sharedSpaceCopy.statLabel}</Text>
+                                        <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '800' }}>{sharedWorkspaceCopy.statLabel}</Text>
                                         <Text style={{ color: colors.text, fontWeight: '900', marginTop: 2, fontSize: 14 }}>
-                                            {formatSharedSpaceStatus(workspaceCount, pendingReviewsCount)}
+                                            {formatWorkspaceStatus(workspaceCount, pendingReviewsCount)}
                                         </Text>
                                     </View>
                                     <View style={[styles.archiveToggle, pendingReviewsCount > 0 && { borderColor: colors.yellow }]}>
                                         <Text style={styles.archiveToggleText}>
-                                            {openingWorkspaceHub ? 'Abriendo...' : (pendingReviewsCount > 0 ? sharedSpaceCopy.ctaReviewNow : sharedSpaceCopy.ctaOpenHub)}
+                                            {openingWorkspaceHub ? 'Abriendo...' : (pendingReviewsCount > 0 ? sharedWorkspaceCopy.ctaReviewNow : sharedWorkspaceCopy.ctaOpenHub)}
                                         </Text>
                                     </View>
                                 </TouchableOpacity>
@@ -1122,7 +1122,7 @@ export default function SocialTab() {
                 styles={styles}
             />
 
-            <SharedSpaceHubModal
+            <SharedWorkspaceHubModal
                 visible={isWorkspaceHubVisible}
                 onClose={() => {
                     setIsWorkspaceHubVisible(false);

@@ -25,26 +25,26 @@ const roleLabel: Record<SharedRoutineItem['membership']['role'], string> = {
 export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: SharedWorkspaceHubModalProps) {
     const colors = useColors();
     const [loading, setLoading] = useState(false);
-    const [sharedSpaces, setSharedSpaces] = useState<SharedRoutineItem[]>([]);
-    const [pendingBySharedSpace, setPendingBySharedSpace] = useState<Record<string, number>>({});
-    const [loadingReviewsBySharedSpace, setLoadingReviewsBySharedSpace] = useState<Record<string, boolean>>({});
+    const [workspaces, setWorkspaces] = useState<SharedRoutineItem[]>([]);
+    const [pendingByWorkspace, setPendingByWorkspace] = useState<Record<string, number>>({});
+    const [loadingReviewsByWorkspace, setLoadingReviewsByWorkspace] = useState<Record<string, boolean>>({});
     const [linkedRoutineBySpace, setLinkedRoutineBySpace] = useState<Record<string, string>>({});
 
     const pendingTotal = useMemo(
-        () => Object.values(pendingBySharedSpace).reduce((acc, count) => acc + count, 0),
-        [pendingBySharedSpace]
+        () => Object.values(pendingByWorkspace).reduce((acc, count) => acc + count, 0),
+        [pendingByWorkspace]
     );
 
-    const loadSharedSpacePendingReviews = useCallback(async (sharedSpaceId: string) => {
-        setLoadingReviewsBySharedSpace((prev) => ({ ...prev, [sharedSpaceId]: true }));
+    const loadWorkspacePendingReviews = useCallback(async (workspaceId: string) => {
+        setLoadingReviewsByWorkspace((prev) => ({ ...prev, [workspaceId]: true }));
         try {
-            const reviews: SharedRoutineReviewRequest[] = await SocialService.listSharedRoutineReviews(sharedSpaceId);
+            const reviews: SharedRoutineReviewRequest[] = await SocialService.listSharedRoutineReviews(workspaceId);
             const pendingCount = reviews.filter((review) => review.status === 'pending').length;
-            setPendingBySharedSpace((prev) => ({ ...prev, [sharedSpaceId]: pendingCount }));
+            setPendingByWorkspace((prev) => ({ ...prev, [workspaceId]: pendingCount }));
         } catch {
-            setPendingBySharedSpace((prev) => ({ ...prev, [sharedSpaceId]: 0 }));
+            setPendingByWorkspace((prev) => ({ ...prev, [workspaceId]: 0 }));
         } finally {
-            setLoadingReviewsBySharedSpace((prev) => ({ ...prev, [sharedSpaceId]: false }));
+            setLoadingReviewsByWorkspace((prev) => ({ ...prev, [workspaceId]: false }));
         }
     }, []);
 
@@ -52,8 +52,8 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
         setLoading(true);
         try {
             const items = await SocialService.listSharedRoutines();
-            setSharedSpaces(items);
-            setPendingBySharedSpace(
+            setWorkspaces(items);
+            setPendingByWorkspace(
                 Object.fromEntries(items.map((space) => [space.id, space.pendingReviewsCount ?? 0]))
             );
 
@@ -76,12 +76,12 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
 
         } catch (error: any) {
             workspaceFeedback.error('Workspaces', error?.message || 'No se pudieron cargar los espacios compartidos.');
-            setSharedSpaces([]);
-            setPendingBySharedSpace({});
+            setWorkspaces([]);
+            setPendingByWorkspace({});
         } finally {
             setLoading(false);
         }
-    }, [loadSharedSpacePendingReviews]);
+    }, [loadWorkspacePendingReviews]);
 
     useEffect(() => {
         if (visible) {
@@ -133,7 +133,7 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                             <View>
                                 <Text style={{ color: colors.text, fontSize: 16, fontWeight: '900', letterSpacing: -0.3 }}>{sharedWorkspaceCopy.title}</Text>
                                 <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700' }}>
-                                    {formatWorkspaceStatus(sharedSpaces.length, pendingTotal)}
+                                    {formatWorkspaceStatus(workspaces.length, pendingTotal)}
                                 </Text>
                             </View>
                         </View>
@@ -180,7 +180,7 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                                 </Text>
                                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                                     <View style={{ borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: withAlpha(colors.primary.DEFAULT, '12') }}>
-                                        <Text style={{ color: colors.primary.DEFAULT, fontSize: 10, fontWeight: '900' }}>{sharedSpaces.length} espacios</Text>
+                                        <Text style={{ color: colors.primary.DEFAULT, fontSize: 10, fontWeight: '900' }}>{workspaces.length} espacios</Text>
                                     </View>
                                     <View style={{ borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: withAlpha(colors.yellow, '16') }}>
                                         <Text style={{ color: colors.yellow, fontSize: 10, fontWeight: '900' }}>{pendingTotal} pendientes</Text>
@@ -188,7 +188,7 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                                 </View>
                             </View>
 
-                            {sharedSpaces.length === 0 ? (
+                            {workspaces.length === 0 ? (
                                 <View
                                     style={{
                                         padding: 20,
@@ -204,9 +204,9 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                                         {sharedWorkspaceCopy.emptyDescription} Creá uno desde una rutina para empezar a colaborar.
                                     </Text>
                                 </View>
-                            ) : sharedSpaces.map((sharedSpace) => (
+                            ) : workspaces.map((workspace) => (
                                 <View
-                                    key={sharedSpace.id}
+                                    key={workspace.id}
                                     style={{
                                         marginBottom: 12,
                                         borderRadius: 16,
@@ -220,10 +220,10 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                                         <View style={{ flex: 1 }}>
                                             <Text style={{ color: colors.text, fontWeight: '900', fontSize: 15 }} numberOfLines={1}>
-                                                {sharedSpace.title}
+                                                {workspace.title}
                                             </Text>
                                             <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
-                                                Rev {sharedSpace.currentRevision} • {sharedSpace.editMode === 'collaborative' ? 'Colaborativo' : 'Solo owner'}
+                                                Rev {workspace.currentRevision} • {workspace.editMode === 'collaborative' ? 'Colaborativo' : 'Solo owner'}
                                             </Text>
                                         </View>
                                         <View
@@ -237,12 +237,12 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                                             }}
                                         >
                                             <Text style={{ color: colors.primary.DEFAULT, fontSize: 10, fontWeight: '900' }}>
-                                                {roleLabel[sharedSpace.membership.role]}
+                                                {roleLabel[workspace.membership.role]}
                                             </Text>
                                         </View>
                                     </View>
 
-                                    {!!linkedRoutineBySpace[sharedSpace.id] && (
+                                    {!!linkedRoutineBySpace[workspace.id] && (
                                         <View
                                             style={{
                                                 borderRadius: 10,
@@ -270,10 +270,10 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                                             }}
                                         >
                                             <Text style={{ color: colors.blue, fontSize: 10, fontWeight: '900' }}>
-                                                {sharedSpace.approvalMode === 'owner_review' ? sharedWorkspaceCopy.reviewRequired : sharedWorkspaceCopy.autoPublish}
+                                                {workspace.approvalMode === 'owner_review' ? sharedWorkspaceCopy.reviewRequired : sharedWorkspaceCopy.autoPublish}
                                             </Text>
                                         </View>
-                                        {(pendingBySharedSpace[sharedSpace.id] ?? 0) > 0 && (
+                                        {(pendingByWorkspace[workspace.id] ?? 0) > 0 && (
                                             <View
                                                 style={{
                                                     borderRadius: 10,
@@ -283,7 +283,7 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                                                 }}
                                             >
                                                 <Text style={{ color: colors.yellow, fontSize: 10, fontWeight: '900' }}>
-                                                    {pendingBySharedSpace[sharedSpace.id]} {sharedWorkspaceCopy.pendingSuffix.toUpperCase()}
+                                                    {pendingByWorkspace[workspace.id]} {sharedWorkspaceCopy.pendingSuffix.toUpperCase()}
                                                 </Text>
                                             </View>
                                         )}
@@ -293,7 +293,7 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                                         <TouchableOpacity
                                             onPress={() => {
                                                 workspaceFeedback.selection();
-                                                void loadSharedSpacePendingReviews(sharedSpace.id);
+                                                void loadWorkspacePendingReviews(workspace.id);
                                             }}
                                             style={{
                                                 flex: 1,
@@ -308,7 +308,7 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                                                 gap: 6,
                                             }}
                                         >
-                                            {loadingReviewsBySharedSpace[sharedSpace.id] ? (
+                                            {loadingReviewsByWorkspace[workspace.id] ? (
                                                 <ActivityIndicator size="small" color={colors.textMuted} />
                                             ) : (
                                                 <>
@@ -317,12 +317,12 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                                                 </>
                                             )}
                                         </TouchableOpacity>
-                                        {!!(linkedRoutineBySpace[sharedSpace.id] || sharedSpace.sourceRoutineId) && onOpenRoutine && (
+                                        {!!(linkedRoutineBySpace[workspace.id] || workspace.sourceRoutineId) && onOpenRoutine && (
                                             <TouchableOpacity
                                                 onPress={() => {
                                                     workspaceFeedback.selection();
                                                     onClose();
-                                                    onOpenRoutine((linkedRoutineBySpace[sharedSpace.id] || sharedSpace.sourceRoutineId) as string);
+                                                    onOpenRoutine((linkedRoutineBySpace[workspace.id] || workspace.sourceRoutineId) as string);
                                                 }}
                                                 style={{
                                                     flex: 1,

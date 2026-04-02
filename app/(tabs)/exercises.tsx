@@ -3,15 +3,15 @@ import { CreateRoutineModal } from '@/components/CreateRoutineModal';
 import { DuplicateResolutionModal } from '@/components/DuplicateResolutionModal';
 import { ExerciseList } from '@/components/ExerciseList';
 import { RoutineDetailModal } from '@/components/RoutineDetailModal';
-import { SharedSpaceHubModal } from '@/components/social/SharedSpaceHubModal';
+import { SharedWorkspaceHubModal } from '@/components/social/SharedWorkspaceHubModal';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { useDataReload } from '@/src/hooks/useDataReload';
-import { useSharedSpaceSummary } from '@/src/hooks/useSharedSpaceSummary';
+import { useSharedWorkspaceSummary } from '@/src/hooks/useSharedWorkspaceSummary';
 import { configService } from '@/src/services/ConfigService';
 import { DuplicateResolutionService } from '@/src/services/DuplicateResolutionService';
 import { routineService } from '@/src/services/RoutineService';
-import { sharedSpaceCopy } from '@/src/social/sharedSpaceCopy';
-import { sharedSpaceFeedback } from '@/src/social/sharedSpaceFeedback';
+import { sharedWorkspaceCopy } from '@/src/social/sharedWorkspaceCopy';
+import { workspaceFeedback } from '@/src/social/workspaceFeedback';
 import { confirm } from '@/src/store/confirmStore';
 import { Routine } from '@/src/types/db';
 import { notify } from '@/src/utils/notify';
@@ -65,7 +65,7 @@ const RoutineCard = React.memo(({ item, colors, ss, onPress, onEdit, onDelete, i
                 )}
                 {isShared && (
                     <View style={{ marginTop: 6, alignSelf: 'flex-start', backgroundColor: withAlpha(colors.primary.DEFAULT, '15'), borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: withAlpha(colors.primary.DEFAULT, '35') }}>
-                        <Text style={{ color: colors.primary.DEFAULT, fontSize: 9, fontWeight: '900', letterSpacing: 0.4 }}>{sharedSpaceCopy.cardBadge}</Text>
+                        <Text style={{ color: colors.primary.DEFAULT, fontSize: 9, fontWeight: '900', letterSpacing: 0.4 }}>{sharedWorkspaceCopy.cardBadge}</Text>
                     </View>
                 )}
             </View>
@@ -110,7 +110,7 @@ export default function LibraryScreen() {
     const [workspaceHubVisible, setWorkspaceHubVisible] = useState(false);
     const [openingWorkspaceHub, setOpeningWorkspaceHub] = useState(false);
 
-    const { workspaceCount, linkedRoutineIds, reload: reloadSharedWorkspaces } = useSharedSpaceSummary();
+    const { workspaceCount, linkedRoutineIds, reload: reloadSharedWorkspaces } = useSharedWorkspaceSummary();
     const showWorkspaceBadge = workspaceCount > 0;
     const workspaceBadgeAnim = React.useRef(new Animated.Value(showWorkspaceBadge ? 1 : 0)).current;
     const workspaceBadgeCountAnim = React.useRef(new Animated.Value(1)).current;
@@ -391,7 +391,7 @@ export default function LibraryScreen() {
 
     const handleOpenWorkspaceHub = useCallback(() => {
         if (openingWorkspaceHub) return;
-        sharedSpaceFeedback.openHub();
+        workspaceFeedback.openHub();
         setOpeningWorkspaceHub(true);
         setWorkspaceHubVisible(true);
         setTimeout(() => setOpeningWorkspaceHub(false), 220);
@@ -615,7 +615,7 @@ export default function LibraryScreen() {
                 }}
             />
 
-            <SharedSpaceHubModal
+            <SharedWorkspaceHubModal
                 visible={workspaceHubVisible}
                 onClose={() => {
                     setWorkspaceHubVisible(false);
