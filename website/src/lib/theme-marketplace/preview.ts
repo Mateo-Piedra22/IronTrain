@@ -6,6 +6,13 @@ export type ThemePreviewChannels = {
     text: string;
 };
 
+export type ThemeMode = 'light' | 'dark';
+
+export type ThemePreviewByMode = {
+    light: ThemePreviewChannels;
+    dark: ThemePreviewChannels;
+};
+
 const FALLBACK_PREVIEW: ThemePreviewChannels = {
     hero: '#8AA0B8',
     surface: '#FFFFFF',
@@ -76,4 +83,57 @@ export function resolveThemePreview(payloadRaw: unknown): ThemePreviewChannels {
     ) ?? FALLBACK_PREVIEW.text;
 
     return { hero, surface, text };
+}
+
+function resolveThemePreviewForMode(payloadRaw: unknown, mode: ThemeMode): ThemePreviewChannels {
+    const payload = (asRecord(payloadRaw) ?? {}) as Partial<ThemePackPayload>;
+    const preview = asRecord(payload.preview);
+    const lightPatch = asRecord(payload.lightPatch);
+    const darkPatch = asRecord(payload.darkPatch);
+    const preferredPatch = mode === 'light' ? lightPatch : darkPatch;
+    const secondaryPatch = mode === 'light' ? darkPatch : lightPatch;
+    const preferredPrimary = asRecord(preferredPatch?.primary);
+    const secondaryPrimary = asRecord(secondaryPatch?.primary);
+
+    const hero = pickFirstHex(
+        preview?.hero,
+        preferredPrimary?.DEFAULT,
+        preferredPrimary?.light,
+        preferredPatch?.blue,
+        preferredPatch?.onPrimary,
+        secondaryPrimary?.DEFAULT,
+        secondaryPrimary?.dark,
+        secondaryPatch?.blue,
+        secondaryPatch?.onPrimary,
+        FALLBACK_PREVIEW.hero,
+    ) ?? FALLBACK_PREVIEW.hero;
+
+    const surface = pickFirstHex(
+        preview?.surface,
+        preferredPatch?.surface,
+        preferredPatch?.surfaceLighter,
+        preferredPatch?.background,
+        secondaryPatch?.surface,
+        secondaryPatch?.surfaceLighter,
+        secondaryPatch?.background,
+        FALLBACK_PREVIEW.surface,
+    ) ?? FALLBACK_PREVIEW.surface;
+
+    const text = pickFirstHex(
+        preview?.text,
+        preferredPatch?.text,
+        preferredPatch?.textMuted,
+        secondaryPatch?.text,
+        secondaryPatch?.textMuted,
+        FALLBACK_PREVIEW.text,
+    ) ?? FALLBACK_PREVIEW.text;
+
+    return { hero, surface, text };
+}
+
+export function resolveThemePreviewByMode(payloadRaw: unknown): ThemePreviewByMode {
+    return {
+        light: resolveThemePreviewForMode(payloadRaw, 'light'),
+        dark: resolveThemePreviewForMode(payloadRaw, 'dark'),
+    };
 }

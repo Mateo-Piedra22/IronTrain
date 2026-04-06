@@ -1,18 +1,20 @@
 import { and, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
-import { Copy, Download, Palette } from 'lucide-react';
+import { Palette } from 'lucide-react';
 import { Metadata } from 'next';
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import ThemeModePreview from '../../../../../components/marketplace/ThemeModePreview';
 import { db } from '../../../../../src/db';
 import * as schema from '../../../../../src/db/schema';
 import { verifyAuthFromHeaders } from '../../../../../src/lib/server-auth';
-import { resolveThemePreview } from '../../../../../src/lib/theme-marketplace/preview';
+import { buildThemeHashtags } from '../../../../../src/lib/theme-marketplace/theme-hashtags';
 import { ThemeInteractionsPanel } from './ThemeInteractionsPanel';
+import { ThemeShareActions } from './ThemeShareActions';
 
 interface ThemePageProps {
     params: Promise<{ slug: string }>;
-    searchParams?: Promise<{ commentsPage?: string; feedbackPage?: string; feedbackStatus?: string }>;
+    searchParams?: Promise<{ commentsPage?: string; feedbackPage?: string; feedbackStatus?: string; mode?: string }>;
 }
 
 async function getThemePackBySlug(slug: string) {
@@ -98,13 +100,23 @@ export default async function ThemeSharePage({ params, searchParams }: ThemePage
     const feedbackStatus = ['all', 'open', 'resolved', 'dismissed'].includes(feedbackStatusRaw)
         ? feedbackStatusRaw as 'all' | 'open' | 'resolved' | 'dismissed'
         : 'all';
+    const previewModeRaw = (sp?.mode ?? '').toLowerCase();
 
     const data = await getThemePackBySlug(slug);
 
     if (!data) return notFound();
 
     const { pack, payload } = data;
-    const { hero, surface, text } = resolveThemePreview(payload);
+    const initialPreviewMode = previewModeRaw === 'light' || previewModeRaw === 'dark'
+        ? previewModeRaw
+        : pack.supportsDark
+            ? 'dark'
+            : 'light';
+    const resolvedPreviewMode = initialPreviewMode === 'dark' && !pack.supportsDark
+        ? 'light'
+        : initialPreviewMode === 'light' && !pack.supportsLight && pack.supportsDark
+            ? 'dark'
+            : initialPreviewMode;
     const requestHeaders = await headers();
     const currentUserId = await verifyAuthFromHeaders(requestHeaders);
 
@@ -196,19 +208,24 @@ export default async function ThemeSharePage({ params, searchParams }: ThemePage
         nextCommentsPage: number,
         nextFeedbackStatus: 'all' | 'open' | 'resolved' | 'dismissed',
         nextFeedbackPage: number,
+        nextMode: 'light' | 'dark',
     ) => {
         const qs = new URLSearchParams();
         qs.set('commentsPage', String(nextCommentsPage));
         qs.set('feedbackStatus', nextFeedbackStatus);
         qs.set('feedbackPage', String(nextFeedbackPage));
+        qs.set('mode', nextMode);
         return `/share/theme/${pack.slug}?${qs.toString()}`;
     };
 
-    const deepLink = `irontrain://share/theme/${pack.slug}`;
     const publicLink = `https://irontrain.motiona.xyz/share/theme/${pack.slug}`;
     const exportUrl = `https://irontrain.motiona.xyz/api/share/theme/${pack.slug}`;
 
-    const tags = Array.isArray(pack.tags) ? pack.tags : [];
+    const tags = buildThemeHashtags({
+        rawTags: pack.tags,
+        supportsLight: pack.supportsLight,
+        supportsDark: pack.supportsDark,
+    });
 
     return (
         <div className="min-h-screen py-12 md:py-24 px-6 font-mono text-[#1a1a2e] bg-[#f5f1e8]">
@@ -247,11 +264,13 @@ export default async function ThemeSharePage({ params, searchParams }: ThemePage
                         <div className="grid grid-cols-1 md:grid-cols-2 border-y-[2px] border-current/10 py-8 gap-10">
                             <div>
                                 <div className="text-[9px] font-black opacity-30 uppercase tracking-[0.3em] mb-2">PREVIEW_CHANNELS</div>
-                                <div className="grid grid-cols-3 gap-2 max-w-xs">
-                                    <div className="h-12 border border-current/20" style={{ backgroundColor: hero }} />
-                                    <div className="h-12 border border-current/20" style={{ backgroundColor: surface }} />
-                                    <div className="h-12 border border-current/20" style={{ backgroundColor: text }} />
-                                </div>
+                                <ThemeModePreview
+                                    payload={payload}
+                                    supportsLight={pack.supportsLight}
+                                    supportsDark={pack.supportsDark}
+                                    initialMode={resolvedPreviewMode}
+                                    syncToQueryParam
+                                />
                             </div>
                             <div>
                                 <div className="text-[9px] font-black opacity-30 uppercase tracking-[0.3em] mb-2">CREATOR_ID</div>
@@ -305,7 +324,7 @@ export default async function ThemeSharePage({ params, searchParams }: ThemePage
                                 <div className="flex items-center gap-2">
                                     {currentCommentsPage > 1 ? (
                                         <Link
-                                            href={buildShareHref(currentCommentsPage - 1, feedbackStatus, currentOwnFeedbackPage)}
+                                            href={buildShareHref(currentCommentsPage - 1, feedbackStatus, currentOwnFeedbackPage, resolvedPreviewMode)}
                                             className="border border-current px-2 py-1 hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all"
                                         >
                                             Prev
@@ -313,7 +332,7 @@ export default async function ThemeSharePage({ params, searchParams }: ThemePage
                                     ) : null}
                                     {currentCommentsPage < totalCommentsPages ? (
                                         <Link
-                                            href={buildShareHref(currentCommentsPage + 1, feedbackStatus, currentOwnFeedbackPage)}
+                                            href={buildShareHref(currentCommentsPage + 1, feedbackStatus, currentOwnFeedbackPage, resolvedPreviewMode)}
                                             className="border border-current px-2 py-1 hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all"
                                         >
                                             Next
@@ -323,38 +342,12 @@ export default async function ThemeSharePage({ params, searchParams }: ThemePage
                             </div>
                         </div>
 
-                        <div className="mt-8 pt-10 border-t-[3px] border-current space-y-6">
-                            <a
-                                href={deepLink}
-                                className="w-full bg-[#1a1a2e] text-[#f5f1e8] py-6 px-6 flex items-center justify-center gap-4 hover:invert transition-all font-black uppercase tracking-[0.2em] text-sm"
-                            >
-                                <Download className="w-5 h-5" />
-                                IMPORT_TO_IRONTRAIN_APP
-                            </a>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <button
-                                    type="button"
-                                    className="border-[2px] border-[#1a1a2e] py-4 px-6 flex items-center justify-center gap-3 hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all text-[10px] font-black uppercase tracking-[0.2em]"
-                                    data-copy={publicLink}
-                                >
-                                    <Copy className="w-4 h-4" />
-                                    COPY_PUBLIC_LINK
-                                </button>
-                                <a
-                                    href={exportUrl}
-                                    className="border-[2px] border-[#1a1a2e] py-4 px-6 flex items-center justify-center gap-3 hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-all text-[10px] font-black uppercase tracking-[0.2em]"
-                                >
-                                    DOWNLOAD_THEME_JSON
-                                </a>
-                            </div>
-
-                            <div className="text-[9px] font-black opacity-30 text-center pt-8 uppercase tracking-[0.3em] leading-loose max-w-md mx-auto">
-                                STATUS: PUBLIC_APPROVED_THEME
-                                <br />
-                                LINK: {publicLink}
-                            </div>
-                        </div>
+                        <ThemeShareActions
+                            slug={pack.slug}
+                            publicLink={publicLink}
+                            exportUrl={exportUrl}
+                            defaultMode={resolvedPreviewMode}
+                        />
 
                         <ThemeInteractionsPanel
                             themeId={pack.id}
@@ -380,26 +373,6 @@ export default async function ThemeSharePage({ params, searchParams }: ThemePage
                 </div>
             </div>
 
-            <script
-                dangerouslySetInnerHTML={{
-                    __html: `
-                    (function () {
-                        document.querySelectorAll('[data-copy]').forEach(function (btn) {
-                            btn.addEventListener('click', async function () {
-                                try {
-                                    const link = btn.getAttribute('data-copy');
-                                    if (!link) return;
-                                    await navigator.clipboard.writeText(link);
-                                    const previousLabel = btn.innerHTML;
-                                    btn.innerText = 'COPIADO ✓';
-                                    setTimeout(() => { btn.innerHTML = previousLabel; }, 1500);
-                                } catch {}
-                            });
-                        });
-                    })();
-                `,
-                }}
-            />
         </div>
     );
 }

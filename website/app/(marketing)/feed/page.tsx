@@ -15,11 +15,12 @@ import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { AdoptButton } from '../../../components/marketplace/AdoptButton';
+import ThemeModePreview from '../../../components/marketplace/ThemeModePreview';
 import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { MarketplaceResolver } from '../../../src/lib/marketplace';
 import { verifyAuthFromHeaders } from '../../../src/lib/server-auth';
-import { resolveThemePreview } from '../../../src/lib/theme-marketplace/preview';
+import { buildThemeHashtags } from '../../../src/lib/theme-marketplace/theme-hashtags';
 import { ExperimentWrapper } from '../../components/PostHogFeatures';
 
 
@@ -421,8 +422,12 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {publicThemes.map((theme) => {
                                 const payload = versionMap.get(theme.id) || {};
-                                const { hero, surface, text } = resolveThemePreview(payload);
-                                const tags = Array.isArray(theme.tags) ? theme.tags.slice(0, 3) : [];
+                                const tags = buildThemeHashtags({
+                                    rawTags: theme.tags,
+                                    supportsLight: theme.supportsLight,
+                                    supportsDark: theme.supportsDark,
+                                    limit: 5,
+                                });
 
                                 return (
                                     <Link
@@ -434,6 +439,9 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                                             <div className="flex items-center gap-3">
                                                 <div className="bg-current text-background px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter">THEME_PACK</div>
                                                 <span className="text-[10px] font-black uppercase opacity-40 italic tracking-widest">V{theme.currentVersion}</span>
+                                                <span className="text-[10px] font-black uppercase opacity-40 italic tracking-widest">
+                                                    {theme.supportsLight && theme.supportsDark ? 'LIGHT+DARK' : theme.supportsLight ? 'LIGHT_ONLY' : 'DARK_ONLY'}
+                                                </span>
                                             </div>
 
                                             <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tighter leading-[0.9] italic group-hover:underline">
@@ -446,11 +454,12 @@ export default async function RoutineFeedPage(props: { searchParams: Promise<{ v
                                                 </p>
                                             )}
 
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <div className="h-12 border border-current/20" style={{ backgroundColor: hero }} />
-                                                <div className="h-12 border border-current/20" style={{ backgroundColor: surface }} />
-                                                <div className="h-12 border border-current/20" style={{ backgroundColor: text }} />
-                                            </div>
+                                            <ThemeModePreview
+                                                payload={payload}
+                                                supportsLight={theme.supportsLight}
+                                                supportsDark={theme.supportsDark}
+                                                compact
+                                            />
 
                                             {tags.length > 0 && (
                                                 <div className="flex flex-wrap gap-2">

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { getAdminContext, hasAdminRole, writeAdminAuditLog } from '../../../../../src/lib/admin-security';
 import { verifyAuth } from '../../../../../src/lib/auth';
 import { auth } from '../../../../../src/lib/auth/server';
@@ -23,10 +24,7 @@ function isAdminUser(userId: string): boolean {
 }
 
 function createSessionId(): string {
-    if (typeof globalThis.crypto !== 'undefined' && typeof globalThis.crypto.randomUUID === 'function') {
-        return globalThis.crypto.randomUUID();
-    }
-    return `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    return randomUUID();
 }
 
 export async function GET(req: NextRequest) {

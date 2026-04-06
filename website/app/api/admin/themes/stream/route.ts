@@ -1,5 +1,6 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { db } from '../../../../../src/db';
 import * as schema from '../../../../../src/db/schema';
 import { writeAdminAuditLog } from '../../../../../src/lib/admin-security';
@@ -14,10 +15,7 @@ const MAX_STREAM_DURATION_MS = 5 * 60 * 1000;
 const RETRY_MS = 5000;
 
 function createSessionId(): string {
-    if (typeof globalThis.crypto !== 'undefined' && typeof globalThis.crypto.randomUUID === 'function') {
-        return globalThis.crypto.randomUUID();
-    }
-    return `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    return randomUUID();
 }
 
 type ThemesStreamSnapshot = {
