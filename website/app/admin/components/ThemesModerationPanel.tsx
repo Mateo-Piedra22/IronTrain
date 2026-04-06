@@ -2,7 +2,7 @@
 
 import { AlertTriangle, CheckCircle2, Clock3, Shield, Slash, Undo2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { handleThemeModerationAction } from '../actions';
 
 type ThemePackModerationItem = {
@@ -63,6 +63,10 @@ export default function ThemesModerationPanel({ themes, reports, systemFlagAvail
     const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
     const [refreshSeconds, setRefreshSeconds] = useState(12);
     const [lastRefreshAt, setLastRefreshAt] = useState<Date>(new Date());
+    const [transport, setTransport] = useState<'sse' | 'polling'>('polling');
+    const fallbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const eventSourceRef = useRef<EventSource | null>(null);
+    const refreshThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const activeSection = (searchParams.get('section') as 'queue' | 'reports') || 'queue';
     const activeSource = (searchParams.get('source') as 'all' | 'system' | 'community') || 'all';
 
@@ -74,13 +78,94 @@ export default function ThemesModerationPanel({ themes, reports, systemFlagAvail
     }, [themes, reports]);
 
     useEffect(() => {
-        if (!autoRefreshEnabled) return;
+        if (!autoRefreshEnabled) {
+            if (fallbackTimerRef.current) {
+                clearInterval(fallbackTimerRef.current);
+                fallbackTimerRef.current = null;
+            }
+            if (eventSourceRef.current) {
+                try {
+                    eventSourceRef.current.close();
+                } catch {
+                    // no-op
+                }
+                eventSourceRef.current = null;
+            }
+            return;
+        }
 
-        const timer = setInterval(() => {
-            router.refresh();
-        }, refreshSeconds * 1000);
+        const scheduleRefresh = () => {
+            if (refreshThrottleRef.current) return;
+            refreshThrottleRef.current = setTimeout(() => {
+                refreshThrottleRef.current = null;
+                router.refresh();
+            }, 350);
+        };
 
-        return () => clearInterval(timer);
+        const clearFallback = () => {
+            if (fallbackTimerRef.current) {
+                clearInterval(fallbackTimerRef.current);
+                fallbackTimerRef.current = null;
+            }
+        };
+
+        const startFallback = () => {
+            clearFallback();
+            setTransport('polling');
+            fallbackTimerRef.current = setInterval(() => {
+                router.refresh();
+            }, refreshSeconds * 1000);
+        };
+
+        const source = new EventSource('/api/admin/themes/stream');
+        eventSourceRef.current = source;
+
+        source.addEventListener('ready', () => {
+            setTransport('sse');
+            clearFallback();
+        });
+
+        source.addEventListener('theme.queue.changed', () => {
+            setTransport('sse');
+            clearFallback();
+            scheduleRefresh();
+        });
+
+        source.addEventListener('theme.status.changed', () => {
+            setTransport('sse');
+            clearFallback();
+            scheduleRefresh();
+        });
+
+        source.addEventListener('heartbeat', () => {
+            setTransport('sse');
+            clearFallback();
+        });
+
+        source.onerror = () => {
+            try {
+                source.close();
+            } catch {
+                // no-op
+            }
+            startFallback();
+        };
+
+        return () => {
+            clearFallback();
+            if (refreshThrottleRef.current) {
+                clearTimeout(refreshThrottleRef.current);
+                refreshThrottleRef.current = null;
+            }
+            if (eventSourceRef.current) {
+                try {
+                    eventSourceRef.current.close();
+                } catch {
+                    // no-op
+                }
+                eventSourceRef.current = null;
+            }
+        };
     }, [autoRefreshEnabled, refreshSeconds, router]);
 
     const lastRefreshLabel = useMemo(
@@ -137,7 +222,7 @@ export default function ThemesModerationPanel({ themes, reports, systemFlagAvail
                     onClick={() => setAutoRefreshEnabled((value) => !value)}
                     className={`h-8 px-3 border font-black uppercase text-[9px] tracking-wider transition-all ${autoRefreshEnabled ? 'border-[#1a1a2e] bg-[#1a1a2e] text-[#f5f1e8]' : 'border-[#1a1a2e]/30 bg-white text-[#1a1a2e]'}`}
                 >
-                    {autoRefreshEnabled ? 'REALTIME_ON' : 'REALTIME_OFF'}
+                    {autoRefreshEnabled ? `REALTIME_${transport.toUpperCase()}` : 'REALTIME_OFF'}
                 </button>
 
                 <select

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { verifyAuth } from '../../../../src/lib/auth';
 import { captureServerEvent } from '../../../../src/lib/posthog-server';
 import { RATE_LIMITS } from '../../../../src/lib/rate-limit';
-import { computeSocialPulse } from '../../../../src/lib/social-pulse';
+import { getCachedSocialPulse } from '../../../../src/lib/social-pulse';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
             let interval: ReturnType<typeof setInterval> | null = null;
             let maxDurationTimeout: ReturnType<typeof setTimeout> | null = null;
             let lastVersion: string | null = null;
-            let lastPulse: Awaited<ReturnType<typeof computeSocialPulse>> | null = null;
+            let lastPulse: Awaited<ReturnType<typeof getCachedSocialPulse>> | null = null;
             let emittedPulseCount = 0;
             let emittedHeartbeatCount = 0;
             let emitErrorCount = 0;
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
             const emitPulse = async () => {
                 if (closed) return;
                 try {
-                    const pulse = await computeSocialPulse(userId);
+                    const pulse = await getCachedSocialPulse(userId);
                     if (pulse.version !== lastVersion) {
                         if (lastPulse) {
                             if (pulse.latestThemeRatingAtMs !== lastPulse.latestThemeRatingAtMs) {

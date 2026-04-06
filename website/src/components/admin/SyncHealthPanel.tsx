@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type OperationHealth = {
     ok: boolean;
@@ -46,6 +46,9 @@ export function SyncHealthPanel({ initialReport }: SyncHealthPanelProps) {
     const [report, setReport] = useState<SyncHealthReport>(initialReport);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [transport, setTransport] = useState<'sse' | 'polling'>('polling');
+    const fallbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const eventSourceRef = useRef<EventSource | null>(null);
 
     const formatSignalDate = (value: string | null): string => {
         if (!value) return 'N/A';
@@ -54,7 +57,7 @@ export function SyncHealthPanel({ initialReport }: SyncHealthPanelProps) {
         return date.toLocaleString('es-AR');
     };
 
-    const loadLatest = async () => {
+    const loadLatest = useCallback(async () => {
         setIsRefreshing(true);
         try {
             const response = await fetch('/api/admin/sync-health', { cache: 'no-store' });
@@ -73,14 +76,75 @@ export function SyncHealthPanel({ initialReport }: SyncHealthPanelProps) {
         } finally {
             setIsRefreshing(false);
         }
-    };
+    }, []);
+
+    const clearFallbackPolling = useCallback(() => {
+        if (fallbackTimerRef.current) {
+            clearInterval(fallbackTimerRef.current);
+            fallbackTimerRef.current = null;
+        }
+    }, []);
+
+    const startFallbackPolling = useCallback(() => {
+        clearFallbackPolling();
+        setTransport('polling');
+        fallbackTimerRef.current = setInterval(() => {
+            void loadLatest();
+        }, 30000);
+    }, [clearFallbackPolling, loadLatest]);
 
     useEffect(() => {
-        const timer = setInterval(() => {
-            loadLatest();
-        }, 15000);
-        return () => clearInterval(timer);
-    }, []);
+        clearFallbackPolling();
+
+        const source = new EventSource('/api/admin/sync-health/stream');
+        eventSourceRef.current = source;
+
+        source.addEventListener('ready', () => {
+            setTransport('sse');
+            setError(null);
+            clearFallbackPolling();
+        });
+
+        source.addEventListener('health.delta', (event) => {
+            try {
+                const parsed = JSON.parse((event as MessageEvent).data || '{}') as { report?: SyncHealthReport };
+                if (parsed.report) {
+                    setReport(parsed.report);
+                    setError(null);
+                    setTransport('sse');
+                    clearFallbackPolling();
+                }
+            } catch {
+                // no-op
+            }
+        });
+
+        source.addEventListener('heartbeat', () => {
+            setTransport('sse');
+        });
+
+        source.onerror = () => {
+            setError((current) => current ?? 'SSE stream unavailable. Using polling fallback.');
+            try {
+                source.close();
+            } catch {
+                // no-op
+            }
+            startFallbackPolling();
+        };
+
+        return () => {
+            clearFallbackPolling();
+            if (eventSourceRef.current) {
+                try {
+                    eventSourceRef.current.close();
+                } catch {
+                    // no-op
+                }
+                eventSourceRef.current = null;
+            }
+        };
+    }, [clearFallbackPolling, startFallbackPolling]);
 
     const orderedOperations = useMemo(
         () => [
@@ -103,6 +167,9 @@ export function SyncHealthPanel({ initialReport }: SyncHealthPanelProps) {
                 <div className="flex items-center gap-2">
                     <div className={`px-3 py-1 text-[10px] font-black uppercase tracking-wider border ${report.db.ok ? 'bg-green-100 text-green-900 border-green-700' : 'bg-red-100 text-red-900 border-red-700'}`}>
                         DB {report.db.ok ? 'ONLINE' : 'OFFLINE'}
+                    </div>
+                    <div className={`px-3 py-1 text-[10px] font-black uppercase tracking-wider border ${transport === 'sse' ? 'bg-blue-100 text-blue-900 border-blue-700' : 'bg-amber-100 text-amber-900 border-amber-700'}`}>
+                        LIVE {transport.toUpperCase()}
                     </div>
                     <button
                         type="button"

@@ -32,7 +32,15 @@ export type SocialPulsePayload = {
     serverTimeMs: number;
 };
 
+type SocialPulseCacheEntry = {
+    value: SocialPulsePayload;
+    expiresAtMs: number;
+};
+
 const COUNT_INT_SQL = sql<number>`count(*)::int`;
+const SOCIAL_PULSE_CACHE_TTL_MS = 1500;
+const socialPulseCache = new Map<string, SocialPulseCacheEntry>();
+const socialPulseInFlight = new Map<string, Promise<SocialPulsePayload>>();
 
 const toMs = (value: unknown): number => {
     if (!value) return 0;
@@ -273,4 +281,35 @@ export async function computeSocialPulse(userId: string): Promise<SocialPulsePay
         domainVersions,
         serverTimeMs: Date.now(),
     };
+}
+
+export async function getCachedSocialPulse(userId: string): Promise<SocialPulsePayload> {
+    const now = Date.now();
+    const cachedEntry = socialPulseCache.get(userId);
+    if (cachedEntry && cachedEntry.expiresAtMs > now) {
+        return {
+            ...cachedEntry.value,
+            serverTimeMs: now,
+        };
+    }
+
+    const pending = socialPulseInFlight.get(userId);
+    if (pending) {
+        return pending;
+    }
+
+    const request = computeSocialPulse(userId)
+        .then((pulse) => {
+            socialPulseCache.set(userId, {
+                value: pulse,
+                expiresAtMs: Date.now() + SOCIAL_PULSE_CACHE_TTL_MS,
+            });
+            return pulse;
+        })
+        .finally(() => {
+            socialPulseInFlight.delete(userId);
+        });
+
+    socialPulseInFlight.set(userId, request);
+    return request;
 }
