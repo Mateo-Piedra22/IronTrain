@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { authClient } from '../../../src/lib/auth/client';
-import { buildAuthBridgeCallbackUrl, buildSocialLinkCallbackUrl } from '../../../src/lib/auth/redirects';
+import { buildAuthBridgeCallbackUrl, buildAuthPageUrl, buildSocialLinkCallbackUrl, toAbsoluteAppUrl } from '../../../src/lib/auth/redirects';
 import { performSignOut } from '../../../src/lib/auth/signout';
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -168,20 +168,36 @@ export default function AccountSecurityPage() {
         setSuccess(null);
     };
 
-    const callbackURL = useMemo(() => {
-        if (typeof window === 'undefined') return '/auth/bridge';
-        return `${window.location.origin}/auth/bridge`;
-    }, []);
+    const callbackURL = useMemo(() => toAbsoluteAppUrl('/auth/bridge'), []);
 
     const socialCallbackURL = useMemo(
-        () => buildAuthBridgeCallbackUrl(searchParams.get('redirectUri')),
+        () => toAbsoluteAppUrl(buildAuthBridgeCallbackUrl(searchParams.get('redirectUri'))),
         [searchParams]
     );
 
     const socialLinkCallbackURL = useMemo(
-        () => buildSocialLinkCallbackUrl('google', searchParams.get('redirectUri')),
+        () => toAbsoluteAppUrl(buildSocialLinkCallbackUrl('google', searchParams.get('redirectUri'))),
         [searchParams]
     );
+
+    const socialLinkErrorCallbackURL = useMemo(
+        () => toAbsoluteAppUrl(buildAuthPageUrl('/auth/account', searchParams.get('redirectUri'), { error: 'oauth_link_failed' })),
+        [searchParams]
+    );
+
+    useEffect(() => {
+        const authError = String(searchParams.get('error') || '').toLowerCase();
+        if (!authError) return;
+
+        if (authError.includes('state_mismatch')) {
+            setError('La sesión OAuth de vinculación expiró o cambió de dominio. Reintenta vincular Google desde esta pantalla.');
+            return;
+        }
+
+        if (authError.includes('oauth_link_failed')) {
+            setError('No se pudo completar la vinculación con Google. Intenta nuevamente.');
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         if (searchParams.get('linked') === 'google') {
@@ -356,6 +372,7 @@ export default function AccountSecurityPage() {
             const { error: apiError } = await authClient.linkSocial({
                 provider: 'google',
                 callbackURL: socialLinkCallbackURL,
+                errorCallbackURL: socialLinkErrorCallbackURL,
             });
 
             if (apiError) {

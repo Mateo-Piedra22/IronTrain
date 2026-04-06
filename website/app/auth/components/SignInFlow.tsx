@@ -4,7 +4,7 @@ import { ArrowRight, Check, Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-reac
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { authClient } from '../../../src/lib/auth/client';
-import { buildAuthBridgeCallbackUrl, buildAuthPageUrl } from '../../../src/lib/auth/redirects';
+import { buildAuthBridgeCallbackUrl, buildAuthPageUrl, toAbsoluteAppUrl } from '../../../src/lib/auth/redirects';
 
 function getSocialAuthErrorMessage(error: unknown, provider: string): string {
     const fallback = `No se pudo iniciar con ${provider}`;
@@ -37,9 +37,23 @@ export function SignInFlow() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const redirectUri = searchParams.get('redirectUri');
-    const callbackURL = buildAuthBridgeCallbackUrl(redirectUri);
-    const errorCallbackURL = buildAuthPageUrl('/auth/sign-in', redirectUri);
-    const newUserCallbackURL = buildAuthPageUrl('/auth/sign-up', redirectUri);
+    const callbackURL = toAbsoluteAppUrl(buildAuthBridgeCallbackUrl(redirectUri));
+    const errorCallbackURL = toAbsoluteAppUrl(buildAuthPageUrl('/auth/sign-in', redirectUri));
+    const newUserCallbackURL = toAbsoluteAppUrl(buildAuthPageUrl('/auth/sign-up', redirectUri));
+
+    useEffect(() => {
+        const authError = String(searchParams.get('error') || '').toLowerCase();
+        if (!authError) return;
+
+        if (authError.includes('state_mismatch')) {
+            setError('La sesión OAuth expiró o cambió de dominio. Reintenta Google desde esta pantalla.');
+            return;
+        }
+
+        if (authError.includes('account_not_linked')) {
+            setError('Esta cuenta de Google aún no está vinculada. Inicia con tu método original y luego vincula Google desde Seguridad de Cuenta.');
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         return () => {

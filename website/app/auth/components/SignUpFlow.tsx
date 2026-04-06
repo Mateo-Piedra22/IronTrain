@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowRight, Check, Eye, EyeOff, Loader2, Lock, Mail, Use
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { authClient } from '../../../src/lib/auth/client';
-import { buildAuthBridgeCallbackUrl, buildAuthPageUrl } from '../../../src/lib/auth/redirects';
+import { buildAuthBridgeCallbackUrl, buildAuthPageUrl, toAbsoluteAppUrl } from '../../../src/lib/auth/redirects';
 import { createProfileAfterSignUp } from '../actions';
 
 function getSocialAuthErrorMessage(error: unknown, provider: string): string {
@@ -42,8 +42,22 @@ export function SignUpFlow() {
     const [username, setUsername] = useState('');
     const [displayName, setDisplayName] = useState('');
     const redirectUri = searchParams.get('redirectUri');
-    const callbackURL = buildAuthBridgeCallbackUrl(redirectUri);
-    const errorCallbackURL = buildAuthPageUrl('/auth/sign-up', redirectUri);
+    const callbackURL = toAbsoluteAppUrl(buildAuthBridgeCallbackUrl(redirectUri));
+    const errorCallbackURL = toAbsoluteAppUrl(buildAuthPageUrl('/auth/sign-up', redirectUri));
+
+    useEffect(() => {
+        const authError = String(searchParams.get('error') || '').toLowerCase();
+        if (!authError) return;
+
+        if (authError.includes('state_mismatch')) {
+            setError('La sesión OAuth expiró o cambió de dominio. Reintenta el registro con Google desde esta pantalla.');
+            return;
+        }
+
+        if (authError.includes('account_not_linked') || authError.includes('user_already_exists')) {
+            setError('Ya existe una cuenta con este email. Inicia sesión y vincula Google desde Seguridad de Cuenta.');
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         return () => {

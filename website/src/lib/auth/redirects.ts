@@ -1,5 +1,30 @@
 const MAX_REDIRECT_URI_LENGTH = 512;
 
+function getAppOrigin(): string {
+    if (typeof window !== 'undefined' && window.location?.origin) {
+        return window.location.origin;
+    }
+
+    const envOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim();
+    if (envOrigin) {
+        return envOrigin.replace(/\/$/, '');
+    }
+
+    return 'http://localhost:3000';
+}
+
+export function toAbsoluteAppUrl(pathOrUrl: string): string {
+    const normalized = pathOrUrl.trim();
+    if (!normalized) return `${getAppOrigin()}/`;
+
+    try {
+        return new URL(normalized).toString();
+    } catch {
+        const base = getAppOrigin();
+        return normalized.startsWith('/') ? `${base}${normalized}` : `${base}/${normalized}`;
+    }
+}
+
 function sanitizeMobileRedirectUri(raw: string | null | undefined): string | null {
     if (!raw) return null;
 
