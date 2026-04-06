@@ -42,27 +42,6 @@ function isOAuthCriticalPath(path: string[]): boolean {
 async function proxy(request: Request, { params }: { params: Promise<{ path: string[] }> }) {
     const { path } = await params;
     const oauthCritical = isOAuthCriticalPath(path);
-    const serviceUrlRaw = process.env.NEON_AUTH_BASE_URL || process.env.NEON_AUTH_SERVICE_URL;
-
-    if (!serviceUrlRaw) {
-        return new Response('Auth is not configured', { status: 503 });
-    }
-
-    const url = new URL(request.url);
-    const serviceUrl = new URL(serviceUrlRaw);
-
-    const basePath = serviceUrl.pathname.replace(/\/$/, '');
-    url.pathname = `${basePath}/${path.join('/')}`;
-    url.search = new URL(request.url).search;
-    url.protocol = serviceUrl.protocol;
-    url.host = serviceUrl.host;
-
-    const proxiedRequest = new Request(url, {
-        method: request.method,
-        headers: request.headers,
-        body: request.body,
-        duplex: 'half'
-    } as RequestInit & { duplex: 'half' });
 
     const method = request.method as keyof typeof handlers;
     const maybeHandler = handlers[method];
@@ -73,7 +52,11 @@ async function proxy(request: Request, { params }: { params: Promise<{ path: str
     const handler = maybeHandler as AuthProxyHandler;
 
     try {
-        const response = await handler(proxiedRequest, { params: Promise.resolve({ path }) });
+        // IMPORTANT:
+        // We must pass the ORIGINAL incoming request here.
+        // createNeonAuth().handler() already proxies upstream using configured baseUrl and
+        // manages OAuth challenge/state cookies. Rewriting request.url beforehand can break state validation.
+        const response = await handler(request, { params: Promise.resolve({ path }) });
 
         // --- LOGICA DE RESCATE: Enforzamos el dominio de las cookies ---
         const newHeaders = new Headers(response.headers);
