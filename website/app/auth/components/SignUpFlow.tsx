@@ -1,13 +1,33 @@
 'use client';
 
 import { AlertTriangle, ArrowRight, Check, Eye, EyeOff, Loader2, Lock, Mail, User } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { authClient } from '../../../src/lib/auth/client';
+import { buildAuthBridgeCallbackUrl, buildAuthPageUrl } from '../../../src/lib/auth/redirects';
 import { createProfileAfterSignUp } from '../actions';
+
+function getSocialAuthErrorMessage(error: unknown, provider: string): string {
+    const fallback = `No se pudo continuar con ${provider}`;
+    if (!error || typeof error !== 'object') return fallback;
+
+    const anyError = error as { message?: string; code?: string; statusText?: string };
+    const raw = `${anyError.code || ''} ${anyError.statusText || ''} ${anyError.message || ''}`.toLowerCase();
+
+    if (raw.includes('account_not_linked') || raw.includes('oauth account not linked')) {
+        return 'Ya existe una cuenta con este email. Inicia sesión con tu método original y vincula Google desde Seguridad de Cuenta.';
+    }
+
+    if (raw.includes('user_already_exists') || raw.includes('already exists')) {
+        return 'Ya existe una cuenta con este email. Usa Iniciar Sesión o vincula Google desde tu cuenta actual.';
+    }
+
+    return anyError.message || fallback;
+}
 
 export function SignUpFlow() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [step, setStep] = useState(1);
     const [error, setError] = useState<string | null>(null);
@@ -21,6 +41,9 @@ export function SignUpFlow() {
     const [name, setName] = useState('');
     const [username, setUsername] = useState('');
     const [displayName, setDisplayName] = useState('');
+    const redirectUri = searchParams.get('redirectUri');
+    const callbackURL = buildAuthBridgeCallbackUrl(redirectUri);
+    const errorCallbackURL = buildAuthPageUrl('/auth/sign-up', redirectUri);
 
     useEffect(() => {
         return () => {
@@ -36,12 +59,14 @@ export function SignUpFlow() {
         try {
             const { error: authError } = await authClient.signIn.social({
                 provider,
-                callbackURL: '/auth/bridge',
+                callbackURL,
+                errorCallbackURL,
+                newUserCallbackURL: callbackURL,
                 requestSignUp: true,
             });
 
             if (authError) {
-                setError(authError.message || `No se pudo continuar con ${provider}`);
+                setError(getSocialAuthErrorMessage(authError, provider));
                 setLoading(false);
                 return;
             }
@@ -88,7 +113,7 @@ export function SignUpFlow() {
                 email,
                 password,
                 name: name.trim(),
-                callbackURL: '/auth/bridge'
+                callbackURL,
             });
 
             if (authError) {
@@ -108,7 +133,7 @@ export function SignUpFlow() {
             // SUCCESS!
             setSuccess(true);
             redirectTimeoutRef.current = setTimeout(() => {
-                router.replace('/auth/bridge');
+                router.replace(callbackURL);
             }, 1000);
         } catch {
             setError('Error inesperado durante el registro');

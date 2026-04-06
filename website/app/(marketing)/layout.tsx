@@ -9,8 +9,10 @@
 import { Mail, MapPin, Menu, Phone, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { authClient } from "../../src/lib/auth/client";
+import { performSignOut } from "../../src/lib/auth/signout";
 
 interface MarketingLayoutProps {
     children: ReactNode;
@@ -27,11 +29,23 @@ const primaryLinks = [
 ];
 
 export default function MarketingLayout({ children }: MarketingLayoutProps) {
+    const router = useRouter();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { data: session, isPending: loading } = authClient.useSession();
+    const [isSigningOut, setIsSigningOut] = useState(false);
     const [stableSession, setStableSession] = useState<any>(null);
     const [profileUsername, setProfileUsername] = useState<string | null>(null);
     const [profileLookupDone, setProfileLookupDone] = useState(false);
+
+    const handleSignOut = async () => {
+        if (isSigningOut) return;
+        setIsSigningOut(true);
+        try {
+            await performSignOut(router);
+        } finally {
+            setIsSigningOut(false);
+        }
+    };
 
     useEffect(() => {
         const hasUser = Boolean((session as any)?.user);
@@ -150,10 +164,15 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
                                         <div className="text-[10px] opacity-40 truncate italic">Ver Perfil</div>
                                     </div>
                                 </Link>
-                                <Link href="/auth/sign-out" className="group flex items-center justify-between py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-red-600 text-red-600/70 hover:text-red-600">
+                                <button
+                                    type="button"
+                                    onClick={handleSignOut}
+                                    disabled={isSigningOut}
+                                    className="w-full group flex items-center justify-between py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-red-600 text-red-600/70 hover:text-red-600 disabled:opacity-50"
+                                >
                                     <span>CERRAR SESIÓN</span>
                                     <span className="text-[10px] opacity-40 group-hover:opacity-100 transition-opacity">[OFF]</span>
-                                </Link>
+                                </button>
                             </div>
                         ) : (
                             <>

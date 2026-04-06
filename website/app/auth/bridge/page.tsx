@@ -6,8 +6,10 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
+import { getSafeMobileRedirectUri } from '../../../src/lib/auth/redirects';
 import { auth } from '../../../src/lib/auth/server';
 import { validateDisplayName, validateUsername } from '../../../src/lib/moderation';
+import { BridgeAppRedirect } from './BridgeAppRedirect';
 
 export const revalidate = 0;
 
@@ -52,19 +54,8 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
 
     const redirectUriFromQuery = typeof searchParams?.redirectUri === 'string' ? searchParams.redirectUri : undefined;
 
-    const resolveRedirectUri = (raw: string | undefined): string | null => {
-        if (!raw) return null;
-        try {
-            const parsed = new URL(raw);
-            if (parsed.protocol !== 'irontrain:') return null;
-            return raw;
-        } catch {
-            return null;
-        }
-    };
-
-    const redirectUri = resolveRedirectUri(redirectUriFromQuery)
-        ?? resolveRedirectUri(cookieRedirectUri)
+    const redirectUri = getSafeMobileRedirectUri(redirectUriFromQuery)
+        ?? getSafeMobileRedirectUri(cookieRedirectUri)
         ?? 'irontrain://callback';
 
     const profileResult = await db.select().from(schema.userProfiles).where(eq(schema.userProfiles.id, session.id));
@@ -262,12 +253,7 @@ export default async function AuthBridgePage(props: { searchParams?: Promise<{ [
                         </Link>
                     </div>
 
-                    <script dangerouslySetInnerHTML={{
-                        __html: `
-                        // Clear cookie via document.cookie since we can't do it on server during render
-                        document.cookie = "redirect_uri=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-                        setTimeout(() => { window.location.href = "${appUrl}"; }, 1500);
-                    ` }} />
+                    <BridgeAppRedirect appUrl={appUrl} />
                 </div>
             </div>
         );

@@ -2,8 +2,10 @@
 
 import { LogIn, LogOut, Shield, User, UserPlus } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { authClient } from '../lib/auth/client';
+import { performSignOut } from '../lib/auth/signout';
 
 const links = [
   { href: '/feed', label: 'Feed Social' },
@@ -26,9 +28,22 @@ function isAdminUser(user: unknown): boolean {
 export function Nav() {
   const { data: session, isPending: loading } = authClient.useSession();
   const pathname = usePathname();
+  const router = useRouter();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const user = session?.user;
   const isAdmin = pathname.startsWith('/admin') || isAdminUser(user);
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+
+    try {
+      await performSignOut(router);
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-iron-200 bg-white/80 backdrop-blur">
@@ -96,13 +111,15 @@ export function Nav() {
                   </Link>
 
                   {/* Logout Button */}
-                  <Link
-                    href="/auth/sign-out"
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    disabled={isSigningOut}
                     title="Cerrar Sesión"
-                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all disabled:opacity-50"
                   >
                     <LogOut className="w-5 h-5 md:w-4 md:h-4" />
-                  </Link>
+                  </button>
                 </div>
               ) : (
                 <div className="flex items-center gap-1 md:gap-2">

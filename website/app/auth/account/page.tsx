@@ -2,9 +2,10 @@
 
 import { AlertTriangle, ArrowLeft, Check, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { authClient } from '../../../src/lib/auth/client';
+import { buildAuthBridgeCallbackUrl, buildSocialLinkCallbackUrl } from '../../../src/lib/auth/redirects';
 
 function getErrorMessage(error: unknown, fallback: string): string {
     if (error instanceof Error && error.message) {
@@ -15,6 +16,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 export default function AccountSecurityPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -46,6 +48,30 @@ export default function AccountSecurityPage() {
         if (typeof window === 'undefined') return '/auth/bridge';
         return `${window.location.origin}/auth/bridge`;
     }, []);
+
+    const socialCallbackURL = useMemo(
+        () => buildAuthBridgeCallbackUrl(searchParams.get('redirectUri')),
+        [searchParams]
+    );
+
+    const socialLinkCallbackURL = useMemo(
+        () => buildSocialLinkCallbackUrl('google', searchParams.get('redirectUri')),
+        [searchParams]
+    );
+
+    useEffect(() => {
+        if (searchParams.get('linked') === 'google') {
+            setSuccess('Google vinculado correctamente. Ya puedes iniciar sesión con ambos métodos.');
+            setError(null);
+
+            if (searchParams.get('redirectUri')) {
+                const timeout = window.setTimeout(() => {
+                    router.replace(socialCallbackURL);
+                }, 900);
+                return () => window.clearTimeout(timeout);
+            }
+        }
+    }, [router, searchParams, socialCallbackURL]);
 
     const handleSendVerification = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -116,6 +142,32 @@ export default function AccountSecurityPage() {
         } catch {
             setError('Error inesperado al cambiar contraseña');
         } finally {
+            setBusy(null);
+        }
+    };
+
+    const handleLinkGoogle = async () => {
+        resetMessages();
+        setBusy('link-google');
+
+        try {
+            const { error: apiError } = await authClient.linkSocial({
+                provider: 'google',
+                callbackURL: socialLinkCallbackURL,
+            });
+
+            if (apiError) {
+                const raw = `${apiError.message || ''}`.toLowerCase();
+                if (raw.includes('email_doesn') || raw.includes('email doesn')) {
+                    setError('El email de Google no coincide con tu cuenta actual. Usa la cuenta Google con el mismo email para mantener la seguridad.');
+                } else {
+                    setError(apiError.message || 'No se pudo vincular Google en este momento');
+                }
+                setBusy(null);
+                return;
+            }
+        } catch {
+            setError('Error inesperado al vincular Google');
             setBusy(null);
         }
     };
@@ -324,6 +376,24 @@ export default function AccountSecurityPage() {
                             {busy === 'password' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Actualizar contraseña'}
                         </button>
                     </form>
+
+                    <div className="space-y-2 border border-[#1a1a2e]/10 rounded-xl p-4">
+                        <h2 className="text-[11px] font-black uppercase tracking-widest">Login Social</h2>
+                        <p className="text-[10px] font-bold uppercase opacity-60">
+                            Vincula Google para entrar con el mismo usuario sin crear cuentas duplicadas.
+                        </p>
+                        <p className="text-[10px] font-bold uppercase opacity-50">
+                            Recomendado: usa la misma dirección de email de tu cuenta actual.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={handleLinkGoogle}
+                            disabled={busy !== null}
+                            className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-[#f5f1e8] transition-colors"
+                        >
+                            {busy === 'link-google' ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Vinculando</span> : 'Vincular Google'}
+                        </button>
+                    </div>
 
                     <form onSubmit={handleDeleteAccount} className="space-y-2 border border-red-200 bg-red-50 rounded-xl p-4">
                         <h2 className="text-[11px] font-black uppercase tracking-widest text-red-700 flex items-center gap-2">

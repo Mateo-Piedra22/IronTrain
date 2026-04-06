@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 
 const SAME_ORIGIN_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const AUTH_BYPASS_PATHS = ['/api/webhooks/', '/api/auth/exchange'];
+const MAX_REDIRECT_URI_LENGTH = 512;
 
 function isAllowedOrigin(originOrReferer: string | null, requestOrigin: string): boolean {
     if (!originOrReferer) return false;
@@ -23,6 +24,24 @@ function hasBearerToken(req: NextRequest): boolean {
 function hasLikelyAuthCookie(req: NextRequest): boolean {
     const names = req.cookies.getAll().map((cookie) => cookie.name.toLowerCase());
     return names.some((name) => (name.includes('auth') || name.includes('session')) && name.includes('neon'));
+}
+
+function getSafeRedirectUri(raw: string | null): string | null {
+    if (!raw) return null;
+    const candidate = raw.trim();
+    if (!candidate || candidate.length > MAX_REDIRECT_URI_LENGTH) {
+        return null;
+    }
+
+    try {
+        const parsed = new URL(candidate);
+        if (parsed.protocol !== 'irontrain:') {
+            return null;
+        }
+        return parsed.toString();
+    } catch {
+        return null;
+    }
 }
 
 /**
@@ -138,6 +157,7 @@ export async function middleware(request: NextRequest) {
     const { nextUrl } = request;
     const { pathname } = nextUrl;
     const redirectUri = nextUrl.searchParams.get('redirectUri');
+    const safeRedirectUri = getSafeRedirectUri(redirectUri);
 
     const normalizedLeadingSpacePath = pathname.replace(/^\/(?:%20|\s)+/i, '/');
     if (normalizedLeadingSpacePath !== pathname) {
@@ -166,13 +186,13 @@ export async function middleware(request: NextRequest) {
 
     // If we have a redirectUri, we want to save it in a cookie
     // so the bridge page can send the user back to the correct app link.
-    if (redirectUri && pathname.startsWith('/auth/')) {
+    if (safeRedirectUri && pathname.startsWith('/auth/')) {
         const response = NextResponse.next({
             request: {
                 headers: requestHeaders,
             },
         });
-        response.cookies.set('redirect_uri', redirectUri, {
+        response.cookies.set('redirect_uri', safeRedirectUri, {
             path: '/',
             maxAge: 600, // 10 minutes
             httpOnly: true,

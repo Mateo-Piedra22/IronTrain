@@ -21,8 +21,14 @@ function sanitizeCookieDomain(value: string | undefined | null): string | null {
  */
 async function proxy(request: Request, { params }: { params: Promise<{ path: string[] }> }) {
     const { path } = await params;
+    const serviceUrlRaw = process.env.NEON_AUTH_SERVICE_URL;
+
+    if (!serviceUrlRaw) {
+        return new Response('Auth is not configured', { status: 503 });
+    }
+
     const url = new URL(request.url);
-    const serviceUrl = new URL(process.env.NEON_AUTH_SERVICE_URL!);
+    const serviceUrl = new URL(serviceUrlRaw);
 
     const basePath = serviceUrl.pathname.replace(/\/$/, '');
     url.pathname = `${basePath}/${path.join('/')}`;
