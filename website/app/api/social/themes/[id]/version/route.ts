@@ -3,7 +3,7 @@ import * as schema from '@/db/schema';
 import { verifyAuth } from '@/lib/auth';
 import { createEndpointMetricRecorder } from '@/lib/endpoint-metrics';
 import { RATE_LIMITS } from '@/lib/rate-limit';
-import { createThemeVersionSchema } from '@/lib/theme-marketplace/service';
+import { createThemeVersionSchema, normalizeThemePayloadLogos } from '@/lib/theme-marketplace/service';
 import { and, eq, isNull } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -61,13 +61,14 @@ export async function POST(
 
         const now = new Date();
         const nextVersion = (pack.currentVersion ?? 0) + 1;
+        const normalizedPayload = normalizeThemePayloadLogos(parsed.data.payload);
 
         await db.transaction(async (tx: any) => {
             await tx.insert(schema.themePackVersions).values({
                 id: crypto.randomUUID(),
                 themePackId: id,
                 version: nextVersion,
-                payload: parsed.data.payload,
+                payload: normalizedPayload,
                 changelog: parsed.data.changelog ?? null,
                 createdBy: userId,
                 createdAt: now,

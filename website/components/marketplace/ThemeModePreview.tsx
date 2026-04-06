@@ -2,7 +2,7 @@
 
 import { resolveThemePreviewByMode, ThemeMode } from '@/lib/theme-marketplace/preview';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type ThemeModePreviewProps = {
     payload: Record<string, unknown>;
@@ -46,6 +46,7 @@ export default function ThemeModePreview({
         if (initialMode && availableModes.includes(initialMode)) return initialMode;
         return availableModes[0];
     });
+    const pendingQueryModeRef = useRef<ThemeMode | null>(null);
 
     useEffect(() => {
         if (availableModes.includes(activeMode)) return;
@@ -63,6 +64,10 @@ export default function ThemeModePreview({
 
         const modeFromUrl = searchParams.get(queryParamKey);
         if (modeFromUrl !== 'light' && modeFromUrl !== 'dark') return;
+        if (pendingQueryModeRef.current && modeFromUrl !== pendingQueryModeRef.current) return;
+        if (modeFromUrl === pendingQueryModeRef.current) {
+            pendingQueryModeRef.current = null;
+        }
         if (!availableModes.includes(modeFromUrl)) return;
         if (modeFromUrl === activeMode) return;
 
@@ -77,10 +82,16 @@ export default function ThemeModePreview({
         if (!syncToQueryParam) return;
 
         const currentInUrl = searchParams.get(queryParamKey);
-        if (currentInUrl === activeMode) return;
+        if (currentInUrl === activeMode) {
+            if (pendingQueryModeRef.current === activeMode) {
+                pendingQueryModeRef.current = null;
+            }
+            return;
+        }
 
         const nextParams = new URLSearchParams(searchParams.toString());
         nextParams.set(queryParamKey, activeMode);
+        pendingQueryModeRef.current = activeMode;
         const nextUrl = `${pathname}?${nextParams.toString()}`;
         router.replace(nextUrl, { scroll: false });
     }, [activeMode, pathname, queryParamKey, router, searchParams, syncToQueryParam]);
@@ -97,6 +108,7 @@ export default function ThemeModePreview({
                     {(['light', 'dark'] as ThemeMode[]).map((mode) => {
                         const disabled = !availableModes.includes(mode);
                         const selected = mode === activeMode;
+                        const modeChannels = channelsByMode[mode];
 
                         return (
                             <button
@@ -105,8 +117,9 @@ export default function ThemeModePreview({
                                 disabled={disabled}
                                 onClick={() => setActiveMode(mode)}
                                 className={`px-2 py-1 text-[8px] font-black uppercase tracking-[0.2em] transition-all ${selected
-                                    ? 'bg-current text-background'
+                                    ? ''
                                     : 'hover:bg-current/10'} ${disabled ? 'opacity-25 cursor-not-allowed' : ''}`}
+                                style={selected ? { backgroundColor: modeChannels.surface, color: modeChannels.text } : undefined}
                             >
                                 {getModeLabel(mode)}
                             </button>

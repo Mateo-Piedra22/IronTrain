@@ -9,6 +9,15 @@ const nextConfig: NextConfig = {
     serverActions: {
       allowedOrigins: ['irontrain.motiona.xyz']
     }
+  },
+  webpack: (config) => {
+    config.resolve = config.resolve ?? {};
+    config.resolve.alias = {
+      ...(config.resolve.alias ?? {}),
+      'lucide-react/dist/esm/icons/fingerprint.js': 'lucide-react/dist/esm/icons/fingerprint-pattern.js',
+    };
+
+    return config;
   }
 };
 

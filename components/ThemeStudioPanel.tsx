@@ -552,6 +552,17 @@ export function ThemeStudioPanel() {
                 light: palette.primary?.light ?? colors.primary.light,
                 dark: palette.primary?.dark ?? colors.primary.dark,
             },
+            logoPrimary:
+                palette.logoPrimary ??
+                (mode === 'dark' ? palette.iron?.[800] : palette.iron?.[900]) ??
+                (mode === 'dark' ? colors.iron?.[800] : colors.iron?.[900]) ??
+                palette.text ??
+                colors.text,
+            logoAccent:
+                palette.logoAccent ??
+                (mode === 'dark' ? palette.primary?.light : palette.primary?.dark) ??
+                palette.primary?.DEFAULT ??
+                colors.primary.DEFAULT,
             onPrimary: palette.onPrimary ?? colors.onPrimary,
             background: palette.background ?? colors.background,
             surface: palette.surface ?? colors.surface,

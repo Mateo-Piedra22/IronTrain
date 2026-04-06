@@ -5,6 +5,8 @@ export type EditableColorFieldKey =
     | 'primaryDefault'
     | 'primaryLight'
     | 'primaryDark'
+    | 'logoPrimary'
+    | 'logoAccent'
     | 'onPrimary'
     | 'background'
     | 'surface'

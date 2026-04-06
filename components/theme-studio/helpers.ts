@@ -6,6 +6,8 @@ export function patchToFields(patch: ThemeColorPatch): EditableColorFields {
         primaryDefault: patch.primary?.DEFAULT ?? '',
         primaryLight: patch.primary?.light ?? '',
         primaryDark: patch.primary?.dark ?? '',
+        logoPrimary: patch.logoPrimary ?? '',
+        logoAccent: patch.logoAccent ?? '',
         onPrimary: patch.onPrimary ?? '',
         background: patch.background ?? '',
         surface: patch.surface ?? '',
@@ -30,6 +32,8 @@ export function fieldsToPatch(fields: EditableColorFields): ThemeColorPatch {
         if (isValidHexColor(fields.primaryDark)) patch.primary.dark = fields.primaryDark;
     }
 
+    if (isValidHexColor(fields.logoPrimary)) patch.logoPrimary = fields.logoPrimary;
+    if (isValidHexColor(fields.logoAccent)) patch.logoAccent = fields.logoAccent;
     if (isValidHexColor(fields.onPrimary)) patch.onPrimary = fields.onPrimary;
     if (isValidHexColor(fields.background)) patch.background = fields.background;
     if (isValidHexColor(fields.surface)) patch.surface = fields.surface;
@@ -243,6 +247,8 @@ function isHexValid(value: string): boolean {
 
 export type ModeFallbackColors = {
     primary: { DEFAULT: string; light: string; dark: string };
+    logoPrimary: string;
+    logoAccent: string;
     onPrimary: string;
     background: string;
     surface: string;
@@ -256,12 +262,31 @@ export function applyEditorSmartDefaults(fields: EditableColorFields, mode: Edit
     const next: EditableColorFields = { ...fields };
 
     const primaryBase = isHexValid(next.primaryDefault) ? next.primaryDefault : fallback.primary.DEFAULT;
+    const textBase = isHexValid(next.text) ? next.text : fallback.text;
+    const backgroundBase = isHexValid(next.background) ? next.background : fallback.background;
+
     if (!isHexValid(next.primaryLight)) {
         next.primaryLight = isHexValid(primaryBase) ? mixHex(primaryBase, '#FFFFFF', 0.2) : fallback.primary.light;
     }
     if (!isHexValid(next.primaryDark)) {
         next.primaryDark = isHexValid(primaryBase) ? mixHex(primaryBase, '#000000', 0.18) : fallback.primary.dark;
     }
+    if (!isHexValid(next.logoPrimary)) {
+        next.logoPrimary = isHexValid(textBase) && isHexValid(backgroundBase)
+            ? (mode === 'dark' ? mixHex(textBase, backgroundBase, 0.22) : mixHex(textBase, backgroundBase, 0.14))
+            : (isHexValid(fallback.logoPrimary)
+                ? fallback.logoPrimary
+                : (mode === 'dark' ? fallback.primary.light : fallback.primary.dark));
+    }
+
+    if (!isHexValid(next.logoAccent)) {
+        next.logoAccent = isHexValid(primaryBase)
+            ? (mode === 'dark' ? mixHex(primaryBase, '#FFFFFF', 0.18) : mixHex(primaryBase, '#000000', 0.12))
+            : (isHexValid(fallback.logoAccent)
+                ? fallback.logoAccent
+                : (mode === 'dark' ? fallback.primary.light : fallback.primary.DEFAULT));
+    }
+
     if (!isHexValid(next.onPrimary)) {
         next.onPrimary = isHexValid(primaryBase)
             ? (relativeLuminance(primaryBase) > 0.57 ? '#000000' : '#FFFFFF')
@@ -274,9 +299,6 @@ export function applyEditorSmartDefaults(fields: EditableColorFields, mode: Edit
             ? (mode === 'dark' ? mixHex(surfaceBase, '#FFFFFF', 0.08) : mixHex(surfaceBase, '#000000', 0.06))
             : fallback.surfaceLighter;
     }
-
-    const textBase = isHexValid(next.text) ? next.text : fallback.text;
-    const backgroundBase = isHexValid(next.background) ? next.background : fallback.background;
 
     if (!isHexValid(next.textMuted)) {
         next.textMuted = isHexValid(textBase) && isHexValid(backgroundBase)

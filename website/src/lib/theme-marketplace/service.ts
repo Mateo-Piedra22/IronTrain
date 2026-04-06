@@ -15,6 +15,8 @@ const themePatchSchema = z.object({
         light: hexColorSchema.optional(),
         dark: hexColorSchema.optional(),
     }).optional(),
+    logoPrimary: hexColorSchema.optional(),
+    logoAccent: hexColorSchema.optional(),
     onPrimary: hexColorSchema.optional(),
     white: hexColorSchema.optional(),
     black: hexColorSchema.optional(),
@@ -64,6 +66,40 @@ export const createThemeVersionSchema = z.object({
     payload: themePackPayloadSchema,
     changelog: z.string().trim().max(300).optional(),
 });
+
+type ThemePatchInput = z.infer<typeof themePatchSchema> | undefined;
+type ThemePayloadInput = z.infer<typeof themePackPayloadSchema>;
+
+function normalizeLogoPatch(patch: ThemePatchInput, mode: 'light' | 'dark'): ThemePatchInput {
+    if (!patch) return patch;
+
+    const primary = patch.primary ?? {};
+    const normalized: z.infer<typeof themePatchSchema> = { ...patch };
+
+    if (!normalized.logoPrimary) {
+        normalized.logoPrimary =
+            patch.text ??
+            (mode === 'dark' ? primary.light : primary.dark) ??
+            primary.DEFAULT;
+    }
+
+    if (!normalized.logoAccent) {
+        normalized.logoAccent =
+            (mode === 'dark' ? primary.light : primary.dark) ??
+            primary.DEFAULT ??
+            normalized.logoPrimary;
+    }
+
+    return normalized;
+}
+
+export function normalizeThemePayloadLogos(payload: ThemePayloadInput): ThemePayloadInput {
+    return {
+        ...payload,
+        lightPatch: normalizeLogoPatch(payload.lightPatch, 'light'),
+        darkPatch: normalizeLogoPatch(payload.darkPatch, 'dark'),
+    };
+}
 
 export const installThemePackSchema = z.object({
     appliedLight: z.boolean().default(false),

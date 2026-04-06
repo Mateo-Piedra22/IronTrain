@@ -51,10 +51,14 @@ export function resolveThemePreview(payloadRaw: unknown): ThemePreviewChannels {
 
     const hero = pickFirstHex(
         preview?.hero,
+        lightPatch?.logoAccent,
+        lightPatch?.logoPrimary,
         lightPrimary?.DEFAULT,
         lightPrimary?.light,
         lightPatch?.blue,
         lightPatch?.onPrimary,
+        darkPatch?.logoAccent,
+        darkPatch?.logoPrimary,
         darkPrimary?.DEFAULT,
         darkPrimary?.dark,
         darkPatch?.blue,
@@ -97,10 +101,14 @@ function resolveThemePreviewForMode(payloadRaw: unknown, mode: ThemeMode): Theme
 
     const hero = pickFirstHex(
         preview?.hero,
+        preferredPatch?.logoAccent,
+        preferredPatch?.logoPrimary,
         preferredPrimary?.DEFAULT,
         preferredPrimary?.light,
         preferredPatch?.blue,
         preferredPatch?.onPrimary,
+        secondaryPatch?.logoAccent,
+        secondaryPatch?.logoPrimary,
         secondaryPrimary?.DEFAULT,
         secondaryPrimary?.dark,
         secondaryPatch?.blue,

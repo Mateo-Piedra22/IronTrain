@@ -97,12 +97,16 @@ export function IronTrainLogo({ size = 100, color, accentColor }: Props) {
     const colors = useColors();
     const resolvedColor =
         color ??
+        colors.logoPrimary ??
+        (colors.isDark ? colors.iron?.[800] : colors.iron?.[900]) ??
         colors.text ??
         (colors.isDark ? colors.iron?.[700] : colors.iron?.[700]) ??
         colors.primary?.DEFAULT ??
         '#9CA3AF';
     const resolvedAccentColor =
         accentColor ??
+        colors.logoAccent ??
+        (colors.isDark ? colors.primary?.light : colors.primary?.dark) ??
         colors.primary?.DEFAULT ??
         colors.onPrimary ??
         resolvedColor;

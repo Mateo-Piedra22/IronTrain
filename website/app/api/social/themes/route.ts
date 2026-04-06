@@ -9,6 +9,7 @@ import {
     getAcceptedFriendIds,
     mapThemePackSummary,
     normalizeTags,
+    normalizeThemePayloadLogos,
     parseThemeListQuery,
     resolveUniqueThemeSlug,
     slugifyThemeName,
@@ -132,6 +133,7 @@ export async function POST(req: NextRequest) {
             : parsed.data.visibility === 'friends'
                 ? 'approved'
                 : 'draft';
+        const normalizedPayload = normalizeThemePayloadLogos(parsed.data.payload);
 
         await db.transaction(async (tx: any) => {
             await tx.insert(schema.themePacks).values({
@@ -154,7 +156,7 @@ export async function POST(req: NextRequest) {
                 id: versionId,
                 themePackId: id,
                 version: 1,
-                payload: parsed.data.payload,
+                payload: normalizedPayload,
                 changelog: 'Initial version',
                 createdBy: userId,
                 createdAt: now,

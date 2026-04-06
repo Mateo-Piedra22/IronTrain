@@ -4,6 +4,8 @@ export type ThemeModerationStatus = 'draft' | 'pending_review' | 'approved' | 'r
 export type ThemePatch = Partial<{
   iron: Record<string, string>;
   primary: Partial<{ DEFAULT: string; light: string; dark: string }>;
+  logoPrimary: string;
+  logoAccent: string;
   onPrimary: string;
   white: string;
   black: string;

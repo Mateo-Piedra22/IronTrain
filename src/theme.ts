@@ -27,6 +27,10 @@ export type ThemeColors = {
     isDark: boolean;
     iron: IronScale;
     primary: PrimaryScale;
+    /** Primary brand color for the IronTrain logo foreground. Optional for backward compatibility with existing custom themes. */
+    logoPrimary?: string;
+    /** Accent brand color for selected IronTrain logo paths. Optional for backward compatibility with existing custom themes. */
+    logoAccent?: string;
     /** Foreground color for content placed on top of a primary-colored background. */
     onPrimary: string;
     white: string;
@@ -107,6 +111,8 @@ export const LightThemeTokens: ThemeTokens = {
             light: '#b7c7d8',
             dark: '#5f768f',
         },
+        logoPrimary: LIGHT_IRON[900],
+        logoAccent: '#5f768f',
         onPrimary: LIGHT_IRON[950],
         white: '#ffffff',
         black: '#000000',
@@ -136,6 +142,8 @@ export const DarkThemeTokens: ThemeTokens = {
             light: '#ffb4ad', //#e6ff6b light del tema anterior
             dark: '#e85b54', //#b8e62a dark del tema anterior
         },
+        logoPrimary: DARK_IRON[800],
+        logoAccent: '#ffb4ad',
         onPrimary: '#000000',
         white: '#ffffff',
         black: '#000000',

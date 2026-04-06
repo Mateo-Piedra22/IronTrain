@@ -153,6 +153,8 @@ export function ThemeStudioEditorTab({
         primaryDefault: false,
         primaryLight: false,
         primaryDark: false,
+        logoPrimary: false,
+        logoAccent: false,
         onPrimary: false,
         background: false,
         surface: false,
@@ -185,6 +187,17 @@ export function ThemeStudioEditorTab({
                     light: previewModeColors.primary?.light ?? colors.primary.light,
                     dark: previewModeColors.primary?.dark ?? colors.primary.dark,
                 },
+                logoPrimary:
+                    previewModeColors.logoPrimary ??
+                    (editorMode === 'dark' ? previewModeColors.iron?.[800] : previewModeColors.iron?.[900]) ??
+                    (editorMode === 'dark' ? colors.iron?.[800] : colors.iron?.[900]) ??
+                    previewModeColors.text ??
+                    colors.text,
+                logoAccent:
+                    previewModeColors.logoAccent ??
+                    (editorMode === 'dark' ? previewModeColors.primary?.light : previewModeColors.primary?.dark) ??
+                    previewModeColors.primary?.DEFAULT ??
+                    colors.primary.DEFAULT,
                 onPrimary: previewModeColors.onPrimary ?? colors.onPrimary,
                 background: previewModeColors.background ?? colors.background,
                 surface: previewModeColors.surface ?? colors.surface,

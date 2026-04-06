@@ -3,6 +3,8 @@ import { CoreThemeCatalog, ThemeColors, ThemeMode, ThemeTokens, createColorsForM
 export type ThemeColorPatch = Partial<{
     iron: Partial<ThemeColors['iron']>;
     primary: Partial<ThemeColors['primary']>;
+    logoPrimary: string;
+    logoAccent: string;
     onPrimary: string;
     white: string;
     black: string;
@@ -51,7 +53,7 @@ function sanitizeDraftName(raw: string): string {
 }
 
 function hasAtLeastOnePatchValue(patch: ThemeColorPatch): boolean {
-    const scalarKeys: (keyof ThemeColorPatch)[] = ['onPrimary', 'white', 'black', 'blue', 'red', 'green', 'yellow', 'background', 'surface', 'surfaceLighter', 'text', 'textMuted', 'border'];
+    const scalarKeys: (keyof ThemeColorPatch)[] = ['logoPrimary', 'logoAccent', 'onPrimary', 'white', 'black', 'blue', 'red', 'green', 'yellow', 'background', 'surface', 'surfaceLighter', 'text', 'textMuted', 'border'];
     if (patch.iron && Object.keys(patch.iron).length > 0) return true;
     if (patch.primary && Object.keys(patch.primary).length > 0) return true;
     return scalarKeys.some((key) => typeof patch[key] === 'string');
@@ -94,7 +96,7 @@ function sanitizePatch(patch: ThemeColorPatch): ThemeColorPatch {
             }
         }
     }
-    const scalarKeys: (keyof ThemeColorPatch)[] = ['onPrimary', 'white', 'black', 'blue', 'red', 'green', 'yellow', 'background', 'surface', 'surfaceLighter', 'text', 'textMuted', 'border'];
+    const scalarKeys: (keyof ThemeColorPatch)[] = ['logoPrimary', 'logoAccent', 'onPrimary', 'white', 'black', 'blue', 'red', 'green', 'yellow', 'background', 'surface', 'surfaceLighter', 'text', 'textMuted', 'border'];
     for (const key of scalarKeys) {
         const value = patch[key];
         if (typeof value === 'string') {
