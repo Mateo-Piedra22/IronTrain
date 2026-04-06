@@ -14,6 +14,18 @@ function sanitizeCookieDomain(value: string | undefined | null): string | null {
     return normalized.replace(/^\.+/, '');
 }
 
+function shouldRewriteCookieDomain(cookie: string): boolean {
+    const [namePart = ''] = cookie.split(';', 1);
+    const cookieName = namePart.split('=')[0]?.trim() || '';
+
+    // Reescribimos SOLO cookies locales de sesión Neon.
+    // Cualquier cookie de OAuth state/challenge del upstream debe conservar dominio original,
+    // porque Google vuelve al dominio de Neon Auth para validar estado.
+    return /^(__Secure-|__Host-)?neon-auth\./i.test(cookieName)
+        || /^__Secure-neon-auth\./i.test(cookieName)
+        || /^neon-auth\./i.test(cookieName);
+}
+
 /**
  * Proxy de Autenticación con Enforzamiento de Dominio
  * Este proxy asegura que las cookies emitidas por Neon tengan el dominio correcto
@@ -21,7 +33,7 @@ function sanitizeCookieDomain(value: string | undefined | null): string | null {
  */
 async function proxy(request: Request, { params }: { params: Promise<{ path: string[] }> }) {
     const { path } = await params;
-    const serviceUrlRaw = process.env.NEON_AUTH_SERVICE_URL;
+    const serviceUrlRaw = process.env.NEON_AUTH_BASE_URL || process.env.NEON_AUTH_SERVICE_URL;
 
     if (!serviceUrlRaw) {
         return new Response('Auth is not configured', { status: 503 });
@@ -67,7 +79,7 @@ async function proxy(request: Request, { params }: { params: Promise<{ path: str
             const cookieDomain = envCookieDomain || requestHost;
 
             setCookies.forEach((cookie: string) => {
-                if (!cookieDomain) {
+                if (!cookieDomain || !shouldRewriteCookieDomain(cookie)) {
                     newHeaders.append('Set-Cookie', cookie);
                     return;
                 }
