@@ -26,6 +26,14 @@ function shouldRewriteCookieDomain(cookie: string): boolean {
         || /^neon-auth\./i.test(cookieName);
 }
 
+function isOAuthCriticalPath(path: string[]): boolean {
+    const normalized = path.join('/').toLowerCase();
+    return normalized.includes('sign-in/social')
+        || normalized.includes('link-social')
+        || normalized.includes('callback')
+        || normalized.includes('oauth');
+}
+
 /**
  * Proxy de Autenticación con Enforzamiento de Dominio
  * Este proxy asegura que las cookies emitidas por Neon tengan el dominio correcto
@@ -33,6 +41,7 @@ function shouldRewriteCookieDomain(cookie: string): boolean {
  */
 async function proxy(request: Request, { params }: { params: Promise<{ path: string[] }> }) {
     const { path } = await params;
+    const oauthCritical = isOAuthCriticalPath(path);
     const serviceUrlRaw = process.env.NEON_AUTH_BASE_URL || process.env.NEON_AUTH_SERVICE_URL;
 
     if (!serviceUrlRaw) {
@@ -79,7 +88,7 @@ async function proxy(request: Request, { params }: { params: Promise<{ path: str
             const cookieDomain = envCookieDomain || requestHost;
 
             setCookies.forEach((cookie: string) => {
-                if (!cookieDomain || !shouldRewriteCookieDomain(cookie)) {
+                if (oauthCritical || !cookieDomain || !shouldRewriteCookieDomain(cookie)) {
                     newHeaders.append('Set-Cookie', cookie);
                     return;
                 }

@@ -1,161 +1,181 @@
+<div align="center">
+
+<img src="assets/images/irontrain-logo-mono.svg" width="130" alt="IronTrain Logo" />
+
 # IronTrain
 
-IronTrain es una app mobile de entrenamiento de fuerza construida con Expo + React Native, con enfoque local-first y sincronización social progresiva.
+### App mobile de entrenamiento de fuerza (local-first) con sincronización social progresiva
 
-## TL;DR (onboarding rápido)
+[![Expo](https://img.shields.io/badge/Expo_SDK_54-333333?style=for-the-badge&logo=expo&logoColor=white)](#)
+[![React Native](https://img.shields.io/badge/React_Native_0.81-333333?style=for-the-badge&logo=react&logoColor=61DAFB)](#)
+[![React 19](https://img.shields.io/badge/React_19-333333?style=for-the-badge&logo=react&logoColor=61DAFB)](#)
+[![SQLite](https://img.shields.io/badge/SQLite-FF6600?style=for-the-badge&logo=sqlite&logoColor=white)](#)
+[![Next.js](https://img.shields.io/badge/Next.js_15-333333?style=for-the-badge&logo=next.js&logoColor=white)](#)
 
-- App principal: mobile (Expo/React Native) con persistencia local-first en SQLite.
-- Website separado en `website/` con Next.js + Drizzle + Neon/Postgres.
-- Estado global mobile: Zustand; navegación: Expo Router.
-- Calidad obligatoria antes de merge: tests + typecheck + checks de CI/Security.
-- Workflows clave: `ci.yml`, `security.yml`, `release-android.yml`.
-- Release Android: tag semver `vMAJOR.MINOR.PATCH` y pipeline automatizado.
-- Docs operativas base: `docs/RUNBOOK.md`, `docs/TROUBLESHOOTING.md`, `docs/SECURITY_PRIVACY.md`.
-- Punto de entrada recomendado para contribuir: secciones “Inicio rápido” + “Flujo recomendado de desarrollo” de este README.
+</div>
 
-## Qué es IronTrain
+---
 
-- Producto principal: app mobile para planificación, registro y seguimiento de entrenamientos.
-- Pilar técnico: persistencia local-first para resiliencia offline.
-- Capas complementarias: sincronización social/rutinas compartidas y website desacoplado.
-- Objetivo operativo: calidad y seguridad verificables antes de merge/release.
+## 🚀 TL;DR
 
-## Estado actual
+> **Onboarding express:** empezá por **Inicio rápido** y **Flujo de desarrollo**.
 
-- Plataforma principal: app mobile Expo SDK 54.
-- Sitio web separado en `website/` (Next.js 15).
-- Persistencia local en SQLite (`expo-sqlite`).
-- Estado global con Zustand.
-- CI unificado en `.github/workflows/ci.yml`.
-- Seguridad continua en `.github/workflows/security.yml`.
+- 📱 **Producto principal:** app mobile con Expo + React Native.
+- 💾 **Core técnico:** persistencia **local-first** con SQLite (`expo-sqlite`).
+- 🌐 **Web desacoplada:** `website/` con Next.js + Drizzle + Neon/Postgres.
+- 🧠 **Estado/Navegación:** Zustand + Expo Router.
+- 🛡️ **Calidad obligatoria:** tests, typecheck y checks de CI/Security antes de merge.
 
-## Arquitectura resumida
+---
 
-- Mobile (raíz del repo): Expo Router + Zustand + SQLite.
-- Website (`website/`): Next.js App Router + Drizzle + Neon/Postgres.
-- Integración: módulos desacoplados en runtime, alineados por lineamientos de producto y contratos.
-- Operación: workflows de CI, seguridad y release Android como guardrails de calidad.
+## 🎬 Vista rápida
 
-## Stack
+<div align="center">
+  <img src="website/app/opengraph-image.svg" width="860" alt="IronTrain App Preview" />
+</div>
 
-- Mobile: React Native 0.81, React 19, Expo Router.
-- Web: Next.js 15, React 19, Drizzle ORM, Neon/Postgres.
-- Testing: Jest (mobile) y Vitest (website).
+---
 
-## Estructura del repositorio (alto nivel)
+## 🧱 Arquitectura (alto nivel)
 
-- `app/`: rutas y pantallas Expo Router.
-- `components/`: UI reutilizable y widgets.
-- `src/`: servicios, estado, hooks y lógica de dominio.
-- `docs/`: documentación operativa y técnica vigente.
-- `website/`: aplicación web desacoplada.
-- `.github/workflows/`: pipelines de CI, seguridad y release.
+```mermaid
+flowchart LR
+    A[Mobile App<br/>Expo + React Native] --> B[Estado Global<br/>Zustand]
+    A --> C[Persistencia Local<br/>SQLite]
+    A --> D[Sync Social Progresiva]
+    E[Website<br/>Next.js + Drizzle + Neon] --> D
+    F[CI/CD + Security Guardrails] --> A
+    F --> E
+```
 
-## Inicio rápido
+| Capa | Stack | Propósito |
+| :-- | :-- | :-- |
+| Mobile (raíz) | React Native 0.81, React 19, Expo SDK 54, Expo Router, Zustand | App principal y UX de entrenamiento |
+| Persistencia | `expo-sqlite` | Operación local-first/offline resiliente |
+| Website (`/website`) | Next.js 15, React 19, Drizzle ORM, Neon/Postgres | Superficie web desacoplada |
+| Testing | Jest (mobile), Vitest (website) | Validación funcional y técnica |
+
+> **Guardrails de operación:** los workflows de CI, seguridad y release Android son obligatorios para calidad y seguridad.
+
+---
+
+## 🗂️ Estructura del repositorio
+
+```text
+app/                   # Rutas y pantallas Expo Router
+components/            # UI reutilizable y widgets
+src/                   # Servicios, estado, hooks, dominio
+docs/                  # Documentación operativa y técnica
+website/               # App web desacoplada
+.github/workflows/     # CI, Security, Release Android
+```
+
+---
+
+## ⚡ Inicio rápido
 
 ### Prerrequisitos
 
-- Node 22.x recomendado.
-- npm.
-- Tooling de Expo para desarrollo local mobile.
+- Node **22.x** (recomendado)
+- `npm`
+- Tooling de Expo para desarrollo mobile local
 
-### Setup inicial (root)
+### 📱 Mobile (root)
 
 ```bash
+# 1) Instalar dependencias
 npm install
+
+# 2) Validaciones locales
 npm test -- --watch=false
 npx tsc --noEmit
+
+# 3) Levantar entorno de desarrollo
 npm start
-```
 
-### Setup website
-
-```bash
-cd website
-npm install
-npm run dev
-```
-
-## Comandos principales (mobile)
-
-```bash
-npm install
-npm test -- --watch=false
-npx tsc --noEmit
-npm start
-```
-
-Comandos frecuentes de ejecución:
-
-```bash
+# Plataformas
 npm run android
 npm run ios
 npm run web
 ```
 
-## Comandos principales (website)
+### 💻 Website
 
 ```bash
 cd website
+
+# 1) Instalar dependencias
 npm install
+
+# 2) Desarrollo
 npm run dev
+
+# 3) Build producción
 npm run build
 ```
 
-## Flujo recomendado de desarrollo
+---
+
+## 🔄 Flujo recomendado de desarrollo
 
 1. Crear rama pequeña y con alcance claro.
 2. Implementar cambio focalizado.
-3. Ejecutar validaciones locales (test + typecheck, y build web si aplica).
-4. Abrir PR con contexto de riesgo y evidencia de validación.
+3. Ejecutar validaciones locales (tests + typecheck, y build web si aplica).
+4. Abrir PR con contexto de riesgo + evidencia de validación.
 5. Mergear solo con checks requeridos en verde.
 
-## CI/CD y seguridad
+---
 
-- CI principal: `.github/workflows/ci.yml`.
-- Seguridad continua: `.github/workflows/security.yml`.
-- Release Android: `.github/workflows/release-android.yml`.
-- Guardrails clave: permisos mínimos, checks requeridos, dependency review y escaneo de dependencias.
+## 🛡️ CI/CD y seguridad
 
-## Release Android (resumen)
+- CI principal: `.github/workflows/ci.yml`
+- Seguridad continua: `.github/workflows/security.yml`
+- Release Android: `.github/workflows/release-android.yml`
+- Guardrails clave: permisos mínimos, checks requeridos, dependency review y escaneo de dependencias
+
+---
+
+## 📦 Release Android (resumen)
 
 1. Preparar changelog y versión.
 2. Crear tag semver: `vMAJOR.MINOR.PATCH`.
-3. Dejar que `release-android.yml` construya y publique artefactos.
+3. Ejecutar pipeline `release-android.yml` para build/publicación de artefactos.
 4. Verificar checksum y notas de release.
 
-## Troubleshooting rápido
+---
 
-- Si falla CI en instalación: validar Node + lockfile.
-- Si falla typecheck: corregir primer error raíz antes de los de cascada.
-- Si falla build website: reproducir localmente en `website/`.
+<details>
+<summary><strong>🧯 Troubleshooting rápido</strong></summary>
+
+- Si falla instalación en CI: validar versión de Node + lockfile.
+- Si falla typecheck: corregir primero el error raíz.
+- Si falla build web: reproducir localmente dentro de `website/`.
 - Si falla release Android: revisar tag semver y secretos.
-- Si hay inconsistencias de sincronización social/rutinas compartidas: revisar conflictos de revisión y estado local/remoto.
+- Si hay inconsistencias de sync social/rutinas compartidas: revisar estado local/remoto y conflictos de revisión.
 
-## Documentación
+</details>
 
-### Índice rápido por tema
+---
 
-- Arquitectura: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- Desarrollo: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
-- Base de datos: [docs/DATABASE.md](docs/DATABASE.md)
-- CI/CD: [docs/CI_CD.md](docs/CI_CD.md)
-- Guardrails DevOps: [docs/DEVOPS_GUARDRAILS.md](docs/DEVOPS_GUARDRAILS.md)
-- Testing: [docs/TESTING.md](docs/TESTING.md)
-- Release: [docs/RELEASE.md](docs/RELEASE.md)
-- Distribución: [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)
-- Runbook operacional: [docs/RUNBOOK.md](docs/RUNBOOK.md)
-- Comandos operativos: [docs/OPERATIONS_COMMANDS.md](docs/OPERATIONS_COMMANDS.md)
-- Troubleshooting: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-- Seguridad y privacidad: [docs/SECURITY_PRIVACY.md](docs/SECURITY_PRIVACY.md)
+## 📚 Documentación operativa
 
-## Notas
+- Arquitectura: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- Desarrollo: [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)
+- Base de datos: [`docs/DATABASE.md`](docs/DATABASE.md)
+- CI/CD: [`docs/CI_CD.md`](docs/CI_CD.md)
+- Guardrails DevOps: [`docs/DEVOPS_GUARDRAILS.md`](docs/DEVOPS_GUARDRAILS.md)
+- Testing: [`docs/TESTING.md`](docs/TESTING.md)
+- Release: [`docs/RELEASE.md`](docs/RELEASE.md)
+- Distribución: [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md)
+- Runbook operacional: [`docs/RUNBOOK.md`](docs/RUNBOOK.md)
+- Comandos operativos: [`docs/OPERATIONS_COMMANDS.md`](docs/OPERATIONS_COMMANDS.md)
+- Troubleshooting: [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)
+- Seguridad y privacidad: [`docs/SECURITY_PRIVACY.md`](docs/SECURITY_PRIVACY.md)
 
-- Este repositorio contiene también archivos de soporte de agentes y planes históricos.
-- Para cambios operativos, priorizar siempre los documentos bajo `docs/`.
+---
 
-## Criterio de calidad para cambios
+## ✅ Criterio de calidad para cambios
 
 - Sin checks críticos fallando en PR.
-- Sin cambios de alto riesgo sin documentación/mitigación.
-- Documentación técnica actualizada cuando cambia arquitectura, operación o seguridad.
+- Sin cambios de alto riesgo sin documentación o mitigación.
+- Documentación técnica actualizada cuando cambian arquitectura, operación o seguridad.

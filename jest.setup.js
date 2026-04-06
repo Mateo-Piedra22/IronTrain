@@ -41,6 +41,13 @@ jest.mock('expo-audio', () => {
     };
 });
 
+jest.mock('@shopify/flash-list', () => {
+    return {
+        __esModule: true,
+        FlashList: () => null,
+    };
+});
+
 jest.mock('react-native-reanimated/mock', () => {
     const RN = require('react-native');
     const Animated = {
