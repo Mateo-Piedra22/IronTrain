@@ -11,6 +11,19 @@ export async function performSignOut(router: AppRouterInstance): Promise<void> {
     try {
         const { error } = await authClient.signOut();
         if (error) {
+            await fetch('/api/internal/auth/signout-hard', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            }).catch(() => null);
+        } else {
+            await fetch('/api/internal/auth/signout-hard', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            }).catch(() => null);
+        }
+
+        const sessionCheck = await authClient.getSession().catch(() => null);
+        if (sessionCheck?.data?.session) {
             fallback();
             return;
         }

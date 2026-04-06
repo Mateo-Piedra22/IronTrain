@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { authClient } from '../../../src/lib/auth/client';
 import { buildAuthBridgeCallbackUrl, buildSocialLinkCallbackUrl } from '../../../src/lib/auth/redirects';
+import { performSignOut } from '../../../src/lib/auth/signout';
 
 function getErrorMessage(error: unknown, fallback: string): string {
     if (error instanceof Error && error.message) {
@@ -14,9 +15,40 @@ function getErrorMessage(error: unknown, fallback: string): string {
     return fallback;
 }
 
+async function callAuthProxy(paths: string[], payload?: Record<string, unknown>) {
+    let lastError: string | null = null;
+
+    for (const path of paths) {
+        try {
+            const response = await fetch(path, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify(payload ?? {}),
+                credentials: 'include',
+            });
+
+            if (response.ok) {
+                return { ok: true as const, path };
+            }
+
+            const data = await response.json().catch(() => ({}));
+            const message = data?.error || data?.message || `Request failed (${response.status})`;
+            lastError = String(message);
+        } catch (error) {
+            lastError = getErrorMessage(error, 'Network error');
+        }
+    }
+
+    return { ok: false as const, error: lastError || 'No se pudo completar la operación' };
+}
+
 export default function AccountSecurityPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { data: session } = authClient.useSession();
     const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -30,12 +62,104 @@ export default function AccountSecurityPage() {
     const [newPassword, setNewPassword] = useState('');
 
     const [deletePassword, setDeletePassword] = useState('');
+    const [profileDisplayName, setProfileDisplayName] = useState('');
+    const [profileUsername, setProfileUsername] = useState('');
+    const [profilePublic, setProfilePublic] = useState(true);
+    const [authName, setAuthName] = useState('');
+    const [accountEmail, setAccountEmail] = useState('');
+    const [accountStatus, setAccountStatus] = useState<{ googleLinked: boolean; sessions: number | null }>({
+        googleLinked: false,
+        sessions: null,
+    });
 
     useEffect(() => {
         return () => {
             if (redirectTimeoutRef.current) {
                 clearTimeout(redirectTimeoutRef.current);
             }
+        };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadAuthStatus = async () => {
+            const authAny = authClient as any;
+
+            try {
+                const listAccounts = authAny?.listAccounts;
+                if (typeof listAccounts === 'function') {
+                    const result = await listAccounts();
+                    const accounts = Array.isArray(result?.data) ? result.data : [];
+                    if (!cancelled) {
+                        setAccountStatus((prev) => ({
+                            ...prev,
+                            googleLinked: accounts.some((acc: any) => String(acc?.providerId || '').toLowerCase() === 'google'),
+                        }));
+                    }
+                }
+            } catch {
+            }
+
+            try {
+                const listSessions = authAny?.listSessions;
+                if (typeof listSessions === 'function') {
+                    const result = await listSessions();
+                    const sessions = Array.isArray(result?.data) ? result.data : [];
+                    if (!cancelled) {
+                        setAccountStatus((prev) => ({ ...prev, sessions: sessions.length }));
+                    }
+                }
+            } catch {
+            }
+        };
+
+        loadAuthStatus();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (session?.user?.name) {
+            setAuthName(String(session.user.name));
+        }
+        if (session?.user?.email) {
+            setAccountEmail(String(session.user.email));
+            if (!verifyEmail) {
+                setVerifyEmail(String(session.user.email));
+            }
+        }
+    }, [session, verifyEmail]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadProfile = async () => {
+            try {
+                const response = await fetch('/api/social/profile', {
+                    method: 'GET',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    cache: 'no-store',
+                });
+
+                if (!response.ok) return;
+                const payload = await response.json().catch(() => null);
+                const profile = payload?.profile;
+                if (!profile || cancelled) return;
+
+                setProfileDisplayName(String(profile.displayName || ''));
+                setProfileUsername(String(profile.username || ''));
+                setProfilePublic(Boolean(profile.isPublic ?? true));
+            } catch {
+            }
+        };
+
+        loadProfile();
+
+        return () => {
+            cancelled = true;
         };
     }, []);
 
@@ -146,6 +270,84 @@ export default function AccountSecurityPage() {
         }
     };
 
+    const handleUpdateProfileIdentity = async (e: React.FormEvent) => {
+        e.preventDefault();
+        resetMessages();
+        setBusy('profile-identity');
+
+        const normalizedDisplayName = profileDisplayName.trim();
+        const normalizedUsername = profileUsername.trim().toLowerCase();
+
+        if (normalizedDisplayName.length < 1 || normalizedDisplayName.length > 50) {
+            setError('El nombre visible debe tener entre 1 y 50 caracteres');
+            setBusy(null);
+            return;
+        }
+
+        if (!/^[a-z0-9_]{3,20}$/.test(normalizedUsername)) {
+            setError('El username debe tener entre 3 y 20 caracteres y usar solo minúsculas, números y _');
+            setBusy(null);
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/social/profile', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                    displayName: normalizedDisplayName,
+                    username: normalizedUsername,
+                    isPublic: profilePublic,
+                }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || 'No se pudo actualizar el perfil');
+            }
+
+            setProfileDisplayName(normalizedDisplayName);
+            setProfileUsername(normalizedUsername);
+            setSuccess('Perfil actualizado correctamente');
+        } catch (updateError: unknown) {
+            setError(getErrorMessage(updateError, 'Error inesperado al actualizar perfil'));
+        } finally {
+            setBusy(null);
+        }
+    };
+
+    const handleUpdateAuthName = async (e: React.FormEvent) => {
+        e.preventDefault();
+        resetMessages();
+        setBusy('auth-name');
+
+        const normalizedName = authName.trim();
+        if (normalizedName.length < 1 || normalizedName.length > 80) {
+            setError('El nombre de cuenta debe tener entre 1 y 80 caracteres');
+            setBusy(null);
+            return;
+        }
+
+        try {
+            const { error: apiError } = await authClient.updateUser({ name: normalizedName });
+            if (apiError) {
+                setError(apiError.message || 'No se pudo actualizar el nombre de cuenta');
+                setBusy(null);
+                return;
+            }
+
+            await authClient.getSession().catch(() => null);
+            setSuccess('Nombre de cuenta actualizado');
+        } catch {
+            setError('Error inesperado al actualizar nombre de cuenta');
+        } finally {
+            setBusy(null);
+        }
+    };
+
     const handleLinkGoogle = async () => {
         resetMessages();
         setBusy('link-google');
@@ -168,6 +370,102 @@ export default function AccountSecurityPage() {
             }
         } catch {
             setError('Error inesperado al vincular Google');
+            setBusy(null);
+        }
+    };
+
+    const handleUnlinkGoogle = async () => {
+        resetMessages();
+
+        const confirmed = window.confirm('¿Seguro que deseas desvincular Google de esta cuenta?');
+        if (!confirmed) return;
+
+        setBusy('unlink-google');
+
+        try {
+            const authAny = authClient as any;
+            const unlink = authAny?.unlinkAccount;
+            let done = false;
+
+            if (typeof unlink === 'function') {
+                const { error: apiError } = await unlink({ providerId: 'google' });
+                if (!apiError) {
+                    done = true;
+                } else {
+                    const code = String((apiError as any)?.code || '').toLowerCase();
+                    if (code.includes('cannot_unlink_last_account')) {
+                        setError('No se puede desvincular Google porque es tu último método de acceso. Agrega otro método primero.');
+                        setBusy(null);
+                        return;
+                    }
+                }
+            }
+
+            if (!done) {
+                const fallback = await callAuthProxy([
+                    '/api/auth/unlinkAccount',
+                    '/api/auth/account/unlink',
+                ], {
+                    providerId: 'google',
+                });
+
+                if (!fallback.ok) {
+                    const raw = String(fallback.error || '').toLowerCase();
+                    if (raw.includes('cannot_unlink_last_account') || raw.includes('last account')) {
+                        setError('No se puede desvincular Google porque es tu último método de acceso. Agrega otro método primero.');
+                    } else {
+                        setError(fallback.error || 'No se pudo desvincular Google');
+                    }
+                    setBusy(null);
+                    return;
+                }
+            }
+
+            setAccountStatus((prev) => ({ ...prev, googleLinked: false }));
+            setSuccess('Google desvinculado correctamente');
+        } catch {
+            setError('Error inesperado al desvincular Google');
+        } finally {
+            setBusy(null);
+        }
+    };
+
+    const handleRevokeOtherSessions = async () => {
+        resetMessages();
+        setBusy('revoke-sessions');
+
+        try {
+            const authAny = authClient as any;
+            const revokeOthers = authAny?.revokeOtherSessions;
+            let done = false;
+
+            if (typeof revokeOthers === 'function') {
+                const { error: apiError } = await revokeOthers();
+                if (!apiError) {
+                    done = true;
+                }
+            }
+
+            if (!done) {
+                const fallback = await callAuthProxy([
+                    '/api/auth/revokeOtherSessions',
+                    '/api/auth/multi-session/revoke-other-sessions',
+                ]);
+                if (!fallback.ok) {
+                    setError(fallback.error || 'No se pudieron revocar las otras sesiones');
+                    setBusy(null);
+                    return;
+                }
+            }
+
+            setAccountStatus((prev) => ({
+                ...prev,
+                sessions: prev.sessions !== null ? 1 : prev.sessions,
+            }));
+            setSuccess('Se cerraron todas las demás sesiones activas');
+        } catch {
+            setError('Error inesperado al revocar sesiones');
+        } finally {
             setBusy(null);
         }
     };
@@ -285,7 +583,7 @@ export default function AccountSecurityPage() {
                 throw new Error(data.error || 'No se pudo desactivar la cuenta');
             }
 
-            await authClient.signOut();
+            await performSignOut(router);
             setSuccess('Cuenta desactivada. Cerrando sesión...');
             redirectTimeoutRef.current = setTimeout(() => {
                 router.replace('/auth/sign-in');
@@ -377,8 +675,75 @@ export default function AccountSecurityPage() {
                         </button>
                     </form>
 
+                    <form onSubmit={handleUpdateProfileIdentity} className="space-y-2 border border-[#1a1a2e]/10 rounded-xl p-4">
+                        <h2 className="text-[11px] font-black uppercase tracking-widest">Perfil Público (IronTrain)</h2>
+                        <input
+                            type="text"
+                            value={profileDisplayName}
+                            onChange={(e) => setProfileDisplayName(e.target.value)}
+                            required
+                            minLength={1}
+                            maxLength={50}
+                            placeholder="Nombre visible"
+                            className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20"
+                        />
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black opacity-40">@</span>
+                            <input
+                                type="text"
+                                value={profileUsername}
+                                onChange={(e) => setProfileUsername(e.target.value.toLowerCase())}
+                                required
+                                minLength={3}
+                                maxLength={20}
+                                pattern="[a-z0-9_]+"
+                                title="Solo minúsculas, números y guiones bajos"
+                                placeholder="username"
+                                className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl pl-8 pr-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20"
+                            />
+                        </div>
+                        <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest opacity-70">
+                            <input
+                                type="checkbox"
+                                checked={profilePublic}
+                                onChange={(e) => setProfilePublic(e.target.checked)}
+                                className="accent-[#1a1a2e]"
+                            />
+                            Perfil público
+                        </label>
+                        <button type="submit" disabled={busy !== null} className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex justify-center items-center gap-2">
+                            {busy === 'profile-identity' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Guardar perfil'}
+                        </button>
+                    </form>
+
+                    <form onSubmit={handleUpdateAuthName} className="space-y-2 border border-[#1a1a2e]/10 rounded-xl p-4">
+                        <h2 className="text-[11px] font-black uppercase tracking-widest">Cuenta Auth</h2>
+                        <input
+                            type="text"
+                            value={authName}
+                            onChange={(e) => setAuthName(e.target.value)}
+                            required
+                            minLength={1}
+                            maxLength={80}
+                            placeholder="Nombre de cuenta"
+                            className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20"
+                        />
+                        <input
+                            type="email"
+                            value={accountEmail}
+                            readOnly
+                            className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold opacity-70"
+                        />
+                        <button type="submit" disabled={busy !== null} className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex justify-center items-center gap-2">
+                            {busy === 'auth-name' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Actualizar nombre de cuenta'}
+                        </button>
+                    </form>
+
                     <div className="space-y-2 border border-[#1a1a2e]/10 rounded-xl p-4">
                         <h2 className="text-[11px] font-black uppercase tracking-widest">Login Social</h2>
+                        <div className="text-[10px] font-bold uppercase opacity-50">
+                            Estado Google: {accountStatus.googleLinked ? 'VINCULADO' : 'NO_VINCULADO'}
+                        </div>
                         <p className="text-[10px] font-bold uppercase opacity-60">
                             Vincula Google para entrar con el mismo usuario sin crear cuentas duplicadas.
                         </p>
@@ -393,6 +758,36 @@ export default function AccountSecurityPage() {
                         >
                             {busy === 'link-google' ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Vinculando</span> : 'Vincular Google'}
                         </button>
+                        <button
+                            type="button"
+                            onClick={handleUnlinkGoogle}
+                            disabled={busy !== null}
+                            className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-[#f5f1e8] transition-colors"
+                        >
+                            {busy === 'unlink-google' ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Desvinculando</span> : 'Desvincular Google'}
+                        </button>
+                    </div>
+
+                    <div className="space-y-2 border border-[#1a1a2e]/10 rounded-xl p-4">
+                        <h2 className="text-[11px] font-black uppercase tracking-widest">Sesiones y Recuperación</h2>
+                        <div className="text-[10px] font-bold uppercase opacity-50">
+                            Sesiones activas: {accountStatus.sessions === null ? 'N/D' : String(accountStatus.sessions)}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleRevokeOtherSessions}
+                            disabled={busy !== null}
+                            className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-[#f5f1e8] transition-colors"
+                        >
+                            {busy === 'revoke-sessions' ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Cerrando sesiones</span> : 'Cerrar otras sesiones'}
+                        </button>
+
+                        <Link
+                            href="/auth/forgot-password"
+                            className="block w-full text-center bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#f5f1e8] transition-colors"
+                        >
+                            Recuperar cuenta
+                        </Link>
                     </div>
 
                     <form onSubmit={handleDeleteAccount} className="space-y-2 border border-red-200 bg-red-50 rounded-xl p-4">

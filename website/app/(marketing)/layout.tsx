@@ -52,11 +52,12 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
         if (hasUser) {
             setStableSession(session as any);
         }
-        if (!hasUser && !loading && !stableSession) {
+        if (!hasUser && !loading) {
+            setStableSession(null);
             setProfileUsername(null);
             setProfileLookupDone(false);
         }
-    }, [session, loading, stableSession]);
+    }, [session, loading]);
 
     const effectiveSession = useMemo(() => {
         return ((session as any)?.user ? (session as any) : stableSession) as any;
@@ -163,6 +164,13 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
                                         <div className="font-bold truncate text-xs">{effectiveSession?.user?.name || 'MI_CUENTA'}</div>
                                         <div className="text-[10px] opacity-40 truncate italic">Ver Perfil</div>
                                     </div>
+                                </Link>
+                                <Link
+                                    href="/auth/account"
+                                    className="group flex items-center justify-between py-2 px-3 hover:bg-current/5 transition-colors border-l-2 border-transparent hover:border-current"
+                                >
+                                    <span>SEGURIDAD DE CUENTA</span>
+                                    <span className="text-[10px] opacity-40 group-hover:opacity-100 transition-opacity">[SAFE]</span>
                                 </Link>
                                 <button
                                     type="button"

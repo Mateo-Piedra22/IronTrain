@@ -322,6 +322,26 @@ export default async function UserProfilePage(props: ProfilePageProps) {
                                 initialStatus={relationshipStatus}
                                 requestId={relationshipRow?.id ?? null}
                             />
+
+                            {isOwner && (
+                                <div className="mt-4 border-2 border-[#1a1a2e] bg-white p-3 md:p-4">
+                                    <div className="text-[9px] font-black uppercase tracking-[0.2em] opacity-50 mb-3">OWNER_CONTROLS</div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <Link
+                                            href="/auth/account"
+                                            className="text-center border border-[#1a1a2e] px-3 py-2 text-[10px] font-black uppercase tracking-[0.15em] hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-colors"
+                                        >
+                                            Seguridad de cuenta
+                                        </Link>
+                                        <Link
+                                            href="/settings"
+                                            className="text-center border border-[#1a1a2e] px-3 py-2 text-[10px] font-black uppercase tracking-[0.15em] hover:bg-[#1a1a2e] hover:text-[#f5f1e8] transition-colors"
+                                        >
+                                            Ajustes app
+                                        </Link>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 

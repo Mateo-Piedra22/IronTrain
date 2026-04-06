@@ -110,6 +110,14 @@ export function Nav() {
                     </div>
                   </Link>
 
+                  <Link
+                    href="/auth/account"
+                    title="Seguridad de cuenta"
+                    className="p-2 text-slate-400 hover:text-iron-600 hover:bg-iron-50 rounded-lg transition-all"
+                  >
+                    <Shield className="w-5 h-5 md:w-4 md:h-4" />
+                  </Link>
+
                   {/* Logout Button */}
                   <button
                     type="button"
