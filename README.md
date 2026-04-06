@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/images/irontrain-logo-mono.svg" width="130" alt="IronTrain Logo" />
+<img src="Logo IronTrain.svg" width="130" alt="IronTrain Logo" />
 
 # IronTrain
 
