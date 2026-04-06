@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { Category, Exercise, ExerciseType, Workout, WorkoutSet } from '../types/db';
 
 import { logger } from '../utils/logger';
+import { captureOptimizationMetric } from '../utils/optimizationMetrics';
 import { uuidV4 } from '../utils/uuid';
 import { dataEventService } from './DataEventService';
 
@@ -29,6 +30,23 @@ export class DatabaseService {
     private initPromise: Promise<void> | null = null;
     private currentBatchId: string | null = null;
     private batchIdStack: string[] = [];
+
+    private emitDbMetric(operation: 'run' | 'executeRaw' | 'getAll' | 'getFirst', sql: string, elapsedMs: number, failed = false): void {
+        const normalized = sql.trim().replace(/\s+/g, ' ').toLowerCase();
+        const statement = normalized.split(' ')[0] || 'unknown';
+        const tableMatch = normalized.match(/\bfrom\s+([a-z_]+)|\binto\s+([a-z_]+)|\bupdate\s+([a-z_]+)/i);
+        const tableName = tableMatch?.[1] || tableMatch?.[2] || tableMatch?.[3] || 'unknown';
+        const isSlow = elapsedMs >= 75;
+
+        captureOptimizationMetric('opt_db_query_timing', {
+            reason: isSlow ? 'slow_query' : 'query',
+            operation,
+            statement,
+            table: tableName,
+            elapsed_ms: elapsedMs,
+            failed,
+        }, isSlow ? 1000 : 15000);
+    }
 
     public async init(): Promise<void> {
         if (this.isInitialized) return;
@@ -431,7 +449,9 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_exercises_category ON exercises(category_id);
       CREATE INDEX IF NOT EXISTS idx_sets_exercise ON workout_sets(exercise_id);
       CREATE INDEX IF NOT EXISTS idx_sets_workout ON workout_sets(workout_id);
+    CREATE INDEX IF NOT EXISTS idx_sets_workout_order ON workout_sets(workout_id, order_index, deleted_at);
       CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
+    CREATE INDEX IF NOT EXISTS idx_workouts_date_active ON workouts(date, deleted_at, is_template, start_time);
       CREATE INDEX IF NOT EXISTS idx_routine_days_routine ON routine_days(routine_id);
       CREATE INDEX IF NOT EXISTS idx_routine_exercises_day ON routine_exercises(routine_day_id);
       CREATE INDEX IF NOT EXISTS idx_eb_exercise ON exercise_badges(exercise_id);
@@ -1386,30 +1406,62 @@ export class DatabaseService {
 
     public async run(sql: string, params: any[] = []): Promise<SQLite.SQLiteRunResult> {
         await this.ensureInitialized();
-        return await this.executeWithRetry(async () => {
-            return await this.db!.runAsync(sql, ...this.normalizeParams(params));
-        });
+        const startedAt = Date.now();
+        let succeeded = false;
+        try {
+            const result = await this.executeWithRetry(async () => {
+                return await this.db!.runAsync(sql, ...this.normalizeParams(params));
+            });
+            succeeded = true;
+            return result;
+        } finally {
+            this.emitDbMetric('run', sql, Date.now() - startedAt, !succeeded);
+        }
     }
 
     public async executeRaw(sql: string): Promise<void> {
         await this.ensureInitialized();
-        return await this.executeWithRetry(async () => {
-            await this.db!.execAsync(sql);
-        });
+        const startedAt = Date.now();
+        let succeeded = false;
+        try {
+            const result = await this.executeWithRetry(async () => {
+                await this.db!.execAsync(sql);
+            });
+            succeeded = true;
+            return result;
+        } finally {
+            this.emitDbMetric('executeRaw', sql, Date.now() - startedAt, !succeeded);
+        }
     }
 
     public async getAll<T>(sql: string, params: any[] = []): Promise<T[]> {
         await this.ensureInitialized();
-        return await this.executeWithRetry(async () => {
-            return await this.db!.getAllAsync(sql, ...this.normalizeParams(params)) as T[];
-        });
+        const startedAt = Date.now();
+        let succeeded = false;
+        try {
+            const result = await this.executeWithRetry(async () => {
+                return await this.db!.getAllAsync(sql, ...this.normalizeParams(params)) as T[];
+            });
+            succeeded = true;
+            return result;
+        } finally {
+            this.emitDbMetric('getAll', sql, Date.now() - startedAt, !succeeded);
+        }
     }
 
     public async getFirst<T>(sql: string, params: any[] = []): Promise<T | null> {
         await this.ensureInitialized();
-        return await this.executeWithRetry(async () => {
-            return await this.db!.getFirstAsync(sql, ...this.normalizeParams(params)) as T | null;
-        });
+        const startedAt = Date.now();
+        let succeeded = false;
+        try {
+            const result = await this.executeWithRetry(async () => {
+                return await this.db!.getFirstAsync(sql, ...this.normalizeParams(params)) as T | null;
+            });
+            succeeded = true;
+            return result;
+        } finally {
+            this.emitDbMetric('getFirst', sql, Date.now() - startedAt, !succeeded);
+        }
     }
 
     private async executeWithRetry<T>(operation: () => Promise<T>, retries = 3, delay = 150): Promise<T> {

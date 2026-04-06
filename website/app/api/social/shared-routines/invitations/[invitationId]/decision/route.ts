@@ -4,11 +4,27 @@ import { z } from 'zod';
 import { db } from '../../../../../../../src/db';
 import * as schema from '../../../../../../../src/db/schema';
 import { verifyAuth } from '../../../../../../../src/lib/auth';
+import { captureServerEvent } from '../../../../../../../src/lib/posthog-server';
 import { RATE_LIMITS } from '../../../../../../../src/lib/rate-limit';
+import { buildSharedRoutineInvalidStatePayload, buildSharedRoutineNotFoundPayload } from '../../../../../../../src/lib/shared-routine-http-errors';
 
 const decideInvitationSchema = z.object({
     decision: z.enum(['accept', 'reject']),
 });
+
+class InvalidStateError extends Error {
+    resource: 'invitation';
+    expectedStatus: string;
+    currentStatus: string;
+
+    constructor(resource: 'invitation', expectedStatus: string, currentStatus: string, message: string) {
+        super(message);
+        this.name = 'InvalidStateError';
+        this.resource = resource;
+        this.expectedStatus = expectedStatus;
+        this.currentStatus = currentStatus;
+    }
+}
 
 export async function POST(
     req: NextRequest,
@@ -45,11 +61,32 @@ export async function POST(
             .limit(1);
 
         if (!invitation) {
-            return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
+            return NextResponse.json(buildSharedRoutineNotFoundPayload('invitation', 'Invitation not found'), { status: 404 });
         }
 
         if (invitation.status !== 'pending') {
-            return NextResponse.json({ error: 'Invitation is not pending' }, { status: 409 });
+            const requestedStatus = parsed.data.decision === 'accept' ? 'accepted' : 'rejected';
+            if (invitation.status === requestedStatus) {
+                void captureServerEvent(
+                    userId,
+                    parsed.data.decision === 'accept' ? 'workspace_invitation_accepted' : 'workspace_invitation_rejected',
+                    {
+                        sharedRoutineId: invitation.sharedRoutineId,
+                        invitationId: invitation.id,
+                        idempotent: true,
+                    },
+                );
+
+                return NextResponse.json({
+                    success: true,
+                    decision: parsed.data.decision,
+                    invitationId: invitation.id,
+                    sharedRoutineId: invitation.sharedRoutineId,
+                    idempotent: true,
+                });
+            }
+
+            throw new InvalidStateError('invitation', 'pending', String(invitation.status), 'Invitation is not pending');
         }
 
         const [workspace] = await db
@@ -64,7 +101,7 @@ export async function POST(
             .limit(1);
 
         if (!workspace) {
-            return NextResponse.json({ error: 'Shared routine not found' }, { status: 404 });
+            return NextResponse.json(buildSharedRoutineNotFoundPayload('workspace', 'Shared routine not found'), { status: 404 });
         }
 
         await db.transaction(async (tx) => {
@@ -126,6 +163,16 @@ export async function POST(
             });
         });
 
+        void captureServerEvent(
+            userId,
+            parsed.data.decision === 'accept' ? 'workspace_invitation_accepted' : 'workspace_invitation_rejected',
+            {
+                sharedRoutineId: invitation.sharedRoutineId,
+                invitationId: invitation.id,
+                idempotent: false,
+            },
+        );
+
         return NextResponse.json({
             success: true,
             decision: parsed.data.decision,
@@ -133,6 +180,13 @@ export async function POST(
             sharedRoutineId: invitation.sharedRoutineId,
         });
     } catch (error) {
+        if (error instanceof InvalidStateError) {
+            return NextResponse.json(
+                buildSharedRoutineInvalidStatePayload(error.resource, error.currentStatus, error.expectedStatus, error.message),
+                { status: 409 },
+            );
+        }
+
         const message = error instanceof Error ? error.message : 'Internal server error';
         return NextResponse.json({ error: message }, { status: 500 });
     }

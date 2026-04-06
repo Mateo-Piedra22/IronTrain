@@ -10,9 +10,10 @@ import { useDataReload } from '@/src/hooks/useDataReload';
 import { AnalysisService, CardioSummary, CategoryVolumeRow, ExerciseVolumeRow, OneRMProgressRow, OneRepMax, RepsOnlySummary, VolumeSeriesPoint, WeightOnlySummary, WorkoutComparison, WorkoutStreak, WorkoutSummary } from '@/src/services/AnalysisService';
 import { configService } from '@/src/services/ConfigService';
 import { UnitService } from '@/src/services/UnitService';
+import { isOptimizationFlagEnabled } from '@/src/utils/optimizationFlags';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { IronTrainLogo } from '../../components/IronTrainLogo';
 import { useColors } from '../../src/hooks/useColors';
@@ -52,6 +53,8 @@ const INITIAL_RANGE_STATE: RangeAnalysisState = {
     topExercisesByVolume: [],
     top1RMProgress: [],
 };
+
+const ANALYSIS_CACHE_TTL_MS = 2 * 60 * 1000;
 
 export default function AnalysisScreen() {
     const colors = useColors();
@@ -134,9 +137,13 @@ export default function AnalysisScreen() {
     const [rangeData, setRangeData] = useState<RangeAnalysisState>(INITIAL_RANGE_STATE);
 
     const [rangeDays, setRangeDays] = useState<7 | 30 | 90 | 365>(configService.get('analyticsDefaultRangeDays'));
+    const analysisLazyEnabled = isOptimizationFlagEnabled('analysisLazyLoadingV1');
 
     const coreRequestIdRef = useRef(0);
     const rangeRequestIdRef = useRef(0);
+    const coreLoadedAtRef = useRef(0);
+    const rangeLoadedAtRef = useRef(0);
+    const rangeCacheKeyRef = useRef('');
     const isLoading = coreLoading || rangeLoading;
 
     useFocusEffect(
@@ -163,9 +170,16 @@ export default function AnalysisScreen() {
         }));
     }, [rangeData.volumeSeries]);
 
-    const loadStats = useCallback(async () => {
+    const loadStats = useCallback(async (force = false) => {
         setCoreLoading(true);
         setError(null);
+        if (analysisLazyEnabled && !force) {
+            const now = Date.now();
+            if (coreData.heatmapData.length > 0 && now - coreLoadedAtRef.current < ANALYSIS_CACHE_TTL_MS) {
+                setCoreLoading(false);
+                return;
+            }
+        }
         const requestId = ++coreRequestIdRef.current;
         try {
             const [data, st] = await Promise.all([
@@ -178,6 +192,7 @@ export default function AnalysisScreen() {
                 heatmapData: data,
                 streak: st
             });
+            coreLoadedAtRef.current = Date.now();
 
             // Schedule daily streak reminder based on current data
             try {
@@ -195,11 +210,23 @@ export default function AnalysisScreen() {
             if (coreRequestIdRef.current !== requestId) return;
             setCoreLoading(false);
         }
-    }, []);
+    }, [analysisLazyEnabled, coreData.heatmapData.length]);
 
-    const loadRangeStats = useCallback(async (days: 7 | 30 | 90 | 365, b: 'day' | 'week' | 'month') => {
+    const loadRangeStats = useCallback(async (days: 7 | 30 | 90 | 365, b: 'day' | 'week' | 'month', force = false) => {
         setRangeLoading(true);
         setError(null);
+        const cacheKey = `${days}:${b}`;
+        if (analysisLazyEnabled && !force) {
+            const now = Date.now();
+            if (
+                rangeData.summaryRange &&
+                rangeCacheKeyRef.current === cacheKey &&
+                now - rangeLoadedAtRef.current < ANALYSIS_CACHE_TTL_MS
+            ) {
+                setRangeLoading(false);
+                return;
+            }
+        }
         const requestId = ++rangeRequestIdRef.current;
         try {
             const [s7, sRange, comp, series, cardio, repsOnly, weightOnly, cats, maxes, topExVol, rmProg] = await Promise.all([
@@ -230,6 +257,8 @@ export default function AnalysisScreen() {
                 topExercisesByVolume: topExVol,
                 top1RMProgress: rmProg
             });
+            rangeCacheKeyRef.current = cacheKey;
+            rangeLoadedAtRef.current = Date.now();
 
         } catch (e) {
             if (rangeRequestIdRef.current !== requestId) return;
@@ -239,7 +268,7 @@ export default function AnalysisScreen() {
             if (rangeRequestIdRef.current !== requestId) return;
             setRangeLoading(false);
         }
-    }, []);
+    }, [analysisLazyEnabled, rangeData.summaryRange]);
 
     const handleRangeChange = useCallback((d: 7 | 30 | 90 | 365) => {
         setRangeDays(d);
@@ -250,14 +279,36 @@ export default function AnalysisScreen() {
 
     useFocusEffect(
         useCallback(() => {
-            loadStats();
-            loadRangeStats(rangeDays, bucket);
-        }, [loadStats, loadRangeStats, rangeDays, bucket])
+            if (tab === 'overview') {
+                loadStats();
+                loadRangeStats(rangeDays, bucket);
+            } else if (tab === 'trends' || tab === 'records') {
+                loadRangeStats(rangeDays, bucket);
+            }
+        }, [loadStats, loadRangeStats, rangeDays, bucket, tab])
     );
 
+    useEffect(() => {
+        if (!analysisLazyEnabled) return;
+        if (tab === 'overview') {
+            void loadStats();
+            void loadRangeStats(rangeDays, bucket);
+            return;
+        }
+        if (tab === 'trends' || tab === 'records') {
+            void loadRangeStats(rangeDays, bucket);
+        }
+    }, [analysisLazyEnabled, tab, rangeDays, bucket, loadStats, loadRangeStats]);
+
     useDataReload(async () => {
-        loadStats();
-        loadRangeStats(rangeDays, bucket);
+        if (tab === 'overview') {
+            loadStats(true);
+            loadRangeStats(rangeDays, bucket, true);
+            return;
+        }
+        if (tab === 'trends' || tab === 'records') {
+            loadRangeStats(rangeDays, bucket, true);
+        }
     });
 
     return (

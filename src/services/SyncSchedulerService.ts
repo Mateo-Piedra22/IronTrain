@@ -2,6 +2,8 @@ import NetInfo from '@react-native-community/netinfo';
 import { AppState, AppStateStatus } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 import { logger } from '../utils/logger';
+import { isOptimizationFlagEnabled } from '../utils/optimizationFlags';
+import { captureOptimizationMetric } from '../utils/optimizationMetrics';
 import { dataEventService } from './DataEventService';
 import { dbService } from './DatabaseService';
 import { syncService } from './SyncService';
@@ -17,6 +19,7 @@ type SyncSchedulerOptions = {
     periodicMs: number;
     periodicMaxStaleMs: number;
     maxBackoffMs: number;
+    remoteHintCooldownMs: number;
 };
 
 const DEFAULT_OPTIONS: SyncSchedulerOptions = {
@@ -26,6 +29,7 @@ const DEFAULT_OPTIONS: SyncSchedulerOptions = {
     periodicMs: 5 * 60_000,
     periodicMaxStaleMs: 30 * 60_000,
     maxBackoffMs: 10 * 60_000,
+    remoteHintCooldownMs: 30_000,
 };
 
 export class SyncSchedulerService {
@@ -41,6 +45,8 @@ export class SyncSchedulerService {
     private lastSuccessAt = 0;
     private lastAttemptAt = 0;
     private backoffMs = 0;
+    private lastRemoteHintAt = 0;
+    private readonly pendingReasons = new Set<SyncReason>();
 
     private unsubscribeNetInfo: (() => void) | null = null;
     private unsubscribeQueue: (() => void) | null = null;
@@ -56,6 +62,13 @@ export class SyncSchedulerService {
     public init(): void {
         if (this.initialized) return;
         this.initialized = true;
+
+        captureOptimizationMetric('opt_sync_scheduler_init', {
+            reason: 'service_init',
+            scheduler_v2_enabled: isOptimizationFlagEnabled('syncSchedulerV2'),
+            periodic_ms: this.options.periodicMs,
+            min_interval_ms: this.options.minIntervalMs,
+        }, 2000);
 
         this.unsubscribeQueue = dataEventService.subscribe('SYNC_QUEUE_ENQUEUED', () => {
             this.requestSync('queue');
@@ -121,18 +134,30 @@ export class SyncSchedulerService {
     public requestSync(reason: SyncReason): void {
         if (!this.initialized) return;
 
+        this.pendingReasons.add(reason);
+
         const now = Date.now();
         const sinceAttempt = now - this.lastAttemptAt;
         const bypassMinInterval = ['manual', 'net_reconnect'].includes(reason);
+        const minIntervalMs = this.resolveMinIntervalMs(reason);
 
         let waitMs = this.options.debounceMs;
-        if (sinceAttempt < this.options.minIntervalMs && !bypassMinInterval) {
-            waitMs = Math.max(waitMs, this.options.minIntervalMs - sinceAttempt);
+        if (sinceAttempt < minIntervalMs && !bypassMinInterval) {
+            waitMs = Math.max(waitMs, minIntervalMs - sinceAttempt);
         }
 
         if (this.debounceTimer) clearTimeout(this.debounceTimer);
+
+        captureOptimizationMetric('opt_sync_scheduler_request', {
+            reason,
+            since_attempt_ms: sinceAttempt,
+            wait_ms: waitMs,
+            bypass_min_interval: bypassMinInterval,
+        });
+
         this.debounceTimer = setTimeout(() => {
             this.debounceTimer = null;
+            this.pendingReasons.delete(reason);
             this.run(reason).catch(() => {
                 return;
             });
@@ -152,15 +177,36 @@ export class SyncSchedulerService {
         await this.run('manual');
     }
 
+    public async requestRemoteHintSync(): Promise<void> {
+        if (!this.initialized) return;
+        if (!useAuthStore.getState().token) return;
+
+        const now = Date.now();
+        const sinceLastHint = now - this.lastRemoteHintAt;
+        if (sinceLastHint < this.options.remoteHintCooldownMs) {
+            return;
+        }
+
+        this.lastRemoteHintAt = now;
+
+        if (this.currentAppState === 'active') {
+            await this.syncNow();
+            return;
+        }
+
+        this.requestSync('resume');
+    }
+
     private canAttemptNow(reason: SyncReason): boolean {
         const token = useAuthStore.getState().token;
         if (!token) return false;
 
         const now = Date.now();
         const sinceAttempt = now - this.lastAttemptAt;
+        const minIntervalMs = this.resolveMinIntervalMs(reason);
 
         const bypassMinInterval = ['manual', 'net_reconnect'].includes(reason);
-        if (sinceAttempt < this.options.minIntervalMs && !bypassMinInterval) return false;
+        if (sinceAttempt < minIntervalMs && !bypassMinInterval) return false;
 
         if (this.backoffTimer) return false;
 
@@ -193,6 +239,12 @@ export class SyncSchedulerService {
         const now = Date.now();
         this.lastAttemptAt = now;
 
+        captureOptimizationMetric('opt_sync_scheduler_run_started', {
+            reason,
+            scheduler_v2_enabled: isOptimizationFlagEnabled('syncSchedulerV2'),
+            backoff_ms: this.backoffMs,
+        });
+
         try {
             if (reason === 'periodic') {
                 const hasOutstanding = await this.hasOutstandingQueue();
@@ -219,6 +271,12 @@ export class SyncSchedulerService {
             this.backoffMs = 0;
             dataEventService.emit('SYNC_COMPLETED');
 
+            captureOptimizationMetric('opt_sync_scheduler_run_succeeded', {
+                reason,
+                first_sync: isFirstSync,
+                elapsed_ms: Date.now() - now,
+            }, 5000);
+
             // After a successful sync, if we just logged in or resumed, we double check if there's anything else pending
             // to fulfill the "automatic re-check" requirement.
             if (reason === 'manual' || reason === 'resume') {
@@ -230,18 +288,37 @@ export class SyncSchedulerService {
         } catch (e: any) {
             const code = e?.code as string | undefined;
             if (code === 'ALREADY_SYNCING' || code === 'OFFLINE' || code === 'UNAUTHENTICATED' || code === 'OFFLINE_MODE_ACTIVE') {
+                captureOptimizationMetric('opt_sync_scheduler_run_skipped', {
+                    reason,
+                    skip_code: code,
+                }, 3000);
                 return;
             }
 
             this.backoffMs = this.backoffMs ? Math.min(this.backoffMs * 2, this.options.maxBackoffMs) : 10_000;
+            const jitterMs = Math.min(5000, Math.floor(this.backoffMs * 0.2 * Math.random()));
             if (this.backoffTimer) clearTimeout(this.backoffTimer);
             this.backoffTimer = setTimeout(() => {
                 this.backoffTimer = null;
                 this.requestSync(reason);
-            }, this.backoffMs);
+            }, this.backoffMs + jitterMs);
+
+            captureOptimizationMetric('opt_sync_scheduler_run_failed', {
+                reason,
+                backoff_ms: this.backoffMs,
+                jitter_ms: jitterMs,
+                error_code: code || 'unknown',
+            }, 3000);
 
             logger.captureException(e, { scope: 'SyncSchedulerService.run', reason, backoffMs: this.backoffMs });
         }
+    }
+
+    private resolveMinIntervalMs(reason: SyncReason): number {
+        if (!isOptimizationFlagEnabled('syncSchedulerV2')) return this.options.minIntervalMs;
+        if (reason === 'manual' || reason === 'net_reconnect') return this.options.minIntervalMs;
+        if (this.currentAppState !== 'active') return Math.max(this.options.minIntervalMs, 30_000);
+        return this.options.minIntervalMs;
     }
 }
 

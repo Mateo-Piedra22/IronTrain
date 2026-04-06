@@ -186,6 +186,30 @@ export default function SocialTab() {
         return comparisons[selectedFriendUserId] ?? [];
     }, [selectedFriendUserId, comparisons]);
 
+    const workspaceStatusGuidance = useMemo(() => {
+        if (pendingReviewsCount > 0) {
+            return {
+                status: 'Estado actual: tenés cambios pendientes de revisión.',
+                meaning: 'Qué significa: el espacio compartido necesita decisión del propietario.',
+                action: 'Acción recomendada: abrí el espacio y revisá/aprobá las solicitudes.',
+            };
+        }
+
+        if (workspaceCount > 0) {
+            return {
+                status: 'Estado actual: tu espacio compartido está activo.',
+                meaning: 'Qué significa: podés colaborar y mantener la rutina actualizada.',
+                action: 'Acción recomendada: abrí el espacio para publicar cambios o actualizar.',
+            };
+        }
+
+        return {
+            status: 'Estado actual: no tenés espacios compartidos activos.',
+            meaning: 'Qué significa: todavía no hay una rutina colaborativa conectada.',
+            action: 'Acción recomendada: abrí el espacio para crear uno o aceptar una invitación.',
+        };
+    }, [pendingReviewsCount, workspaceCount]);
+
     const incomingFriendRequests = incomingFriendRequestsList.length;
     const pendingRoutinesCount = notificationShares.filter(i => i.status === 'pending' && !i.seenAt).length;
     const unseenActivitiesCount = activityFeedItems.filter(i => !i.seenAt).length;
@@ -823,7 +847,7 @@ export default function SocialTab() {
                     </View>
                     <Text style={styles.loggedOutTitle}>Conectate a IronSocial</Text>
                     <Text style={styles.loggedOutSub}>
-                        Sincronizá tus rutinas, compartilas con amigos y descubrí la comunidad IronTrain.
+                        Entrá para compartir entrenos, colaborar en espacios compartidos y descubrir la comunidad IronTrain.
                     </Text>
                     <TouchableOpacity
                         style={styles.loginBtn}
@@ -983,10 +1007,19 @@ export default function SocialTab() {
                                         <Text style={{ color: colors.text, fontWeight: '900', marginTop: 2, fontSize: 14 }}>
                                             {formatWorkspaceStatus(workspaceCount, pendingReviewsCount)}
                                         </Text>
+                                        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 4 }}>
+                                            {workspaceStatusGuidance.status}
+                                        </Text>
+                                        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                                            {workspaceStatusGuidance.meaning}
+                                        </Text>
+                                        <Text style={{ color: colors.text, fontSize: 11, marginTop: 2, fontWeight: '700' }}>
+                                            {workspaceStatusGuidance.action}
+                                        </Text>
                                     </View>
                                     <View style={[styles.archiveToggle, pendingReviewsCount > 0 && { borderColor: colors.yellow }]}>
                                         <Text style={styles.archiveToggleText}>
-                                            {openingWorkspaceHub ? 'Abriendo...' : (pendingReviewsCount > 0 ? sharedWorkspaceCopy.ctaReviewNow : sharedWorkspaceCopy.ctaOpenHub)}
+                                            {openingWorkspaceHub ? 'Abriendo espacio...' : (pendingReviewsCount > 0 ? sharedWorkspaceCopy.ctaReviewNow : sharedWorkspaceCopy.ctaOpenHub)}
                                         </Text>
                                     </View>
                                 </TouchableOpacity>

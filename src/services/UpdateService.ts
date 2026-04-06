@@ -3,6 +3,8 @@ import { configService } from '@/src/services/ConfigService';
 import { systemNotificationService } from '@/src/services/SystemNotificationService';
 import { useUpdateStore } from '@/src/store/updateStore';
 import { logger } from '@/src/utils/logger';
+import { isOptimizationFlagEnabled } from '@/src/utils/optimizationFlags';
+import { captureOptimizationMetric } from '@/src/utils/optimizationMetrics';
 import Constants from 'expo-constants';
 import { AppState, AppStateStatus } from 'react-native';
 
@@ -50,6 +52,12 @@ class UpdateServiceManager {
         const installedVersion = Constants.expoConfig?.version ?? '0.0.0';
         useUpdateStore.getState().setUpdateInfo({ installedVersion });
 
+        captureOptimizationMetric('opt_update_service_init', {
+            reason: 'service_init',
+            polling_interval_ms: this.POLLING_INTERVAL,
+            sync_scheduler_v2_enabled: isOptimizationFlagEnabled('syncSchedulerV2'),
+        }, 2000);
+
         // Detect version change (app updated)
         try {
             await configService.init();
@@ -78,6 +86,10 @@ class UpdateServiceManager {
         if (this.isChecking) return;
         this.isChecking = true;
         this.retryCount = 0; // Reset retries on manual/new check
+
+        captureOptimizationMetric('opt_update_check_started', {
+            reason: 'manual_or_periodic',
+        }, 5000);
 
         useUpdateStore.getState().setStatus('checking');
         useUpdateStore.getState().setUpdateInfo({ error: null });
@@ -141,9 +153,20 @@ class UpdateServiceManager {
             const data = (await res.json()) as UpdateFeed;
             this.processFeed(data);
 
+            captureOptimizationMetric('opt_update_check_succeeded', {
+                reason: 'feed_fetched',
+                status: res.status,
+            }, 5000);
+
         } catch (e) {
             const errorMsg = (e as any)?.message ? String((e as any).message) : 'Network error';
             logger.error(`Update check failed (Attempt ${this.retryCount + 1}/${this.MAX_RETRIES}):`, { error: errorMsg });
+
+            captureOptimizationMetric('opt_update_check_failed', {
+                reason: 'fetch_or_parse_error',
+                retry_count: this.retryCount,
+                error: errorMsg,
+            }, 3000);
 
             if (this.retryCount < this.MAX_RETRIES) {
                 this.retryCount++;

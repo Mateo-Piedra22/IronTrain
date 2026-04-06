@@ -19,7 +19,7 @@ export default function ActiveWorkoutScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const {
-        activeWorkout, activeSets, isTimerRunning, workoutTimer, tickTimer,
+        activeWorkout, activeSets, workoutTimer, tickTimer,
         setWorkoutStatus, updateSet, addSet, toggleSetComplete, loadWorkoutById, exerciseNames,
     } = useWorkoutStore();
 
@@ -200,12 +200,6 @@ export default function ActiveWorkoutScreen() {
         if (!id) return;
         if (!activeWorkout || activeWorkout.id !== id) { loadWorkoutById(id); }
     }, [id, activeWorkout?.id, loadWorkoutById]);
-
-    useEffect(() => {
-        let interval: any;
-        if (isTimerRunning) { tickTimer(); interval = setInterval(tickTimer, 1000); }
-        return () => clearInterval(interval);
-    }, [isTimerRunning, tickTimer]);
 
     useEffect(() => {
         const sub = AppState.addEventListener('change', (s) => { if (s === 'active') tickTimer(); });

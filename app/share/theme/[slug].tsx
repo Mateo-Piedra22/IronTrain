@@ -3,6 +3,9 @@ import { ModalScreenOverlayHost } from '@/components/ui/ModalScreenOverlayHost';
 import { SafeAreaWrapper } from '@/components/ui/SafeAreaWrapper';
 import { useColors } from '@/src/hooks/useColors';
 import { useTheme } from '@/src/hooks/useTheme';
+import { ThemeImportError, ThemeImportService } from '@/src/services/ThemeImportService';
+import { ThemeInstallTrackingService } from '@/src/services/ThemeInstallTrackingService';
+import { confirm } from '@/src/store/confirmStore';
 import { ThemeColorPatch } from '@/src/theme-engine';
 import * as analytics from '@/src/utils/analytics';
 import { notify } from '@/src/utils/notify';
@@ -36,18 +39,11 @@ export default function ShareThemeScreen() {
 
         async function fetchTheme() {
             try {
-                const response = await fetch(`https://irontrain.motiona.xyz/api/share/theme/${encodeURIComponent(slug)}`);
-
-                if (!response.ok) {
-                    if (response.status === 404) throw new Error('El theme no está disponible o fue removido.');
-                    throw new Error('No se pudo establecer conexión con IronTrain.');
-                }
-
-                const responseData = await response.json();
-                if (!responseData.success) throw new Error(responseData.error || 'Error desconocido.');
-                setPayload(responseData.data);
-            } catch (err: any) {
-                setError(err.message || 'Error de carga.');
+                const responseData = await ThemeImportService.fetchSharedThemeBySlug(slug);
+                setPayload(responseData);
+            } catch (err: unknown) {
+                const errorMessage = err instanceof ThemeImportError ? err.message : 'Error de carga.';
+                setError(errorMessage);
             } finally {
                 setLoading(false);
             }
@@ -56,7 +52,7 @@ export default function ShareThemeScreen() {
         void fetchTheme();
     }, [slug]);
 
-    const handleImport = async () => {
+    const performImport = async () => {
         if (!payload) return;
 
         const lightPatch = getSafePatch(payload.payload?.lightPatch);
@@ -64,6 +60,14 @@ export default function ShareThemeScreen() {
 
         setImporting(true);
         try {
+            analytics.capture('theme_import_started', {
+                source: 'slug_link',
+                slug: payload.slug,
+                version: payload.version,
+                supportsLight: !!payload.supportsLight,
+                supportsDark: !!payload.supportsDark,
+            });
+
             const saveResult = await saveThemeDraft({
                 name: String(payload.name || payload.slug || 'Imported Theme').slice(0, 48),
                 lightPatch,
@@ -81,14 +85,49 @@ export default function ShareThemeScreen() {
                 await setActiveThemePackId('dark', saveResult.draft.id);
             }
 
-            analytics.capture('theme_imported', { source: 'slug_link', slug: payload.slug, version: payload.version });
+            void ThemeInstallTrackingService.reportInstall(payload.id, {
+                source: 'deep_link_import',
+                appliedLight: payload.supportsLight === true,
+                appliedDark: payload.supportsDark === true,
+            });
+
+            analytics.capture('theme_import_success', {
+                source: 'slug_link',
+                slug: payload.slug,
+                version: payload.version,
+                draftId: saveResult.draft.id,
+            });
             notify.success('Theme importado', 'Se guardó y aplicó en los modos compatibles.');
             router.dismissAll();
         } catch (err: any) {
+            analytics.capture('theme_import_failed', {
+                source: 'slug_link',
+                slug: payload?.slug,
+                version: payload?.version,
+                error: err?.message || 'unknown_error',
+            });
             notify.error('Fallo de importación', err?.message || 'No se pudo importar el theme.');
         } finally {
             setImporting(false);
         }
+    };
+
+    const handleImport = () => {
+        if (!payload || importing) return;
+
+        const compatibleModes = [
+            payload.supportsLight ? 'Light' : null,
+            payload.supportsDark ? 'Dark' : null,
+        ].filter(Boolean).join(' + ');
+
+        confirm.ask(
+            'Importar theme',
+            `Se va a importar "${payload.name}" y aplicar en: ${compatibleModes || 'ningún modo'}.`,
+            () => {
+                void performImport();
+            },
+            'Importar'
+        );
     };
 
     const styles = useMemo(() => StyleSheet.create({

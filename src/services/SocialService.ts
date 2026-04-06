@@ -402,6 +402,11 @@ export interface CreateMarketplaceThemePackInput {
     payload: MarketplaceThemePackPayload;
 }
 
+export interface InstallMarketplaceThemeInput {
+    appliedLight?: boolean;
+    appliedDark?: boolean;
+}
+
 export class SocialApiError extends Error {
     status: number;
     code?: string;
@@ -1208,6 +1213,22 @@ export class SocialService {
             },
         );
         return data.item;
+    }
+
+    static async installMarketplaceTheme(themeId: string, input?: InstallMarketplaceThemeInput): Promise<{ success: boolean }> {
+        const headers = await this.getHeaders();
+        const data = await this.request<{ success: boolean }>(
+            `${API_URL}/api/social/themes/${encodeURIComponent(themeId)}/install`,
+            {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    appliedLight: input?.appliedLight === true,
+                    appliedDark: input?.appliedDark === true,
+                }),
+            },
+        );
+        return data;
     }
 
     static async getPulse(): Promise<SocialPulse> {

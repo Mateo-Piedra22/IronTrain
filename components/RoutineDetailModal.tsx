@@ -353,6 +353,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
     const sharedRole = routineWorkspace?.membership.role ?? null;
     const sharedCanEdit = !!routineWorkspace?.membership.canEdit;
     const sharedApprovalMode = routineWorkspace?.approvalMode ?? 'none';
+    const sharedRoleLabel = sharedRole === 'owner' ? 'PROPIETARIO' : sharedRole === 'editor' ? 'EDITOR' : 'LECTOR';
 
     const dismissTeamCoachmark = useCallback(async () => {
         setShowTeamCoachmark(false);
@@ -818,7 +819,7 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                             <View style={ss.btnCol}>
                                                 <TouchableOpacity style={ss.smallBtn} onPress={handleOpenTeamModal}>
                                                     <Users size={12} color={colors.primary.DEFAULT} />
-                                                    <Text style={ss.smallBtnText}>Equipo</Text>
+                                                    <Text style={ss.smallBtnText}>Espacio</Text>
                                                 </TouchableOpacity>
                                             </View>
                                             <View style={ss.btnCol}>
@@ -829,22 +830,22 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                                     setEditRoutineVisible(true);
                                                 }}>
                                                     <Edit3 size={12} color={colors.primary.DEFAULT} />
-                                                    <Text style={ss.smallBtnText}>Edit</Text>
+                                                    <Text style={ss.smallBtnText}>Editar</Text>
                                                 </TouchableOpacity>
                                             </View>
                                             <View style={ss.btnCol}>
                                                 <TouchableOpacity style={[ss.smallBtn, ss.smallBtnDanger]} onPress={handleDeleteRoutine}>
                                                     <Trash2 size={12} color={colors.red} />
-                                                    <Text style={[ss.smallBtnText, ss.smallBtnTextDanger]}>Del</Text>
+                                                    <Text style={[ss.smallBtnText, ss.smallBtnTextDanger]}>Borrar</Text>
                                                 </TouchableOpacity>
                                             </View>
                                         </View>
 
                                         {showTeamCoachmark && (
                                             <View style={[ss.infoCard, { marginTop: 12, borderLeftColor: colors.primary.DEFAULT }]}> 
-                                                <Text style={[ss.warningLabel, { color: colors.primary.DEFAULT }]}>TIP RÁPIDO · EQUIPO</Text>
+                                                <Text style={[ss.warningLabel, { color: colors.primary.DEFAULT }]}>TIP RÁPIDO · ESPACIO</Text>
                                                 <Text style={ss.infoCardText}>
-                                                    Tocá “Equipo” para configurar cómo colaboran, invitar personas y decidir si los cambios se publican directo o con revisión del owner.
+                                                    Tocá “Espacio” para configurar cómo colaboran, invitar personas y decidir si los cambios se publican directo o con revisión del propietario.
                                                 </Text>
                                                 <TouchableOpacity
                                                     onPress={() => { void dismissTeamCoachmark(); }}
@@ -859,24 +860,24 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                             <View style={[ss.infoCard, { marginTop: 12, borderLeftColor: colors.primary.DEFAULT }]}> 
                                                 <Text style={[ss.warningLabel, { color: colors.primary.DEFAULT }]}>ESPACIO COMPARTIDO ACTIVO</Text>
                                                 <Text style={ss.infoCardText}>
-                                                    Uso diario: 1) Entrená/edita normalmente. 2) En Equipo podés publicar cambios o traer la última revisión. 3) Las importaciones reutilizan la rutina local para evitar duplicados.
+                                                    Uso diario: 1) Entrená/edita normalmente. 2) En Espacio podés publicar cambios o actualizar desde la última revisión. 3) Las importaciones reutilizan la rutina local para evitar duplicados.
                                                 </Text>
 
                                                 {!!routineWorkspace && (
                                                     <>
                                                         <View style={{ marginTop: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, padding: 10 }}>
-                                                            <Text style={[ss.warningLabel, { color: colors.textMuted }]}>TU ROL EN ESTE ESPACIO: {(sharedRole || 'viewer').toUpperCase()}</Text>
+                                                            <Text style={[ss.warningLabel, { color: colors.textMuted }]}>TU ROL EN ESTE ESPACIO: {sharedRoleLabel}</Text>
                                                             {sharedRole === 'owner' ? (
                                                                 <Text style={ss.infoCardText}>
-                                                                    Como owner: definís reglas, invitás usuarios y decidís si las propuestas se aprueban manualmente o se publican directo.
+                                                                    Como propietario: definís reglas, invitás personas y decidís si las propuestas se aprueban manualmente o se publican directo.
                                                                 </Text>
                                                             ) : sharedCanEdit ? (
                                                                 <Text style={ss.infoCardText}>
-                                                                    Como editor: podés modificar tu rutina local y publicar versión local. {sharedApprovalMode === 'owner_review' ? 'Tu propuesta queda pendiente del owner.' : 'Tus cambios se publican al instante.'}
+                                                                    Como editor: podés modificar tu rutina local y publicar versión local. {sharedApprovalMode === 'owner_review' ? 'Tu propuesta queda pendiente del propietario.' : 'Tus cambios se publican al instante.'}
                                                                 </Text>
                                                             ) : (
                                                                 <Text style={ss.infoCardText}>
-                                                                    Como viewer: no publicás cambios. La rutina se sincroniza automáticamente al abrir esta pantalla y también podés usar Equipo para traer manualmente.
+                                                                    Como lector: no publicás cambios. La rutina se actualiza automáticamente al abrir esta pantalla y también podés usar Espacio para actualizar manualmente.
                                                                 </Text>
                                                             )}
                                                         </View>
@@ -885,14 +886,14 @@ export function RoutineDetailModal({ visible, routineId, onClose, onDeleted }: R
                                                             <View style={{ marginTop: 8, alignSelf: 'flex-start', borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, paddingHorizontal: 10, paddingVertical: 6 }}>
                                                                 <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '800' }}>
                                                                     {sharedAutoSyncState === 'syncing'
-                                                                        ? 'Sincronizando automáticamente…'
+                                                                        ? 'Actualizando automáticamente…'
                                                                         : sharedAutoSyncState === 'updated'
-                                                                            ? 'Auto-sync aplicado en esta apertura'
+                                                                            ? 'Actualización automática aplicada en esta apertura'
                                                                             : sharedAutoSyncState === 'up_to_date'
                                                                                 ? 'Ya estabas en la última revisión'
                                                                                 : sharedAutoSyncState === 'error'
-                                                                                    ? 'No se pudo auto-sincronizar (podés traer revisión manualmente en Equipo)'
-                                                                                    : 'Auto-sync listo'}
+                                                                                    ? 'No se pudo actualizar automáticamente (podés actualizar manualmente en Espacio)'
+                                                                                    : 'Actualización automática lista'}
                                                                 </Text>
                                                             </View>
                                                         )}

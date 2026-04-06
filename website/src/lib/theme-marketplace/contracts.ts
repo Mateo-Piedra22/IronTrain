@@ -115,7 +115,6 @@ export const THEME_MARKETPLACE_ENDPOINTS = {
   bySlug: (slug: string) => `/api/social/themes/slug/${encodeURIComponent(slug)}`,
   create: '/api/social/themes',
   createVersion: (id: string) => `/api/social/themes/${encodeURIComponent(id)}/version`,
-  publish: (id: string) => `/api/social/themes/${encodeURIComponent(id)}/publish`,
   install: (id: string) => `/api/social/themes/${encodeURIComponent(id)}/install`,
   rate: (id: string) => `/api/social/themes/${encodeURIComponent(id)}/rate`,
   feedback: (id: string) => `/api/social/themes/${encodeURIComponent(id)}/feedback`,

@@ -93,6 +93,8 @@ const INACTIVITY_TIMEOUT_MS = 2.5 * 60 * 60 * 1000;
  */
 class SystemNotificationServiceImpl {
     private channelsCreated = false;
+    private lastPersistentWorkoutKey: string | null = null;
+    private lastPersistentWorkoutShownAt = 0;
 
     private shouldUseForegroundService(): boolean {
         if (Platform.OS !== 'android') return false;
@@ -211,6 +213,20 @@ class SystemNotificationServiceImpl {
         await this.ensureChannels();
 
         const { elapsedSeconds, completedSets, totalExercises, isPaused, workoutName } = params;
+        const now = Date.now();
+        const roundedElapsedSeconds = Math.max(0, Math.floor(elapsedSeconds / 5) * 5);
+        const persistentKey = [
+            roundedElapsedSeconds,
+            completedSets,
+            totalExercises,
+            isPaused ? 1 : 0,
+            (workoutName || '').trim().toLowerCase(),
+        ].join('|');
+
+        if (!force && this.lastPersistentWorkoutKey === persistentKey && now - this.lastPersistentWorkoutShownAt < 15_000) {
+            return;
+        }
+
         const timeStr = this.formatDuration(elapsedSeconds);
         const statusEmoji = isPaused ? '⏸️' : '💪';
         const titlePrefix = workoutName && !workoutName.toLowerCase().includes('entrenamiento')
@@ -251,12 +267,16 @@ class SystemNotificationServiceImpl {
 
         try {
             await show(wantsFg);
+            this.lastPersistentWorkoutKey = persistentKey;
+            this.lastPersistentWorkoutShownAt = now;
         } catch (e) {
             logger.captureException(e, { scope: 'SystemNotificationService.showPersistentWorkout', message: 'Error showing persistent workout notification' });
             if (wantsFg) {
                 try {
                     await show(false);
                     await configService.set('androidForegroundServiceNotificationsEnabled', false);
+                    this.lastPersistentWorkoutKey = persistentKey;
+                    this.lastPersistentWorkoutShownAt = Date.now();
                 } catch (e2) {
                     logger.captureException(e2, { scope: 'SystemNotificationService.showPersistentWorkout', message: 'Fallback display failed' });
                 }
@@ -268,6 +288,8 @@ class SystemNotificationServiceImpl {
         try {
             await notifee.cancelNotification(NOTIFICATION_IDS.PERSISTENT_WORKOUT);
             await notifee.cancelNotification(NOTIFICATION_IDS.INACTIVITY_REMINDER);
+            this.lastPersistentWorkoutKey = null;
+            this.lastPersistentWorkoutShownAt = 0;
         } catch (e) {
             logger.captureException(e, { scope: 'SystemNotificationService.dismissPersistentWorkout' });
         }

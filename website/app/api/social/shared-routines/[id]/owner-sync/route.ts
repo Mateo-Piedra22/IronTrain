@@ -7,6 +7,7 @@ import { verifyAuth } from '../../../../../../src/lib/auth';
 import { recordEndpointMetric } from '../../../../../../src/lib/endpoint-metrics';
 import { RATE_LIMITS } from '../../../../../../src/lib/rate-limit';
 import { summarizeSharedRoutinePayload } from '../../../../../../src/lib/shared-routine-diff';
+import { buildSharedRoutineForbiddenPayload, buildSharedRoutineNotFoundPayload, buildSharedRoutineRevisionConflictPayload } from '../../../../../../src/lib/shared-routine-http-errors';
 import { lockSharedRoutineWorkspace } from '../../../../../../src/lib/shared-routine-lock';
 import { checkSharedRoutineRevision } from '../../../../../../src/lib/shared-routine-sync-policy';
 import { buildRoutineSharePayloadForUser } from '../../../../../../src/lib/social-routine-share-payload';
@@ -66,12 +67,12 @@ export async function POST(
 
         if (!workspace) {
             recordEndpointMetric({ endpoint: 'social.shared_routines.owner_sync', outcome: 'error', statusCode: 404, event: 'not_found' });
-            return NextResponse.json({ error: 'Shared routine not found' }, { status: 404 });
+            return NextResponse.json(buildSharedRoutineNotFoundPayload('workspace', 'Shared routine not found'), { status: 404 });
         }
 
         if (workspace.ownerId !== userId) {
             recordEndpointMetric({ endpoint: 'social.shared_routines.owner_sync', outcome: 'error', statusCode: 403, event: 'forbidden' });
-            return NextResponse.json({ error: 'Only owner can sync updates' }, { status: 403 });
+            return NextResponse.json(buildSharedRoutineForbiddenPayload('Only owner can sync updates'), { status: 403 });
         }
 
         const sourceRoutineId = parsed.data.sourceRoutineId ?? workspace.sourceRoutineId;
@@ -171,12 +172,7 @@ export async function POST(
         if (error instanceof RevisionConflictError) {
             recordEndpointMetric({ endpoint: 'social.shared_routines.owner_sync', outcome: 'conflict', statusCode: 409, event: 'revision_conflict' });
             return NextResponse.json(
-                {
-                    error: error.message,
-                    code: 'SHARED_ROUTINE_REVISION_CONFLICT',
-                    baseRevision: error.baseRevision,
-                    serverRevision: error.serverRevision,
-                },
+                buildSharedRoutineRevisionConflictPayload(error.baseRevision, error.serverRevision, error.message),
                 { status: 409 },
             );
         }

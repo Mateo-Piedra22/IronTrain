@@ -1,4 +1,5 @@
 import { PostHog } from 'posthog-node';
+import { recordWorkspaceBusinessEvent } from './workspace-weekly-metrics';
 
 const PH_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const PH_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
@@ -18,6 +19,8 @@ export const getPostHogServer = () => {
  * Capture a server-side event.
  */
 export const captureServerEvent = async (userId: string, eventName: string, properties?: Record<string, any>) => {
+    recordWorkspaceBusinessEvent(eventName);
+
     const client = getPostHogServer();
     if (client) {
         client.capture({

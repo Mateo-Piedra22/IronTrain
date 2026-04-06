@@ -75,7 +75,7 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
             }
 
         } catch (error: any) {
-            workspaceFeedback.error('Workspaces', error?.message || 'No se pudieron cargar los espacios compartidos.');
+            workspaceFeedback.error('Espacios compartidos', error?.message || 'No se pudieron cargar los espacios compartidos.');
             setWorkspaces([]);
             setPendingByWorkspace({});
         } finally {
@@ -133,7 +133,7 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                             <View>
                                 <Text style={{ color: colors.text, fontSize: 16, fontWeight: '900', letterSpacing: -0.3 }}>{sharedWorkspaceCopy.title}</Text>
                                 <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700' }}>
-                                    Estado: {formatWorkspaceStatus(workspaces.length, pendingTotal)}
+                                    Estado actual: {formatWorkspaceStatus(workspaces.length, pendingTotal)}
                                 </Text>
                             </View>
                         </View>
@@ -160,7 +160,7 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                     {loading ? (
                         <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>
                             <ActivityIndicator color={colors.primary.DEFAULT} />
-                            <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '700', marginTop: 8 }}>Sincronizando espacios…</Text>
+                            <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '700', marginTop: 8 }}>Cargando espacios compartidos…</Text>
                         </View>
                     ) : (
                         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 28 }}>
@@ -227,7 +227,7 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                                                 {workspace.title}
                                             </Text>
                                             <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
-                                                Rev {workspace.currentRevision} • {workspace.editMode === 'collaborative' ? 'Colaborativo' : 'Solo owner'}
+                                                Rev {workspace.currentRevision} • {workspace.editMode === 'collaborative' ? 'Colaborativo' : 'Solo propietario'}
                                             </Text>
                                         </View>
                                         <View
@@ -317,7 +317,7 @@ export function SharedWorkspaceHubModal({ visible, onClose, onOpenRoutine }: Sha
                                             ) : (
                                                 <>
                                                     <ClipboardList size={14} color={colors.textMuted} />
-                                                    <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '800' }}>Recontar pendientes</Text>
+                                                    <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '800' }}>Actualizar pendientes</Text>
                                                 </>
                                             )}
                                         </TouchableOpacity>

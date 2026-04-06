@@ -61,7 +61,7 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
     const [workspacePanel, setWorkspacePanel] = useState<'config' | 'actions'>('actions');
 
     const defaultWorkspaceTitle = useMemo(
-        () => (routineName ? `${routineName} (Equipo)` : 'Rutina compartida'),
+        () => (routineName ? `${routineName} (Espacio compartido)` : 'Rutina compartida'),
         [routineName],
     );
 
@@ -138,6 +138,11 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
 
     const isEditingConfig = !!activeWorkspace;
     const canEditConfig = !activeWorkspace || activeWorkspace.membership.role === 'owner';
+    const membershipRoleLabel = useCallback((role: 'owner' | 'editor' | 'viewer') => {
+        if (role === 'owner') return 'propietario';
+        if (role === 'editor') return 'editor';
+        return 'lector';
+    }, []);
 
     const applyWorkspaceToForm = useCallback((workspace: SharedRoutineItem | null) => {
         if (workspace) {
@@ -213,7 +218,7 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
     const handleCreateTeamWorkspace = async () => {
         if (!routineId) return;
         if (activeWorkspace && activeWorkspace.membership.role !== 'owner') {
-            workspaceFeedback.error('Permisos', 'Solo el owner puede editar la configuración de este espacio.');
+            workspaceFeedback.error('Permisos', 'Solo el propietario puede editar la configuración de este espacio.');
             return;
         }
 
@@ -276,7 +281,7 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
 
                 const safetyLine = addedEditors.length > 0
                     ? `⚠️ ${addedEditors.length} nueva(s) persona(s) entran como editor y podrán publicar cambios para el equipo.`
-                    : 'Por seguridad, los nuevos miembros se agregan como viewer salvo que elijas editor manualmente.';
+                    : 'Por seguridad, los nuevos miembros se agregan como lector salvo que elijas editor manualmente.';
 
                 const message = `${summaryParts.join(' · ')}\n\n${safetyLine}\n\n¿Querés aplicar estos cambios?`;
 
@@ -299,7 +304,7 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
             configService.setGeneric(WORKSPACE_AUTO_SYNC_FOR_EDITORS_KEY, next),
             configService.setGeneric(LEGACY_SHARED_SPACE_AUTO_SYNC_FOR_EDITORS_KEY, next),
         ]);
-        workspaceFeedback.success('Preferencia actualizada', next ? 'Auto-sync para owner/editor activado.' : 'Auto-sync para owner/editor desactivado.');
+        workspaceFeedback.success('Preferencia actualizada', next ? 'Actualización automática para propietario/editor activada.' : 'Actualización automática para propietario/editor desactivada.');
     };
 
     const handleDecideIncomingInvitation = async (invitation: SharedRoutineInvitationItem, decision: 'accept' | 'reject') => {
@@ -325,7 +330,7 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
     const handleOwnerSyncWorkspace = async (workspace: SharedRoutineItem) => {
         if (!routineId) return;
         if (workspace.membership.role !== 'owner') {
-            workspaceFeedback.error('Permisos', 'Solo el owner puede sincronizar esta rutina.');
+            workspaceFeedback.error('Permisos', 'Solo el propietario puede actualizar esta rutina.');
             return;
         }
 
@@ -346,8 +351,8 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                 workspaceFeedback.error(
                     'Conflicto de revisión',
                     serverRevision !== null
-                        ? `Tu revisión (${clientRevision}) quedó desactualizada. Última en servidor: ${serverRevision}. Recargamos workspaces para continuar.`
-                        : 'Tu revisión quedó desactualizada. Recargamos workspaces para continuar.',
+                        ? `Tu revisión (${clientRevision}) quedó desactualizada. Última en servidor: ${serverRevision}. Recargamos espacios para continuar.`
+                        : 'Tu revisión quedó desactualizada. Recargamos espacios para continuar.',
                 );
                 await refreshTeamWorkspaces();
                 return;
@@ -383,7 +388,7 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
             });
 
             if (result.reviewRequired) {
-                workspaceFeedback.success('Enviado a revisión', 'El owner debe aprobar esta propuesta antes de publicarla.');
+                workspaceFeedback.success('Enviado a revisión', 'El propietario debe aprobar esta propuesta antes de publicarla.');
             } else {
                 workspaceFeedback.success('Cambios publicados', `Nueva revisión: ${result.revision}${result.forced ? ' (forzada)' : ''}.`);
             }
@@ -435,7 +440,7 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                 workspaceFeedback.success('Sin cambios', 'Ya tenías aplicada esta misma revisión en tu biblioteca.');
                 return;
             }
-            workspaceFeedback.success('Sincronizada', 'La última revisión ya está aplicada en tu biblioteca.');
+            workspaceFeedback.success('Actualizada', 'La última revisión ya está aplicada en tu biblioteca.');
         } catch (e: any) {
             workspaceFeedback.error('Error', e?.message || 'No se pudo importar la revisión.');
         } finally {
@@ -648,7 +653,7 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
         opts?: { force?: boolean },
     ) => {
         if (workspace.membership.role !== 'owner') {
-            workspaceFeedback.error('Permisos', 'Solo el owner puede decidir revisiones.');
+            workspaceFeedback.error('Permisos', 'Solo el propietario puede decidir revisiones.');
             return;
         }
 
@@ -698,7 +703,7 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
         options?: { force?: boolean; baseRevision?: number },
     ) => {
         if (workspace.membership.role !== 'owner') {
-            workspaceFeedback.error('Permisos', 'Solo el owner puede hacer rollback.');
+            workspaceFeedback.error('Permisos', 'Solo el propietario puede restaurar versiones.');
             return;
         }
 
@@ -800,7 +805,7 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                                     {workspace.title}
                                 </Text>
                                 <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 3 }}>
-                                    Rev {workspace.currentRevision} • {workspace.membership.role} • {workspace.editMode === 'collaborative' ? 'Colaborativa' : 'Solo propietario'}
+                                    Rev {workspace.currentRevision} • {membershipRoleLabel(workspace.membership.role)} • {workspace.editMode === 'collaborative' ? 'Colaborativa' : 'Solo propietario'}
                                 </Text>
                             </TouchableOpacity>
                         );
@@ -857,9 +862,9 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                             backgroundColor: colors.surface,
                         }}>
                             <View style={{ flex: 1 }}>
-                                <Text style={{ color: colors.text, fontWeight: '900', fontSize: isCompact ? 15 : 17, letterSpacing: -0.4 }}>Rutinas compartidas</Text>
+                                <Text style={{ color: colors.text, fontWeight: '900', fontSize: isCompact ? 15 : 17, letterSpacing: -0.4 }}>Espacios compartidos</Text>
                                 <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '700', marginTop: 2 }}>
-                                    Configurá equipo, publicá cambios y validá revisiones
+                                    Configurá colaboración, publicá cambios y gestioná revisiones
                                 </Text>
                             </View>
                             <TouchableOpacity
@@ -1079,10 +1084,10 @@ export function RoutineWorkspaceManagerModal({ visible, routineId, routineName, 
                                             onLoadWorkspaceReviews={() => handleLoadWorkspaceReviews(activeWorkspace)}
                                             onRollbackWorkspace={() => {
                                                 confirm.destructive(
-                                                    'Rollback de workspace',
+                                                    'Restaurar versión del espacio',
                                                     `Vas a crear una nueva revisión restaurando la versión anterior (rev ${Math.max(1, activeWorkspace.currentRevision - 1)}).`,
                                                     () => { void handleRollbackWorkspace(activeWorkspace); },
-                                                    'Aplicar rollback',
+                                                    'Restaurar versión',
                                                 );
                                             }}
                                             onCommentDraftChange={(value) => setWorkspaceCommentDrafts((prev) => ({ ...prev, [activeWorkspace.id]: value }))}

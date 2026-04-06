@@ -2,10 +2,19 @@ import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
 import { Linking, Platform } from 'react-native';
 import { confirm } from '../store/confirmStore';
+import { isOptimizationFlagEnabled } from '../utils/optimizationFlags';
 
 const WEATHER_PERMISSION_PROMPTED_KEY = 'irontrain_weather_location_prompted_v1';
 
 class LocationPermissionsService {
+    private resolveAccuracy(silent: boolean): Location.Accuracy {
+        if (!isOptimizationFlagEnabled('socialRealtimeV2')) {
+            return Location.Accuracy.High;
+        }
+
+        return silent ? Location.Accuracy.Balanced : Location.Accuracy.High;
+    }
+
     async requestWeatherBonusPermission(explainDenied = false): Promise<boolean> {
         try {
             const current = await Location.getForegroundPermissionsAsync();
@@ -71,7 +80,7 @@ class LocationPermissionsService {
             }
 
             const position = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.High,
+                accuracy: this.resolveAccuracy(silent),
             });
 
             const { latitude: lat, longitude: lon } = position.coords;

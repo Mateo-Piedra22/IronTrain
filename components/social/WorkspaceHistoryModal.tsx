@@ -35,13 +35,13 @@ function formatDateTime(value?: string | number | Date | null): string {
 
 function actionLabel(actionType: string): string {
     const map: Record<string, string> = {
-        owner_sync: 'Owner publicó actualización',
+        owner_sync: 'Propietario publicó actualización',
         member_sync: 'Editor publicó cambios',
-        forced_member_sync: 'Editor forzó publicación',
+        forced_member_sync: 'Editor publicó forzando',
         review_requested: 'Revisión solicitada',
         review_approved: 'Revisión aprobada',
         review_rejected: 'Revisión rechazada',
-        rollback: 'Rollback aplicado',
+        rollback: 'Revisión restaurada',
         comment_added: 'Comentario agregado',
         member_invitation_accepted: 'Invitación aceptada',
         member_invitation_rejected: 'Invitación rechazada',
@@ -99,9 +99,9 @@ export function WorkspaceHistoryModal({
                 <View style={{ backgroundColor: colors.surfaceLighter, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, maxHeight: '92%', overflow: 'hidden', ...ThemeFx.shadowLg }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1.5, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
                         <View style={{ flex: 1, paddingRight: 10 }}>
-                            <Text style={{ color: colors.text, fontWeight: '900', fontSize: 16 }}>Historial del espacio</Text>
+                            <Text style={{ color: colors.text, fontWeight: '900', fontSize: 16 }}>Historial del espacio compartido</Text>
                             <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
-                                Espacio: {workspace?.title || 'Workspace'} • {changes.length} eventos
+                                Espacio: {workspace?.title || 'Espacio compartido'} • {changes.length} eventos
                             </Text>
                         </View>
                         <View style={{ flexDirection: 'row', gap: 8 }}>

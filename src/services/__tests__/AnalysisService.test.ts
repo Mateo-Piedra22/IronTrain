@@ -21,30 +21,22 @@ describe('AnalysisService', () => {
       const now = new Date(2026, 0, 15, 12, 0, 0).getTime();
       jest.spyOn(Date, 'now').mockReturnValue(now);
       const days = 30;
-      const currentStart = now - (days * 86400 * 1000);
 
-      (dbService.getFirst as jest.Mock).mockImplementation((sql: string, params: any[]) => {
-        const endMs = params?.[params.length - 1];
-        const isCurrent = endMs === now;
-
-        if (sql.includes('COUNT(*)')) {
-          return Promise.resolve({ count: isCurrent ? 10 : 5 });
-        }
-        if (sql.includes('SUM(s.weight * s.reps)')) {
-          return Promise.resolve({ total: isCurrent ? 1000 : 500 });
-        }
-        if (sql.includes('AVG((end_time - start_time)')) {
-          return Promise.resolve({ avgMin: isCurrent ? 60 : 50 });
-        }
-        return Promise.resolve(null);
-      });
+      (dbService.getAll as jest.Mock)
+        .mockResolvedValueOnce([
+          { workoutId: 'w1', date: now - 1_000, volume: 600, total_sets: 6, total_reps: 30, durationMin: 60 },
+          { workoutId: 'w2', date: now - 2_000, volume: 400, total_sets: 4, total_reps: 20, durationMin: 60 },
+        ])
+        .mockResolvedValueOnce([
+          { workoutId: 'w3', date: now - 35 * 86400 * 1000, volume: 500, total_sets: 5, total_reps: 25, durationMin: 50 },
+        ]);
 
       const result = await AnalysisService.getWorkoutComparison(days);
 
       expect(result.days).toBe(30);
-      expect(result.current.workoutCount).toBe(10);
+      expect(result.current.workoutCount).toBe(2);
       expect(result.current.totalVolume).toBe(1000);
-      expect(result.previous.workoutCount).toBe(5);
+      expect(result.previous.workoutCount).toBe(1);
       expect(result.previous.totalVolume).toBe(500);
       expect(result.workoutChangePct).toBe(100);
       expect(result.volumeChangePct).toBe(100);
@@ -54,21 +46,12 @@ describe('AnalysisService', () => {
       const now = new Date(2026, 0, 15, 12, 0, 0).getTime();
       jest.spyOn(Date, 'now').mockReturnValue(now);
 
-      (dbService.getFirst as jest.Mock).mockImplementation((sql: string, params: any[]) => {
-        const endMs = params?.[params.length - 1];
-        const isCurrent = endMs === now;
-
-        if (sql.includes('COUNT(*)')) {
-          return Promise.resolve({ count: isCurrent ? 3 : 0 });
-        }
-        if (sql.includes('SUM(s.weight * s.reps)')) {
-          return Promise.resolve({ total: isCurrent ? 900 : 0 });
-        }
-        if (sql.includes('AVG((end_time - start_time)')) {
-          return Promise.resolve({ avgMin: isCurrent ? 60 : null });
-        }
-        return Promise.resolve(null);
-      });
+      (dbService.getAll as jest.Mock)
+        .mockResolvedValueOnce([
+          { workoutId: 'w1', date: now - 1_000, volume: 500, total_sets: 5, total_reps: 20, durationMin: 60 },
+          { workoutId: 'w2', date: now - 2_000, volume: 400, total_sets: 4, total_reps: 16, durationMin: null },
+        ])
+        .mockResolvedValueOnce([]);
 
       const result = await AnalysisService.getWorkoutComparison(7);
 

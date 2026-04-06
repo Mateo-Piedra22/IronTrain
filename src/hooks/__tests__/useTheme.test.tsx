@@ -1,34 +1,56 @@
+import { Theme } from '@react-navigation/native';
 import { renderHook } from '@testing-library/react-native';
 import React from 'react';
-import { ThemeContext } from '../../contexts/ThemeContext';
+import { ThemeContext, ThemeContextType } from '../../contexts/ThemeContext';
+import { resolveNavigationTheme, resolveThemeTokens } from '../../theme';
 import { useTheme } from '../useTheme';
 
+const makeContextValue = (mode: 'light' | 'dark' = 'dark'): ThemeContextType => {
+    const activeTheme = resolveThemeTokens(mode, mode);
+    return {
+        themeMode: mode,
+        activeTheme,
+        currentNavTheme: resolveNavigationTheme(activeTheme) as Theme,
+        systemScheme: mode,
+        effectiveMode: mode,
+        themeDrafts: [],
+        activeThemePackIdLight: null,
+        activeThemePackIdDark: null,
+        setThemeMode: async () => undefined,
+        setActiveThemePackId: async () => undefined,
+        saveThemeDraft: async () => ({ ok: false, errors: ['not available'] }),
+        deleteThemeDraft: async () => undefined,
+        statusBarStyle: mode === 'dark' ? 'light' : 'dark',
+    };
+};
+
 describe('useTheme', () => {
-    it('should return theme context when used within Provider', () => {
-        const mockThemeContext = {
-            theme: 'dark',
-            setTheme: jest.fn(),
-            activeTheme: { colors: {} },
-            toggleTheme: jest.fn()
-        };
+    it('returns ThemeContext value when used inside provider', () => {
+        const mockThemeContext = makeContextValue('dark');
 
         const wrapper = ({ children }: { children: React.ReactNode }) => (
-            <ThemeContext.Provider value= { mockThemeContext as any } >
-            { children }
+            <ThemeContext.Provider value={mockThemeContext}>
+                {children}
             </ThemeContext.Provider>
         );
 
-    const { result } = renderHook(() => useTheme(), { wrapper });
+        const { result } = renderHook(() => useTheme(), { wrapper });
 
-    expect(result.current).toEqual(mockThemeContext);
-});
+        expect(result.current).toBe(mockThemeContext);
+        expect(result.current.effectiveMode).toBe('dark');
+        expect(result.current.activeTheme.colors.background).toBeTruthy();
+    });
 
-it('should throw error when used outside of ThemeProvider', () => {
-    const { result } = renderHook(() => useTheme());
+    it('returns fallback theme context when used outside ThemeProvider', () => {
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-    expect(result.current).toBeDefined();
-    expect(result.current.activeTheme).toBeDefined();
-    expect(result.current.themeMode).toBe('light');
-    expect(result.current.effectiveMode).toBe('light');
-});
+        const { result } = renderHook(() => useTheme());
+
+        expect(result.current).toBeDefined();
+        expect(result.current.themeMode).toBe('light');
+        expect(result.current.effectiveMode).toBe('light');
+        expect(result.current.activeTheme.colors.background).toBeTruthy();
+
+        warnSpy.mockRestore();
+    });
 });

@@ -76,9 +76,9 @@ export function WorkspaceReviewsModal({
                 <View style={{ backgroundColor: colors.surfaceLighter, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, maxHeight: '92%', overflow: 'hidden', ...ThemeFx.shadowLg }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1.5, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
                         <View style={{ flex: 1, paddingRight: 10 }}>
-                            <Text style={{ color: colors.text, fontWeight: '900', fontSize: 16 }}>Revisiones del espacio</Text>
+                            <Text style={{ color: colors.text, fontWeight: '900', fontSize: 16 }}>Revisiones del espacio compartido</Text>
                             <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
-                                Espacio: {workspace?.title || 'Workspace'} • {reviews.length} revisiones • {pendingCount} pendientes
+                                Espacio: {workspace?.title || 'Espacio compartido'} • {reviews.length} revisiones • {pendingCount} pendientes
                             </Text>
                         </View>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -140,7 +140,7 @@ export function WorkspaceReviewsModal({
                                 <View style={{ borderWidth: 1.5, borderColor: colors.border, borderRadius: 14, padding: 14, backgroundColor: colors.surface }}>
                                     <Text style={{ color: colors.text, fontWeight: '900' }}>Sin revisiones</Text>
                                     <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 4 }}>
-                                        No hay revisiones para este filtro. Probá con “TODAS” o pedí una nueva sincronización.
+                                        No hay revisiones para este filtro. Probá con “TODAS” o pedí una nueva actualización.
                                     </Text>
                                 </View>
                             )}
@@ -170,7 +170,7 @@ export function WorkspaceReviewsModal({
 
                                         {!!item.candidateSummary && (
                                             <View style={{ marginTop: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.surfaceLighter, padding: 8 }}>
-                                                <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '900' }}>PREVIEW CANDIDATO</Text>
+                                                <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '900' }}>VISTA PREVIA DE PROPUESTA</Text>
                                                 <Text style={{ color: colors.textMuted, fontSize: 10, marginTop: 4 }}>
                                                     Días: {item.candidateSummary.routineDays} • Ejercicios rutina: {item.candidateSummary.routineExercises} • Biblioteca: {item.candidateSummary.exercises}
                                                 </Text>
@@ -216,7 +216,7 @@ export function WorkspaceReviewsModal({
                                                     style={{ flex: 1, minHeight: 34, borderRadius: 10, borderWidth: 1.5, borderColor: colors.primary.DEFAULT, backgroundColor: withAlpha(colors.primary.DEFAULT, '18'), alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
                                                 >
                                                     <Check size={14} color={colors.primary.DEFAULT} />
-                                                    <Text style={{ color: colors.primary.DEFAULT, fontSize: 11, fontWeight: '900' }}>Aprobar cambio</Text>
+                                                    <Text style={{ color: colors.primary.DEFAULT, fontSize: 11, fontWeight: '900' }}>Aprobar propuesta</Text>
                                                 </TouchableOpacity>
                                                 <TouchableOpacity
                                                     onPress={() => {
@@ -226,7 +226,7 @@ export function WorkspaceReviewsModal({
                                                     style={{ flex: 1, minHeight: 34, borderRadius: 10, borderWidth: 1, borderColor: withAlpha(colors.red, '35'), backgroundColor: colors.surfaceLighter, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
                                                 >
                                                     <X size={14} color={colors.red} />
-                                                    <Text style={{ color: colors.red, fontSize: 11, fontWeight: '900' }}>Rechazar cambio</Text>
+                                                    <Text style={{ color: colors.red, fontSize: 11, fontWeight: '900' }}>Rechazar propuesta</Text>
                                                 </TouchableOpacity>
                                             </View>
                                         )}

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../../../../src/db';
 import * as schema from '../../../../src/db/schema';
 import { verifyAuth } from '../../../../src/lib/auth';
+import { captureServerEvent } from '../../../../src/lib/posthog-server';
 import { RATE_LIMITS } from '../../../../src/lib/rate-limit';
 import { summarizeSharedRoutinePayload } from '../../../../src/lib/shared-routine-diff';
 import { buildRoutineSharePayloadForUser } from '../../../../src/lib/social-routine-share-payload';
@@ -483,6 +484,13 @@ export async function POST(req: NextRequest) {
                 updatedAt: now,
             });
         });
+
+        if (memberIds.length > 0) {
+            void captureServerEvent(userId, 'workspace_invitation_sent', {
+                sharedRoutineId,
+                invitationsCount: memberIds.length,
+            });
+        }
 
         return NextResponse.json({
             success: true,

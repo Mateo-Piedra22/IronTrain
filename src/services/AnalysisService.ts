@@ -154,6 +154,84 @@ export class AnalysisService {
         this.cache.set(key, { value, timestamp: Date.now() });
     }
 
+    private static async getWeightRepsSessionAggregates(startMs: number, endMs: number) {
+        const cacheKey = `weight_reps_session_aggr_${startMs}_${endMs}`;
+        const cached = this.getCached<Array<{
+            workoutId: string;
+            date: number;
+            volume: number;
+            total_sets: number;
+            total_reps: number;
+            durationMin: number | null;
+        }>>(cacheKey);
+        if (cached) return cached;
+
+        const rows = await dbService.getAll<{
+            workoutId: string;
+            date: number;
+            volume: number;
+            total_sets: number;
+            total_reps: number;
+            durationMin: number | null;
+        }>(
+            `
+                SELECT
+                    w.id as workoutId,
+                    w.date as date,
+                    COALESCE(SUM(CASE
+                        WHEN s.completed = 1
+                          AND s.type != 'warmup'
+                          AND e.type = 'weight_reps'
+                          AND s.weight < 1000
+                          AND s.reps < 500
+                        THEN (s.weight * s.reps)
+                        ELSE 0 END), 0) as volume,
+                    COALESCE(SUM(CASE
+                        WHEN s.completed = 1
+                          AND s.type != 'warmup'
+                          AND e.type = 'weight_reps'
+                          AND s.weight < 1000
+                          AND s.reps < 500
+                        THEN 1
+                        ELSE 0 END), 0) as total_sets,
+                    COALESCE(SUM(CASE
+                        WHEN s.completed = 1
+                          AND s.type != 'warmup'
+                          AND e.type = 'weight_reps'
+                          AND s.weight < 1000
+                          AND s.reps < 500
+                        THEN s.reps
+                        ELSE 0 END), 0) as total_reps,
+                    CASE
+                        WHEN w.duration > 0 THEN
+                            CASE
+                                WHEN w.duration > 43200000 THEN NULL
+                                WHEN w.duration > 43200 THEN w.duration / 60000.0
+                                ELSE w.duration / 60.0
+                            END
+                        WHEN w.end_time > w.start_time THEN
+                            CASE
+                                WHEN (w.end_time - w.start_time) > 43200000 THEN NULL
+                                ELSE (w.end_time - w.start_time) / 60000.0
+                            END
+                        ELSE NULL
+                    END as durationMin
+                FROM workouts w
+                LEFT JOIN workout_sets s ON s.workout_id = w.id
+                LEFT JOIN exercises e ON e.id = s.exercise_id
+                WHERE w.status = 'completed'
+                  AND w.date > ?
+                  AND w.date <= ?
+                GROUP BY w.id
+                ORDER BY w.date ASC
+            `,
+            [startMs, endMs]
+        );
+
+        this.setCache(cacheKey, rows);
+        return rows;
+    }
+
 
     // 1RM Calculation (Epley Formula)
     static async getTop1RMs(days?: number, limit: number = 5): Promise<OneRepMax[]> {
@@ -281,51 +359,23 @@ export class AnalysisService {
         const now = Date.now();
         const cutoffMs = now - (days * 86400 * 1000);
 
-        const workoutCountRow = await dbService.getFirst<{ count: number }>(
-            'SELECT COUNT(*) as count FROM workouts WHERE status = ? AND date > ?',
-            ['completed', cutoffMs]
-        );
-        const volumeRow = await dbService.getFirst<{ total: number; sets: number; reps: number }>(
-            `
-                SELECT COALESCE(SUM(s.weight * s.reps), 0) as total,
-                       COUNT(s.id) as total_sets,
-                       COALESCE(SUM(s.reps), 0) as total_reps
-                FROM workout_sets s
-                JOIN workouts w ON s.workout_id = w.id
-                JOIN exercises e ON e.id = s.exercise_id
-                WHERE w.status = 'completed' 
-                AND w.date > ? 
-                AND s.completed = 1 
-                AND s.type != 'warmup'
-                AND e.type = 'weight_reps'
-                AND s.weight < 1000 -- Guard against typos/outliers
-                AND s.reps < 500 -- Guard against typos/outliers
-            `,
-            [cutoffMs]
-        );
-        const avgDurationRow = await dbService.getFirst<{ avgMin: number | null }>(
-            `
-                SELECT AVG(
-                    CASE 
-                        WHEN duration > 0 THEN duration / 60.0
-                        WHEN end_time > start_time THEN (end_time - start_time) / 60000.0
-                        ELSE NULL
-                    END
-                ) as avgMin
-                FROM workouts
-                WHERE status = 'completed'
-                AND date > ?
-            `,
-            [cutoffMs]
-        );
+        const sessionRows = await this.getWeightRepsSessionAggregates(cutoffMs, now);
+        const workoutCount = sessionRows.length;
+        const totalVolume = sessionRows.reduce((sum, row) => sum + Number(row.volume || 0), 0);
+        const totalSets = sessionRows.reduce((sum, row) => sum + Number(row.total_sets || 0), 0);
+        const totalReps = sessionRows.reduce((sum, row) => sum + Number(row.total_reps || 0), 0);
+        const durationRows = sessionRows.filter((row) => typeof row.durationMin === 'number' && Number.isFinite(row.durationMin));
+        const avgDurationMin = durationRows.length
+            ? durationRows.reduce((sum, row) => sum + Number(row.durationMin || 0), 0) / durationRows.length
+            : null;
 
         const result = {
             days,
-            workoutCount: workoutCountRow?.count ?? 0,
-            totalVolume: Math.round(volumeRow?.total ?? 0),
-            avgDurationMin: avgDurationRow?.avgMin ?? null,
-            totalSets: (volumeRow as any)?.total_sets ?? 0,
-            totalReps: (volumeRow as any)?.total_reps ?? 0
+            workoutCount,
+            totalVolume: Math.round(totalVolume),
+            avgDurationMin,
+            totalSets,
+            totalReps,
         };
         this.setCache(cacheKey, result);
         return result;
@@ -466,66 +516,24 @@ export class AnalysisService {
 
 
     static async getWorkoutSummaryBetween(startMs: number, endMs: number): Promise<Omit<WorkoutSummary, 'days'> & { startMs: number; endMs: number }> {
-        const workoutCountRow = await dbService.getFirst<{ count: number }>(
-            'SELECT COUNT(*) as count FROM workouts WHERE status = ? AND date > ? AND date <= ?',
-            ['completed', startMs, endMs]
-        );
-        const volumeRow = await dbService.getFirst<{ total: number; sets: number; reps: number }>(
-            `
-                SELECT COALESCE(SUM(s.weight * s.reps), 0) as total,
-                       COUNT(s.id) as total_sets,
-                       COALESCE(SUM(s.reps), 0) as total_reps
-                FROM workout_sets s
-                JOIN workouts w ON s.workout_id = w.id
-                JOIN exercises e ON e.id = s.exercise_id
-                WHERE w.status = 'completed'
-                AND w.date > ?
-                AND w.date <= ?
-                AND s.completed = 1
-                AND s.type != 'warmup'
-                AND e.type = 'weight_reps'
-            `,
-            [startMs, endMs]
-        );
-        const avgDurationRow = await dbService.getFirst<{ avgMin: number | null }>(
-            `
-                SELECT AVG(
-                    COALESCE(
-                        CASE 
-                            WHEN duration > 0 THEN 
-                                CASE 
-                                    WHEN duration > 43200000 THEN NULL 
-                                    WHEN duration > 43200 THEN duration / 60000.0 
-                                    ELSE duration / 60.0 
-                                END
-                            ELSE NULL 
-                        END,
-                        CASE 
-                            WHEN end_time > start_time THEN 
-                                CASE 
-                                    WHEN (end_time - start_time) > 43200000 THEN NULL 
-                                    ELSE (end_time - start_time) / 60000.0 
-                                END
-                            ELSE NULL 
-                        END
-                    )
-                ) as avgMin
-                FROM workouts
-                WHERE status = 'completed'
-                AND date > ?
-                AND date <= ?
-            `,
-            [startMs, endMs]
-        );
+        const sessionRows = await this.getWeightRepsSessionAggregates(startMs, endMs);
+        const workoutCount = sessionRows.length;
+        const totalVolume = sessionRows.reduce((sum, row) => sum + Number(row.volume || 0), 0);
+        const totalSets = sessionRows.reduce((sum, row) => sum + Number(row.total_sets || 0), 0);
+        const totalReps = sessionRows.reduce((sum, row) => sum + Number(row.total_reps || 0), 0);
+        const durationRows = sessionRows.filter((row) => typeof row.durationMin === 'number' && Number.isFinite(row.durationMin));
+        const avgDurationMin = durationRows.length
+            ? durationRows.reduce((sum, row) => sum + Number(row.durationMin || 0), 0) / durationRows.length
+            : null;
 
         return {
             startMs,
             endMs,
-            workoutCount: workoutCountRow?.count ?? 0,
-            totalVolume: Math.round(volumeRow?.total ?? 0),
-            avgDurationMin: avgDurationRow?.avgMin ?? null,
-            totalSets: (volumeRow as any)?.total_sets ?? 0,
-            totalReps: (volumeRow as any)?.total_reps ?? 0
+            workoutCount,
+            totalVolume: Math.round(totalVolume),
+            avgDurationMin,
+            totalSets,
+            totalReps,
         };
     }
 
@@ -580,24 +588,13 @@ export class AnalysisService {
         const now = Date.now();
         const cutoffMs = now - (days * 86400 * 1000);
 
-        const rows = await dbService.getAll<{ date: number; volume: number; total_sets: number }>(
-            `
-                SELECT w.date as date, COALESCE(SUM(s.weight * s.reps), 0) as volume, COUNT(s.id) as total_sets
-                FROM workouts w
-                JOIN workout_sets s ON s.workout_id = w.id
-                JOIN exercises e ON s.exercise_id = e.id
-                WHERE w.status = 'completed' 
-                AND w.date > ? 
-                AND s.completed = 1
-                AND s.type != 'warmup'
-                AND e.type = 'weight_reps' -- Strict type check
-                AND s.weight < 1000
-                AND s.reps < 500
-                GROUP BY w.id
-                ORDER BY w.date ASC
-            `,
-            [cutoffMs]
-        );
+        const rows = (await this.getWeightRepsSessionAggregates(cutoffMs, now))
+            .filter((row) => Number(row.volume || 0) > 0)
+            .map((row) => ({
+                date: Number(row.date),
+                volume: Number(row.volume || 0),
+                total_sets: Number(row.total_sets || 0),
+            }));
 
         const keyFor = (ts: number) => {
             const d = new Date(ts);

@@ -88,4 +88,19 @@ export class PushRegistrationService {
             responseSubscription.remove();
         };
     }
+
+    static hasSyncHint(payload: { request?: { content?: { data?: Record<string, unknown> } } } | null | undefined): boolean {
+        const data = payload?.request?.content?.data;
+        if (!data || typeof data !== 'object') return false;
+
+        const raw = data.sync_hint;
+        if (typeof raw === 'boolean') return raw;
+        if (typeof raw === 'number') return raw === 1;
+        if (typeof raw === 'string') {
+            const normalized = raw.trim().toLowerCase();
+            return normalized === '1' || normalized === 'true' || normalized === 'yes';
+        }
+
+        return false;
+    }
 }

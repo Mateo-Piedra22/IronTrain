@@ -14,9 +14,24 @@ export function WorkoutTimerSync() {
     const workoutTimer = useWorkoutStore(state => state.workoutTimer);
 
     const notifCounterRef = useRef<number>(0);
+    const activeWorkoutRef = useRef(activeWorkout);
+    const activeSetsRef = useRef(activeSets);
+    const workoutTimerRef = useRef(workoutTimer);
 
     useEffect(() => {
-        if (!isTimerRunning || !activeWorkout) {
+        activeWorkoutRef.current = activeWorkout;
+    }, [activeWorkout]);
+
+    useEffect(() => {
+        activeSetsRef.current = activeSets;
+    }, [activeSets]);
+
+    useEffect(() => {
+        workoutTimerRef.current = workoutTimer;
+    }, [workoutTimer]);
+
+    useEffect(() => {
+        if (!isTimerRunning || !activeWorkoutRef.current) {
             // If timer stopped, we dismiss the notification to ensure UI consistency
             systemNotificationService.dismissPersistentWorkout();
             return;
@@ -32,15 +47,20 @@ export function WorkoutTimerSync() {
             if (notifCounterRef.current >= 10) {
                 notifCounterRef.current = 0;
 
-                const completedSets = activeSets.filter(s => !!s.completed).length;
-                const uniqueExercises = new Set(activeSets.map(s => s.exercise_id)).size;
+                const sets = activeSetsRef.current;
+                const workout = activeWorkoutRef.current;
+                const elapsedSeconds = workoutTimerRef.current;
+                if (!workout) return;
+
+                const completedSets = sets.filter(s => !!s.completed).length;
+                const uniqueExercises = new Set(sets.map(s => s.exercise_id)).size;
 
                 systemNotificationService.showPersistentWorkout({
-                    elapsedSeconds: workoutTimer,
+                    elapsedSeconds,
                     completedSets,
                     totalExercises: uniqueExercises,
                     isPaused: false,
-                    workoutName: activeWorkout.name || 'Entrenamiento'
+                    workoutName: workout.name || 'Entrenamiento'
                 });
             }
         }, 1000);
@@ -48,7 +68,7 @@ export function WorkoutTimerSync() {
         return () => {
             clearInterval(interval);
         };
-    }, [isTimerRunning, !!activeWorkout, activeWorkout?.id, tickTimer, activeSets.length, workoutTimer]);
+    }, [isTimerRunning, activeWorkout?.id, tickTimer]);
 
     return null;
 }

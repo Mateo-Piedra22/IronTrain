@@ -347,7 +347,7 @@ class RoutineService {
             await this.sharedRoutineSyncLocks.get(lockKey);
         }
 
-        let releaseLock: (() => void) | null = null;
+        let releaseLock: () => void = () => {};
         const lockPromise = new Promise<void>((resolve) => {
             releaseLock = resolve;
         });
@@ -665,7 +665,7 @@ class RoutineService {
         } finally {
             if (this.sharedRoutineSyncLocks.get(lockKey) === lockPromise) {
                 this.sharedRoutineSyncLocks.delete(lockKey);
-                releaseLock?.();
+                releaseLock();
             }
         }
     }

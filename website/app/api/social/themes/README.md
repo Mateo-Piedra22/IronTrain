@@ -44,13 +44,6 @@ Edita metadata y visibilidad (owner only).
 
 Crea nueva versión inmutable del payload.
 
-### `POST /api/social/themes/:id/publish`
-
-Transición de estado:
-
-- `draft -> pending_review`
-- `pending_review -> approved|rejected` (admin)
-
 ### `POST /api/social/themes/:id/install`
 
 Registra instalación/aplicación para métricas.
@@ -129,7 +122,6 @@ Thresholds configurables por env:
 
 ## Eventos realtime esperados
 
-- `theme.published`
 - `theme.updated`
 - `theme.rating.updated`
 - `theme.feedback.created`

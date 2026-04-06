@@ -9,6 +9,20 @@ jest.mock('expo-device', () => ({
     isDevice: true,
 }));
 
+jest.mock('expo-constants', () => ({
+    __esModule: true,
+    default: {
+        appOwnership: 'standalone',
+        expoConfig: {
+            extra: {
+                eas: {
+                    projectId: 'test-project-id',
+                },
+            },
+        },
+    },
+}));
+
 jest.mock('expo-notifications', () => ({
     getPermissionsAsync: jest.fn(),
     requestPermissionsAsync: jest.fn(),
@@ -24,6 +38,11 @@ jest.mock('expo-notifications', () => ({
 jest.mock('react-native', () => ({
     Platform: {
         OS: 'ios',
+    },
+    Appearance: {
+        getColorScheme: jest.fn(() => 'light'),
+        addChangeListener: jest.fn(() => ({ remove: jest.fn() })),
+        removeChangeListener: jest.fn(),
     },
 }));
 

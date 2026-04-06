@@ -18,8 +18,9 @@ jest.mock('expo-haptics', () => ({
 }));
 
 describe('FeedbackService', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         jest.clearAllMocks();
+        await feedbackService.dispose();
         (configService.get as jest.Mock).mockImplementation((key) => {
             if (key === 'soundFeedbackEnabled') return true;
             if (key === 'hapticFeedbackEnabled') return true;

@@ -18,7 +18,7 @@ import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { addDays, subDays } from 'date-fns';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
 import { BookOpen, Check, Copy, Info, Plus, Timer, Wrench, X } from 'lucide-react-native';
-import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -54,6 +54,7 @@ export default function DailyLogScreen() {
   const [historyExerciseType, setHistoryExerciseType] = useState<ExerciseType>('weight_reps');
   const [hasNewChangelog, setHasNewChangelog] = useState(false);
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
+  const calendarRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const insets = useSafeAreaInsets();
   const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
@@ -103,6 +104,26 @@ export default function DailyLogScreen() {
   }, [workouts]);
 
   // Lightweight refresh — updates workout + calendar without showing loading spinner
+  const refreshCalendarIndicators = useCallback(async () => {
+    try {
+      const events = await workoutService.getCalendarEvents();
+      setMarkedDates(events);
+    } catch (e) {
+      logger.captureException(e, { scope: 'HomeTab.refreshCalendarIndicators', message: 'Failed to refresh calendar indicators' });
+    }
+  }, []);
+
+  const scheduleCalendarRefresh = useCallback((delayMs: number = 800) => {
+    if (calendarRefreshTimeoutRef.current) {
+      clearTimeout(calendarRefreshTimeoutRef.current);
+    }
+    calendarRefreshTimeoutRef.current = setTimeout(() => {
+      calendarRefreshTimeoutRef.current = null;
+      void refreshCalendarIndicators();
+    }, delayMs);
+  }, [refreshCalendarIndicators]);
+
+  // Lightweight refresh — updates only current day/session without forcing calendar recalculation
   const refreshWorkoutOnly = useCallback(async () => {
     try {
       const dayWorkouts = await workoutService.getWorkoutsForDate(selectedDate);
@@ -112,14 +133,22 @@ export default function DailyLogScreen() {
       if (current) {
         const s = await workoutService.getSets(current.id);
         setSets(s);
+      } else {
+        setSets([]);
       }
-
-      const events = await workoutService.getCalendarEvents();
-      setMarkedDates(events);
     } catch (e) {
       logger.captureException(e, { scope: 'HomeTab.refreshWorkoutOnly', message: 'Failed to refresh workout' });
     }
   }, [selectedDate, activeWorkoutIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (calendarRefreshTimeoutRef.current) {
+        clearTimeout(calendarRefreshTimeoutRef.current);
+        calendarRefreshTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Reload when date changes or screen comes into focus
   useFocusEffect(
@@ -163,15 +192,15 @@ export default function DailyLogScreen() {
       const updatedSets = await workoutService.getSets(workout.id);
       setSets(updatedSets);
 
-      // Refresh markers on the DateStrip
-      refreshWorkoutOnly();
+      // Refresh markers on the DateStrip in deferred mode (coalesced)
+      scheduleCalendarRefresh();
 
       setIsPickerVisible(false);
       notify.success('Serie agregada', 'Ejercicio añadido al entrenamiento.');
     } catch (e: any) {
       notify.error('Fallo de conexión', e?.message || 'No se pudo agregar el ejercicio.');
     }
-  }, [workout]);
+  }, [workout, scheduleCalendarRefresh]);
 
   const handleStartNewSession = useCallback(async () => {
     try {
@@ -225,12 +254,12 @@ export default function DailyLogScreen() {
         rpe: originalSet.rpe
       });
       refreshActiveSessionSets(activeWorkoutIndex);
-      refreshWorkoutOnly(); // Refresh indicators
+      scheduleCalendarRefresh();
       notify.success('Serie multiplicada', 'Los valores se han copiado exitosamente.');
     } catch (e: any) {
       notify.error('Error al clonar', e?.message || 'Fallo general de base de datos.');
     }
-  }, [workout, sets, activeWorkoutIndex, refreshActiveSessionSets]);
+  }, [workout, sets, activeWorkoutIndex, refreshActiveSessionSets, scheduleCalendarRefresh]);
 
   const handleUpdateSet = useCallback(async (setId: string, updates: Partial<WorkoutSet>) => {
     const prevSet = sets.find(s => s.id === setId);
@@ -246,8 +275,9 @@ export default function DailyLogScreen() {
     try {
       await workoutService.updateSet(setId, updates);
 
-      // If categories might have changed or status might have changed, refresh indicators
+      // Keep session fresh and calendar refresh batched
       refreshWorkoutOnly();
+      scheduleCalendarRefresh();
 
       if (shouldAutoRest) {
         useTimerStore.getState().startTimer(configService.get('defaultRestTimer'));
@@ -256,18 +286,18 @@ export default function DailyLogScreen() {
       setSets(prevSetsSnapshot);
       notify.error('Datos revertidos', e?.message || 'Fallo de integridad al actualizar.');
     }
-  }, [sets]);
+  }, [sets, refreshWorkoutOnly, scheduleCalendarRefresh]);
 
   const handleDeleteSet = useCallback(async (setId: string) => {
     try {
       await workoutService.deleteSet(setId);
       refreshActiveSessionSets(activeWorkoutIndex);
-      refreshWorkoutOnly(); // Refresh indicators
+      scheduleCalendarRefresh();
       notify.success('Descartada', 'La serie fue eliminada.');
     } catch (e: any) {
       notify.error('Operación fallida', e?.message || 'No se pudo borrar la serie.');
     }
-  }, [activeWorkoutIndex, refreshActiveSessionSets]);
+  }, [activeWorkoutIndex, refreshActiveSessionSets, scheduleCalendarRefresh]);
 
   const handleLinkExercise = useCallback(async (exerciseId: string) => {
     if (!workout) return;

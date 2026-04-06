@@ -67,16 +67,24 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     },
 
     removeToast: (id) => {
-        set((state) => ({
-            toasts: state.toasts.filter((t) => t.id !== id),
-        }));
+        set((state) => {
+            const filteredToasts = state.toasts.filter((t) => t.id !== id);
+            if (filteredToasts.length === state.toasts.length) {
+                return state;
+            }
+            return { toasts: filteredToasts };
+        });
     },
 
     sweepExpiredToasts: () => {
         const nowMs = Date.now();
-        set((state) => ({
-            toasts: state.toasts.filter((t) => t.expiresAtMs > nowMs),
-        }));
+        set((state) => {
+            const filteredToasts = state.toasts.filter((t) => t.expiresAtMs > nowMs);
+            if (filteredToasts.length === state.toasts.length) {
+                return state;
+            }
+            return { toasts: filteredToasts };
+        });
     },
 
     setGlobalBanner: (banner) => {

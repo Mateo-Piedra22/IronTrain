@@ -19,12 +19,28 @@ const FALLBACK_VIBRATION_MS: Record<SensoryFeedbackType, number> = {
     error: 34,
 };
 
+const FEEDBACK_MIN_INTERVAL_MS: Record<SensoryFeedbackType, number> = {
+    selection: 90,
+    tapLight: 110,
+    tapMedium: 140,
+    success: 300,
+    warning: 300,
+    error: 300,
+};
+
+let lastFeedbackAtMs = 0;
+
 const canUseHaptics = (): boolean => {
     return configService.get('hapticFeedbackEnabled');
 };
 
 export const triggerSensoryFeedback = async (type: SensoryFeedbackType): Promise<void> => {
     if (!canUseHaptics()) return;
+
+    const now = Date.now();
+    const minIntervalMs = FEEDBACK_MIN_INTERVAL_MS[type] ?? 100;
+    if (now - lastFeedbackAtMs < minIntervalMs) return;
+    lastFeedbackAtMs = now;
 
     try {
         switch (type) {

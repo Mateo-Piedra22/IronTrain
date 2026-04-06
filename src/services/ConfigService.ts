@@ -83,6 +83,23 @@ export interface AppConfig {
     activeThemePackIdDark: string | null;
 }
 
+export type ThemeSettingKey =
+    | 'theme_studio_meta_v1'
+    | 'theme_studio_remote_links_v1'
+    | 'theme_studio_filters_v1'
+    | 'theme_studio_expanded_actions_v1'
+    | 'theme_studio_strict_contrast_v1'
+    | 'theme_install_queue_v1';
+
+export const THEME_LOCAL_ONLY_KEYS: ReadonlySet<ThemeSettingKey> = new Set([
+    'theme_studio_meta_v1',
+    'theme_studio_remote_links_v1',
+    'theme_studio_filters_v1',
+    'theme_studio_expanded_actions_v1',
+    'theme_studio_strict_contrast_v1',
+    'theme_install_queue_v1',
+]);
+
 const DEFAULT_CONFIG: AppConfig = {
     weightUnit: 'kg',
     defaultRestTimer: 90,
@@ -355,6 +372,15 @@ class ConfigService {
         );
 
         dataEventService.emit('SETTINGS_UPDATED', { key, value });
+    }
+
+    public getThemeSetting<T>(key: ThemeSettingKey, fallback: T): T {
+        const value = this.getGeneric<T>(key);
+        return value ?? fallback;
+    }
+
+    public async setThemeSetting<T>(key: ThemeSettingKey, value: T): Promise<void> {
+        await this.setGeneric(key, value);
     }
 
     public async reset(): Promise<void> {

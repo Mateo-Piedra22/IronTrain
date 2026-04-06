@@ -5,8 +5,10 @@ import { db } from '../../../../../../src/db';
 import * as schema from '../../../../../../src/db/schema';
 import { verifyAuth } from '../../../../../../src/lib/auth';
 import { recordEndpointMetric } from '../../../../../../src/lib/endpoint-metrics';
+import { captureServerEvent } from '../../../../../../src/lib/posthog-server';
 import { RATE_LIMITS } from '../../../../../../src/lib/rate-limit';
 import { diffSharedRoutinePayload, summarizeSharedRoutinePayload } from '../../../../../../src/lib/shared-routine-diff';
+import { buildSharedRoutineForbiddenPayload, buildSharedRoutineNotFoundPayload, buildSharedRoutineRevisionConflictPayload } from '../../../../../../src/lib/shared-routine-http-errors';
 import { lockSharedRoutineWorkspace } from '../../../../../../src/lib/shared-routine-lock';
 import { sharedRoutinePayloadSchema } from '../../../../../../src/lib/shared-routine-payload';
 import { canEditSharedRoutine, checkSharedRoutineRevision } from '../../../../../../src/lib/shared-routine-sync-policy';
@@ -34,12 +36,17 @@ export async function POST(
     req: NextRequest,
     context: { params: Promise<{ id: string }> },
 ) {
+    let actorUserId: string | null = null;
+    let sharedRoutineId: string | null = null;
+
     try {
         const userId = await verifyAuth(req);
         if (!userId) {
             recordEndpointMetric({ endpoint: 'social.shared_routines.sync', outcome: 'error', statusCode: 401, event: 'unauthorized' });
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        actorUserId = userId;
 
         const rateLimit = await RATE_LIMITS.SOCIAL_SHARED_ROUTINES_WRITE(userId);
         if (!rateLimit.ok) {
@@ -48,6 +55,7 @@ export async function POST(
         }
 
         const { id } = await context.params;
+        sharedRoutineId = id;
         const body = await req.json().catch(() => null);
         const parsed = syncSharedRoutineSchema.safeParse(body ?? {});
         if (!parsed.success) {
@@ -214,6 +222,14 @@ export async function POST(
             event: reviewRequired ? 'review_requested' : 'published',
         });
 
+        if (reviewRequired) {
+            void captureServerEvent(userId, 'workspace_review_requested', {
+                sharedRoutineId: id,
+                reviewRequestId,
+                baseRevision: parsed.data.baseRevision,
+            });
+        }
+
         return NextResponse.json({
             success: true,
             sharedRoutineId: id,
@@ -226,13 +242,15 @@ export async function POST(
     } catch (error) {
         if (error instanceof RevisionConflictError) {
             recordEndpointMetric({ endpoint: 'social.shared_routines.sync', outcome: 'conflict', statusCode: 409, event: 'revision_conflict' });
-            return NextResponse.json(
-                {
-                    error: error.message,
-                    code: 'SHARED_ROUTINE_REVISION_CONFLICT',
+            if (actorUserId && sharedRoutineId) {
+                void captureServerEvent(actorUserId, 'workspace_sync_conflict', {
+                    sharedRoutineId,
                     baseRevision: error.baseRevision,
                     serverRevision: error.serverRevision,
-                },
+                });
+            }
+            return NextResponse.json(
+                buildSharedRoutineRevisionConflictPayload(error.baseRevision, error.serverRevision, error.message),
                 { status: 409 },
             );
         }
@@ -240,15 +258,15 @@ export async function POST(
         const message = error instanceof Error ? error.message : 'Internal server error';
         if (message === 'Forbidden') {
             recordEndpointMetric({ endpoint: 'social.shared_routines.sync', outcome: 'error', statusCode: 403, event: 'forbidden' });
-            return NextResponse.json({ error: message }, { status: 403 });
+            return NextResponse.json(buildSharedRoutineForbiddenPayload('Forbidden'), { status: 403 });
         }
         if (message === 'Shared routine not found') {
             recordEndpointMetric({ endpoint: 'social.shared_routines.sync', outcome: 'error', statusCode: 404, event: 'not_found' });
-            return NextResponse.json({ error: message }, { status: 404 });
+            return NextResponse.json(buildSharedRoutineNotFoundPayload('workspace', message), { status: 404 });
         }
         if (message === 'You do not have permission to update this shared routine') {
             recordEndpointMetric({ endpoint: 'social.shared_routines.sync', outcome: 'error', statusCode: 403, event: 'insufficient_permissions' });
-            return NextResponse.json({ error: message }, { status: 403 });
+            return NextResponse.json(buildSharedRoutineForbiddenPayload(message), { status: 403 });
         }
 
         recordEndpointMetric({ endpoint: 'social.shared_routines.sync', outcome: 'error', statusCode: 500, event: 'internal_error' });

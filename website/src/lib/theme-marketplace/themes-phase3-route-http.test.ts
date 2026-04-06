@@ -104,4 +104,66 @@ describe('social themes phase 3 routes HTTP behavior', () => {
         expect(res.status).toBe(429);
         expect(body.error).toBe('rate_limited');
     });
+
+    it('GET /api/share/theme/:slug returns 200 with normalized payload when public theme exists', async () => {
+        vi.resetModules();
+
+        const shareThemeLimit = vi.fn().mockResolvedValue({ ok: true, remaining: 9, resetAtMs: Date.now() + 3000 });
+        const select = vi.fn();
+
+        vi.doMock('@/lib/rate-limit', () => ({
+            RATE_LIMITS: {
+                SHARE_THEME: shareThemeLimit,
+            },
+        }));
+        vi.doMock('@/db', () => ({
+            db: {
+                select,
+            },
+        }));
+
+        const packChain = createSelectChain([
+            {
+                id: 'theme_123',
+                slug: 'nord-iron',
+                name: 'Nord Iron',
+                description: 'Tema de prueba',
+                tags: ['nord'],
+                supportsLight: true,
+                supportsDark: true,
+                currentVersion: 2,
+            },
+        ]);
+        const versionChain = createSelectChain([
+            {
+                payload: {
+                    schemaVersion: 1,
+                    lightPatch: { primary: { DEFAULT: '#112233' } },
+                    darkPatch: { primary: { DEFAULT: '#445566' } },
+                },
+            },
+        ]);
+
+        select
+            .mockReturnValueOnce({ from: packChain.from })
+            .mockReturnValueOnce({ from: versionChain.from });
+
+        const route = await import('../../../app/api/share/theme/[slug]/route');
+        const req = new Request('http://localhost/api/share/theme/nord-iron', { method: 'GET' });
+        const res = await route.GET(req as any, { params: Promise.resolve({ slug: 'nord-iron' }) });
+        const body = await res.json();
+
+        expect(res.status).toBe(200);
+        expect(body).toMatchObject({
+            success: true,
+            data: {
+                id: 'theme_123',
+                slug: 'nord-iron',
+                supportsLight: true,
+                supportsDark: true,
+                version: 2,
+            },
+        });
+        expect(body.data.payload.lightPatch.primary.DEFAULT).toBe('#112233');
+    });
 });

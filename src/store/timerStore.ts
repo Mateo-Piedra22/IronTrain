@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { configService } from '../services/ConfigService';
 import { feedbackService } from '../services/FeedbackService';
 import { systemNotificationService } from '../services/SystemNotificationService';
+import { isOptimizationFlagEnabled } from '../utils/optimizationFlags';
+import { captureOptimizationMetric } from '../utils/optimizationMetrics';
 
 interface TimerState {
     timeLeft: number;
@@ -26,6 +28,11 @@ export const useTimerStore = create<TimerState>((set, get) => ({
         const s = Math.max(0, Math.floor(seconds));
         const now = Date.now();
         const endAtMs = now + s * 1000;
+        captureOptimizationMetric('opt_timer_started', {
+            reason: 'start_timer',
+            seconds: s,
+            timer_unified_v1_enabled: isOptimizationFlagEnabled('timerUnifiedV1'),
+        }, 500);
         set({ timeLeft: s, duration: s, isRunning: s > 0, endAtMs: s > 0 ? endAtMs : null });
         if (s > 0) {
             systemNotificationService.scheduleRestTimerNotification(endAtMs);
@@ -35,6 +42,9 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     },
     stopTimer: () => {
         systemNotificationService.cancelRestTimerNotification();
+        captureOptimizationMetric('opt_timer_stopped', {
+            reason: 'stop_timer',
+        }, 500);
         set({ isRunning: false, timeLeft: 0, duration: 0, endAtMs: null });
     },
     pauseTimer: () => {
@@ -66,6 +76,9 @@ export const useTimerStore = create<TimerState>((set, get) => ({
         }
         if (!endAtMs) {
             console.error('[TimerStore] Inconsistent state: timer is running but endAtMs is null/undefined. Stopping timer.');
+            captureOptimizationMetric('opt_timer_inconsistent_state', {
+                reason: 'missing_end_at',
+            }, 2000);
             get().stopTimer();
             return;
         }
@@ -103,12 +116,19 @@ useTimerStore.subscribe(
     (state) => {
         const isRunning = state.isRunning;
         if (isRunning && !_timerInterval) {
+            captureOptimizationMetric('opt_timer_loop_started', {
+                reason: 'store_subscribe',
+                timer_unified_v1_enabled: isOptimizationFlagEnabled('timerUnifiedV1'),
+            }, 1000);
             _timerInterval = setInterval(() => {
                 useTimerStore.getState().tick();
             }, 1000);
         } else if (!isRunning && _timerInterval) {
             clearInterval(_timerInterval);
             _timerInterval = null;
+            captureOptimizationMetric('opt_timer_loop_stopped', {
+                reason: 'store_subscribe',
+            }, 1000);
         }
     }
 );

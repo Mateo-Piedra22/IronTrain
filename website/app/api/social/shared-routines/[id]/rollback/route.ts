@@ -5,7 +5,9 @@ import { db } from '../../../../../../src/db';
 import * as schema from '../../../../../../src/db/schema';
 import { verifyAuth } from '../../../../../../src/lib/auth';
 import { recordEndpointMetric } from '../../../../../../src/lib/endpoint-metrics';
+import { captureServerEvent } from '../../../../../../src/lib/posthog-server';
 import { RATE_LIMITS } from '../../../../../../src/lib/rate-limit';
+import { buildSharedRoutineForbiddenPayload, buildSharedRoutineNotFoundPayload, buildSharedRoutineRevisionConflictPayload } from '../../../../../../src/lib/shared-routine-http-errors';
 import { lockSharedRoutineWorkspace } from '../../../../../../src/lib/shared-routine-lock';
 import { checkSharedRoutineRevision } from '../../../../../../src/lib/shared-routine-sync-policy';
 
@@ -153,6 +155,12 @@ export async function POST(
         });
 
         recordEndpointMetric({ endpoint: 'social.shared_routines.rollback', outcome: 'success', statusCode: 200, event: 'rollback_applied' });
+        void captureServerEvent(userId, 'workspace_rollback_executed', {
+            sharedRoutineId: id,
+            targetRevision: parsed.data.targetRevision,
+            resultingRevision: nextRevision,
+            forced: parsed.data.force,
+        });
 
         return NextResponse.json({
             success: true,
@@ -166,12 +174,7 @@ export async function POST(
         if (error instanceof RevisionConflictError) {
             recordEndpointMetric({ endpoint: 'social.shared_routines.rollback', outcome: 'conflict', statusCode: 409, event: 'revision_conflict' });
             return NextResponse.json(
-                {
-                    error: error.message,
-                    code: 'SHARED_ROUTINE_REVISION_CONFLICT',
-                    baseRevision: error.baseRevision,
-                    serverRevision: error.serverRevision,
-                },
+                buildSharedRoutineRevisionConflictPayload(error.baseRevision, error.serverRevision, error.message),
                 { status: 409 },
             );
         }
@@ -179,15 +182,15 @@ export async function POST(
         const message = error instanceof Error ? error.message : 'Internal server error';
         if (message === 'Shared routine not found') {
             recordEndpointMetric({ endpoint: 'social.shared_routines.rollback', outcome: 'error', statusCode: 404, event: 'not_found' });
-            return NextResponse.json({ error: message }, { status: 404 });
+            return NextResponse.json(buildSharedRoutineNotFoundPayload('workspace', message), { status: 404 });
         }
         if (message === 'Only owner can rollback shared routine') {
             recordEndpointMetric({ endpoint: 'social.shared_routines.rollback', outcome: 'error', statusCode: 403, event: 'forbidden' });
-            return NextResponse.json({ error: message }, { status: 403 });
+            return NextResponse.json(buildSharedRoutineForbiddenPayload(message), { status: 403 });
         }
         if (message === 'Target revision not found') {
             recordEndpointMetric({ endpoint: 'social.shared_routines.rollback', outcome: 'error', statusCode: 404, event: 'target_not_found' });
-            return NextResponse.json({ error: message }, { status: 404 });
+            return NextResponse.json(buildSharedRoutineNotFoundPayload('target_revision', message), { status: 404 });
         }
 
         recordEndpointMetric({ endpoint: 'social.shared_routines.rollback', outcome: 'error', statusCode: 500, event: 'internal_error' });

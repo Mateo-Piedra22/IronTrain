@@ -5,7 +5,9 @@ import { db } from '../../../../../../../../src/db';
 import * as schema from '../../../../../../../../src/db/schema';
 import { verifyAuth } from '../../../../../../../../src/lib/auth';
 import { recordEndpointMetric } from '../../../../../../../../src/lib/endpoint-metrics';
+import { captureServerEvent } from '../../../../../../../../src/lib/posthog-server';
 import { RATE_LIMITS } from '../../../../../../../../src/lib/rate-limit';
+import { buildSharedRoutineForbiddenPayload, buildSharedRoutineInvalidStatePayload, buildSharedRoutineNotFoundPayload, buildSharedRoutineRevisionConflictPayload } from '../../../../../../../../src/lib/shared-routine-http-errors';
 import { lockSharedRoutineWorkspace } from '../../../../../../../../src/lib/shared-routine-lock';
 import { checkSharedRoutineRevision } from '../../../../../../../../src/lib/shared-routine-sync-policy';
 
@@ -24,6 +26,41 @@ class RevisionConflictError extends Error {
         this.name = 'RevisionConflictError';
         this.baseRevision = baseRevision;
         this.serverRevision = serverRevision;
+    }
+}
+
+class InvalidStateError extends Error {
+    resource: 'review_request';
+    expectedStatus: string;
+    currentStatus: string;
+
+    constructor(resource: 'review_request', expectedStatus: string, currentStatus: string, message: string) {
+        super(message);
+        this.name = 'InvalidStateError';
+        this.resource = resource;
+        this.expectedStatus = expectedStatus;
+        this.currentStatus = currentStatus;
+    }
+}
+
+class IdempotentDecisionError extends Error {
+    decision: 'approve' | 'reject';
+    reviewId: string;
+    revision: number | null;
+    snapshotId: string | null;
+
+    constructor(
+        decision: 'approve' | 'reject',
+        reviewId: string,
+        revision: number | null,
+        snapshotId: string | null,
+    ) {
+        super('Review decision already applied');
+        this.name = 'IdempotentDecisionError';
+        this.decision = decision;
+        this.reviewId = reviewId;
+        this.revision = revision;
+        this.snapshotId = snapshotId;
     }
 }
 
@@ -86,7 +123,19 @@ export async function POST(
                 .limit(1);
 
             if (!review) throw new Error('Review request not found');
-            if (review.status !== 'pending') throw new Error('Review request is not pending');
+            if (review.status !== 'pending') {
+                const requestedStatus = parsed.data.decision === 'approve' ? 'approved' : 'rejected';
+                if (review.status === requestedStatus) {
+                    throw new IdempotentDecisionError(
+                        parsed.data.decision,
+                        reviewId,
+                        workspace.currentRevision ?? null,
+                        workspace.currentSnapshotId ?? null,
+                    );
+                }
+
+                throw new InvalidStateError('review_request', 'pending', String(review.status), 'Review request is not pending');
+            }
 
             const revisionCheck = checkSharedRoutineRevision({
                 baseRevision: review.requestedBaseRevision,
@@ -156,6 +205,16 @@ export async function POST(
             event: parsed.data.decision === 'approve' ? 'approved' : 'rejected',
         });
 
+        void captureServerEvent(
+            userId,
+            parsed.data.decision === 'approve' ? 'workspace_review_approved' : 'workspace_review_rejected',
+            {
+                sharedRoutineId: id,
+                reviewId,
+                revision: parsed.data.decision === 'approve' ? nextRevision : null,
+            },
+        );
+
         return NextResponse.json({
             success: true,
             decision: parsed.data.decision,
@@ -167,34 +226,44 @@ export async function POST(
         if (error instanceof RevisionConflictError) {
             recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'conflict', statusCode: 409, event: 'revision_conflict' });
             return NextResponse.json(
-                {
-                    error: error.message,
-                    code: 'SHARED_ROUTINE_REVISION_CONFLICT',
-                    baseRevision: error.baseRevision,
-                    serverRevision: error.serverRevision,
-                },
+                buildSharedRoutineRevisionConflictPayload(error.baseRevision, error.serverRevision, error.message),
                 { status: 409 },
             );
+        }
+
+        if (error instanceof InvalidStateError) {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'conflict', statusCode: 409, event: 'review_not_pending' });
+            return NextResponse.json(
+                buildSharedRoutineInvalidStatePayload(error.resource, error.currentStatus, error.expectedStatus, error.message),
+                { status: 409 },
+            );
+        }
+
+        if (error instanceof IdempotentDecisionError) {
+            recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'success', statusCode: 200, event: 'idempotent_replay' });
+            return NextResponse.json({
+                success: true,
+                decision: error.decision,
+                reviewId: error.reviewId,
+                revision: error.revision,
+                snapshotId: error.snapshotId,
+                idempotent: true,
+            });
         }
 
         const message = error instanceof Error ? error.message : 'Internal server error';
         if (message === 'Shared routine not found') {
             recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'error', statusCode: 404, event: 'workspace_not_found' });
-            return NextResponse.json({ error: message }, { status: 404 });
+            return NextResponse.json(buildSharedRoutineNotFoundPayload('workspace', message), { status: 404 });
         }
         if (message === 'Only owner can decide reviews') {
             recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'error', statusCode: 403, event: 'forbidden' });
-            return NextResponse.json({ error: message }, { status: 403 });
+            return NextResponse.json(buildSharedRoutineForbiddenPayload(message), { status: 403 });
         }
         if (message === 'Review request not found') {
             recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'error', statusCode: 404, event: 'review_not_found' });
-            return NextResponse.json({ error: message }, { status: 404 });
+            return NextResponse.json(buildSharedRoutineNotFoundPayload('review_request', message), { status: 404 });
         }
-        if (message === 'Review request is not pending') {
-            recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'conflict', statusCode: 409, event: 'review_not_pending' });
-            return NextResponse.json({ error: message }, { status: 409 });
-        }
-
         recordEndpointMetric({ endpoint: 'social.shared_routines.review_decision', outcome: 'error', statusCode: 500, event: 'internal_error' });
         return NextResponse.json({ error: message }, { status: 500 });
     }

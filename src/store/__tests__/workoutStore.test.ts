@@ -73,6 +73,39 @@ describe('workoutStore', () => {
     expect(useWorkoutStore.getState().workoutTimer).toBe(2);
   });
 
+  it('should resume timer without losing precision across foreground resume', () => {
+    const nowSpy = jest.spyOn(Date, 'now');
+    nowSpy.mockReturnValue(10_000);
+
+    useWorkoutStore.setState({
+      activeWorkout: { id: 'w1', status: 'in_progress', is_template: 0 } as any,
+      workoutTimer: 120,
+      isTimerRunning: true,
+      lastTickAtMs: 8_000,
+    } as any);
+
+    useWorkoutStore.getState().tickTimer();
+
+    expect(useWorkoutStore.getState().workoutTimer).toBe(122);
+    expect(useWorkoutStore.getState().lastTickAtMs).toBe(10_000);
+  });
+
+  it('should cap background delta to prevent massive timer jumps', () => {
+    const nowSpy = jest.spyOn(Date, 'now');
+    nowSpy.mockReturnValue(50_000_000);
+
+    useWorkoutStore.setState({
+      activeWorkout: { id: 'w1', status: 'in_progress', is_template: 0 } as any,
+      workoutTimer: 30,
+      isTimerRunning: true,
+      lastTickAtMs: 0,
+    } as any);
+
+    useWorkoutStore.getState().tickTimer();
+
+    expect(useWorkoutStore.getState().workoutTimer).toBe(43_230);
+  });
+
   it('should not transfer workout timer ownership when loading another workout by id (cross-day safety)', async () => {
     const { dbService } = require('../../services/DatabaseService');
     const { configService } = require('../../services/ConfigService');

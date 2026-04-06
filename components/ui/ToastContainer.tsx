@@ -174,14 +174,18 @@ export const ToastContainer = () => {
         if (!hasToasts) return;
 
         sweepExpiredToasts();
-        const interval = setInterval(() => {
+        const nowMs = Date.now();
+        const nextExpiryMs = Math.min(...toasts.map((toast) => toast.expiresAtMs));
+        const delayMs = Math.max(100, nextExpiryMs - nowMs + 25);
+
+        const timeout = setTimeout(() => {
             sweepExpiredToasts();
-        }, 1000);
+        }, delayMs);
 
         return () => {
-            clearInterval(interval);
+            clearTimeout(timeout);
         };
-    }, [hasToasts, sweepExpiredToasts]);
+    }, [hasToasts, toasts, sweepExpiredToasts]);
 
     if (!hasToasts) return null;
 

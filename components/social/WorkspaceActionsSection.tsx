@@ -60,14 +60,19 @@ export function WorkspaceActionsSection({
     onDecideReview,
 }: WorkspaceActionsSectionProps) {
     const recentChange = selectedWorkspaceChanges[0] ?? null;
+    const roleLabel = activeWorkspace.membership.role === 'owner'
+        ? 'propietario'
+        : activeWorkspace.membership.role === 'editor'
+            ? 'editor'
+            : 'lector';
 
     return (
         <View style={{ backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, borderRadius: 16, padding: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text style={{ color: colors.text, fontWeight: '900' }}>3) Acciones del espacio activo</Text>
+                <Text style={{ color: colors.text, fontWeight: '900' }}>3) Acciones del espacio compartido activo</Text>
                 {autoSyncingWorkspaceId === activeWorkspace.id ? (
                     <View style={{ borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: withAlpha(colors.primary.DEFAULT, '12') }}>
-                        <Text style={{ color: colors.primary.DEFAULT, fontSize: 10, fontWeight: '900' }}>Sincronizando…</Text>
+                        <Text style={{ color: colors.primary.DEFAULT, fontSize: 10, fontWeight: '900' }}>Actualizando…</Text>
                     </View>
                 ) : activePendingReviewsCount > 0 && (
                     <View style={{ borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: withAlpha(colors.yellow, '16') }}>
@@ -83,7 +88,7 @@ export function WorkspaceActionsSection({
             <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 10, backgroundColor: colors.surface }}>
                 <Text style={{ color: colors.text, fontWeight: '900', fontSize: 13 }}>{activeWorkspace.title}</Text>
                 <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 3 }}>
-                    Rev {activeWorkspace.currentRevision} • {activeWorkspace.membership.role} • {activeWorkspace.editMode === 'collaborative' ? 'Colaborativa' : 'Solo propietario'} • {activeWorkspace.approvalMode === 'owner_review' ? 'Con aprobación de propietario' : 'Sin aprobación'}
+                    Rev {activeWorkspace.currentRevision} • {roleLabel} • {activeWorkspace.editMode === 'collaborative' ? 'Colaborativa' : 'Solo propietario'} • {activeWorkspace.approvalMode === 'owner_review' ? 'Con revisión del propietario' : 'Sin revisión'}
                 </Text>
 
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
@@ -105,24 +110,24 @@ export function WorkspaceActionsSection({
                     </Text>
                     {activeWorkspace.membership.role === 'owner' ? (
                         <Text style={{ color: colors.textMuted, fontSize: 10, lineHeight: 14 }}>
-                            Owner: configurás reglas, invitaciones y aprobaciones. Podés actualizar desde rutina base y decidir propuestas pendientes.
+                            Propietario: configurás reglas, invitaciones y aprobaciones. Podés actualizar desde rutina base y decidir propuestas pendientes.
                         </Text>
                     ) : activeWorkspace.membership.canEdit ? (
                         <Text style={{ color: colors.textMuted, fontSize: 10, lineHeight: 14 }}>
-                            Editor: publicás tu versión local. {activeWorkspace.approvalMode === 'owner_review' ? 'El owner debe aprobar la propuesta.' : 'Se publica directamente.'}
+                            Editor: publicás tu versión local. {activeWorkspace.approvalMode === 'owner_review' ? 'El propietario debe aprobar la propuesta.' : 'Se publica directamente.'}
                         </Text>
                     ) : (
                         <Text style={{ color: colors.textMuted, fontSize: 10, lineHeight: 14 }}>
-                            Viewer: no publicás cambios. Podés traer la última revisión y seguir el estado de comentarios/revisiones.
+                            Lector: no publicás cambios. Podés traer la última revisión y seguir el estado de comentarios/revisiones.
                         </Text>
                     )}
                 </View>
 
                 <Text style={{ color: colors.textMuted, fontSize: 10, marginTop: 10, marginBottom: 6, fontWeight: '800' }}>
-                    Sincronización
+                    Publicación y actualización
                 </Text>
                 <Text style={{ color: colors.textMuted, fontSize: 10, marginBottom: 8 }}>
-                    Elegí una acción para traer/publicar cambios entre tu rutina local y este espacio.
+                    Elegí una acción para actualizar desde el espacio o publicar tus cambios.
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
                     <TouchableOpacity
@@ -148,7 +153,7 @@ export function WorkspaceActionsSection({
                                 workspaceFeedback.selection();
                                 runExplainedAction(
                                     'Publicar tus cambios',
-                                    'Sube tu versión local como nueva propuesta para el equipo. Si el espacio requiere aprobación, quedará pendiente del owner.',
+                                    'Sube tu versión local como nueva propuesta para el equipo. Si el espacio requiere aprobación, quedará pendiente del propietario.',
                                     'Publicar',
                                     onPublishWorkspaceChanges,
                                 );

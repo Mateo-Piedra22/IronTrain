@@ -1,6 +1,7 @@
 import { useTheme } from '@/src/hooks/useTheme';
 import { configService } from '@/src/services/ConfigService';
 import { MarketplaceThemePackSummary, SocialApiError, SocialService } from '@/src/services/SocialService';
+import { ThemeInstallTrackingService } from '@/src/services/ThemeInstallTrackingService';
 import { confirm } from '@/src/store/confirmStore';
 import {
     applyThemeColorPatch,
@@ -95,13 +96,13 @@ export function ThemeStudioPanel() {
     const liveFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
-        const stored = configService.get(META_STORAGE_KEY as any);
+        const stored = configService.getThemeSetting<unknown>(META_STORAGE_KEY, null);
         setThemeMetaMap(normalizeThemeMeta(stored));
 
-        const storedRemoteLinks = configService.get(REMOTE_LINK_STORAGE_KEY as any);
+        const storedRemoteLinks = configService.getThemeSetting<unknown>(REMOTE_LINK_STORAGE_KEY, null);
         setRemoteThemeLinks(normalizeRemoteLinkMap(storedRemoteLinks));
 
-        const storedFilterPrefs = configService.get(THEMES_FILTER_PREFS_STORAGE_KEY as any);
+        const storedFilterPrefs = configService.getThemeSetting<unknown>(THEMES_FILTER_PREFS_STORAGE_KEY, null);
         const filterPrefs = normalizeThemeFilterPreferences(storedFilterPrefs);
         setSourceFilter(filterPrefs.sourceFilter);
         setActiveFilter(filterPrefs.activeFilter);
@@ -109,10 +110,10 @@ export function ThemeStudioPanel() {
         setThemeSearch(filterPrefs.themeSearch);
         setFiltersExpanded(filterPrefs.filtersExpanded);
 
-        const storedExpanded = configService.get(THEMES_EXPANDED_ACTIONS_STORAGE_KEY as any);
+        const storedExpanded = configService.getThemeSetting<unknown>(THEMES_EXPANDED_ACTIONS_STORAGE_KEY, null);
         setExpandedActionsThemeId(typeof storedExpanded === 'string' && storedExpanded.trim().length > 0 ? storedExpanded : null);
 
-        const storedStrictContrast = configService.get(THEME_STUDIO_STRICT_CONTRAST_STORAGE_KEY as any);
+        const storedStrictContrast = configService.getThemeSetting<unknown>(THEME_STUDIO_STRICT_CONTRAST_STORAGE_KEY, null);
         setStrictContrastMode(storedStrictContrast === true);
 
         return () => {
@@ -130,24 +131,24 @@ export function ThemeStudioPanel() {
             themeSearch,
             filtersExpanded,
         };
-        void configService.set(THEMES_FILTER_PREFS_STORAGE_KEY as any, preferences as any);
+        void configService.setThemeSetting(THEMES_FILTER_PREFS_STORAGE_KEY, preferences);
     }, [sourceFilter, activeFilter, statusFilter, themeSearch, filtersExpanded]);
 
     useEffect(() => {
         if (!expandedActionsThemeId) {
-            void configService.set(THEMES_EXPANDED_ACTIONS_STORAGE_KEY as any, '' as any);
+            void configService.setThemeSetting(THEMES_EXPANDED_ACTIONS_STORAGE_KEY, '');
             return;
         }
-        void configService.set(THEMES_EXPANDED_ACTIONS_STORAGE_KEY as any, expandedActionsThemeId as any);
+        void configService.setThemeSetting(THEMES_EXPANDED_ACTIONS_STORAGE_KEY, expandedActionsThemeId);
     }, [expandedActionsThemeId]);
 
     useEffect(() => {
-        void configService.set(THEME_STUDIO_STRICT_CONTRAST_STORAGE_KEY as any, strictContrastMode as any);
+        void configService.setThemeSetting(THEME_STUDIO_STRICT_CONTRAST_STORAGE_KEY, strictContrastMode);
     }, [strictContrastMode]);
 
     const persistRemoteThemeLinks = async (next: Record<string, string>) => {
         setRemoteThemeLinks(next);
-        await configService.set(REMOTE_LINK_STORAGE_KEY as any, next as any);
+        await configService.setThemeSetting(REMOTE_LINK_STORAGE_KEY, next);
     };
 
     const findRemoteThemeIdByLocalDraftId = (localDraftId: string): string | null => {
@@ -356,7 +357,7 @@ export function ThemeStudioPanel() {
 
     const persistThemeMeta = async (next: Record<string, LocalThemeMeta>) => {
         setThemeMetaMap(next);
-        await configService.set(META_STORAGE_KEY as any, next as any);
+        await configService.setThemeSetting(META_STORAGE_KEY, next);
     };
 
     const coreThemes: CatalogItem[] = useMemo(() => {
@@ -957,6 +958,15 @@ export function ThemeStudioPanel() {
                 await setActiveThemePackId('dark', result.draft.id);
             }
 
+            const linkedRemoteThemeId = findRemoteThemeIdByLocalDraftId(result.draft.id);
+            if (linkedRemoteThemeId && applyOnSave !== 'none') {
+                void ThemeInstallTrackingService.reportInstall(linkedRemoteThemeId, {
+                    source: 'theme_studio_save_apply',
+                    appliedLight: applyOnSave === 'light' || applyOnSave === 'both',
+                    appliedDark: applyOnSave === 'dark' || applyOnSave === 'both',
+                });
+            }
+
             notify.success('Tema guardado', 'El tema quedó listo y aplicado según tu selección.');
             pushLiveFeedback('Tema guardado y aplicado correctamente.');
             await triggerSensoryFeedback('success');
@@ -966,6 +976,8 @@ export function ThemeStudioPanel() {
     };
 
     const assignTheme = async (mode: 'light' | 'dark', item: CatalogItem) => {
+        let linkedRemoteThemeId: string | null = null;
+
         if (item.isCore) {
             await setActiveThemePackId(mode, null);
             notify.success('Tema core activado', `Se activó el tema core para modo ${mode === 'light' ? 'Claro' : 'Oscuro'}.`);
@@ -973,7 +985,16 @@ export function ThemeStudioPanel() {
             const draft = await ensureLocalDraftForItem(item);
             if (!draft) return;
             await setActiveThemePackId(mode, draft.id);
+            linkedRemoteThemeId = item.remoteId ?? findRemoteThemeIdByLocalDraftId(draft.id);
             notify.success('Tema activado', `Se activó "${item.name}" en modo ${mode === 'light' ? 'Claro' : 'Oscuro'}.`);
+        }
+
+        if (linkedRemoteThemeId) {
+            void ThemeInstallTrackingService.reportInstall(linkedRemoteThemeId, {
+                source: 'theme_studio_assign',
+                appliedLight: mode === 'light',
+                appliedDark: mode === 'dark',
+            });
         }
 
         pushLiveFeedback(`Tema aplicado en modo ${mode === 'light' ? 'Claro' : 'Oscuro'}.`);

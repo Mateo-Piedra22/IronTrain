@@ -106,6 +106,30 @@ export function WorkspaceConfigSection({
 }: WorkspaceConfigSectionProps) {
     const visibleCount = visibleActiveWorkspaceMembers.length;
     const totalMembers = activeWorkspaceMembers.length;
+    const roleSummary = React.useMemo(() => {
+        return activeWorkspaceMembers.reduce(
+            (acc, member) => {
+                if (member.role === 'owner') acc.owner += 1;
+                if (member.role === 'editor') acc.editor += 1;
+                if (member.role === 'viewer') acc.viewer += 1;
+                return acc;
+            },
+            { owner: 0, editor: 0, viewer: 0 }
+        );
+    }, [activeWorkspaceMembers]);
+
+    const invitationSummary = React.useMemo(() => {
+        return activeWorkspaceInvitations.reduce(
+            (acc, invitation) => {
+                if (invitation.status === 'pending') acc.pending += 1;
+                if (invitation.status === 'accepted') acc.accepted += 1;
+                if (invitation.status === 'rejected') acc.rejected += 1;
+                if (invitation.status === 'cancelled') acc.cancelled += 1;
+                return acc;
+            },
+            { pending: 0, accepted: 0, rejected: 0, cancelled: 0 }
+        );
+    }, [activeWorkspaceInvitations]);
 
     return (
         <View style={{ backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, borderRadius: 16, padding: 12, marginBottom: 12 }}>
@@ -120,7 +144,7 @@ export function WorkspaceConfigSection({
 
             {isEditingConfig && (
                 <View style={{ borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, padding: 10, marginBottom: 10 }}>
-                    <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '900', marginBottom: 6 }}>SINCRONIZACIÓN AUTOMÁTICA AL ABRIR (OWNER/EDITOR)</Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '900', marginBottom: 6 }}>ACTUALIZACIÓN AUTOMÁTICA AL ABRIR (PROPIETARIO/EDITOR)</Text>
                     <TouchableOpacity
                         onPress={() => {
                             workspaceFeedback.selection();
@@ -129,7 +153,7 @@ export function WorkspaceConfigSection({
                         style={{ borderWidth: 1, borderColor: autoSyncForEditorsEnabled ? withAlpha(colors.primary.DEFAULT, '35') : colors.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: autoSyncForEditorsEnabled ? withAlpha(colors.primary.DEFAULT, '10') : colors.surface }}
                     >
                         <Text style={{ color: autoSyncForEditorsEnabled ? colors.primary.DEFAULT : colors.textMuted, fontSize: 11, fontWeight: '800' }}>
-                            {autoSyncForEditorsEnabled ? 'Activada: sincroniza al abrir' : 'Desactivada: solo manual con botones'}
+                            {autoSyncForEditorsEnabled ? 'Activada: actualiza al abrir' : 'Desactivada: solo actualización manual'}
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -148,6 +172,23 @@ export function WorkspaceConfigSection({
                     <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '900', marginBottom: 6 }}>
                         ESTADO DE INVITACIONES
                     </Text>
+                    <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+                        <View style={{ borderRadius: 8, borderWidth: 1, borderColor: withAlpha(colors.yellow, '35'), paddingHorizontal: 8, paddingVertical: 4, backgroundColor: withAlpha(colors.yellow, '10') }}>
+                            <Text style={{ color: colors.yellow, fontSize: 10, fontWeight: '900' }}>
+                                PENDIENTES {invitationSummary.pending}
+                            </Text>
+                        </View>
+                        <View style={{ borderRadius: 8, borderWidth: 1, borderColor: withAlpha(colors.primary.DEFAULT, '35'), paddingHorizontal: 8, paddingVertical: 4, backgroundColor: withAlpha(colors.primary.DEFAULT, '10') }}>
+                            <Text style={{ color: colors.primary.DEFAULT, fontSize: 10, fontWeight: '900' }}>
+                                ACEPTADAS {invitationSummary.accepted}
+                            </Text>
+                        </View>
+                        <View style={{ borderRadius: 8, borderWidth: 1, borderColor: withAlpha(colors.red, '35'), paddingHorizontal: 8, paddingVertical: 4, backgroundColor: withAlpha(colors.red, '10') }}>
+                            <Text style={{ color: colors.red, fontSize: 10, fontWeight: '900' }}>
+                                RECHAZADAS {invitationSummary.rejected}
+                            </Text>
+                        </View>
+                    </View>
                     <View style={{ gap: 6 }}>
                         {activeWorkspaceInvitations.slice(0, 8).map((invitation) => {
                             const invitee = invitation.displayName || invitation.username || invitation.invitedUserId;
@@ -173,6 +214,11 @@ export function WorkspaceConfigSection({
                             );
                         })}
                     </View>
+                    {activeWorkspaceInvitations.length > 8 && (
+                        <Text style={{ color: colors.textMuted, fontSize: 10, marginTop: 8 }}>
+                            Mostrando 8 de {activeWorkspaceInvitations.length} invitaciones. Usá este bloque para seguimiento rápido y abrí historial para auditoría completa.
+                        </Text>
+                    )}
                 </View>
             )}
 
@@ -238,15 +284,44 @@ export function WorkspaceConfigSection({
                 Al guardar, las personas seleccionadas se agregan (o se vuelven a activar) en este espacio.
             </Text>
             <Text style={{ color: colors.textMuted, fontSize: 10, marginBottom: 8 }}>
-                Seguridad: si no elegís rol manualmente, las personas nuevas entran como VIEWER.
+                Seguridad: si no elegís rol manualmente, las personas nuevas entran como LECTOR.
             </Text>
 
             {isEditingConfig && activeWorkspaceMembers.length > 0 && (
                 <View style={{ marginBottom: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceLighter, padding: 10 }}>
                     <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '900', marginBottom: 6 }}>MIEMBROS Y ROLES</Text>
                     <Text style={{ color: colors.textMuted, fontSize: 10, marginBottom: 8 }}>
-                        Se muestran primero owner, luego editores y viewers. Podés cambiar rol, quitar o volver a agregar (owner protegido).
+                        Se muestran primero propietario, luego editores y lectores. Podés cambiar rol, quitar o volver a agregar (propietario protegido).
                     </Text>
+
+                    <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+                        <View style={{ borderRadius: 8, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.surface }}>
+                            <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '900' }}>
+                                PROPIETARIO {roleSummary.owner}
+                            </Text>
+                        </View>
+                        <View style={{ borderRadius: 8, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.surface }}>
+                            <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '900' }}>
+                                EDITORES {roleSummary.editor}
+                            </Text>
+                        </View>
+                        <View style={{ borderRadius: 8, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.surface }}>
+                            <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '900' }}>
+                                LECTORES {roleSummary.viewer}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {totalMembers > 2 && (
+                        <View style={{ borderRadius: 10, borderWidth: 1, borderColor: withAlpha(colors.primary.DEFAULT, '30'), backgroundColor: withAlpha(colors.primary.DEFAULT, '08'), padding: 8, marginBottom: 8 }}>
+                            <Text style={{ color: colors.primary.DEFAULT, fontSize: 10, fontWeight: '900' }}>
+                                EQUIPO MAYOR A 2 PERSONAS
+                            </Text>
+                            <Text style={{ color: colors.textMuted, fontSize: 10, marginTop: 4 }}>
+                                Recomendación: mantené al menos 1 editor activo y usá revisión del propietario cuando haya cambios en paralelo.
+                            </Text>
+                        </View>
+                    )}
 
                     <Text style={{ color: colors.textMuted, fontSize: 10, marginBottom: 8 }}>
                         Mostrando {visibleCount} de {totalMembers} miembro(s).
@@ -257,7 +332,13 @@ export function WorkspaceConfigSection({
                     <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
                         {(['all', 'owner', 'editor', 'viewer'] as const).map((filterRole) => {
                             const selectedFilter = memberRoleFilter === filterRole;
-                            const label = filterRole === 'all' ? 'Todos' : filterRole.toUpperCase();
+                            const label = filterRole === 'all'
+                                ? 'Todos'
+                                : filterRole === 'owner'
+                                    ? 'Propietario'
+                                    : filterRole === 'editor'
+                                        ? 'Editor'
+                                        : 'Lector';
                             return (
                                 <TouchableOpacity
                                     key={`role-filter-${filterRole}`}
@@ -285,7 +366,7 @@ export function WorkspaceConfigSection({
                                         <Text style={{ color: colors.text, fontSize: 12, fontWeight: '800', flex: 1 }}>{name}</Text>
                                         <View style={{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: isOwner ? withAlpha(colors.primary.DEFAULT, '14') : effectiveRole === 'editor' ? withAlpha(colors.yellow, '16') : withAlpha(colors.border, '50') }}>
                                             <Text style={{ color: isOwner ? colors.primary.DEFAULT : effectiveRole === 'editor' ? colors.yellow : colors.textMuted, fontSize: 10, fontWeight: '900' }}>
-                                                {isOwner ? 'OWNER' : effectiveRole.toUpperCase()}
+                                                {isOwner ? 'PROPIETARIO' : effectiveRole === 'editor' ? 'EDITOR' : 'LECTOR'}
                                             </Text>
                                         </View>
                                     </View>
@@ -310,7 +391,7 @@ export function WorkspaceConfigSection({
                                                 style={{ borderWidth: 1, borderColor: effectiveRole === 'viewer' && selectedInSpace ? withAlpha(colors.primary.DEFAULT, '35') : colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: effectiveRole === 'viewer' && selectedInSpace ? withAlpha(colors.primary.DEFAULT, '12') : colors.surfaceLighter }}
                                                 disabled={!canEditConfig}
                                             >
-                                                <Text style={{ color: effectiveRole === 'viewer' && selectedInSpace ? colors.primary.DEFAULT : colors.textMuted, fontSize: 10, fontWeight: '900' }}>Poner viewer</Text>
+                                                <Text style={{ color: effectiveRole === 'viewer' && selectedInSpace ? colors.primary.DEFAULT : colors.textMuted, fontSize: 10, fontWeight: '900' }}>Asignar lector</Text>
                                             </TouchableOpacity>
 
                                             {selectedInSpace ? (
@@ -341,7 +422,7 @@ export function WorkspaceConfigSection({
 
                                     {isOwner && (
                                         <Text style={{ color: colors.textMuted, fontSize: 10, marginTop: 6 }}>
-                                            El owner siempre mantiene control total de este espacio.
+                                            El propietario siempre mantiene control total de este espacio.
                                         </Text>
                                     )}
                                 </View>
@@ -407,7 +488,7 @@ export function WorkspaceConfigSection({
                                             style={{ borderWidth: 1, borderColor: roleValue === 'viewer' ? withAlpha(colors.primary.DEFAULT, '35') : colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: roleValue === 'viewer' ? withAlpha(colors.primary.DEFAULT, '12') : colors.surface }}
                                             disabled={!canEditConfig}
                                         >
-                                            <Text style={{ color: roleValue === 'viewer' ? colors.primary.DEFAULT : colors.textMuted, fontSize: 10, fontWeight: '900' }}>VIEWER</Text>
+                                            <Text style={{ color: roleValue === 'viewer' ? colors.primary.DEFAULT : colors.textMuted, fontSize: 10, fontWeight: '900' }}>LECTOR</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             onPress={() => {

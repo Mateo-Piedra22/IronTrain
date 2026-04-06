@@ -311,6 +311,7 @@ export default function RootLayout() {
   const updatePromptShown = useRef(false);
   const authToken = useAuthStore((s) => s.token);
   const lastSyncedTokenRef = useRef<string | null>(null);
+  const pushListenersCleanupRef = useRef<null | (() => void)>(null);
   const [fontsLoaded, fontError] = useFonts({});
 
   const updateStatus = useUpdateStore((state) => state.status);
@@ -369,12 +370,71 @@ export default function RootLayout() {
 
   useEffect(() => {
     return () => {
+      if (pushListenersCleanupRef.current) {
+        pushListenersCleanupRef.current();
+        pushListenersCleanupRef.current = null;
+      }
       feedbackService.dispose().catch((e) => {
         logger.captureException(e, { scope: 'RootLayout.cleanup', message: 'feedbackService.dispose failed' });
       });
       syncScheduler.dispose();
     };
   }, []);
+
+  useEffect(() => {
+    if (!dbInitialized || !authToken) {
+      if (pushListenersCleanupRef.current) {
+        pushListenersCleanupRef.current();
+        pushListenersCleanupRef.current = null;
+      }
+      return;
+    }
+
+    if (pushListenersCleanupRef.current) return;
+
+    let disposed = false;
+
+    const initPushHintListeners = async () => {
+      try {
+        const { PushRegistrationService } = await import('../src/services/PushRegistrationService');
+        if (disposed || pushListenersCleanupRef.current) return;
+
+        const cleanup = PushRegistrationService.initListeners(
+          async (notification) => {
+            if (!PushRegistrationService.hasSyncHint(notification)) return;
+            try {
+              await syncScheduler.requestRemoteHintSync();
+            } catch (e) {
+              logger.captureException(e, { scope: 'RootLayout.syncHint.notification' });
+            }
+          },
+          async (response) => {
+            if (!PushRegistrationService.hasSyncHint(response.notification)) return;
+            try {
+              await syncScheduler.requestRemoteHintSync();
+            } catch (e) {
+              logger.captureException(e, { scope: 'RootLayout.syncHint.response' });
+            }
+          }
+        );
+
+        if (disposed) {
+          cleanup();
+          return;
+        }
+
+        pushListenersCleanupRef.current = cleanup;
+      } catch (e) {
+        logger.captureException(e, { scope: 'RootLayout.initPushHintListeners' });
+      }
+    };
+
+    initPushHintListeners();
+
+    return () => {
+      disposed = true;
+    };
+  }, [dbInitialized, authToken]);
 
   useEffect(() => {
     const { needsInitialSync } = useAuthStore.getState();

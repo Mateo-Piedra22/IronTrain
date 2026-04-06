@@ -90,9 +90,9 @@ export function WorkspaceCommentsModal({
                 <View style={{ backgroundColor: colors.surfaceLighter, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, maxHeight: '92%', overflow: 'hidden', ...ThemeFx.shadowLg }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1.5, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
                         <View style={{ flex: 1, paddingRight: 10 }}>
-                            <Text style={{ color: colors.text, fontWeight: '900', fontSize: 16 }}>Comentarios del espacio</Text>
+                            <Text style={{ color: colors.text, fontWeight: '900', fontSize: 16 }}>Comentarios del espacio compartido</Text>
                             <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
-                                Espacio: {workspace?.title || 'Workspace'} • {comments.length} comentarios • {snapshotCount} con snapshot
+                                Espacio: {workspace?.title || 'Espacio compartido'} • {comments.length} comentarios • {snapshotCount} con snapshot
                             </Text>
                         </View>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -142,7 +142,7 @@ export function WorkspaceCommentsModal({
 
                     <View style={{ paddingHorizontal: 16, paddingBottom: 8, flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
                         <View style={{ flex: 1 }}>
-                            <IronInput label="Nuevo comentario" value={draft} onChangeText={onDraftChange} />
+                            <IronInput label="Nuevo comentario del espacio" value={draft} onChangeText={onDraftChange} />
                         </View>
                         <View style={{ width: 120, paddingBottom: 2 }}>
                             <IronButton

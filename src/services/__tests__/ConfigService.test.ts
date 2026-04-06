@@ -430,4 +430,40 @@ describe('ConfigService', () => {
             expect(dbService.queueSyncMutation).toHaveBeenCalled();
         });
     });
+
+    describe('Theme settings wrappers', () => {
+        beforeEach(async () => {
+            (dbService.getAll as jest.Mock).mockResolvedValue([]);
+            await configService.init();
+            jest.clearAllMocks();
+        });
+
+        it('setThemeSetting persists local-only theme key without queueing sync mutation', async () => {
+            const value = { compactMode: true };
+
+            await configService.setThemeSetting('theme_studio_meta_v1', value);
+
+            expect(dbService.run).toHaveBeenCalledWith(
+                'INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?)',
+                expect.arrayContaining(['theme_studio_meta_v1', JSON.stringify(value), expect.any(Number)]),
+            );
+            expect(dbService.queueSyncMutation).not.toHaveBeenCalled();
+        });
+
+        it('getThemeSetting returns fallback for missing key', () => {
+            const fallback = { open: false };
+            const result = configService.getThemeSetting('theme_studio_expanded_actions_v1', fallback);
+
+            expect(result).toBe(fallback);
+        });
+
+        it('getThemeSetting returns stored value after setThemeSetting', async () => {
+            const stored = { sort: 'recent' };
+
+            await configService.setThemeSetting('theme_studio_filters_v1', stored);
+
+            const result = configService.getThemeSetting('theme_studio_filters_v1', { sort: 'popular' });
+            expect(result).toEqual(stored);
+        });
+    });
 });

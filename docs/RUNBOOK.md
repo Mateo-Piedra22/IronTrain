@@ -201,3 +201,86 @@ THEMES_LOAD_TOKEN=<token> THEMES_LOAD_THEME_ID=<theme-id> npm run test:themes:lo
 2. Verificar recuperación de SLO con `GET /api/admin/themes-health`.
 3. Confirmar auditoría admin de consulta/acción (`admin_audit_logs`).
 4. Registrar post-mortem y acción preventiva.
+
+## 11) Incidente: fallo de import/apply de themes en móvil
+
+### 11.1 Síntomas
+
+- Deep link `irontrain://share/theme/:slug` no abre flujo de importación.
+- Import falla con `not_found`, `rate_limited`, `timeout` o `network_error` en secuencia.
+- Se importa el theme pero no queda aplicable en Theme Studio.
+- Métricas de install/apply no se mueven pese a uso real.
+
+### 11.2 Diagnóstico rápido
+
+1. Validar endpoint público con slug afectado: `GET /api/share/theme/:slug`.
+2. Verificar estado del pack en DB (`visibility=public`, `status=approved`, `deleted_at IS NULL`).
+3. Revisar salud API de themes con `GET /api/admin/themes-health`.
+4. Confirmar en app que `themeMode`, `activeThemePackIdLight/Dark` y `themeDrafts` son coherentes.
+5. Revisar cola local `theme_install_queue_v1` para detectar acumulación por fallos de red.
+
+### 11.3 Contención
+
+- Si hay abuso externo, endurecer rate limits de `share/theme` temporalmente.
+- Si hay degradación backend, priorizar disponibilidad de lectura (`GET /api/share/theme/:slug`, `GET /api/social/themes`).
+- Mantener apply local no bloqueante aunque falle tracking remoto de install.
+
+### 11.4 Recuperación
+
+1. Corregir disponibilidad del endpoint share y revalidar slug con request manual.
+2. Ejecutar smoke tests de rutas themes en `website/`.
+3. Validar en app import → draft persistido → apply (`light/dark/both`) en dispositivo real.
+4. Confirmar drenado de cola de installs al restablecer conectividad.
+
+### 11.5 Cierre
+
+- Registrar timeline del incidente y causa raíz.
+- Adjuntar evidencia de tests (app + website) y validación manual en iOS/Android.
+- Crear acción preventiva (alerta, test o guardrail) antes de cerrar.
+
+## 12) Incidente: degradación de colaboración en espacios compartidos
+
+### 12.1 Síntomas
+
+- Aumento de conflictos de sincronización por revisión.
+- Caída de aceptación de invitaciones o backlog de invitaciones pendientes.
+- Incremento sostenido de revisiones pendientes sin resolución.
+- Equipos de 3+ miembros con fricción operativa recurrente.
+
+### 12.2 Diagnóstico rápido
+
+1. Consultar salud colaborativa: `GET /api/admin/workspace-collaboration/health`.
+2. Consultar dashboard semanal: `GET /api/admin/workspace-collaboration/weekly?days=7`.
+3. Verificar indicadores clave:
+   - `report.windows.last7Days.activity.conflictCount`
+   - `report.windows.last7Days.quality.conflictPer100Reviews`
+   - `report.windows.last7Days.quality.invitationAcceptanceRatePct`
+   - `report.adoption.pendingReviews`
+   - `report.adoption.pendingInvitations`
+
+### 12.3 Contención
+
+- Si sube el conflicto: instruir actualización previa de revisión en equipos activos.
+- Si crecen pendientes de revisión: priorizar revisión de owner en espacios con más miembros.
+- Si cae aceptación de invitaciones: revisar copy operativo y roles propuestos por defecto.
+
+### 12.4 Recuperación
+
+1. Ejecutar seguimiento de 7 y 30 días con `workspace-collaboration/health`.
+2. Priorizar espacios con conflicto alto y equipos de 3+ miembros.
+3. Aplicar ajustes de rol/modo de aprobación en espacios con fricción repetida.
+4. Revalidar métricas 24–48h después del ajuste.
+
+### 12.5 Retención técnica (snapshots/changes)
+
+- Política activa: [SHARED_ROUTINE_RETENTION_POLICY.md](SHARED_ROUTINE_RETENTION_POLICY.md).
+- Cadencia:
+  - Dry-run semanal (sin borrar).
+  - Ejecución mensual controlada.
+- Regla operativa: no ejecutar hard delete si existe incidente abierto de colaboración.
+
+### 12.6 Cierre
+
+- Registrar antes/después con evidencia de endpoints admin.
+- Documentar causa raíz y ajuste aplicado (roles, aprobación, flujo operativo).
+- Definir acción preventiva con owner y fecha (alerta, test o mejora de UX).

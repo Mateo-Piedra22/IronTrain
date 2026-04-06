@@ -23,6 +23,24 @@ const SOUND_VOLUMES: Record<SoundKey, number> = {
     phase_rest: 0.6,
 };
 
+const SOUND_MIN_INTERVAL_MS: Record<SoundKey, number> = {
+    timer_complete: 700,
+    countdown_tick: 300,
+    workout_complete: 1200,
+    phase_work: 700,
+    phase_rest: 700,
+};
+
+const HAPTIC_MIN_INTERVAL_MS: Record<'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' | 'selection', number> = {
+    light: 120,
+    medium: 150,
+    heavy: 200,
+    success: 350,
+    warning: 350,
+    error: 350,
+    selection: 100,
+};
+
 /**
  * Centralized feedback service for haptic and sound effects.
  * All feedback is gated by user preferences (hapticFeedbackEnabled, soundFeedbackEnabled).
@@ -31,6 +49,8 @@ const SOUND_VOLUMES: Record<SoundKey, number> = {
 class FeedbackServiceImpl {
     private soundCache: Map<SoundKey, AudioPlayer> = new Map();
     private audioConfigured = false;
+    private lastSoundAt: Partial<Record<SoundKey, number>> = {};
+    private lastHapticAt: Partial<Record<'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' | 'selection', number>> = {};
 
     // ─── Audio Configuration ──────────────────────────────────────────────────
     private async ensureAudioConfig(): Promise<void> {
@@ -58,6 +78,12 @@ class FeedbackServiceImpl {
     // ─── Sound Playback ───────────────────────────────────────────────────────
     private async playSound(soundKey: SoundKey): Promise<void> {
         if (!configService.get('soundFeedbackEnabled')) return;
+
+        const now = Date.now();
+        const minIntervalMs = SOUND_MIN_INTERVAL_MS[soundKey] ?? 200;
+        const previous = this.lastSoundAt[soundKey] ?? 0;
+        if (now - previous < minIntervalMs) return;
+        this.lastSoundAt[soundKey] = now;
 
         await this.ensureAudioConfig();
 
@@ -91,6 +117,12 @@ class FeedbackServiceImpl {
     // ─── Haptic Feedback ──────────────────────────────────────────────────────
     private async haptic(type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' | 'selection'): Promise<void> {
         if (!configService.get('hapticFeedbackEnabled')) return;
+
+        const now = Date.now();
+        const minIntervalMs = HAPTIC_MIN_INTERVAL_MS[type] ?? 100;
+        const previous = this.lastHapticAt[type] ?? 0;
+        if (now - previous < minIntervalMs) return;
+        this.lastHapticAt[type] = now;
 
         try {
             switch (type) {
@@ -208,6 +240,8 @@ class FeedbackServiceImpl {
         }
         this.soundCache.clear();
         this.audioConfigured = false;
+        this.lastSoundAt = {};
+        this.lastHapticAt = {};
     }
 }
 
