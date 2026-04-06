@@ -21,8 +21,9 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Auto-approve patch/minor updates
+      - name: Auto-approve patch/minor updates (best effort)
         if: contains('version-update:semver-patch,version-update:semver-minor', steps.metadata.outputs.update-type)
+        continue-on-error: true
         uses: hmarr/auto-approve-action@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
