@@ -41,6 +41,60 @@ jest.mock('expo-audio', () => {
     };
 });
 
+jest.mock('react-native-reanimated/mock', () => {
+    const RN = require('react-native');
+    const Animated = {
+        View: RN.View,
+        Text: RN.Text,
+        Image: RN.Image,
+        ScrollView: RN.ScrollView,
+        FlatList: RN.FlatList,
+        createAnimatedComponent: (Component) => Component,
+    };
+
+    return {
+        __esModule: true,
+        default: Animated,
+        ...Animated,
+        useSharedValue: (value) => ({ value }),
+        useAnimatedStyle: (updater) => updater(),
+        useAnimatedProps: (updater) => updater(),
+        useDerivedValue: (updater) => ({ value: updater() }),
+        withTiming: (value) => value,
+        withSpring: (value) => value,
+        withDelay: (_delay, value) => value,
+        withRepeat: (value) => value,
+        withSequence: (...values) => values[values.length - 1],
+        interpolate: (value, input, output) => {
+            if (!Array.isArray(input) || !Array.isArray(output) || input.length < 2 || output.length < 2) {
+                return value;
+            }
+            const [inputStart, inputEnd] = input;
+            const [outputStart, outputEnd] = output;
+            if (inputEnd === inputStart) {
+                return outputStart;
+            }
+            const progress = (value - inputStart) / (inputEnd - inputStart);
+            return outputStart + (outputEnd - outputStart) * progress;
+        },
+        runOnJS: (fn) => fn,
+        runOnUI: (fn) => fn,
+        cancelAnimation: () => undefined,
+        Extrapolate: {
+            CLAMP: 'clamp',
+            EXTEND: 'extend',
+            IDENTITY: 'identity',
+        },
+        Easing: {
+            linear: (t) => t,
+            ease: (t) => t,
+            inOut: (fn) => fn,
+            out: (fn) => fn,
+            in: (fn) => fn,
+        },
+    };
+});
+
 jest.mock('react-native-reanimated', () => {
     const Reanimated = require('react-native-reanimated/mock');
     Reanimated.default.call = () => { };
