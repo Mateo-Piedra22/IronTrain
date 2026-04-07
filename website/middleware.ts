@@ -2,8 +2,16 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 const SAME_ORIGIN_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-const AUTH_BYPASS_PATHS = ['/api/webhooks/', '/api/auth/exchange'];
+const AUTH_BYPASS_PATHS = ['/api/webhooks/', '/api/auth/exchange', '/api/auth/'];
 const MAX_REDIRECT_URI_LENGTH = 512;
+
+/**
+ * Neon Auth session verifier parameter name.
+ * After OAuth callback, Neon Auth redirects to callbackURL with this parameter.
+ * The middleware must exchange it for session cookies to complete the flow.
+ */
+const NEON_AUTH_SESSION_VERIFIER_PARAM = 'neon_auth_session_verifier';
+const NEON_AUTH_BASE_URL = process.env.NEON_AUTH_BASE_URL || process.env.NEON_AUTH_SERVICE_URL || '';
 
 function isAllowedOrigin(originOrReferer: string | null, requestOrigin: string): boolean {
     if (!originOrReferer) return false;
@@ -112,12 +120,12 @@ function addSecurityHeaders(response: NextResponse, pathname: string): NextRespo
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "img-src 'self' data: https: blob:",
         "font-src 'self' https://fonts.gstatic.com",
-        "connect-src 'self' https://api.openweathermap.org https://assets.vercel.com https://vercel-vitals.axiom.co https://vercel.live wss://vercel.live",
+        "connect-src 'self' https://api.openweathermap.org https://assets.vercel.com https://vercel-vitals.axiom.co https://vercel.live wss://vercel.live https://*.neonauth.sa-east-1.aws.neon.tech",
         "frame-src 'none'",
         "frame-ancestors 'none'",
         "object-src 'none'",
         "base-uri 'self'",
-        "form-action 'self'",
+        "form-action 'self' https://accounts.google.com https://*.neonauth.sa-east-1.aws.neon.tech",
     ].join('; ');
     
     response.headers.set('Content-Security-Policy', csp);
@@ -153,6 +161,71 @@ function addSecurityHeaders(response: NextResponse, pathname: string): NextRespo
     return response;
 }
 
+/**
+ * OAuth Session Verifier Exchange
+ *
+ * After Google OAuth callback, Neon Auth redirects back to our domain with:
+ *   ?neon_auth_session_verifier=TOKEN
+ *
+ * This function exchanges that verifier for session cookies by calling
+ * /get-session on the Neon Auth upstream with the challenge cookie.
+ * Without this step, no OAuth flow can complete.
+ */
+async function handleOAuthVerifierExchange(
+    request: NextRequest,
+    verifier: string,
+): Promise<NextResponse | null> {
+    try {
+        if (!NEON_AUTH_BASE_URL) {
+            console.error('[middleware] Missing NEON_AUTH_BASE_URL for OAuth verifier exchange');
+            return null;
+        }
+
+        // Build the get-session URL with the verifier parameter
+        const upstreamUrl = new URL(`${NEON_AUTH_BASE_URL}/get-session`);
+        upstreamUrl.searchParams.set(NEON_AUTH_SESSION_VERIFIER_PARAM, verifier);
+
+        // Forward Neon Auth cookies from the browser to the upstream
+        const cookieHeader = request.headers.get('cookie') || '';
+        const neonCookies = cookieHeader
+            .split(';')
+            .map(c => c.trim())
+            .filter(c => c.startsWith('__Secure-neon-auth') || c.startsWith('neon-auth'))
+            .join('; ');
+
+        const response = await fetch(upstreamUrl.toString(), {
+            method: 'GET',
+            headers: {
+                'Cookie': neonCookies || cookieHeader,
+                'x-neon-auth-middleware': 'true',
+            },
+            signal: AbortSignal.timeout(5000),
+        });
+
+        if (!response.ok) {
+            console.error('[middleware] OAuth verifier exchange failed:', response.status, response.statusText);
+            return null;
+        }
+
+        // Build NextResponse redirect that strips the verifier from the URL
+        const cleanUrl = request.nextUrl.clone();
+        cleanUrl.searchParams.delete(NEON_AUTH_SESSION_VERIFIER_PARAM);
+
+        const redirectResponse = NextResponse.redirect(cleanUrl);
+
+        // Forward all Set-Cookie headers from the upstream response
+        const setCookieHeaders = response.headers.getSetCookie();
+        for (const cookie of setCookieHeaders) {
+            redirectResponse.headers.append('Set-Cookie', cookie);
+        }
+
+        return redirectResponse;
+    } catch (error) {
+        console.error('[middleware] OAuth verifier exchange error:', error);
+        return null;
+    }
+}
+
 export async function middleware(request: NextRequest) {
     const { nextUrl } = request;
     const { pathname } = nextUrl;
@@ -168,6 +241,25 @@ export async function middleware(request: NextRequest) {
 
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set('x-url', request.url);
+
+    // ──────────────────────────────────────────────────────────
+    // OAuth Session Verifier Exchange (CRITICAL for Google Auth)
+    // After Neon Auth processes the Google callback, it redirects
+    // back to our domain with ?neon_auth_session_verifier=TOKEN.
+    // We MUST exchange this for session cookies here.
+    // ──────────────────────────────────────────────────────────
+    const verifier = nextUrl.searchParams.get(NEON_AUTH_SESSION_VERIFIER_PARAM);
+    const hasChallengeCookie = request.cookies.getAll().some(
+        c => c.name.includes('session_challange') || c.name.includes('session_challenge')
+    );
+
+    if (verifier && hasChallengeCookie) {
+        const exchangeResult = await handleOAuthVerifierExchange(request, verifier);
+        if (exchangeResult) {
+            return addSecurityHeaders(exchangeResult, pathname);
+        }
+        // If exchange fails, continue — let the page handle the error
+    }
 
     // CSRF Protection para API routes
     if (pathname.startsWith('/api/')) {
