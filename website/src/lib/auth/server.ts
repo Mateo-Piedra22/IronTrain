@@ -1,11 +1,12 @@
 import { createNeonAuth } from '@neondatabase/auth/next/server';
+import { getNeonAuthServiceBaseUrl } from './runtime';
 
 /**
  * Instancia única de autenticación.
  * 1. Forzamos NEON_AUTH_SERVICE_URL para evitar bucles 508.
  * 2. Configuramos el dominio de cookies para que el navegador las reconozca (soluciona UI desaparecida).
  */
-const neonAuthServiceUrl = process.env.NEON_AUTH_BASE_URL || process.env.NEON_AUTH_SERVICE_URL;
+const neonAuthServiceUrl = getNeonAuthServiceBaseUrl();
 const neonAuthCookieSecret = process.env.NEON_AUTH_COOKIE_SECRET;
 
 const missingAuthConfig = [

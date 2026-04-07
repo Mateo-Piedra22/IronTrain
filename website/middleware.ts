@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { getCanonicalAppOrigin, getNeonAuthServiceBaseUrl, shouldEnforceCanonicalAuthOrigin } from './src/lib/auth/runtime';
 
 const SAME_ORIGIN_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const AUTH_BYPASS_PATHS = ['/api/webhooks/', '/api/auth/exchange', '/api/auth/'];
@@ -11,7 +12,30 @@ const MAX_REDIRECT_URI_LENGTH = 512;
  * The middleware must exchange it for session cookies to complete the flow.
  */
 const NEON_AUTH_SESSION_VERIFIER_PARAM = 'neon_auth_session_verifier';
-const NEON_AUTH_BASE_URL = process.env.NEON_AUTH_BASE_URL || process.env.NEON_AUTH_SERVICE_URL || '';
+const NEON_AUTH_BASE_URL = getNeonAuthServiceBaseUrl() || '';
+const CANONICAL_APP_ORIGIN = getCanonicalAppOrigin();
+
+function resolveCanonicalAuthRedirectUrl(request: NextRequest): URL | null {
+    if (!shouldEnforceCanonicalAuthOrigin()) return null;
+    if (!CANONICAL_APP_ORIGIN) return null;
+
+    const { pathname } = request.nextUrl;
+    const isAuthPath = pathname === '/auth'
+        || pathname.startsWith('/auth/')
+        || pathname.startsWith('/api/auth/');
+
+    if (!isAuthPath) return null;
+
+    if (request.nextUrl.origin === CANONICAL_APP_ORIGIN) {
+        return null;
+    }
+
+    const target = request.nextUrl.clone();
+    const canonical = new URL(CANONICAL_APP_ORIGIN);
+    target.protocol = canonical.protocol;
+    target.host = canonical.host;
+    return target;
+}
 
 function isAllowedOrigin(originOrReferer: string | null, requestOrigin: string): boolean {
     if (!originOrReferer) return false;
@@ -229,6 +253,12 @@ async function handleOAuthVerifierExchange(
 export async function middleware(request: NextRequest) {
     const { nextUrl } = request;
     const { pathname } = nextUrl;
+
+    const canonicalRedirect = resolveCanonicalAuthRedirectUrl(request);
+    if (canonicalRedirect) {
+        return NextResponse.redirect(canonicalRedirect, 308);
+    }
+
     const redirectUri = nextUrl.searchParams.get('redirectUri');
     const safeRedirectUri = getSafeRedirectUri(redirectUri);
 
