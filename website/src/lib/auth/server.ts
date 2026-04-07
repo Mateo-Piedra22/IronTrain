@@ -1,5 +1,5 @@
 import { createNeonAuth } from '@neondatabase/auth/next/server';
-import { getNeonAuthServiceBaseUrl } from './runtime';
+import { getNeonAuthServiceBaseUrl, getSafeNeonAuthCookieDomain } from './runtime';
 
 /**
  * Instancia única de autenticación.
@@ -8,6 +8,7 @@ import { getNeonAuthServiceBaseUrl } from './runtime';
  */
 const neonAuthServiceUrl = getNeonAuthServiceBaseUrl();
 const neonAuthCookieSecret = process.env.NEON_AUTH_COOKIE_SECRET;
+const neonAuthCookieDomain = getSafeNeonAuthCookieDomain();
 
 const missingAuthConfig = [
     !neonAuthServiceUrl ? 'NEON_AUTH_BASE_URL (or NEON_AUTH_SERVICE_URL)' : null,
@@ -37,6 +38,10 @@ if (missingAuthConfig.length > 0) {
     console.warn(`[auth] Missing env config: ${missingAuthConfig.join(', ')}. Falling back to disabled auth.`);
 }
 
+if (process.env.NEON_AUTH_COOKIE_DOMAIN && !neonAuthCookieDomain) {
+    console.warn('[auth] Ignoring invalid NEON_AUTH_COOKIE_DOMAIN because it does not match NEXT_PUBLIC_APP_URL host.');
+}
+
 const authInstance = missingAuthConfig.length === 0 && neonAuthServiceUrl && neonAuthCookieSecret
     ? createNeonAuth({
         baseUrl: neonAuthServiceUrl,
@@ -44,8 +49,8 @@ const authInstance = missingAuthConfig.length === 0 && neonAuthServiceUrl && neo
             secret: neonAuthCookieSecret,
             // Domain is set exclusively via NEON_AUTH_COOKIE_DOMAIN environment variable.
             // Do NOT hardcode the domain here — set it in the deployment environment.
-            ...(process.env.NEON_AUTH_COOKIE_DOMAIN
-                ? { domain: process.env.NEON_AUTH_COOKIE_DOMAIN }
+            ...(neonAuthCookieDomain
+                ? { domain: neonAuthCookieDomain }
                 : {}),
         },
     })

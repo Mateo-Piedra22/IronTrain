@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getCanonicalAppOrigin, getNeonAuthServiceBaseUrl, shouldEnforceCanonicalAuthOrigin } from './runtime';
+import { getCanonicalAppOrigin, getNeonAuthServiceBaseUrl, getSafeNeonAuthCookieDomain, shouldEnforceCanonicalAuthOrigin } from './runtime';
 
 afterEach(() => {
     vi.unstubAllEnvs();
@@ -23,5 +23,14 @@ describe('auth runtime helpers', () => {
 
         vi.stubEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000');
         expect(shouldEnforceCanonicalAuthOrigin()).toBe(false);
+    });
+
+    it('accepts cookie domain only when it matches canonical app host', () => {
+        vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://irontrain.motiona.xyz');
+        vi.stubEnv('NEON_AUTH_COOKIE_DOMAIN', 'motiona.xyz');
+        expect(getSafeNeonAuthCookieDomain()).toBe('motiona.xyz');
+
+        vi.stubEnv('NEON_AUTH_COOKIE_DOMAIN', 'evil.test');
+        expect(getSafeNeonAuthCookieDomain()).toBeNull();
     });
 });

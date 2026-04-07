@@ -10,6 +10,18 @@ function parseUrl(raw: string | null | undefined): URL | null {
     }
 }
 
+function normalizeCookieDomain(raw: string | null | undefined): string | null {
+    if (!raw) return null;
+    const candidate = raw.trim().replace(/^\.+/, '');
+    if (!candidate) return null;
+
+    if (candidate.includes('/') || candidate.includes(':') || candidate.includes(' ')) {
+        return null;
+    }
+
+    return candidate.toLowerCase();
+}
+
 export function getCanonicalAppOrigin(): string | null {
     const parsed = parseUrl(process.env.NEXT_PUBLIC_APP_URL);
     return parsed ? parsed.origin : null;
@@ -39,4 +51,22 @@ export function getNeonAuthServiceBaseUrl(): string | null {
     }
 
     return `${parsed.origin}${normalizedPath}`;
+}
+
+export function getSafeNeonAuthCookieDomain(): string | null {
+    const cookieDomain = normalizeCookieDomain(process.env.NEON_AUTH_COOKIE_DOMAIN);
+    if (!cookieDomain) return null;
+
+    const canonicalOrigin = getCanonicalAppOrigin();
+    if (!canonicalOrigin) {
+        return cookieDomain;
+    }
+
+    const appHost = new URL(canonicalOrigin).hostname.toLowerCase();
+    const matchesHost = appHost === cookieDomain || appHost.endsWith(`.${cookieDomain}`);
+    if (!matchesHost) {
+        return null;
+    }
+
+    return cookieDomain;
 }

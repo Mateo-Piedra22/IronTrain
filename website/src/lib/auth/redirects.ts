@@ -1,13 +1,17 @@
 const MAX_REDIRECT_URI_LENGTH = 512;
 
 function getAppOrigin(): string {
-    if (typeof window !== 'undefined' && window.location?.origin) {
-        return window.location.origin;
-    }
-
     const envOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim();
     if (envOrigin) {
-        return envOrigin.replace(/\/$/, '');
+        try {
+            return new URL(envOrigin).origin;
+        } catch {
+            return envOrigin.replace(/\/$/, '');
+        }
+    }
+
+    if (typeof window !== 'undefined' && window.location?.origin) {
+        return window.location.origin;
     }
 
     return 'http://localhost:3000';
