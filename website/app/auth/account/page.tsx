@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowLeft, Check, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { authClient } from '../../../src/lib/auth/client';
+import { authClient, directAuthClient } from '../../../src/lib/auth/client';
 import { buildAuthBridgeCallbackUrl, buildAuthPageUrl, buildSocialLinkCallbackUrl, toAbsoluteAppUrl } from '../../../src/lib/auth/redirects';
 import { performSignOut } from '../../../src/lib/auth/signout';
 
@@ -369,7 +369,7 @@ export default function AccountSecurityPage() {
         setBusy('link-google');
 
         try {
-            const { error: apiError } = await authClient.linkSocial({
+            const { error: apiError } = await directAuthClient.linkSocial({
                 provider: 'google',
                 callbackURL: socialLinkCallbackURL,
                 errorCallbackURL: socialLinkErrorCallbackURL,

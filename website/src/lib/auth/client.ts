@@ -24,3 +24,13 @@ function resolveAuthBaseUrl(): string {
 export const authClient = createAuthClient(resolveAuthBaseUrl(), {
 	adapter: BetterAuthReactAdapter(),
 });
+
+/**
+ * directAuthClient points directly to the upstream Neon Auth service.
+ * It MUST be used for OAuth flows (signIn.social, linkSocial) because 
+ * the Better Auth state cookie must be set on the neon.tech domain before 
+ * the browser redirects to Google, otherwise a state_mismatch error will occur.
+ */
+export const directAuthClient = createAuthClient('https://ep-falling-wind-aca65w0x.neonauth.sa-east-1.aws.neon.tech/neondb/auth', {
+	adapter: BetterAuthReactAdapter(),
+});

@@ -3,7 +3,7 @@
 import { AlertTriangle, ArrowRight, Check, Eye, EyeOff, Loader2, Lock, Mail, User } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { authClient } from '../../../src/lib/auth/client';
+import { authClient, directAuthClient } from '../../../src/lib/auth/client';
 import { buildAuthBridgeCallbackUrl, buildAuthPageUrl, toAbsoluteAppUrl } from '../../../src/lib/auth/redirects';
 import { createProfileAfterSignUp } from '../actions';
 
@@ -71,7 +71,7 @@ export function SignUpFlow() {
         setError(null);
         setLoading(true);
         try {
-            const { error: authError } = await authClient.signIn.social({
+            const { error: authError } = await directAuthClient.signIn.social({
                 provider,
                 callbackURL,
                 errorCallbackURL,

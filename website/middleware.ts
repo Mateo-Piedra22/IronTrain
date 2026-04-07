@@ -279,11 +279,8 @@ export async function middleware(request: NextRequest) {
     // We MUST exchange this for session cookies here.
     // ──────────────────────────────────────────────────────────
     const verifier = nextUrl.searchParams.get(NEON_AUTH_SESSION_VERIFIER_PARAM);
-    const hasChallengeCookie = request.cookies.getAll().some(
-        c => c.name.includes('session_challange') || c.name.includes('session_challenge')
-    );
 
-    if (verifier && hasChallengeCookie) {
+    if (verifier) {
         const exchangeResult = await handleOAuthVerifierExchange(request, verifier);
         if (exchangeResult) {
             return addSecurityHeaders(exchangeResult, pathname);

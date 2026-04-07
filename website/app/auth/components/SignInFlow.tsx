@@ -3,7 +3,7 @@
 import { ArrowRight, Check, Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { authClient } from '../../../src/lib/auth/client';
+import { authClient, directAuthClient } from '../../../src/lib/auth/client';
 import { buildAuthBridgeCallbackUrl, buildAuthPageUrl, toAbsoluteAppUrl } from '../../../src/lib/auth/redirects';
 
 function getSocialAuthErrorMessage(error: unknown, provider: string): string {
@@ -67,7 +67,7 @@ export function SignInFlow() {
         setError(null);
         setLoading(true);
         try {
-            const { error: authError } = await authClient.signIn.social({
+            const { error: authError } = await directAuthClient.signIn.social({
                 provider,
                 callbackURL,
                 errorCallbackURL,
