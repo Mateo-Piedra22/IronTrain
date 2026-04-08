@@ -15,6 +15,44 @@ function getErrorMessage(error: unknown, fallback: string): string {
     return fallback;
 }
 
+function getOAuthLinkErrorMessage(authError: string): string | null {
+    if (!authError) return null;
+
+    if (authError.includes('state_mismatch')) {
+        return 'La sesión OAuth de vinculación expiró o cambió de dominio. Reintenta vincular Google desde esta pantalla.';
+    }
+
+    if (authError.includes('oauth_link_requires_custom_domain')) {
+        return 'Tu configuración actual de Auth requiere un dominio personalizado compartido para vincular Google. Contacta soporte o ajusta la configuración de Neon Auth.';
+    }
+
+    if (authError.includes('oauth_link_account_conflict')) {
+        return 'Esa cuenta de Google ya está vinculada a otro usuario. Inicia sesión con tu método original y usa otra cuenta de Google.';
+    }
+
+    if (authError.includes('oauth_link_already_linked')) {
+        return 'Google ya está vinculado a esta cuenta.';
+    }
+
+    if (authError.includes('oauth_link_no_session')) {
+        return 'Tu sesión expiró antes de iniciar la vinculación. Inicia sesión nuevamente e inténtalo otra vez.';
+    }
+
+    if (authError.includes('oauth_link_not_configured')) {
+        return 'La vinculación con Google no está configurada correctamente en el servidor.';
+    }
+
+    if (authError.includes('link_failed_')) {
+        return 'El servicio de autenticación rechazó la vinculación con Google. Intenta nuevamente en unos segundos.';
+    }
+
+    if (authError.includes('oauth_link_failed') || authError.includes('no_google_url') || authError.includes('server_error')) {
+        return 'No se pudo completar la vinculación con Google. Intenta nuevamente.';
+    }
+
+    return null;
+}
+
 async function reportOAuthLinkFailure(payload: {
     provider: 'google';
     error: string;
@@ -151,20 +189,24 @@ export default function AccountSecurityPage() {
      * Re-fetches the linked accounts status.
      * Called after link/unlink operations to verify the result.
      */
-    const refreshAccountStatus = async () => {
+    const refreshAccountStatus = async (): Promise<boolean | null> => {
         try {
             const authAny = authClient as any;
             const listAccounts = authAny?.listAccounts;
             if (typeof listAccounts === 'function') {
                 const result = await listAccounts();
                 const accounts = Array.isArray(result?.data) ? result.data : [];
+                const googleLinked = accounts.some((acc: any) => String(acc?.providerId || '').toLowerCase() === 'google');
                 setAccountStatus((prev) => ({
                     ...prev,
-                    googleLinked: accounts.some((acc: any) => String(acc?.providerId || '').toLowerCase() === 'google'),
+                    googleLinked,
                 }));
+                return googleLinked;
             }
         } catch {
         }
+
+        return null;
     };
 
     useEffect(() => {
@@ -251,13 +293,9 @@ export default function AccountSecurityPage() {
             });
         }
 
-        if (authError.includes('state_mismatch')) {
-            setError('La sesión OAuth de vinculación expiró o cambió de dominio. Reintenta vincular Google desde esta pantalla.');
-            return;
-        }
-
-        if (authError.includes('oauth_link_failed')) {
-            setError('No se pudo completar la vinculación con Google. Intenta nuevamente.');
+        const mappedMessage = getOAuthLinkErrorMessage(authError);
+        if (mappedMessage) {
+            setError(mappedMessage);
         }
     }, [searchParams, socialLinkCallbackURL, socialLinkErrorCallbackURL]);
 
@@ -266,9 +304,16 @@ export default function AccountSecurityPage() {
             // After returning from Google OAuth, verify the link actually happened
             // then show success message
             const verifyAndConfirm = async () => {
-                await refreshAccountStatus();
-                setSuccess('Google vinculado correctamente. Ya puedes iniciar sesión con ambos métodos.');
-                setError(null);
+                const linked = await refreshAccountStatus();
+
+                if (linked) {
+                    setSuccess('Google vinculado correctamente. Ya puedes iniciar sesión con ambos métodos.');
+                    setError(null);
+                } else {
+                    setSuccess(null);
+                    setError('El flujo con Google regresó, pero no se confirmó la vinculación. Reintenta desde esta pantalla.');
+                }
+
                 setBusy(null);
             };
             verifyAndConfirm();
@@ -451,40 +496,24 @@ export default function AccountSecurityPage() {
 
         setBusy('link-google');
 
+        // Navigate to the server-side link handler.
+        // This bypasses ALL cross-origin cookie issues by:
+        // 1. Server verifies session via app-domain cookies (first-party, reliable)
+        // 2. Server calls Neon Auth's link-social endpoint server-to-server
+        // 3. Server gets the Google OAuth URL and redirects the browser
+        // 4. Google callback goes to Neon Auth → links account → redirects to app
+        //
+        // This is a FULL PAGE NAVIGATION (not fetch), so the browser handles
+        // all cookies and redirects natively.
         try {
-            // Use the same-origin authClient (goes through /api/auth proxy) to call linkSocial.
-            // This is the official pattern used by Better Auth UI.
-            // The proxy handles session authentication via cookies (same-origin, no CORS issues).
-            // The OAuth state cookie is set on the APP domain as a first-party cookie,
-            // ensuring no third-party cookie blocking occurs.
-            const { error: apiError } = await authClient.linkSocial({
-                provider: 'google',
-                callbackURL: socialLinkCallbackURL,
-                errorCallbackURL: socialLinkErrorCallbackURL,
-            });
-
-            // If linkSocial succeeds, the SDK's redirect plugin navigates the browser
-            // to Google. The user returns via the neon_auth_session_verifier flow.
-            // We only reach here if there's an error before the redirect.
-
-            if (apiError) {
-                const raw = `${apiError.message || ''}`.toLowerCase();
-                if (raw.includes('unauthorized') || raw.includes('401') || raw.includes('session') || raw.includes('unauthenticated')) {
-                    setError('Tu sesión no es válida para vincular Google. Cierra sesión, vuelve a entrar e intenta nuevamente.');
-                } else if (raw.includes('already_linked') || raw.includes('already linked')) {
-                    setError('Esta cuenta de Google ya está vinculada a otro usuario.');
-                    // Refresh the linked status in case it was already linked to THIS user
-                    refreshAccountStatus();
-                } else if (raw.includes('email_doesn') || raw.includes('email doesn')) {
-                    setError('El email de Google no coincide con tu cuenta actual. Usa la cuenta Google con el mismo email para mantener la seguridad.');
-                } else {
-                    setError(apiError.message || 'No se pudo vincular Google en este momento');
-                }
-                setBusy(null);
-                return;
+            const linkUrl = new URL('/api/auth/link-google', window.location.origin);
+            const currentRedirectUri = searchParams.get('redirectUri');
+            if (currentRedirectUri) {
+                linkUrl.searchParams.set('redirectUri', currentRedirectUri);
             }
+            window.location.href = linkUrl.toString();
         } catch (err) {
-            console.error('[auth/account] linkSocial error:', err);
+            console.error('[auth/account] linkGoogle navigation error:', err);
             setError('Error inesperado al vincular Google. Intenta nuevamente.');
             setBusy(null);
         }

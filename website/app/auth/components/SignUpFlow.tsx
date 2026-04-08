@@ -25,6 +25,32 @@ function getSocialAuthErrorMessage(error: unknown, provider: string): string {
     return anyError.message || fallback;
 }
 
+function getOAuthCallbackErrorMessage(authError: string): string | null {
+    if (!authError) return null;
+
+    if (authError.includes('state_mismatch')) {
+        return 'La sesión OAuth expiró o cambió de dominio. Reintenta el registro con Google desde esta pantalla.';
+    }
+
+    if (authError.includes('account_not_linked') || authError.includes('user_already_exists')) {
+        return 'Ya existe una cuenta con este email. Inicia sesión y vincula Google desde Seguridad de Cuenta.';
+    }
+
+    if (authError.includes('oauth_link_requires_custom_domain')) {
+        return 'La configuración OAuth requiere dominio personalizado compartido para completar Google en este entorno.';
+    }
+
+    if (authError.includes('oauth_link_not_configured')) {
+        return 'La integración OAuth no está configurada correctamente en el servidor.';
+    }
+
+    if (authError.includes('link_failed_') || authError.includes('oauth_link_failed')) {
+        return 'No se pudo completar el registro con Google. Intenta nuevamente.';
+    }
+
+    return null;
+}
+
 async function reportOAuthFailure(payload: {
     provider: 'google';
     flow: 'sign-up';
@@ -93,13 +119,9 @@ export function SignUpFlow() {
             });
         }
 
-        if (authError.includes('state_mismatch')) {
-            setError('La sesión OAuth expiró o cambió de dominio. Reintenta el registro con Google desde esta pantalla.');
-            return;
-        }
-
-        if (authError.includes('account_not_linked') || authError.includes('user_already_exists')) {
-            setError('Ya existe una cuenta con este email. Inicia sesión y vincula Google desde Seguridad de Cuenta.');
+        const mappedMessage = getOAuthCallbackErrorMessage(authError);
+        if (mappedMessage) {
+            setError(mappedMessage);
         }
     }, [searchParams, redirectUri, callbackURL, errorCallbackURL]);
 
