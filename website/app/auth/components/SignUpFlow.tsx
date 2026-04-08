@@ -25,10 +25,38 @@ function getSocialAuthErrorMessage(error: unknown, provider: string): string {
     return anyError.message || fallback;
 }
 
+async function reportOAuthFailure(payload: {
+    provider: 'google';
+    flow: 'sign-up';
+    source: 'callback_query' | 'client_response';
+    error: string;
+    redirectUri: string | null;
+    callbackURL: string;
+    errorCallbackURL: string;
+    pagePath: string;
+    pageSearch: string;
+    userAgent: string;
+}) {
+    try {
+        await fetch('/api/auth/telemetry/oauth-link-failure', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify(payload),
+            credentials: 'include',
+            keepalive: true,
+        });
+    } catch {
+    }
+}
+
 export function SignUpFlow() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const reportedOAuthErrorRef = useRef<string | null>(null);
     const [step, setStep] = useState(1);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -49,6 +77,22 @@ export function SignUpFlow() {
         const authError = String(searchParams.get('error') || '').toLowerCase();
         if (!authError) return;
 
+        if (reportedOAuthErrorRef.current !== authError) {
+            reportedOAuthErrorRef.current = authError;
+            void reportOAuthFailure({
+                provider: 'google',
+                flow: 'sign-up',
+                source: 'callback_query',
+                error: authError,
+                redirectUri,
+                callbackURL,
+                errorCallbackURL,
+                pagePath: typeof window !== 'undefined' ? window.location.pathname : '/auth/sign-up',
+                pageSearch: typeof window !== 'undefined' ? window.location.search : '',
+                userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+            });
+        }
+
         if (authError.includes('state_mismatch')) {
             setError('La sesión OAuth expiró o cambió de dominio. Reintenta el registro con Google desde esta pantalla.');
             return;
@@ -57,7 +101,7 @@ export function SignUpFlow() {
         if (authError.includes('account_not_linked') || authError.includes('user_already_exists')) {
             setError('Ya existe una cuenta con este email. Inicia sesión y vincula Google desde Seguridad de Cuenta.');
         }
-    }, [searchParams]);
+    }, [searchParams, redirectUri, callbackURL, errorCallbackURL]);
 
     useEffect(() => {
         return () => {
@@ -80,6 +124,19 @@ export function SignUpFlow() {
             });
 
             if (authError) {
+                const raw = `${(authError as any)?.code || ''} ${(authError as any)?.statusText || ''} ${(authError as any)?.message || ''}`.toLowerCase().trim() || 'oauth_client_error';
+                void reportOAuthFailure({
+                    provider: 'google',
+                    flow: 'sign-up',
+                    source: 'client_response',
+                    error: raw.slice(0, 128),
+                    redirectUri,
+                    callbackURL,
+                    errorCallbackURL,
+                    pagePath: typeof window !== 'undefined' ? window.location.pathname : '/auth/sign-up',
+                    pageSearch: typeof window !== 'undefined' ? window.location.search : '',
+                    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+                });
                 setError(getSocialAuthErrorMessage(authError, provider));
                 setLoading(false);
                 return;

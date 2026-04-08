@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowLeft, Check, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { authClient } from '../../../src/lib/auth/client';
+import { authClient, directAuthClient } from '../../../src/lib/auth/client';
 import { buildAuthBridgeCallbackUrl, buildAuthPageUrl, buildSocialLinkCallbackUrl, toAbsoluteAppUrl } from '../../../src/lib/auth/redirects';
 import { performSignOut } from '../../../src/lib/auth/signout';
 
@@ -13,6 +13,31 @@ function getErrorMessage(error: unknown, fallback: string): string {
         return error.message;
     }
     return fallback;
+}
+
+async function reportOAuthLinkFailure(payload: {
+    provider: 'google';
+    error: string;
+    redirectUri: string | null;
+    callbackURL: string;
+    errorCallbackURL: string;
+    pagePath: string;
+    pageSearch: string;
+    userAgent: string;
+}) {
+    try {
+        await fetch('/api/auth/telemetry/oauth-link-failure', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify(payload),
+            credentials: 'include',
+            keepalive: true,
+        });
+    } catch {
+    }
 }
 
 async function callAuthProxy(paths: string[], payload?: Record<string, unknown>) {
@@ -50,6 +75,7 @@ export default function AccountSecurityPage() {
     const searchParams = useSearchParams();
     const { data: session } = authClient.useSession();
     const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const reportedOAuthErrorRef = useRef<string | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
@@ -189,6 +215,22 @@ export default function AccountSecurityPage() {
         const authError = String(searchParams.get('error') || '').toLowerCase();
         if (!authError) return;
 
+        const isLinkCallbackFailure = authError.includes('state_mismatch') || authError.includes('oauth_link_failed');
+        if (isLinkCallbackFailure && reportedOAuthErrorRef.current !== authError) {
+            reportedOAuthErrorRef.current = authError;
+
+            void reportOAuthLinkFailure({
+                provider: 'google',
+                error: authError,
+                redirectUri: searchParams.get('redirectUri'),
+                callbackURL: socialLinkCallbackURL,
+                errorCallbackURL: socialLinkErrorCallbackURL,
+                pagePath: typeof window !== 'undefined' ? window.location.pathname : '/auth/account',
+                pageSearch: typeof window !== 'undefined' ? window.location.search : '',
+                userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+            });
+        }
+
         if (authError.includes('state_mismatch')) {
             setError('La sesión OAuth de vinculación expiró o cambió de dominio. Reintenta vincular Google desde esta pantalla.');
             return;
@@ -197,7 +239,7 @@ export default function AccountSecurityPage() {
         if (authError.includes('oauth_link_failed')) {
             setError('No se pudo completar la vinculación con Google. Intenta nuevamente.');
         }
-    }, [searchParams]);
+    }, [searchParams, socialLinkCallbackURL, socialLinkErrorCallbackURL]);
 
     useEffect(() => {
         if (searchParams.get('linked') === 'google') {
@@ -369,7 +411,7 @@ export default function AccountSecurityPage() {
         setBusy('link-google');
 
         try {
-            const { error: apiError } = await authClient.linkSocial({
+            const { error: apiError } = await directAuthClient.linkSocial({
                 provider: 'google',
                 callbackURL: socialLinkCallbackURL,
                 errorCallbackURL: socialLinkErrorCallbackURL,
