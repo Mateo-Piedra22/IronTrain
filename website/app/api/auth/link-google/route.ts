@@ -110,29 +110,71 @@ export async function GET(req: NextRequest) {
         // Also include full cookie header as fallback
         const forwardCookies = neonCookies || rawCookies;
 
-        const linkSocialUrl = `${NEON_AUTH_BASE_URL}/link-social/google`;
-        
+        const linkSocialCandidates = [
+            {
+                url: `${NEON_AUTH_BASE_URL}/link-social`,
+                body: {
+                    provider: 'google',
+                    callbackURL: accountUrl.toString(),
+                    errorCallbackURL: errorUrl.toString(),
+                },
+            },
+            {
+                url: `${NEON_AUTH_BASE_URL}/link-social/google`,
+                body: {
+                    callbackURL: accountUrl.toString(),
+                    errorCallbackURL: errorUrl.toString(),
+                },
+            },
+            {
+                url: `${NEON_AUTH_BASE_URL}/link-social?provider=google`,
+                body: {
+                    callbackURL: accountUrl.toString(),
+                    errorCallbackURL: errorUrl.toString(),
+                },
+            },
+        ] as const;
+
         console.info('[link-google] Initiating server-to-server link-social call', {
             userId: session.user.id,
             callbackURL: accountUrl.toString(),
             neonAuthUrl: NEON_AUTH_BASE_URL,
+            candidateCount: linkSocialCandidates.length,
         });
 
-        const neonResponse = await fetch(linkSocialUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cookie': forwardCookies,
-                'Origin': origin,
-                'x-neon-auth-middleware': 'true',
-            },
-            body: JSON.stringify({
-                callbackURL: accountUrl.toString(),
-                errorCallbackURL: errorUrl.toString(),
-            }),
-            redirect: 'manual',
-            signal: AbortSignal.timeout(7000),
-        });
+        let neonResponse: Response | null = null;
+        let selectedCandidate: string | null = null;
+
+        for (const candidate of linkSocialCandidates) {
+            const response = await fetch(candidate.url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cookie': forwardCookies,
+                    'Origin': origin,
+                    'x-neon-auth-middleware': 'true',
+                },
+                body: JSON.stringify(candidate.body),
+                redirect: 'manual',
+                signal: AbortSignal.timeout(7000),
+            });
+
+            if (response.status === 404) {
+                continue;
+            }
+
+            neonResponse = response;
+            selectedCandidate = candidate.url;
+            break;
+        }
+
+        if (!neonResponse) {
+            console.error('[link-google] No matching link-social endpoint found (all returned 404)', {
+                userId: session.user.id,
+                endpoints: linkSocialCandidates.map((entry) => entry.url),
+            });
+            return buildAccountRedirect(req, { error: 'oauth_link_not_configured' });
+        }
 
         // 4. Extract Google OAuth URL from response
         let googleUrl: string | null = null;
@@ -151,6 +193,7 @@ export async function GET(req: NextRequest) {
             const errorBody = await neonResponse.text().catch(() => '');
             const inferredCode = inferNeonErrorCode(errorBody);
             console.error('[link-google] Neon Auth error:', {
+                endpoint: selectedCandidate,
                 status: neonResponse.status,
                 statusText: neonResponse.statusText,
                 inferredCode,
@@ -192,6 +235,7 @@ export async function GET(req: NextRequest) {
 
         console.info('[link-google] Redirecting to Google OAuth', {
             userId: session.user.id,
+            endpoint: selectedCandidate,
             setCookieCount: setCookies.length,
         });
 
