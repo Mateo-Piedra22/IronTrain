@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getNeonAuthServiceBaseUrl, getSafeNeonAuthCookieDomain } from '../../../../src/lib/auth/runtime';
+import { getNeonAuthServiceBaseUrl } from '../../../../src/lib/auth/runtime';
 import { auth } from '../../../../src/lib/auth/server';
 
 export const runtime = 'nodejs';
@@ -29,7 +29,6 @@ export const runtime = 'nodejs';
  */
 
 const NEON_AUTH_BASE_URL = getNeonAuthServiceBaseUrl() || '';
-const NEON_AUTH_COOKIE_DOMAIN = getSafeNeonAuthCookieDomain();
 
 function buildAccountRedirect(req: NextRequest, params: Record<string, string>): NextResponse {
     const origin = new URL(req.url).origin;
@@ -56,11 +55,6 @@ function inferNeonErrorCode(raw: string): string {
     if (message.includes('unauthorized') || message.includes('not authenticated')) return 'oauth_link_no_session';
 
     return 'oauth_link_failed';
-}
-
-function domainsAreCompatible(appHost: string, upstreamHost: string): boolean {
-    if (appHost === upstreamHost) return true;
-    return appHost.endsWith(`.${upstreamHost}`) || upstreamHost.endsWith(`.${appHost}`);
 }
 
 /**
@@ -99,18 +93,6 @@ export async function GET(req: NextRequest) {
 
         // 2. Build callback URLs
         const origin = new URL(req.url).origin;
-        const appHost = new URL(origin).hostname.toLowerCase();
-        const upstreamHost = new URL(NEON_AUTH_BASE_URL).hostname.toLowerCase();
-
-        if (!domainsAreCompatible(appHost, upstreamHost) && !NEON_AUTH_COOKIE_DOMAIN) {
-            console.warn('[link-google] OAuth linking blocked due to cross-domain cookie constraints', {
-                appHost,
-                upstreamHost,
-                hasCookieDomainOverride: Boolean(NEON_AUTH_COOKIE_DOMAIN),
-            });
-            return buildAccountRedirect(req, { error: 'oauth_link_requires_custom_domain' });
-        }
-
         const redirectUri = new URL(req.url).searchParams.get('redirectUri');
         
         const accountUrl = new URL('/auth/account', origin);
