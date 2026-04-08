@@ -14,6 +14,30 @@ const MAX_REDIRECT_URI_LENGTH = 512;
 const NEON_AUTH_SESSION_VERIFIER_PARAM = 'neon_auth_session_verifier';
 const NEON_AUTH_BASE_URL = getNeonAuthServiceBaseUrl() || '';
 const CANONICAL_APP_ORIGIN = getCanonicalAppOrigin();
+const DEBUG_OAUTH_EXCHANGE = process.env.AUTH_DEBUG_OAUTH_EXCHANGE === '1';
+
+function parseCookieNames(cookieHeader: string): string[] {
+    if (!cookieHeader) return [];
+    return cookieHeader
+        .split(';')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .map((entry) => entry.split('=')[0]?.trim() || '')
+        .filter(Boolean);
+}
+
+function countLikelyNeonCookies(cookieNames: string[]): number {
+    return cookieNames.filter((name) => {
+        const lower = name.toLowerCase();
+        return lower.includes('neon') || lower.includes('auth') || lower.includes('session');
+    }).length;
+}
+
+function getSetCookieNames(setCookieHeaders: string[]): string[] {
+    return setCookieHeaders
+        .map((raw) => raw.split(';')[0]?.split('=')[0]?.trim() || '')
+        .filter(Boolean);
+}
 
 function resolveCanonicalAuthRedirectUrl(request: NextRequest): URL | null {
     if (!shouldEnforceCanonicalAuthOrigin()) return null;
@@ -209,6 +233,9 @@ async function handleOAuthVerifierExchange(
     };
 
     try {
+        const requestHost = request.headers.get('host') || request.nextUrl.host;
+        const requestPath = request.nextUrl.pathname;
+
         if (!NEON_AUTH_BASE_URL) {
             console.error('[middleware] Missing NEON_AUTH_BASE_URL for OAuth verifier exchange');
             return buildFailureRedirect();
@@ -218,25 +245,40 @@ async function handleOAuthVerifierExchange(
         const upstreamUrl = new URL(`${NEON_AUTH_BASE_URL}/get-session`);
         upstreamUrl.searchParams.set(NEON_AUTH_SESSION_VERIFIER_PARAM, verifier);
 
-        // Forward Neon Auth cookies from the browser to the upstream
         const cookieHeader = request.headers.get('cookie') || '';
-        const neonCookies = cookieHeader
-            .split(';')
-            .map(c => c.trim())
-            .filter(c => c.startsWith('__Secure-neon-auth') || c.startsWith('neon-auth'))
-            .join('; ');
+        const cookieNames = parseCookieNames(cookieHeader);
+        const cookieCount = cookieNames.length;
+        const neonCookieCount = countLikelyNeonCookies(cookieNames);
+
+        if (DEBUG_OAUTH_EXCHANGE) {
+            console.info('[middleware] OAuth verifier exchange start', {
+                requestHost,
+                requestPath,
+                upstreamHost: upstreamUrl.host,
+                cookieCount,
+                neonCookieCount,
+            });
+        }
 
         const response = await fetch(upstreamUrl.toString(), {
             method: 'GET',
             headers: {
-                'Cookie': neonCookies || cookieHeader,
+                'Cookie': cookieHeader,
                 'x-neon-auth-middleware': 'true',
             },
             signal: AbortSignal.timeout(5000),
         });
 
         if (!response.ok) {
-            console.error('[middleware] OAuth verifier exchange failed:', response.status, response.statusText);
+            console.error('[middleware] OAuth verifier exchange failed', {
+                requestHost,
+                requestPath,
+                upstreamHost: upstreamUrl.host,
+                status: response.status,
+                statusText: response.statusText,
+                cookieCount,
+                neonCookieCount,
+            });
             return buildFailureRedirect();
         }
 
@@ -248,13 +290,30 @@ async function handleOAuthVerifierExchange(
 
         // Forward all Set-Cookie headers from the upstream response
         const setCookieHeaders = response.headers.getSetCookie();
+        const setCookieNames = getSetCookieNames(setCookieHeaders);
+
+        if (DEBUG_OAUTH_EXCHANGE) {
+            console.info('[middleware] OAuth verifier exchange success', {
+                requestHost,
+                requestPath,
+                upstreamHost: upstreamUrl.host,
+                status: response.status,
+                setCookieCount: setCookieHeaders.length,
+                setCookieNames,
+            });
+        }
+
         for (const cookie of setCookieHeaders) {
             redirectResponse.headers.append('Set-Cookie', cookie);
         }
 
         return redirectResponse;
     } catch (error) {
-        console.error('[middleware] OAuth verifier exchange error:', error);
+        console.error('[middleware] OAuth verifier exchange error', {
+            requestHost: request.headers.get('host') || request.nextUrl.host,
+            requestPath: request.nextUrl.pathname,
+            error: error instanceof Error ? error.message : String(error),
+        });
         return buildFailureRedirect();
     }
 }
