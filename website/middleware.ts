@@ -199,10 +199,19 @@ async function handleOAuthVerifierExchange(
     request: NextRequest,
     verifier: string,
 ): Promise<NextResponse | null> {
+    const buildFailureRedirect = () => {
+        const cleanUrl = request.nextUrl.clone();
+        cleanUrl.searchParams.delete(NEON_AUTH_SESSION_VERIFIER_PARAM);
+        if (!cleanUrl.searchParams.get('error')) {
+            cleanUrl.searchParams.set('error', 'state_mismatch');
+        }
+        return NextResponse.redirect(cleanUrl);
+    };
+
     try {
         if (!NEON_AUTH_BASE_URL) {
             console.error('[middleware] Missing NEON_AUTH_BASE_URL for OAuth verifier exchange');
-            return null;
+            return buildFailureRedirect();
         }
 
         // Build the get-session URL with the verifier parameter
@@ -228,7 +237,7 @@ async function handleOAuthVerifierExchange(
 
         if (!response.ok) {
             console.error('[middleware] OAuth verifier exchange failed:', response.status, response.statusText);
-            return null;
+            return buildFailureRedirect();
         }
 
         // Build NextResponse redirect that strips the verifier from the URL
@@ -246,7 +255,7 @@ async function handleOAuthVerifierExchange(
         return redirectResponse;
     } catch (error) {
         console.error('[middleware] OAuth verifier exchange error:', error);
-        return null;
+        return buildFailureRedirect();
     }
 }
 

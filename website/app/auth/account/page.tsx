@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowLeft, Check, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { authClient, directAuthClient } from '../../../src/lib/auth/client';
+import { authClient } from '../../../src/lib/auth/client';
 import { buildAuthBridgeCallbackUrl, buildAuthPageUrl, buildSocialLinkCallbackUrl, toAbsoluteAppUrl } from '../../../src/lib/auth/redirects';
 import { performSignOut } from '../../../src/lib/auth/signout';
 
@@ -369,7 +369,7 @@ export default function AccountSecurityPage() {
         setBusy('link-google');
 
         try {
-            const { error: apiError } = await directAuthClient.linkSocial({
+            const { error: apiError } = await authClient.linkSocial({
                 provider: 'google',
                 callbackURL: socialLinkCallbackURL,
                 errorCallbackURL: socialLinkErrorCallbackURL,
@@ -394,6 +394,11 @@ export default function AccountSecurityPage() {
     const handleUnlinkGoogle = async () => {
         resetMessages();
 
+        if (!accountStatus.googleLinked) {
+            setError('Google ya está desvinculado para esta cuenta.');
+            return;
+        }
+
         const confirmed = window.confirm('¿Seguro que deseas desvincular Google de esta cuenta?');
         if (!confirmed) return;
 
@@ -409,6 +414,14 @@ export default function AccountSecurityPage() {
                 if (!apiError) {
                     done = true;
                 } else {
+                    if (process.env.NODE_ENV === 'production') {
+                        console.info('[auth/account] unlinkAccount primary failed', {
+                            providerId: 'google',
+                            code: String((apiError as any)?.code || ''),
+                            message: String((apiError as any)?.message || ''),
+                        });
+                    }
+
                     const code = String((apiError as any)?.code || '').toLowerCase();
                     if (code.includes('cannot_unlink_last_account')) {
                         setError('No se puede desvincular Google porque es tu último método de acceso. Agrega otro método primero.');
@@ -427,6 +440,17 @@ export default function AccountSecurityPage() {
                 });
 
                 if (!fallback.ok) {
+                    if (process.env.NODE_ENV === 'production') {
+                        console.info('[auth/account] unlinkAccount fallback failed', {
+                            providerId: 'google',
+                            attemptedPaths: [
+                                '/api/auth/unlinkAccount',
+                                '/api/auth/account/unlink',
+                            ],
+                            error: String(fallback.error || ''),
+                        });
+                    }
+
                     const raw = String(fallback.error || '').toLowerCase();
                     if (raw.includes('cannot_unlink_last_account') || raw.includes('last account')) {
                         setError('No se puede desvincular Google porque es tu último método de acceso. Agrega otro método primero.');
@@ -778,7 +802,7 @@ export default function AccountSecurityPage() {
                         <button
                             type="button"
                             onClick={handleUnlinkGoogle}
-                            disabled={busy !== null}
+                            disabled={busy !== null || !accountStatus.googleLinked}
                             className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-[#f5f1e8] transition-colors"
                         >
                             {busy === 'unlink-google' ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Desvinculando</span> : 'Desvincular Google'}
