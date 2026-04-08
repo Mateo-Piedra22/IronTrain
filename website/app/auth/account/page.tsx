@@ -411,20 +411,49 @@ export default function AccountSecurityPage() {
         setBusy('link-google');
 
         try {
-            let bearerToken: string | null = null;
+            const primary = await authClient.linkSocial({
+                provider: 'google',
+                callbackURL: socialLinkCallbackURL,
+                errorCallbackURL: socialLinkErrorCallbackURL,
+            });
 
+            if (!primary.error) {
+                return;
+            }
+
+            const primaryRaw = `${primary.error.message || ''}`.toLowerCase();
+            const shouldTryDirectFallback =
+                primaryRaw.includes('state_mismatch') ||
+                primaryRaw.includes('oauth_link_failed') ||
+                primaryRaw.includes('callback') ||
+                primaryRaw.includes('redirect');
+
+            if (!shouldTryDirectFallback) {
+                if (primaryRaw.includes('email_doesn') || primaryRaw.includes('email doesn')) {
+                    setError('El email de Google no coincide con tu cuenta actual. Usa la cuenta Google con el mismo email para mantener la seguridad.');
+                } else {
+                    setError(primary.error.message || 'No se pudo vincular Google en este momento');
+                }
+                setBusy(null);
+                return;
+            }
+
+            let bearerToken: string | null = null;
             const authAny = authClient as any;
             const tokenFn = authAny?.token;
             if (typeof tokenFn === 'function') {
-                const tokenResult = await tokenFn();
-                const tokenValue = typeof tokenResult?.data?.token === 'string' ? tokenResult.data.token : null;
+                const tokenResult = await Promise.race([
+                    tokenFn(),
+                    new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+                ]);
+                const tokenValue = typeof (tokenResult as any)?.data?.token === 'string' ? (tokenResult as any).data.token : null;
                 if (tokenValue) {
                     bearerToken = tokenValue;
                 }
             }
 
             if (!bearerToken) {
-                setError('No se pudo obtener un token de sesión para vincular Google. Recarga la página e intenta nuevamente.');
+                setError('No se pudo completar la vinculación (fallback OAuth). Intenta cerrar sesión y volver a entrar.');
                 setBusy(null);
                 return;
             }
