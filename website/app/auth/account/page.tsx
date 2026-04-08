@@ -411,7 +411,7 @@ export default function AccountSecurityPage() {
         setBusy('link-google');
 
         try {
-            const { error: apiError } = await directAuthClient.linkSocial({
+            const { error: apiError } = await authClient.linkSocial({
                 provider: 'google',
                 callbackURL: socialLinkCallbackURL,
                 errorCallbackURL: socialLinkErrorCallbackURL,
@@ -419,6 +419,9 @@ export default function AccountSecurityPage() {
 
             if (apiError) {
                 const raw = `${apiError.message || ''}`.toLowerCase();
+                if (raw.includes('unauthorized') || raw.includes('401') || raw.includes('session')) {
+                    setError('Tu sesión no es válida para vincular Google. Cierra sesión, vuelve a entrar e intenta nuevamente.');
+                } else
                 if (raw.includes('email_doesn') || raw.includes('email doesn')) {
                     setError('El email de Google no coincide con tu cuenta actual. Usa la cuenta Google con el mismo email para mantener la seguridad.');
                 } else {
