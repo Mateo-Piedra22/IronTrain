@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowLeft, Check, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { authClient, directAuthClient } from '../../../src/lib/auth/client';
+import { authClient } from '../../../src/lib/auth/client';
 import { buildAuthBridgeCallbackUrl, buildAuthPageUrl, buildSocialLinkCallbackUrl, toAbsoluteAppUrl } from '../../../src/lib/auth/redirects';
 import { performSignOut } from '../../../src/lib/auth/signout';
 
@@ -147,6 +147,26 @@ export default function AccountSecurityPage() {
         };
     }, []);
 
+    /**
+     * Re-fetches the linked accounts status.
+     * Called after link/unlink operations to verify the result.
+     */
+    const refreshAccountStatus = async () => {
+        try {
+            const authAny = authClient as any;
+            const listAccounts = authAny?.listAccounts;
+            if (typeof listAccounts === 'function') {
+                const result = await listAccounts();
+                const accounts = Array.isArray(result?.data) ? result.data : [];
+                setAccountStatus((prev) => ({
+                    ...prev,
+                    googleLinked: accounts.some((acc: any) => String(acc?.providerId || '').toLowerCase() === 'google'),
+                }));
+            }
+        } catch {
+        }
+    };
+
     useEffect(() => {
         if (session?.user?.name) {
             setAuthName(String(session.user.name));
@@ -243,16 +263,24 @@ export default function AccountSecurityPage() {
 
     useEffect(() => {
         if (searchParams.get('linked') === 'google') {
-            setSuccess('Google vinculado correctamente. Ya puedes iniciar sesión con ambos métodos.');
-            setError(null);
+            // After returning from Google OAuth, verify the link actually happened
+            // then show success message
+            const verifyAndConfirm = async () => {
+                await refreshAccountStatus();
+                setSuccess('Google vinculado correctamente. Ya puedes iniciar sesión con ambos métodos.');
+                setError(null);
+                setBusy(null);
+            };
+            verifyAndConfirm();
 
             if (searchParams.get('redirectUri')) {
                 const timeout = window.setTimeout(() => {
                     router.replace(socialCallbackURL);
-                }, 900);
+                }, 1500);
                 return () => window.clearTimeout(timeout);
             }
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router, searchParams, socialCallbackURL]);
 
     const handleSendVerification = async (e: React.FormEvent) => {
@@ -408,46 +436,46 @@ export default function AccountSecurityPage() {
 
     const handleLinkGoogle = async () => {
         resetMessages();
+
+        // Guard: Prevent linking if already linked
+        if (accountStatus.googleLinked) {
+            setError('Google ya está vinculado a esta cuenta.');
+            return;
+        }
+
+        // Guard: Verify session exists before initiating OAuth flow
+        if (!session?.user?.id) {
+            setError('No hay sesión activa. Cierra sesión e ingresa nuevamente antes de vincular.');
+            return;
+        }
+
         setBusy('link-google');
 
         try {
-            let bearerToken: string | null = null;
-            const authAny = authClient as any;
-            const tokenFn = authAny?.token;
-            if (typeof tokenFn === 'function') {
-                const tokenResult = await Promise.race([
-                    tokenFn(),
-                    new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
-                ]);
-                const tokenValue = typeof (tokenResult as any)?.data?.token === 'string' ? (tokenResult as any).data.token : null;
-                if (tokenValue) {
-                    bearerToken = tokenValue;
-                }
-            }
-
-            if (!bearerToken) {
-                setError('No se pudo completar la vinculación (fallback OAuth). Intenta cerrar sesión y volver a entrar.');
-                setBusy(null);
-                return;
-            }
-
-            const { error: apiError } = await directAuthClient.linkSocial({
+            // Use the same-origin authClient (goes through /api/auth proxy) to call linkSocial.
+            // This is the official pattern used by Better Auth UI.
+            // The proxy handles session authentication via cookies (same-origin, no CORS issues).
+            // The OAuth state cookie is set on the APP domain as a first-party cookie,
+            // ensuring no third-party cookie blocking occurs.
+            const { error: apiError } = await authClient.linkSocial({
                 provider: 'google',
                 callbackURL: socialLinkCallbackURL,
                 errorCallbackURL: socialLinkErrorCallbackURL,
-                fetchOptions: {
-                    headers: {
-                        Authorization: `Bearer ${bearerToken}`,
-                    },
-                },
             });
+
+            // If linkSocial succeeds, the SDK's redirect plugin navigates the browser
+            // to Google. The user returns via the neon_auth_session_verifier flow.
+            // We only reach here if there's an error before the redirect.
 
             if (apiError) {
                 const raw = `${apiError.message || ''}`.toLowerCase();
-                if (raw.includes('unauthorized') || raw.includes('401') || raw.includes('session')) {
+                if (raw.includes('unauthorized') || raw.includes('401') || raw.includes('session') || raw.includes('unauthenticated')) {
                     setError('Tu sesión no es válida para vincular Google. Cierra sesión, vuelve a entrar e intenta nuevamente.');
-                } else
-                if (raw.includes('email_doesn') || raw.includes('email doesn')) {
+                } else if (raw.includes('already_linked') || raw.includes('already linked')) {
+                    setError('Esta cuenta de Google ya está vinculada a otro usuario.');
+                    // Refresh the linked status in case it was already linked to THIS user
+                    refreshAccountStatus();
+                } else if (raw.includes('email_doesn') || raw.includes('email doesn')) {
                     setError('El email de Google no coincide con tu cuenta actual. Usa la cuenta Google con el mismo email para mantener la seguridad.');
                 } else {
                     setError(apiError.message || 'No se pudo vincular Google en este momento');
@@ -455,8 +483,9 @@ export default function AccountSecurityPage() {
                 setBusy(null);
                 return;
             }
-        } catch {
-            setError('Error inesperado al vincular Google');
+        } catch (err) {
+            console.error('[auth/account] linkSocial error:', err);
+            setError('Error inesperado al vincular Google. Intenta nuevamente.');
             setBusy(null);
         }
     };
@@ -850,33 +879,42 @@ export default function AccountSecurityPage() {
                         </button>
                     </form>
 
-                    <div className="space-y-2 border border-[#1a1a2e]/10 rounded-xl p-4">
+                    <div className="space-y-3 border border-[#1a1a2e]/10 rounded-xl p-4">
                         <h2 className="text-[11px] font-black uppercase tracking-widest">Login Social</h2>
-                        <div className="text-[10px] font-bold uppercase opacity-50">
-                            Estado Google: {accountStatus.googleLinked ? 'VINCULADO' : 'NO_VINCULADO'}
+                        <div className={`text-[10px] font-bold uppercase flex items-center gap-2 ${accountStatus.googleLinked ? 'text-green-700' : 'opacity-50'}`}>
+                            <span className={`inline-block w-2 h-2 rounded-full ${accountStatus.googleLinked ? 'bg-green-500' : 'bg-gray-300'}`} />
+                            Google: {accountStatus.googleLinked ? 'VINCULADO' : 'NO VINCULADO'}
                         </div>
-                        <p className="text-[10px] font-bold uppercase opacity-60">
-                            Vincula Google para entrar con el mismo usuario sin crear cuentas duplicadas.
-                        </p>
-                        <p className="text-[10px] font-bold uppercase opacity-50">
-                            Recomendado: usa la misma dirección de email de tu cuenta actual.
-                        </p>
-                        <button
-                            type="button"
-                            onClick={handleLinkGoogle}
-                            disabled={busy !== null}
-                            className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-[#f5f1e8] transition-colors"
-                        >
-                            {busy === 'link-google' ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Vinculando</span> : 'Vincular Google'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleUnlinkGoogle}
-                            disabled={busy !== null || !accountStatus.googleLinked}
-                            className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-[#f5f1e8] transition-colors"
-                        >
-                            {busy === 'unlink-google' ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Desvinculando</span> : 'Desvincular Google'}
-                        </button>
+
+                        {!accountStatus.googleLinked && (
+                            <>
+                                <p className="text-[10px] font-bold uppercase opacity-60">
+                                    Vincula Google para entrar con el mismo usuario sin crear cuentas duplicadas.
+                                </p>
+                                <p className="text-[10px] font-bold uppercase opacity-50">
+                                    Recomendado: usa la misma dirección de email de tu cuenta actual.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={handleLinkGoogle}
+                                    disabled={busy !== null || accountStatus.googleLinked}
+                                    className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-black transition-colors flex justify-center items-center gap-2"
+                                >
+                                    {busy === 'link-google' ? <><Loader2 className="w-4 h-4 animate-spin" /> Redirigiendo a Google...</> : 'Vincular Google'}
+                                </button>
+                            </>
+                        )}
+
+                        {accountStatus.googleLinked && (
+                            <button
+                                type="button"
+                                onClick={handleUnlinkGoogle}
+                                disabled={busy !== null}
+                                className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-[#f5f1e8] transition-colors flex justify-center items-center gap-2"
+                            >
+                                {busy === 'unlink-google' ? <><Loader2 className="w-4 h-4 animate-spin" /> Desvinculando...</> : 'Desvincular Google'}
+                            </button>
+                        )}
                     </div>
 
                     <div className="space-y-2 border border-[#1a1a2e]/10 rounded-xl p-4">
