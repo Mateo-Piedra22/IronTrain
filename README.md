@@ -174,6 +174,7 @@ npm run build
 - Desarrollo: [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)
 - Base de datos: [`docs/DATABASE.md`](docs/DATABASE.md)
 - CI/CD: [`docs/CI_CD.md`](docs/CI_CD.md)
+- Guía GitHub para novato: [`docs/GIT_GITHUB_NOVATO.md`](docs/GIT_GITHUB_NOVATO.md)
 - Guardrails DevOps: [`docs/DEVOPS_GUARDRAILS.md`](docs/DEVOPS_GUARDRAILS.md)
 - Testing: [`docs/TESTING.md`](docs/TESTING.md)
 - Release: [`docs/RELEASE.md`](docs/RELEASE.md)
