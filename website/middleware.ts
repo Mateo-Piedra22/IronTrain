@@ -37,7 +37,10 @@ function parseCookieNames(cookieHeader: string): string[] {
 function hasSessionChallengeCookie(cookieNames: string[]): boolean {
     return cookieNames.some((name) => {
         const lower = name.toLowerCase();
-        return lower.includes('session_challenge') || lower.endsWith('.challenge');
+        return lower.includes('session_challenge')
+            || lower.includes('session_challange')
+            || lower.endsWith('.challenge')
+            || lower.endsWith('.challange');
     });
 }
 
