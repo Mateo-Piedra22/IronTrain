@@ -115,6 +115,27 @@ En la sección `## [VERSION] (Unreleased)`, describa los cambios realizados sigu
  - Lee el changelog desde `src/changelog.generated.json` y lo usa como notas del release.
  - Crea el Release en GitHub con el tag correspondiente y el contenido detallado del changelog.
  - Sube el binario (`.apk`) y el archivo de sumas de verificación (`sha256`).
+
+---
+
+### Promover a Staging (Controlado)
+
+Para evitar builds automáticos de `master` que promuevan cambios a `staging`, el proceso de promoción está controlado por dos mecanismos:
+
+- Trigger manual: usa el workflow de `Promote Android Build to Staging` desde la pestaña **Actions** → selecciona el workflow y pulsa **Run workflow** (este requiere la aprobación del Environment `staging`).
+- Trigger por commit: incluye la cadena `[promote]` en el mensaje del commit que quieras promover (por ejemplo: `chore: finish release 2.2.0 [promote]`). Si se detecta esa cadena en el `head_commit.message`, el workflow de promoción se ejecutará automáticamente y respetará las reglas del Environment `staging`.
+
+Uso recomendado:
+- Para despliegues controlados y revisados, ejecuta manualmente el workflow (`workflow_dispatch`).
+- Si necesitas automatizar una promoción por push, marca explícitamente el commit con `[promote]`.
+
+Ejemplo de commit para promover desde la rama `master`:
+```
+git commit -m "chore: release 2.2.1 [promote]"
+git push origin master
+```
+
+Nota de seguridad: la promoción a `staging` seguirá sometida a las reglas de protección del Environment (revisores, restricciones de quién puede desplegar, etc.).
  
  ---
  
