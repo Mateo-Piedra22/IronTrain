@@ -78,10 +78,12 @@ jobs:
           fi
 
           provenance_file="release-provenance-${tag}.json"
-          echo "apk_file=$apk_file" >> "$GITHUB_OUTPUT"
-          echo "metadata_file=$metadata_file" >> "$GITHUB_OUTPUT"
-          echo "apk_sha256=$calculated_sha" >> "$GITHUB_OUTPUT"
-          echo "provenance_file=$provenance_file" >> "$GITHUB_OUTPUT"
+          {
+            echo "apk_file=$apk_file"
+            echo "metadata_file=$metadata_file"
+            echo "apk_sha256=$calculated_sha"
+            echo "provenance_file=$provenance_file"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Generate provenance file
         shell: bash

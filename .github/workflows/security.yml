@@ -63,7 +63,7 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Audit root production dependencies (JSON)
-        run: npm audit --omit=dev --json > npm-audit-root.json
+        run: npm audit --omit=dev --json > npm-audit-root.json || true
 
       - name: Install dependencies (website)
         working-directory: ./website
@@ -71,7 +71,7 @@ jobs:
 
       - name: Audit website production dependencies (JSON)
         working-directory: ./website
-        run: npm audit --omit=dev --json > ../npm-audit-website.json
+        run: npm audit --omit=dev --json > ../npm-audit-website.json || true
 
       - name: Enforce audit policy with expiring waivers
         shell: bash

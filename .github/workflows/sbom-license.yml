@@ -41,11 +41,11 @@ jobs:
         run: npm ci
 
       - name: Generate SBOM (root)
-        run: npx -y @cyclonedx/cyclonedx-npm --output-file sbom-root.cdx.json --output-format JSON --omit dev
+        run: npx -y @cyclonedx/cyclonedx-npm --package-lock-only --output-file sbom-root.cdx.json --output-format JSON --omit dev
 
       - name: Generate SBOM (website)
         working-directory: ./website
-        run: npx -y @cyclonedx/cyclonedx-npm --output-file ../sbom-website.cdx.json --output-format JSON --omit dev
+        run: npx -y @cyclonedx/cyclonedx-npm --package-lock-only --output-file ../sbom-website.cdx.json --output-format JSON --omit dev
 
       - name: Export production licenses (root)
         run: npx -y license-checker --production --json > licenses-root.json

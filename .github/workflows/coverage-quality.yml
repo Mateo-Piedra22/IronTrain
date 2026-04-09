@@ -65,6 +65,7 @@ jobs:
 
       - name: Collect base branch coverage (PR only)
         if: github.event_name == 'pull_request'
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -200,4 +201,11 @@ jobs:
       - name: Publish report to workflow summary
         if: always()
         shell: bash
-        run: cat .coverage-artifacts/coverage-gate-report.md >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          if [ -f .coverage-artifacts/coverage-gate-report.md ]; then
+            cat .coverage-artifacts/coverage-gate-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "# Coverage Quality Report" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Coverage report was not generated due to an earlier step failure." >> "$GITHUB_STEP_SUMMARY"
+          fi
