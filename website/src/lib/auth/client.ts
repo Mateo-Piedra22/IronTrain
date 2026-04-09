@@ -1,31 +1,12 @@
 'use client';
 
-import { createAuthClient } from '@neondatabase/auth';
+import { createAuthClient as createDirectAuthClient } from '@neondatabase/auth';
+import { createAuthClient as createNextAuthClient } from '@neondatabase/auth/next';
 import { BetterAuthReactAdapter } from '@neondatabase/auth/react';
 
 const FALLBACK_NEON_AUTH_DIRECT_URL = 'https://ep-falling-wind-aca65w0x.neonauth.sa-east-1.aws.neon.tech/neondb/auth';
 
-function resolveAuthBaseUrl(): string {
-	const envAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
-	if (envAppUrl) {
-		try {
-			const canonical = new URL(envAppUrl);
-			return `${canonical.origin}/api/auth`;
-		} catch {
-			return `${envAppUrl.replace(/\/$/, '')}/api/auth`;
-		}
-	}
-
-	if (typeof window !== 'undefined' && window.location?.origin) {
-		return `${window.location.origin}/api/auth`;
-	}
-
-	return 'http://localhost:3000/api/auth';
-}
-
-export const authClient = createAuthClient(resolveAuthBaseUrl(), {
-	adapter: BetterAuthReactAdapter(),
-});
+export const authClient = createNextAuthClient();
 
 function resolveDirectAuthBaseUrl(): string {
 	const candidates = [
@@ -68,6 +49,6 @@ function resolveDirectAuthBaseUrl(): string {
  * authClient on the app domain and sending it as Authorization when calling
  * directAuthClient.linkSocial.
  */
-export const directAuthClient = createAuthClient(resolveDirectAuthBaseUrl(), {
+export const directAuthClient = createDirectAuthClient(resolveDirectAuthBaseUrl(), {
 	adapter: BetterAuthReactAdapter(),
 });

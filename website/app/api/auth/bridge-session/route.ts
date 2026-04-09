@@ -1,12 +1,26 @@
-import { NextResponse } from 'next/server';
-import { auth } from '../../../../src/lib/auth/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const result = await auth.getSession();
-        const data = result?.data ?? null;
+        const upstreamUrl = new URL('/api/auth/get-session', req.nextUrl.origin);
+        upstreamUrl.searchParams.set('disableCookieCache', 'true');
+
+        const response = await fetch(upstreamUrl.toString(), {
+            method: 'GET',
+            headers: {
+                cookie: req.headers.get('cookie') || '',
+                'x-requested-with': 'XMLHttpRequest',
+            },
+            cache: 'no-store',
+        });
+
+        if (!response.ok) {
+            return NextResponse.json({ session: null }, { status: 401 });
+        }
+
+        const data = await response.json().catch(() => null);
 
         if (!data?.session || !data?.user?.id) {
             return NextResponse.json({ session: null }, { status: 401 });
