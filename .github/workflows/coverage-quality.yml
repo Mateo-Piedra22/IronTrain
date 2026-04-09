@@ -205,7 +205,9 @@ jobs:
           if [ -f .coverage-artifacts/coverage-gate-report.md ]; then
             cat .coverage-artifacts/coverage-gate-report.md >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "# Coverage Quality Report" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "- Coverage report was not generated due to an earlier step failure." >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "# Coverage Quality Report"
+              echo ""
+              echo "- Coverage report was not generated due to an earlier step failure."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
