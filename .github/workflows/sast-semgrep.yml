@@ -32,11 +32,12 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
 
       - name: Install Semgrep
         run: |
-          pip install --disable-pip-version-check --upgrade pip setuptools
+          pip install --disable-pip-version-check --upgrade pip setuptools wheel
+          python -c "import pkg_resources; print('pkg_resources ready')"
           pip install --disable-pip-version-check semgrep==1.121.0
 
       - name: Run Semgrep
