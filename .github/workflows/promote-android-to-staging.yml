@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   build-and-release:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[promote]') }}
     runs-on: ubuntu-22.04
     timeout-minutes: 240
     environment: staging
