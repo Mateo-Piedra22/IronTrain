@@ -4,7 +4,7 @@ import { ArrowRight, Check, Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-reac
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { authClient } from '../../../src/lib/auth/client';
-import { buildAuthBridgeCallbackUrl, buildAuthPageUrl, toAbsoluteAppUrl } from '../../../src/lib/auth/redirects';
+import { buildAuthPageUrl, toAbsoluteAppUrl } from '../../../src/lib/auth/redirects';
 
 function getSocialAuthErrorMessage(error: unknown, provider: string): string {
     const fallback = `No se pudo iniciar con ${provider}`;
@@ -91,7 +91,22 @@ export function SignInFlow() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const redirectUri = searchParams.get('redirectUri');
-    const callbackURL = toAbsoluteAppUrl(buildAuthBridgeCallbackUrl(redirectUri));
+    const callbackURL = toAbsoluteAppUrl(
+        buildAuthPageUrl('/auth/bridge', redirectUri, {
+            source: 'website',
+            flow: 'sign-in',
+            method: 'email',
+            status: 'success',
+        })
+    );
+    const socialCallbackURL = toAbsoluteAppUrl(
+        buildAuthPageUrl('/auth/bridge', redirectUri, {
+            source: 'website',
+            flow: 'sign-in',
+            method: 'google',
+            status: 'success',
+        })
+    );
     const errorCallbackURL = toAbsoluteAppUrl(buildAuthPageUrl('/auth/sign-in', redirectUri));
     const newUserCallbackURL = toAbsoluteAppUrl(buildAuthPageUrl('/auth/sign-up', redirectUri));
 
@@ -107,7 +122,7 @@ export function SignInFlow() {
                 source: 'callback_query',
                 error: authError,
                 redirectUri,
-                callbackURL,
+                callbackURL: socialCallbackURL,
                 errorCallbackURL,
                 pagePath: typeof window !== 'undefined' ? window.location.pathname : '/auth/sign-in',
                 pageSearch: typeof window !== 'undefined' ? window.location.search : '',
@@ -119,7 +134,7 @@ export function SignInFlow() {
         if (mappedMessage) {
             setError(mappedMessage);
         }
-    }, [searchParams, redirectUri, callbackURL, errorCallbackURL]);
+    }, [searchParams, redirectUri, socialCallbackURL, errorCallbackURL]);
 
     useEffect(() => {
         return () => {
@@ -135,7 +150,7 @@ export function SignInFlow() {
         try {
             const { error: authError } = await authClient.signIn.social({
                 provider,
-                callbackURL,
+                callbackURL: socialCallbackURL,
                 errorCallbackURL,
                 newUserCallbackURL,
             });
@@ -148,7 +163,7 @@ export function SignInFlow() {
                     source: 'client_response',
                     error: raw.slice(0, 128),
                     redirectUri,
-                    callbackURL,
+                    callbackURL: socialCallbackURL,
                     errorCallbackURL,
                     pagePath: typeof window !== 'undefined' ? window.location.pathname : '/auth/sign-in',
                     pageSearch: typeof window !== 'undefined' ? window.location.search : '',

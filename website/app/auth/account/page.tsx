@@ -5,16 +5,74 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { authClient } from '../../../src/lib/auth/client';
-import { buildAuthBridgeCallbackUrl, buildAuthPageUrl, buildSocialLinkCallbackUrl, toAbsoluteAppUrl } from '../../../src/lib/auth/redirects';
+import { buildAuthPageUrl, buildSocialLinkCallbackUrl, toAbsoluteAppUrl } from '../../../src/lib/auth/redirects';
 import { performSignOut } from '../../../src/lib/auth/signout';
 
 const GOOGLE_GSI_SRC = 'https://accounts.google.com/gsi/client';
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const USERNAME_CHANGE_COOLDOWN_DAYS = 30;
+
+function normalizeEmail(value: string): string {
+    return value.trim().toLowerCase();
+}
+
+function validateEmailInput(value: string): string | null {
+    if (!value.trim()) return 'El email es obligatorio';
+    if (!EMAIL_REGEX.test(normalizeEmail(value))) return 'Formato de email inválido';
+    return null;
+}
+
+function validateUsernameInput(value: string): string | null {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return 'El username es obligatorio';
+    if (!/^[a-z0-9_]{3,20}$/.test(normalized)) {
+        return 'Usa 3-20 caracteres: minúsculas, números y _';
+    }
+    return null;
+}
+
+function validateDisplayNameInput(value: string): string | null {
+    const normalized = value.trim();
+    if (!normalized) return 'El nombre visible es obligatorio';
+    if (normalized.length > 50) return 'Máximo 50 caracteres';
+    return null;
+}
+
+function validateAuthNameInput(value: string): string | null {
+    const normalized = value.trim();
+    if (!normalized) return 'El nombre de cuenta es obligatorio';
+    if (normalized.length > 80) return 'Máximo 80 caracteres';
+    return null;
+}
+
+function getPasswordPolicyMessage(password: string): string | null {
+    const normalized = password.trim();
+    if (!normalized) return 'La contraseña nueva es obligatoria';
+    if (normalized.length < 8) return 'Mínimo 8 caracteres';
+    if (!/[a-z]/.test(normalized) || !/[A-Z]/.test(normalized)) return 'Incluye mayúsculas y minúsculas';
+    if (!/[0-9]/.test(normalized)) return 'Incluye al menos 1 número';
+    return null;
+}
 
 function getErrorMessage(error: unknown, fallback: string): string {
     if (error instanceof Error && error.message) {
         return error.message;
     }
     return fallback;
+}
+
+function formatDateShort(value: Date | null): string | null {
+    if (!value) return null;
+    if (Number.isNaN(value.getTime())) return null;
+    try {
+        return new Intl.DateTimeFormat('es-AR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+        }).format(value);
+    } catch {
+        return null;
+    }
 }
 
 function getOAuthLinkErrorMessage(authError: string): string | null {
@@ -228,6 +286,8 @@ export default function AccountSecurityPage() {
     const [deletePassword, setDeletePassword] = useState('');
     const [profileDisplayName, setProfileDisplayName] = useState('');
     const [profileUsername, setProfileUsername] = useState('');
+    const [savedProfileUsername, setSavedProfileUsername] = useState('');
+    const [profileLastUsernameChangeAt, setProfileLastUsernameChangeAt] = useState<string | null>(null);
     const [profilePublic, setProfilePublic] = useState(true);
     const [authName, setAuthName] = useState('');
     const [accountEmail, setAccountEmail] = useState('');
@@ -235,6 +295,113 @@ export default function AccountSecurityPage() {
         googleLinked: false,
         sessions: null,
     });
+
+    const normalizedAccountEmail = useMemo(() => normalizeEmail(accountEmail), [accountEmail]);
+    const normalizedVerifyEmail = useMemo(() => normalizeEmail(verifyEmail), [verifyEmail]);
+    const normalizedNewEmail = useMemo(() => normalizeEmail(newEmail), [newEmail]);
+    const trimmedCurrentPassword = useMemo(() => currentPassword.trim(), [currentPassword]);
+    const trimmedNewPassword = useMemo(() => newPassword.trim(), [newPassword]);
+    const trimmedDisplayName = useMemo(() => profileDisplayName.trim(), [profileDisplayName]);
+    const normalizedProfileUsername = useMemo(() => profileUsername.trim().toLowerCase(), [profileUsername]);
+    const normalizedSavedProfileUsername = useMemo(() => savedProfileUsername.trim().toLowerCase(), [savedProfileUsername]);
+    const isUsernameChanging = useMemo(
+        () => normalizedProfileUsername !== normalizedSavedProfileUsername,
+        [normalizedProfileUsername, normalizedSavedProfileUsername]
+    );
+
+    const hasVerifiedEmail = useMemo(() => {
+        const user = session?.user as Record<string, unknown> | undefined;
+        if (!user) return false;
+
+        if (typeof user.emailVerified === 'boolean') return user.emailVerified;
+        if (typeof user.email_verified === 'boolean') return user.email_verified;
+        if (typeof user.verified === 'boolean') return user.verified;
+
+        if (typeof user.emailVerifiedAt === 'string' && user.emailVerifiedAt.length > 0) return true;
+        if (typeof user.email_verified_at === 'string' && user.email_verified_at.length > 0) return true;
+
+        return false;
+    }, [session]);
+
+    const usernameCooldownDaysRemaining = useMemo(() => {
+        if (!profileLastUsernameChangeAt || !isUsernameChanging) return 0;
+
+        const lastChangeDate = new Date(profileLastUsernameChangeAt);
+        if (Number.isNaN(lastChangeDate.getTime())) return 0;
+
+        const diffMs = Date.now() - lastChangeDate.getTime();
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const daysRemaining = USERNAME_CHANGE_COOLDOWN_DAYS - diffDays;
+
+        return daysRemaining > 0 ? daysRemaining : 0;
+    }, [profileLastUsernameChangeAt, isUsernameChanging]);
+
+    const nextUsernameChangeDate = useMemo(() => {
+        if (!profileLastUsernameChangeAt) return null;
+        const lastChangeDate = new Date(profileLastUsernameChangeAt);
+        if (Number.isNaN(lastChangeDate.getTime())) return null;
+        const nextDate = new Date(lastChangeDate);
+        nextDate.setDate(nextDate.getDate() + USERNAME_CHANGE_COOLDOWN_DAYS);
+        return nextDate;
+    }, [profileLastUsernameChangeAt]);
+
+    const nextUsernameChangeDateLabel = useMemo(() => formatDateShort(nextUsernameChangeDate), [nextUsernameChangeDate]);
+    const trimmedAuthName = useMemo(() => authName.trim(), [authName]);
+    const trimmedDeletePassword = useMemo(() => deletePassword.trim(), [deletePassword]);
+
+    const verifyEmailError = useMemo(() => validateEmailInput(verifyEmail), [verifyEmail]);
+    const verifyEmailRestrictionError = useMemo(() => {
+        if (!normalizedAccountEmail) return 'No hay email principal en la sesión actual';
+        if (normalizedVerifyEmail !== normalizedAccountEmail) return 'Debes verificar el email principal actual de la cuenta';
+        if (hasVerifiedEmail) return 'Este email ya está verificado';
+        return null;
+    }, [hasVerifiedEmail, normalizedAccountEmail, normalizedVerifyEmail]);
+    const newEmailError = useMemo(() => {
+        const formatError = validateEmailInput(newEmail);
+        if (formatError) return formatError;
+        if (normalizedNewEmail === normalizedAccountEmail) return 'El nuevo email debe ser diferente al actual';
+        return null;
+    }, [newEmail, normalizedAccountEmail, normalizedNewEmail]);
+
+    const currentPasswordError = useMemo(() => {
+        if (!trimmedCurrentPassword) return 'La contraseña actual es obligatoria';
+        if (trimmedCurrentPassword.length < 8) return 'La contraseña actual debe tener al menos 8 caracteres';
+        return null;
+    }, [trimmedCurrentPassword]);
+
+    const newPasswordError = useMemo(() => {
+        const policyError = getPasswordPolicyMessage(newPassword);
+        if (policyError) return policyError;
+        if (trimmedCurrentPassword && trimmedCurrentPassword === trimmedNewPassword) {
+            return 'La nueva contraseña debe ser distinta de la actual';
+        }
+        return null;
+    }, [newPassword, trimmedCurrentPassword, trimmedNewPassword]);
+
+    const profileDisplayNameError = useMemo(() => validateDisplayNameInput(profileDisplayName), [profileDisplayName]);
+    const profileUsernameError = useMemo(() => validateUsernameInput(profileUsername), [profileUsername]);
+    const profileUsernameRestrictionError = useMemo(() => {
+        if (usernameCooldownDaysRemaining <= 0) return null;
+        return `Solo podés cambiar tu username una vez cada ${USERNAME_CHANGE_COOLDOWN_DAYS} días. Faltan ${usernameCooldownDaysRemaining} días.`;
+    }, [usernameCooldownDaysRemaining]);
+    const authNameError = useMemo(() => validateAuthNameInput(authName), [authName]);
+    const deletePasswordError = useMemo(() => {
+        if (!trimmedDeletePassword) return 'Debes ingresar tu contraseña actual';
+        if (trimmedDeletePassword.length < 8) return 'La contraseña debe tener al menos 8 caracteres';
+        return null;
+    }, [trimmedDeletePassword]);
+
+    const canSendVerification = !verifyEmailError && !verifyEmailRestrictionError;
+    const canChangeEmail = !newEmailError;
+    const canChangePassword = !currentPasswordError && !newPasswordError;
+    const canUpdateProfileIdentity = !profileDisplayNameError && !profileUsernameError && !profileUsernameRestrictionError;
+    const canUpdateAuthName = !authNameError;
+    const canDeleteAccount = !deletePasswordError;
+
+    const panelClass = (isActive: boolean) =>
+        `space-y-2 border border-[#1a1a2e]/10 rounded-xl p-4 transition-all duration-300 ${
+            isActive ? 'ring-2 ring-[#1a1a2e]/20 shadow-md bg-[#fcfaf6]' : 'hover:shadow-sm hover:-translate-y-[1px]'
+        }`;
 
     useEffect(() => {
         return () => {
@@ -339,6 +506,8 @@ export default function AccountSecurityPage() {
 
                 setProfileDisplayName(String(profile.displayName || ''));
                 setProfileUsername(String(profile.username || ''));
+                setSavedProfileUsername(String(profile.username || ''));
+                setProfileLastUsernameChangeAt(profile.lastUsernameChangeAt ? String(profile.lastUsernameChangeAt) : null);
                 setProfilePublic(Boolean(profile.isPublic ?? true));
             } catch {
             }
@@ -356,10 +525,27 @@ export default function AccountSecurityPage() {
         setSuccess(null);
     };
 
-    const callbackURL = useMemo(() => toAbsoluteAppUrl('/auth/bridge'), []);
+    const callbackURL = useMemo(
+        () => toAbsoluteAppUrl(
+            buildAuthPageUrl('/auth/bridge', searchParams.get('redirectUri'), {
+                source: 'website',
+                flow: 'account',
+                method: 'email',
+                status: 'success',
+            })
+        ),
+        [searchParams]
+    );
 
     const socialCallbackURL = useMemo(
-        () => toAbsoluteAppUrl(buildAuthBridgeCallbackUrl(searchParams.get('redirectUri'))),
+        () => toAbsoluteAppUrl(
+            buildAuthPageUrl('/auth/bridge', searchParams.get('redirectUri'), {
+                source: 'website',
+                flow: 'account-link',
+                method: 'google',
+                status: 'linked',
+            })
+        ),
         [searchParams]
     );
 
@@ -372,6 +558,14 @@ export default function AccountSecurityPage() {
         () => toAbsoluteAppUrl(buildAuthPageUrl('/auth/account', searchParams.get('redirectUri'), { error: 'oauth_link_failed' })),
         [searchParams]
     );
+
+    const accountBackHref = useMemo(() => {
+        const normalizedUsername = profileUsername.trim().replace(/^@+/, '');
+        if (/^[a-z0-9_]{3,20}$/.test(normalizedUsername)) {
+            return `/user/${normalizedUsername}`;
+        }
+        return '/user/me';
+    }, [profileUsername]);
 
     useEffect(() => {
         const authError = String(searchParams.get('error') || '').toLowerCase();
@@ -431,11 +625,22 @@ export default function AccountSecurityPage() {
     const handleSendVerification = async (e: React.FormEvent) => {
         e.preventDefault();
         resetMessages();
+
+        if (verifyEmailError) {
+            setError(verifyEmailError);
+            return;
+        }
+
+        if (verifyEmailRestrictionError) {
+            setError(verifyEmailRestrictionError);
+            return;
+        }
+
         setBusy('verify');
 
         try {
             const { error: apiError } = await authClient.sendVerificationEmail({
-                email: verifyEmail,
+                email: normalizedVerifyEmail,
                 callbackURL,
             });
             if (apiError) {
@@ -454,11 +659,17 @@ export default function AccountSecurityPage() {
     const handleChangeEmail = async (e: React.FormEvent) => {
         e.preventDefault();
         resetMessages();
+
+        if (newEmailError) {
+            setError(newEmailError);
+            return;
+        }
+
         setBusy('email');
 
         try {
             const { error: apiError } = await authClient.changeEmail({
-                newEmail,
+                newEmail: normalizedNewEmail,
                 callbackURL,
             });
             if (apiError) {
@@ -478,12 +689,23 @@ export default function AccountSecurityPage() {
     const handleChangePassword = async (e: React.FormEvent) => {
         e.preventDefault();
         resetMessages();
+
+        if (currentPasswordError) {
+            setError(currentPasswordError);
+            return;
+        }
+
+        if (newPasswordError) {
+            setError(newPasswordError);
+            return;
+        }
+
         setBusy('password');
 
         try {
             const { error: apiError } = await authClient.changePassword({
-                currentPassword,
-                newPassword,
+                currentPassword: trimmedCurrentPassword,
+                newPassword: trimmedNewPassword,
                 revokeOtherSessions: true,
             });
             if (apiError) {
@@ -504,22 +726,23 @@ export default function AccountSecurityPage() {
     const handleUpdateProfileIdentity = async (e: React.FormEvent) => {
         e.preventDefault();
         resetMessages();
+
+        if (profileDisplayNameError) {
+            setError(profileDisplayNameError);
+            return;
+        }
+
+        if (profileUsernameError) {
+            setError(profileUsernameError);
+            return;
+        }
+
+        if (profileUsernameRestrictionError) {
+            setError(profileUsernameRestrictionError);
+            return;
+        }
+
         setBusy('profile-identity');
-
-        const normalizedDisplayName = profileDisplayName.trim();
-        const normalizedUsername = profileUsername.trim().toLowerCase();
-
-        if (normalizedDisplayName.length < 1 || normalizedDisplayName.length > 50) {
-            setError('El nombre visible debe tener entre 1 y 50 caracteres');
-            setBusy(null);
-            return;
-        }
-
-        if (!/^[a-z0-9_]{3,20}$/.test(normalizedUsername)) {
-            setError('El username debe tener entre 3 y 20 caracteres y usar solo minúsculas, números y _');
-            setBusy(null);
-            return;
-        }
 
         try {
             const response = await fetch('/api/social/profile', {
@@ -529,8 +752,8 @@ export default function AccountSecurityPage() {
                     'X-Requested-With': 'XMLHttpRequest',
                 },
                 body: JSON.stringify({
-                    displayName: normalizedDisplayName,
-                    username: normalizedUsername,
+                    displayName: trimmedDisplayName,
+                    username: normalizedProfileUsername,
                     isPublic: profilePublic,
                 }),
             });
@@ -540,8 +763,12 @@ export default function AccountSecurityPage() {
                 throw new Error(data.error || 'No se pudo actualizar el perfil');
             }
 
-            setProfileDisplayName(normalizedDisplayName);
-            setProfileUsername(normalizedUsername);
+            setProfileDisplayName(trimmedDisplayName);
+            setProfileUsername(normalizedProfileUsername);
+            if (isUsernameChanging) {
+                setSavedProfileUsername(normalizedProfileUsername);
+                setProfileLastUsernameChangeAt(new Date().toISOString());
+            }
             setSuccess('Perfil actualizado correctamente');
         } catch (updateError: unknown) {
             setError(getErrorMessage(updateError, 'Error inesperado al actualizar perfil'));
@@ -553,17 +780,16 @@ export default function AccountSecurityPage() {
     const handleUpdateAuthName = async (e: React.FormEvent) => {
         e.preventDefault();
         resetMessages();
-        setBusy('auth-name');
 
-        const normalizedName = authName.trim();
-        if (normalizedName.length < 1 || normalizedName.length > 80) {
-            setError('El nombre de cuenta debe tener entre 1 y 80 caracteres');
-            setBusy(null);
+        if (authNameError) {
+            setError(authNameError);
             return;
         }
 
+        setBusy('auth-name');
+
         try {
-            const { error: apiError } = await authClient.updateUser({ name: normalizedName });
+            const { error: apiError } = await authClient.updateUser({ name: trimmedAuthName });
             if (apiError) {
                 setError(apiError.message || 'No se pudo actualizar el nombre de cuenta');
                 setBusy(null);
@@ -772,19 +998,17 @@ export default function AccountSecurityPage() {
         e.preventDefault();
         resetMessages();
 
+        if (deletePasswordError) {
+            setError(deletePasswordError);
+            return;
+        }
+
         const confirmed = window.confirm('Esta acción eliminará tu cuenta y datos de forma irreversible. ¿Deseas continuar?');
         if (!confirmed) {
             return;
         }
 
         setBusy('delete');
-
-        const trimmedDeletePassword = deletePassword.trim();
-        if (!trimmedDeletePassword) {
-            setError('Debes confirmar tu contraseña para eliminar la cuenta');
-            setBusy(null);
-            return;
-        }
 
         try {
             const wipe = await fetch('/api/sync/wipe', {
@@ -896,7 +1120,7 @@ export default function AccountSecurityPage() {
     return (
         <div className="min-h-screen bg-[#f5f1e8] flex flex-col items-center justify-center p-6 font-mono text-[#1a1a2e]">
             <div className="w-full max-w-lg space-y-4">
-                <Link href="/auth/bridge" className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity">
+                <Link href={accountBackHref} className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity">
                     <ArrowLeft className="w-3 h-3" /> Volver
                 </Link>
 
@@ -907,115 +1131,32 @@ export default function AccountSecurityPage() {
                     </div>
 
                     {error && (
-                        <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-[10px] font-bold text-red-600 uppercase text-center">
+                        <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-[10px] font-bold text-red-600 uppercase text-center shadow-sm transition-all duration-300">
                             {error}
                         </div>
                     )}
 
                     {success && (
-                        <div className="p-3 bg-green-50 border border-green-100 rounded-xl text-[10px] font-bold text-green-700 uppercase text-center flex items-center justify-center gap-2">
+                        <div className="p-3 bg-green-50 border border-green-100 rounded-xl text-[10px] font-bold text-green-700 uppercase text-center flex items-center justify-center gap-2 shadow-sm transition-all duration-300">
                             <Check className="w-4 h-4" /> {success}
                         </div>
                     )}
 
-                    <form onSubmit={handleSendVerification} className="space-y-2 border border-[#1a1a2e]/10 rounded-xl p-4">
-                        <h2 className="text-[11px] font-black uppercase tracking-widest">Verificar Email</h2>
-                        <input
-                            type="email"
-                            value={verifyEmail}
-                            onChange={(e) => setVerifyEmail(e.target.value)}
-                            required
-                            placeholder="email@ejemplo.com"
-                            className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20"
-                        />
-                        <button type="submit" disabled={busy !== null} className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex justify-center items-center gap-2">
-                            {busy === 'verify' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Enviar verificación'}
-                        </button>
-                    </form>
-
-                    <form onSubmit={handleChangeEmail} className="space-y-2 border border-[#1a1a2e]/10 rounded-xl p-4">
-                        <h2 className="text-[11px] font-black uppercase tracking-widest">Cambiar Email</h2>
-                        <input
-                            type="email"
-                            value={newEmail}
-                            onChange={(e) => setNewEmail(e.target.value)}
-                            required
-                            placeholder="nuevo@email.com"
-                            className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20"
-                        />
-                        <button type="submit" disabled={busy !== null} className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex justify-center items-center gap-2">
-                            {busy === 'email' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Solicitar cambio'}
-                        </button>
-                    </form>
-
-                    <form onSubmit={handleChangePassword} className="space-y-2 border border-[#1a1a2e]/10 rounded-xl p-4">
-                        <h2 className="text-[11px] font-black uppercase tracking-widest">Cambiar Contraseña</h2>
-                        <input
-                            type="password"
-                            value={currentPassword}
-                            onChange={(e) => setCurrentPassword(e.target.value)}
-                            required
-                            minLength={8}
-                            placeholder="Contraseña actual"
-                            className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20"
-                        />
-                        <input
-                            type="password"
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            required
-                            minLength={8}
-                            placeholder="Nueva contraseña"
-                            className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20"
-                        />
-                        <button type="submit" disabled={busy !== null} className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex justify-center items-center gap-2">
-                            {busy === 'password' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Actualizar contraseña'}
-                        </button>
-                    </form>
-
-                    <form onSubmit={handleUpdateProfileIdentity} className="space-y-2 border border-[#1a1a2e]/10 rounded-xl p-4">
-                        <h2 className="text-[11px] font-black uppercase tracking-widest">Perfil Público (IronTrain)</h2>
-                        <input
-                            type="text"
-                            value={profileDisplayName}
-                            onChange={(e) => setProfileDisplayName(e.target.value)}
-                            required
-                            minLength={1}
-                            maxLength={50}
-                            placeholder="Nombre visible"
-                            className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20"
-                        />
-                        <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black opacity-40">@</span>
-                            <input
-                                type="text"
-                                value={profileUsername}
-                                onChange={(e) => setProfileUsername(e.target.value.toLowerCase())}
-                                required
-                                minLength={3}
-                                maxLength={20}
-                                pattern="[a-z0-9_]+"
-                                title="Solo minúsculas, números y guiones bajos"
-                                placeholder="username"
-                                className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl pl-8 pr-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20"
-                            />
+                    <div className="grid grid-cols-2 gap-2 text-[9px] uppercase tracking-wider">
+                        <div className="rounded-xl border border-[#1a1a2e]/10 bg-[#f8f5ee] px-3 py-2 font-black transition-all duration-300 hover:shadow-sm">
+                            Email: {hasVerifiedEmail ? 'VERIFICADO' : 'PENDIENTE'}
                         </div>
-                        <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest opacity-70">
-                            <input
-                                type="checkbox"
-                                checked={profilePublic}
-                                onChange={(e) => setProfilePublic(e.target.checked)}
-                                className="accent-[#1a1a2e]"
-                            />
-                            Perfil público
-                        </label>
-                        <button type="submit" disabled={busy !== null} className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex justify-center items-center gap-2">
-                            {busy === 'profile-identity' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Guardar perfil'}
-                        </button>
-                    </form>
+                        <div className="rounded-xl border border-[#1a1a2e]/10 bg-[#f8f5ee] px-3 py-2 font-black transition-all duration-300 hover:shadow-sm">
+                            Google: {accountStatus.googleLinked ? 'VINCULADO' : 'NO VINCULADO'}
+                        </div>
+                        <div className="rounded-xl border border-[#1a1a2e]/10 bg-[#f8f5ee] px-3 py-2 font-black transition-all duration-300 hover:shadow-sm col-span-2">
+                            Sesiones activas: {accountStatus.sessions === null ? 'N/D' : String(accountStatus.sessions)}
+                        </div>
+                    </div>
 
-                    <form onSubmit={handleUpdateAuthName} className="space-y-2 border border-[#1a1a2e]/10 rounded-xl p-4">
-                        <h2 className="text-[11px] font-black uppercase tracking-widest">Cuenta Auth</h2>
+                    <form onSubmit={handleUpdateAuthName} className={panelClass(busy === 'auth-name')}>
+                        <h2 className="text-[11px] font-black uppercase tracking-widest">[P1] Cuenta Auth</h2>
+                        <p className="text-[10px] font-bold uppercase opacity-50">Identidad principal de acceso y estado real de verificación.</p>
                         <input
                             type="text"
                             value={authName}
@@ -1024,21 +1165,101 @@ export default function AccountSecurityPage() {
                             minLength={1}
                             maxLength={80}
                             placeholder="Nombre de cuenta"
-                            className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20"
+                            className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20 transition-all"
                         />
+                        <div className="flex items-center justify-between text-[9px] uppercase tracking-wider">
+                            <span className={authNameError ? 'text-red-600 font-black' : 'opacity-40 font-bold'}>{authNameError || 'Nombre listo para guardar'}</span>
+                            <span className="opacity-30 font-black">{trimmedAuthName.length}/80</span>
+                        </div>
                         <input
                             type="email"
                             value={accountEmail}
                             readOnly
                             className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold opacity-70"
                         />
-                        <button type="submit" disabled={busy !== null} className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex justify-center items-center gap-2">
+                        <div className="text-[9px] uppercase tracking-wider font-black opacity-50">
+                            Estado de verificación: {hasVerifiedEmail ? 'VERIFICADO' : 'PENDIENTE'}
+                        </div>
+                        <button type="submit" disabled={busy !== null || !canUpdateAuthName} className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex justify-center items-center gap-2 transition-all hover:scale-[1.01]">
                             {busy === 'auth-name' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Actualizar nombre de cuenta'}
                         </button>
                     </form>
 
-                    <div className="space-y-3 border border-[#1a1a2e]/10 rounded-xl p-4">
-                        <h2 className="text-[11px] font-black uppercase tracking-widest">Login Social</h2>
+                    <form onSubmit={handleSendVerification} className={panelClass(busy === 'verify')}>
+                        <h2 className="text-[11px] font-black uppercase tracking-widest">[P2] Verificar Email</h2>
+                        <p className="text-[10px] font-bold uppercase opacity-50">Reenvía email de verificación para mantener la cuenta confirmada.</p>
+                        <input
+                            type="email"
+                            value={verifyEmail}
+                            onChange={(e) => setVerifyEmail(e.target.value)}
+                            required
+                            disabled={hasVerifiedEmail}
+                            placeholder="email@ejemplo.com"
+                            className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20 transition-all"
+                        />
+                        <div className="flex items-center justify-between text-[9px] uppercase tracking-wider">
+                            <span className={verifyEmailError || verifyEmailRestrictionError ? 'text-red-600 font-black' : 'opacity-40 font-bold'}>
+                                {verifyEmailError || verifyEmailRestrictionError || 'Formato correcto'}
+                            </span>
+                            <span className="opacity-30 font-black">{normalizedVerifyEmail.length}/120</span>
+                        </div>
+                        <button type="submit" disabled={busy !== null || !canSendVerification} className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex justify-center items-center gap-2 transition-all hover:scale-[1.01]">
+                            {busy === 'verify' ? <Loader2 className="w-4 h-4 animate-spin" /> : hasVerifiedEmail ? 'Email ya verificado' : 'Enviar verificación'}
+                        </button>
+                    </form>
+
+                    <form onSubmit={handleChangeEmail} className={panelClass(busy === 'email')}>
+                        <h2 className="text-[11px] font-black uppercase tracking-widest">[P2] Cambiar Email</h2>
+                        <p className="text-[10px] font-bold uppercase opacity-50">Solicita cambio al email principal. Requiere confirmación por correo.</p>
+                        <input
+                            type="email"
+                            value={newEmail}
+                            onChange={(e) => setNewEmail(e.target.value)}
+                            required
+                            placeholder="nuevo@email.com"
+                            className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20 transition-all"
+                        />
+                        <div className="flex items-center justify-between text-[9px] uppercase tracking-wider">
+                            <span className={newEmailError ? 'text-red-600 font-black' : 'opacity-40 font-bold'}>{newEmailError || 'Listo para solicitar'}</span>
+                            <span className="opacity-30 font-black">Actual: {normalizedAccountEmail || 'N/D'}</span>
+                        </div>
+                        <button type="submit" disabled={busy !== null || !canChangeEmail} className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex justify-center items-center gap-2 transition-all hover:scale-[1.01]">
+                            {busy === 'email' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Solicitar cambio'}
+                        </button>
+                    </form>
+
+                    <form onSubmit={handleChangePassword} className={panelClass(busy === 'password')}>
+                        <h2 className="text-[11px] font-black uppercase tracking-widest">[P2] Cambiar Contraseña</h2>
+                        <p className="text-[10px] font-bold uppercase opacity-50">Mínimo 8 caracteres con mayúsculas, minúsculas y números.</p>
+                        <input
+                            type="password"
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            required
+                            minLength={8}
+                            placeholder="Contraseña actual"
+                            className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20 transition-all"
+                        />
+                        <input
+                            type="password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            required
+                            minLength={8}
+                            placeholder="Nueva contraseña"
+                            className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20 transition-all"
+                        />
+                        <div className="grid grid-cols-2 gap-2 text-[9px] uppercase tracking-wider">
+                            <span className={currentPasswordError ? 'text-red-600 font-black' : 'opacity-40 font-bold'}>{currentPasswordError || 'Actual: OK'}</span>
+                            <span className={newPasswordError ? 'text-red-600 font-black text-right' : 'opacity-40 font-bold text-right'}>{newPasswordError || 'Nueva: OK'}</span>
+                        </div>
+                        <button type="submit" disabled={busy !== null || !canChangePassword} className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex justify-center items-center gap-2 transition-all hover:scale-[1.01]">
+                            {busy === 'password' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Actualizar contraseña'}
+                        </button>
+                    </form>
+
+                    <div className={panelClass(busy === 'link-google' || busy === 'unlink-google')}>
+                        <h2 className="text-[11px] font-black uppercase tracking-widest">[P3] Login Social</h2>
                         <div className={`text-[10px] font-bold uppercase flex items-center gap-2 ${accountStatus.googleLinked ? 'text-green-700' : 'opacity-50'}`}>
                             <span className={`inline-block w-2 h-2 rounded-full ${accountStatus.googleLinked ? 'bg-green-500' : 'bg-gray-300'}`} />
                             Google: {accountStatus.googleLinked ? 'VINCULADO' : 'NO VINCULADO'}
@@ -1056,7 +1277,7 @@ export default function AccountSecurityPage() {
                                     type="button"
                                     onClick={handleLinkGoogle}
                                     disabled={busy !== null || accountStatus.googleLinked}
-                                    className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-black transition-colors flex justify-center items-center gap-2"
+                                    className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-black transition-all hover:scale-[1.01] flex justify-center items-center gap-2"
                                 >
                                     {busy === 'link-google' ? <><Loader2 className="w-4 h-4 animate-spin" /> Redirigiendo a Google...</> : 'Vincular Google'}
                                 </button>
@@ -1068,15 +1289,15 @@ export default function AccountSecurityPage() {
                                 type="button"
                                 onClick={handleUnlinkGoogle}
                                 disabled={busy !== null}
-                                className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-[#f5f1e8] transition-colors flex justify-center items-center gap-2"
+                                className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-[#f5f1e8] transition-all hover:scale-[1.01] flex justify-center items-center gap-2"
                             >
                                 {busy === 'unlink-google' ? <><Loader2 className="w-4 h-4 animate-spin" /> Desvinculando...</> : 'Desvincular Google'}
                             </button>
                         )}
                     </div>
 
-                    <div className="space-y-2 border border-[#1a1a2e]/10 rounded-xl p-4">
-                        <h2 className="text-[11px] font-black uppercase tracking-widest">Sesiones y Recuperación</h2>
+                    <div className={panelClass(busy === 'revoke-sessions')}>
+                        <h2 className="text-[11px] font-black uppercase tracking-widest">[P3] Sesiones y Recuperación</h2>
                         <div className="text-[10px] font-bold uppercase opacity-50">
                             Sesiones activas: {accountStatus.sessions === null ? 'N/D' : String(accountStatus.sessions)}
                         </div>
@@ -1084,23 +1305,99 @@ export default function AccountSecurityPage() {
                             type="button"
                             onClick={handleRevokeOtherSessions}
                             disabled={busy !== null}
-                            className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-[#f5f1e8] transition-colors"
+                            className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-[#f5f1e8] transition-all hover:scale-[1.01]"
                         >
                             {busy === 'revoke-sessions' ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Cerrando sesiones</span> : 'Cerrar otras sesiones'}
                         </button>
 
                         <Link
                             href="/auth/forgot-password"
-                            className="block w-full text-center bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#f5f1e8] transition-colors"
+                            className="block w-full text-center bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#f5f1e8] transition-all hover:scale-[1.01]"
                         >
                             Recuperar cuenta
                         </Link>
                     </div>
 
-                    <form onSubmit={handleDeleteAccount} className="space-y-2 border border-red-200 bg-red-50 rounded-xl p-4">
-                        <h2 className="text-[11px] font-black uppercase tracking-widest text-red-700 flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4" /> Eliminar Cuenta Total
-                        </h2>
+                    <form onSubmit={handleUpdateProfileIdentity} className={panelClass(busy === 'profile-identity')}>
+                        <h2 className="text-[11px] font-black uppercase tracking-widest">[P4] Perfil Público (IronTrain)</h2>
+                        <p className="text-[10px] font-bold uppercase opacity-50">Visible para la comunidad. El username tiene restricciones reales de tiempo.</p>
+                        <input
+                            type="text"
+                            value={profileDisplayName}
+                            onChange={(e) => setProfileDisplayName(e.target.value)}
+                            required
+                            minLength={1}
+                            maxLength={50}
+                            placeholder="Nombre visible"
+                            className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20 transition-all"
+                        />
+                        <div className="flex items-center justify-between text-[9px] uppercase tracking-wider">
+                            <span className={profileDisplayNameError ? 'text-red-600 font-black' : 'opacity-40 font-bold'}>{profileDisplayNameError || 'Nombre visible OK'}</span>
+                            <span className="opacity-30 font-black">{trimmedDisplayName.length}/50</span>
+                        </div>
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black opacity-40">@</span>
+                            <input
+                                type="text"
+                                value={profileUsername}
+                                onChange={(e) => setProfileUsername(e.target.value.toLowerCase())}
+                                required
+                                minLength={3}
+                                maxLength={20}
+                                pattern="[a-z0-9_]+"
+                                title="Solo minúsculas, números y guiones bajos"
+                                placeholder="username"
+                                className="w-full bg-[#f5f1e8] border border-[#1a1a2e]/10 rounded-xl pl-8 pr-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-[#1a1a2e]/20 transition-all"
+                            />
+                        </div>
+                        <div className="flex items-center justify-between text-[9px] uppercase tracking-wider">
+                            <span className={profileUsernameError || profileUsernameRestrictionError ? 'text-red-600 font-black' : 'opacity-40 font-bold'}>
+                                {profileUsernameError || profileUsernameRestrictionError || 'Username disponible para guardar'}
+                            </span>
+                            <span className="opacity-30 font-black">{normalizedProfileUsername.length}/20</span>
+                        </div>
+                        {nextUsernameChangeDateLabel && (
+                            <div className="text-[9px] uppercase tracking-wider font-black opacity-50">
+                                Próximo cambio disponible: {nextUsernameChangeDateLabel}
+                                {usernameCooldownDaysRemaining > 0 ? ` (${usernameCooldownDaysRemaining} días restantes)` : ''}
+                            </div>
+                        )}
+                        <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest opacity-70">
+                            <input
+                                type="checkbox"
+                                checked={profilePublic}
+                                onChange={(e) => setProfilePublic(e.target.checked)}
+                                className="accent-[#1a1a2e]"
+                            />
+                            Perfil público
+                        </label>
+                        <button type="submit" disabled={busy !== null || !canUpdateProfileIdentity} className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex justify-center items-center gap-2 transition-all hover:scale-[1.01]">
+                            {busy === 'profile-identity' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Guardar perfil'}
+                        </button>
+                    </form>
+
+                    <div className={panelClass(busy === 'export' || busy === 'deactivate')}>
+                        <h2 className="text-[11px] font-black uppercase tracking-widest">[P5] Privacidad y Portabilidad</h2>
+                        <button
+                            type="button"
+                            onClick={handleExportData}
+                            disabled={busy !== null}
+                            className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-[#f5f1e8] transition-all hover:scale-[1.01]"
+                        >
+                            {busy === 'export' ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Exportando</span> : 'Exportar mis datos'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleDeactivateAccount}
+                            disabled={busy !== null}
+                            className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-black transition-all hover:scale-[1.01]"
+                        >
+                            {busy === 'deactivate' ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Desactivando</span> : 'Desactivar cuenta'}
+                        </button>
+                    </div>
+
+                    <form onSubmit={handleDeleteAccount} className="space-y-2 border border-red-200 bg-red-50 rounded-xl p-4 transition-all duration-300 hover:shadow-sm">
+                        <h2 className="text-[11px] font-black uppercase tracking-widest text-red-700 flex items-center gap-2">[P6] <AlertTriangle className="w-4 h-4" /> Eliminar Cuenta Total</h2>
                         <p className="text-[10px] font-bold uppercase opacity-60">
                             Borra datos de app y elimina la cuenta auth de forma irreversible.
                         </p>
@@ -1110,32 +1407,16 @@ export default function AccountSecurityPage() {
                             onChange={(e) => setDeletePassword(e.target.value)}
                             required
                             placeholder="Contraseña actual"
-                            className="w-full bg-white border border-red-200 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-red-300"
+                            className="w-full bg-white border border-red-200 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 ring-red-300 transition-all"
                         />
-                        <button type="submit" disabled={busy !== null} className="w-full bg-red-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex justify-center items-center gap-2 hover:bg-red-700 transition-colors">
+                        <div className="flex items-center justify-between text-[9px] uppercase tracking-wider">
+                            <span className={deletePasswordError ? 'text-red-600 font-black' : 'text-green-700 font-black'}>{deletePasswordError || 'Contraseña válida para confirmar'}</span>
+                            <span className="opacity-40 font-black">Requiere confirmación</span>
+                        </div>
+                        <button type="submit" disabled={busy !== null || !canDeleteAccount} className="w-full bg-red-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex justify-center items-center gap-2 hover:bg-red-700 transition-all hover:scale-[1.01]">
                             {busy === 'delete' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Eliminar cuenta'}
                         </button>
                     </form>
-
-                    <div className="space-y-2 border border-[#1a1a2e]/10 rounded-xl p-4">
-                        <h2 className="text-[11px] font-black uppercase tracking-widest">Privacidad y Portabilidad</h2>
-                        <button
-                            type="button"
-                            onClick={handleExportData}
-                            disabled={busy !== null}
-                            className="w-full bg-white border border-[#1a1a2e]/20 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-[#f5f1e8] transition-colors"
-                        >
-                            {busy === 'export' ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Exportando</span> : 'Exportar mis datos'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleDeactivateAccount}
-                            disabled={busy !== null}
-                            className="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 hover:bg-black transition-colors"
-                        >
-                            {busy === 'deactivate' ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Desactivando</span> : 'Desactivar cuenta'}
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>

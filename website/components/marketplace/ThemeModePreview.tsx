@@ -2,7 +2,7 @@
 
 import { resolveThemePreviewByMode, ThemeMode } from '@/lib/theme-marketplace/preview';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type ThemeModePreviewProps = {
     payload: Record<string, unknown>;
@@ -16,8 +16,14 @@ type ThemeModePreviewProps = {
 };
 
 const TABS = ['INICIO', 'ENTRENO', 'PROGRESO'];
+const NAV_ITEMS = ['HOME', 'WORKOUT', 'PROFILE'];
 
 const getModeLabel = (mode: ThemeMode) => (mode === 'light' ? 'CLARO' : 'OSCURO');
+
+const normalizeMode = (raw: string | null): ThemeMode | null => {
+    if (raw === 'light' || raw === 'dark') return raw;
+    return null;
+};
 
 export default function ThemeModePreview({
     payload,
@@ -46,7 +52,6 @@ export default function ThemeModePreview({
         if (initialMode && availableModes.includes(initialMode)) return initialMode;
         return availableModes[0];
     });
-    const pendingQueryModeRef = useRef<ThemeMode | null>(null);
 
     useEffect(() => {
         if (availableModes.includes(activeMode)) return;
@@ -62,12 +67,8 @@ export default function ThemeModePreview({
     useEffect(() => {
         if (!syncToQueryParam) return;
 
-        const modeFromUrl = searchParams.get(queryParamKey);
-        if (modeFromUrl !== 'light' && modeFromUrl !== 'dark') return;
-        if (pendingQueryModeRef.current && modeFromUrl !== pendingQueryModeRef.current) return;
-        if (modeFromUrl === pendingQueryModeRef.current) {
-            pendingQueryModeRef.current = null;
-        }
+        const modeFromUrl = normalizeMode(searchParams.get(queryParamKey));
+        if (!modeFromUrl) return;
         if (!availableModes.includes(modeFromUrl)) return;
         if (modeFromUrl === activeMode) return;
 
@@ -78,33 +79,27 @@ export default function ThemeModePreview({
         onModeChange?.(activeMode);
     }, [activeMode, onModeChange]);
 
-    useEffect(() => {
+    const handleModeSelect = (mode: ThemeMode) => {
+        if (!availableModes.includes(mode)) return;
+        if (mode === activeMode) return;
+
+        setActiveMode(mode);
+
         if (!syncToQueryParam) return;
-
-        const currentInUrl = searchParams.get(queryParamKey);
-        if (currentInUrl === activeMode) {
-            if (pendingQueryModeRef.current === activeMode) {
-                pendingQueryModeRef.current = null;
-            }
-            return;
-        }
-
         const nextParams = new URLSearchParams(searchParams.toString());
-        nextParams.set(queryParamKey, activeMode);
-        pendingQueryModeRef.current = activeMode;
-        const nextUrl = `${pathname}?${nextParams.toString()}`;
-        router.replace(nextUrl, { scroll: false });
-    }, [activeMode, pathname, queryParamKey, router, searchParams, syncToQueryParam]);
+        nextParams.set(queryParamKey, mode);
+        router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
+    };
 
     const channels = channelsByMode[activeMode];
-    const tabBarHeight = compact ? 'h-8' : 'h-10';
-    const panelPadding = compact ? 'p-2' : 'p-3';
+    const phoneWidth = compact ? 'max-w-[280px]' : 'max-w-[320px]';
+    const heroBarHeight = compact ? 'h-2.5' : 'h-3';
 
     return (
-        <div className="space-y-2">
+        <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
                 <div className="text-[8px] font-black opacity-40 uppercase tracking-[0.25em]">MODE_PREVIEW</div>
-                <div className="inline-flex border border-current/30">
+                <div className="inline-flex border border-current/30 rounded-md overflow-hidden">
                     {(['light', 'dark'] as ThemeMode[]).map((mode) => {
                         const disabled = !availableModes.includes(mode);
                         const selected = mode === activeMode;
@@ -115,7 +110,7 @@ export default function ThemeModePreview({
                                 key={mode}
                                 type="button"
                                 disabled={disabled}
-                                onClick={() => setActiveMode(mode)}
+                                onClick={() => handleModeSelect(mode)}
                                 className={`px-2 py-1 text-[8px] font-black uppercase tracking-[0.2em] transition-all ${selected
                                     ? ''
                                     : 'hover:bg-current/10'} ${disabled ? 'opacity-25 cursor-not-allowed' : ''}`}
@@ -128,41 +123,58 @@ export default function ThemeModePreview({
                 </div>
             </div>
 
-            <div className="border border-current/30 overflow-hidden" style={{ backgroundColor: channels.surface, color: channels.text }}>
-                <div className={`border-b border-current/20 flex items-center ${tabBarHeight}`}>
-                    {TABS.map((tab, index) => (
-                        <div
-                            key={tab}
-                            className={`flex-1 flex items-center justify-center text-[8px] font-black uppercase tracking-[0.2em] ${index === 0 ? 'opacity-100' : 'opacity-55'}`}
-                            style={index === 0 ? { backgroundColor: channels.hero, color: channels.surface } : undefined}
-                        >
-                            {tab}
+            <div className={`mx-auto w-full ${phoneWidth}`}>
+                <div className="border border-current/30 overflow-hidden" style={{ backgroundColor: channels.surface, color: channels.text }}>
+                    <div className="h-6 border-b border-current/20 px-2 flex items-center justify-between text-[7px] font-black uppercase tracking-[0.2em] opacity-60">
+                        <span>09:41</span>
+                        <span>IRONTRAIN</span>
+                        <span>100%</span>
+                    </div>
+
+                    <div className="border-b border-current/20 h-10 flex items-center px-2 gap-2 text-[8px] font-black uppercase tracking-[0.2em]">
+                        {TABS.map((tab, index) => (
+                            <div
+                                key={tab}
+                                className="flex-1 h-6 flex items-center justify-center border border-current/20"
+                                style={index === 0 ? { backgroundColor: channels.hero, color: channels.surface } : undefined}
+                            >
+                                {tab}
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="p-3 space-y-2 border-b border-current/20">
+                        <div className="border border-current/20 p-2">
+                            <div className="text-[7px] font-black uppercase tracking-[0.18em] opacity-60 mb-1">Resumen</div>
+                            <div className="h-2 border border-current/20" style={{ backgroundColor: channels.hero }} />
                         </div>
-                    ))}
-                </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="border border-current/20 p-2">
+                                <div className="text-[7px] font-black uppercase tracking-[0.18em] opacity-60 mb-1">Card</div>
+                                <div className="h-2.5" style={{ backgroundColor: channels.hero }} />
+                            </div>
+                            <div className="border border-current/20 p-2">
+                                <div className="text-[7px] font-black uppercase tracking-[0.18em] opacity-60 mb-1">Action</div>
+                                <div className="h-2.5 border border-current/30" style={{ backgroundColor: channels.surface }} />
+                            </div>
+                        </div>
 
-                <div className={`grid grid-cols-2 gap-2 ${panelPadding}`}>
-                    <div className="border border-current/20 p-2">
-                        <div className="text-[7px] font-black uppercase opacity-60 tracking-[0.2em] mb-1">CARD</div>
-                        <div className="h-3" style={{ backgroundColor: channels.hero }} />
+                        <div className={`${heroBarHeight} border border-current/20`} style={{ backgroundColor: channels.hero }} />
+                        <div className={`${heroBarHeight} border border-current/20`} style={{ backgroundColor: channels.text }} />
                     </div>
-                    <div className="border border-current/20 p-2">
-                        <div className="text-[7px] font-black uppercase opacity-60 tracking-[0.2em] mb-1">ACTION</div>
-                        <div className="h-3 border border-current/30" style={{ backgroundColor: channels.surface }} />
+
+                    <div className="h-10 border-t border-current/20 px-2 grid grid-cols-3 gap-2 text-[7px] font-black uppercase tracking-[0.2em] opacity-75">
+                        {NAV_ITEMS.map((item, index) => (
+                            <div
+                                key={item}
+                                className="flex items-center justify-center border border-current/20"
+                                style={index === 0 ? { backgroundColor: channels.hero, color: channels.surface } : undefined}
+                            >
+                                {item}
+                            </div>
+                        ))}
                     </div>
                 </div>
-
-                <div className="border-t border-current/20 px-2 py-1 flex items-center justify-between text-[7px] font-black uppercase tracking-[0.2em] opacity-70">
-                    <span>HOME</span>
-                    <span>WORKOUT</span>
-                    <span>PROFILE</span>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-                <div className="h-8 border border-current/20" style={{ backgroundColor: channels.hero }} />
-                <div className="h-8 border border-current/20" style={{ backgroundColor: channels.surface }} />
-                <div className="h-8 border border-current/20" style={{ backgroundColor: channels.text }} />
             </div>
         </div>
     );
