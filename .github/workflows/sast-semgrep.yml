@@ -36,8 +36,8 @@ jobs:
 
       - name: Install Semgrep
         run: |
-          pip install --disable-pip-version-check --upgrade pip setuptools wheel
-          python -c "import pkg_resources; print('pkg_resources ready')"
+          pip install --disable-pip-version-check --upgrade pip wheel
+          pip install --disable-pip-version-check "setuptools<81"
           pip install --disable-pip-version-check semgrep==1.121.0
 
       - name: Run Semgrep
