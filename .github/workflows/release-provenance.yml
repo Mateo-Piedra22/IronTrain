@@ -1,0 +1,145 @@
+name: Release Provenance
+
+on:
+  release:
+    types: [created, edited, published, prereleased]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v2.3.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  attestations: write
+  id-token: write
+
+concurrency:
+  group: release-provenance-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  provenance:
+    name: Release Provenance
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Resolve tag
+        id: tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${{ github.event.release.tag_name }}"
+          fi
+
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag must follow semantic version format: vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Download release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh release download "${{ steps.tag.outputs.tag }}" --dir dist --pattern '*.apk' --pattern '*.sha256.txt' --pattern 'build-metadata-*.json'
+
+      - name: Validate checksum and collect context
+        id: provenance
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.tag.outputs.tag }}"
+
+          apk_file="$(find dist -maxdepth 1 -name '*.apk' | head -n 1)"
+          checksum_file="$(find dist -maxdepth 1 -name '*.sha256.txt' | head -n 1)"
+          metadata_file="$(find dist -maxdepth 1 -name 'build-metadata-*.json' | head -n 1)"
+
+          if [ -z "$apk_file" ] || [ -z "$checksum_file" ] || [ -z "$metadata_file" ]; then
+            echo "Missing required release assets (.apk, .sha256.txt, build metadata)."
+            exit 1
+          fi
+
+          calculated_sha="$(sha256sum "$apk_file" | awk '{print $1}')"
+          expected_sha="$(cat "$checksum_file")"
+
+          if [ "$calculated_sha" != "$expected_sha" ]; then
+            echo "Checksum mismatch for APK asset"
+            exit 1
+          fi
+
+          provenance_file="release-provenance-${tag}.json"
+          echo "apk_file=$apk_file" >> "$GITHUB_OUTPUT"
+          echo "metadata_file=$metadata_file" >> "$GITHUB_OUTPUT"
+          echo "apk_sha256=$calculated_sha" >> "$GITHUB_OUTPUT"
+          echo "provenance_file=$provenance_file" >> "$GITHUB_OUTPUT"
+
+      - name: Generate provenance file
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.tag.outputs.tag }}"
+          release_json="$(gh release view "$tag" --json tagName,targetCommitish,isDraft,isPrerelease,url,publishedAt)"
+          apk_file="${{ steps.provenance.outputs.apk_file }}"
+          metadata_file="${{ steps.provenance.outputs.metadata_file }}"
+          provenance_file="${{ steps.provenance.outputs.provenance_file }}"
+          now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          apk_sha256="${{ steps.provenance.outputs.apk_sha256 }}"
+
+          RELEASE_JSON="$release_json" METADATA_FILE="$metadata_file" NOW="$now" APK_NAME="$(basename "$apk_file")" APK_SHA256="$apk_sha256" PROVENANCE_FILE="$provenance_file" node - <<'NODE'
+          const fs = require('fs');
+
+          const release = JSON.parse(process.env.RELEASE_JSON);
+          const metadata = JSON.parse(fs.readFileSync(process.env.METADATA_FILE, 'utf8'));
+
+          const report = {
+            schemaVersion: 1,
+            generatedAtUtc: process.env.NOW,
+            release: {
+              tag: release.tagName,
+              targetCommitish: release.targetCommitish,
+              isDraft: release.isDraft,
+              isPrerelease: release.isPrerelease,
+              publishedAt: release.publishedAt,
+              url: release.url
+            },
+            artifact: {
+              name: process.env.APK_NAME,
+              sha256: process.env.APK_SHA256
+            },
+            buildMetadata: metadata
+          };
+
+          fs.writeFileSync(process.env.PROVENANCE_FILE, JSON.stringify(report, null, 2));
+          NODE
+
+      - name: Upload provenance artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-provenance-${{ steps.tag.outputs.tag }}
+          if-no-files-found: error
+          retention-days: 30
+          path: ${{ steps.provenance.outputs.provenance_file }}
+
+      - name: Attach provenance to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ steps.tag.outputs.tag }}" "${{ steps.provenance.outputs.provenance_file }}" --clobber
+
+      - name: Attest APK artifact
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: ${{ steps.provenance.outputs.apk_file }}

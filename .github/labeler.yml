@@ -1,0 +1,40 @@
+mobile:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "app/**"
+          - "components/**"
+          - "assets/**"
+          - "src/**"
+          - "android/**"
+
+web:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "website/**"
+          - "_backup_web/**"
+
+ci-cd:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
+          - "scripts/**"
+
+security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "SECURITY.md"
+          - ".github/workflows/security.yml"
+          - ".github/dependabot.yml"
+
+release:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/workflows/release-android.yml"
+          - "docs/CHANGELOG*"
+          - "src/changelog.generated.json"
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "README.md"

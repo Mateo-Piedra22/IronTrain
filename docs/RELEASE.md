@@ -9,12 +9,15 @@
 ## Flujo estándar Android
 
 1. Preparar versión y changelog.
-2. Crear tag semver `vX.Y.Z`.
-3. Dejar que `release-android.yml` ejecute build y publicación.
+2. Ejecutar `npm run deploy:mobile` (commit/tag/push automático).
+3. Dejar que `release-android.yml` ejecute build en `staging` y cree release `draft/prerelease`.
+4. Verificar artefactos (`.apk`, `.sha256.txt`, `build-metadata-*.json`).
+5. Dejar que `release-provenance.yml` adjunte evidencia de trazabilidad/attestation.
+6. Ejecutar manualmente `android-promote.yml` para promover a `production` (con aprobación de environment).
 
 ## Alcance del proceso
 
-- Este flujo cubre la publicación de artefactos Android por pipeline automatizado.
+- Este flujo cubre build, trazabilidad y promoción controlada a producción.
 - El release debe ser reproducible, auditable y acompañado por evidencia mínima de calidad.
 
 ## Preflight mínimo
@@ -32,12 +35,14 @@
 
 ## Resultado esperado
 
+- Release final publicada (no draft/no prerelease).
 - APK publicada en GitHub Release.
 - Archivo checksum generado.
+- Metadata y provenance adjuntos al release.
 
 ## Criterios de release saludable
 
-- Job de release sin fallas ni pasos omitidos.
+- Jobs de release/provenance/promotion sin fallas ni pasos omitidos.
 - Artefactos descargables y checksum verificable.
 - Metadatos de versión coherentes (tag, notas, changelog).
 

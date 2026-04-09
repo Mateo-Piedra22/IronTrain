@@ -129,18 +129,29 @@ npm run build
 ## 🛡️ CI/CD y seguridad
 
 - CI principal: `.github/workflows/ci.yml`
+- Gobernanza de PR: `.github/workflows/pr-governance.yml`
+- Lint de workflows: `.github/workflows/actionlint-workflows.yml`
 - Seguridad continua: `.github/workflows/security.yml`
+- Secrets scan: `.github/workflows/secrets-scan.yml`
+- SAST (Semgrep): `.github/workflows/sast-semgrep.yml`
+- SBOM + licencias: `.github/workflows/sbom-license.yml`
+- Cobertura/calidad: `.github/workflows/coverage-quality.yml`
+- Higiene operativa (labels/triage/stale): `.github/workflows/repo-hygiene.yml`
 - Release Android: `.github/workflows/release-android.yml`
-- Guardrails clave: permisos mínimos, checks requeridos, dependency review y escaneo de dependencias
+- Release provenance: `.github/workflows/release-provenance.yml`
+- Promoción manual a producción: `.github/workflows/android-promote.yml`
+- Guardrails clave: permisos mínimos, checks requeridos, branch protection, dependency review, escaneo de secretos/SAST y controles de cobertura
 
 ---
 
 ## 📦 Release Android (resumen)
 
 1. Preparar changelog y versión.
-2. Crear tag semver: `vMAJOR.MINOR.PATCH`.
-3. Ejecutar pipeline `release-android.yml` para build/publicación de artefactos.
-4. Verificar checksum y notas de release.
+2. Ejecutar `npm run deploy:mobile` (crea commit/tag y push).
+3. Se dispara `release-android.yml` y genera release en modo `draft/prerelease` con artefactos + metadata.
+4. Se ejecuta `release-provenance.yml` para validación de checksum y trazabilidad.
+5. Promover manualmente el tag con `android-promote.yml` (requiere aprobación del environment `production`).
+6. Verificar release final publicada (no draft/no prerelease), checksum y notas.
 
 ---
 

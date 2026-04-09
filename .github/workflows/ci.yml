@@ -17,8 +17,10 @@ concurrency:
 jobs:
   mobile-quality:
     name: Mobile Quality Checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 25
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -41,8 +43,10 @@ jobs:
 
   web-quality:
     name: Web Build Checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 20
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: ./website
@@ -72,7 +76,7 @@ jobs:
   dependency-review:
     name: Dependency Review
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 10
     permissions:
       contents: read

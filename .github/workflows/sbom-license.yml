@@ -1,0 +1,106 @@
+name: SBOM and License Compliance
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+  schedule:
+    - cron: "45 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sbom-license-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sbom-license:
+    name: SBOM and License Compliance
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (root)
+        run: npm ci --legacy-peer-deps
+
+      - name: Install dependencies (website)
+        working-directory: ./website
+        run: npm ci
+
+      - name: Generate SBOM (root)
+        run: npx -y @cyclonedx/cyclonedx-npm --output-file sbom-root.cdx.json --output-format JSON --omit dev
+
+      - name: Generate SBOM (website)
+        working-directory: ./website
+        run: npx -y @cyclonedx/cyclonedx-npm --output-file ../sbom-website.cdx.json --output-format JSON --omit dev
+
+      - name: Export production licenses (root)
+        run: npx -y license-checker --production --json > licenses-root.json
+
+      - name: Export production licenses (website)
+        working-directory: ./website
+        run: npx -y license-checker --production --json > ../licenses-website.json
+
+      - name: Enforce license policy
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+
+          const policyPath = '.github/security/license-policy.json';
+          const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
+          const deny = new Set((policy.denyLicenses || []).map(v => String(v).trim().toUpperCase()));
+          const exceptions = new Set((policy.allowExceptions || []).map(v => String(v).trim()));
+
+          const files = ['licenses-root.json', 'licenses-website.json'];
+          const violations = [];
+
+          function normalizeLicenses(raw) {
+            if (!raw) return [];
+            if (Array.isArray(raw)) return raw.map(v => String(v));
+            return String(raw).split(' OR ').map(v => v.trim());
+          }
+
+          for (const file of files) {
+            const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+            for (const [pkg, meta] of Object.entries(data)) {
+              if (exceptions.has(pkg)) continue;
+              const licenses = normalizeLicenses(meta.licenses).map(v => v.toUpperCase());
+              if (licenses.some(l => deny.has(l))) {
+                violations.push(`${file}: ${pkg} -> ${meta.licenses}`);
+              }
+            }
+          }
+
+          if (violations.length > 0) {
+            console.error('License policy violations found:\n' + violations.join('\n'));
+            process.exit(1);
+          }
+
+          console.log('License policy passed.');
+          NODE
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-and-licenses-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            sbom-root.cdx.json
+            sbom-website.cdx.json
+            licenses-root.json
+            licenses-website.json

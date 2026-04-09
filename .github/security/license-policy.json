@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "description": "License policy for production dependencies.",
+  "denyLicenses": [
+    "GPL-1.0",
+    "GPL-2.0",
+    "GPL-3.0",
+    "AGPL-1.0",
+    "AGPL-3.0"
+  ],
+  "allowExceptions": []
+}

@@ -1,0 +1,73 @@
+name: Android Promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to promote (e.g. v2.3.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-promote-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote Android Release to Production
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      contents: write
+    steps:
+      - name: Validate tag format
+        shell: bash
+        run: |
+          if [[ ! "${{ inputs.tag }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag must follow semantic version format: vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
+
+      - name: Verify release assets exist
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          release_json="$(gh release view "${{ inputs.tag }}" --json isDraft,isPrerelease,assets,url)"
+          echo "$release_json" > release.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const release = JSON.parse(fs.readFileSync('release.json', 'utf8'));
+          const names = (release.assets || []).map(a => a.name);
+          const hasApk = names.some(n => n.endsWith('.apk'));
+          const hasChecksum = names.some(n => n.endsWith('.sha256.txt'));
+          const hasMetadata = names.some(n => n.startsWith('build-metadata-') && n.endsWith('.json'));
+          if (!hasApk || !hasChecksum || !hasMetadata) {
+            console.error('Release missing required assets (.apk, .sha256.txt, build-metadata-*.json).');
+            process.exit(1);
+          }
+          NODE
+
+      - name: Publish release (draft/prerelease -> production)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release edit "${{ inputs.tag }}" --draft=false --prerelease=false
+
+      - name: Add promotion note
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          current="$(gh release view "${{ inputs.tag }}" --json body --jq '.body')"
+          note="\n\n---\nPromoted to production via workflow run ${GITHUB_RUN_ID} on $(date -u +%Y-%m-%dT%H:%M:%SZ)."
+          printf "%s%s" "$current" "$note" > body.txt
+          gh release edit "${{ inputs.tag }}" --notes-file body.txt

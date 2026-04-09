@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "minimums": {
+    "mobile": {
+      "lines": 30,
+      "statements": 30,
+      "functions": 20,
+      "branches": 20
+    },
+    "web": {
+      "lines": 20,
+      "statements": 20,
+      "functions": 15,
+      "branches": 15
+    }
+  },
+  "maxDropFromBase": 0.5
+}

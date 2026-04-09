@@ -1,0 +1,203 @@
+name: Coverage Quality
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coverage-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage-quality-gate:
+    name: Coverage Quality Gate
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            website/package-lock.json
+
+      - name: Install dependencies (root)
+        run: npm ci --legacy-peer-deps
+
+      - name: Install dependencies (website)
+        working-directory: ./website
+        run: npm ci
+
+      - name: Run mobile coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm test -- --watch=false --coverage --coverageReporters=json-summary --coverageReporters=lcov
+          mkdir -p .coverage-artifacts/current
+          cp coverage/coverage-summary.json .coverage-artifacts/current/mobile-summary.json
+          cp coverage/lcov.info .coverage-artifacts/current/mobile-lcov.info
+
+      - name: Run web coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          pushd website >/dev/null
+          npm run test -- --coverage --coverage.provider=v8 --coverage.reporter=json-summary --coverage.reporter=lcov
+          popd >/dev/null
+          mkdir -p .coverage-artifacts/current
+          cp website/coverage/coverage-summary.json .coverage-artifacts/current/web-summary.json
+          cp website/coverage/lcov.info .coverage-artifacts/current/web-lcov.info
+
+      - name: Collect base branch coverage (PR only)
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          git worktree add --detach .baseline FETCH_HEAD
+          pushd .baseline >/dev/null
+          npm ci --legacy-peer-deps
+          pushd website >/dev/null
+          npm ci
+          popd >/dev/null
+          npm test -- --watch=false --coverage --coverageReporters=json-summary --coverageReporters=lcov
+          pushd website >/dev/null
+          npm run test -- --coverage --coverage.provider=v8 --coverage.reporter=json-summary --coverage.reporter=lcov
+          popd >/dev/null
+          popd >/dev/null
+
+          mkdir -p .coverage-artifacts/base
+          cp .baseline/coverage/coverage-summary.json .coverage-artifacts/base/mobile-summary.json
+          cp .baseline/website/coverage/coverage-summary.json .coverage-artifacts/base/web-summary.json
+
+          git worktree remove .baseline --force
+
+      - name: Evaluate coverage thresholds and regression
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+
+          const thresholds = JSON.parse(fs.readFileSync('.github/quality/coverage-thresholds.json', 'utf8'));
+          const currentMobile = JSON.parse(fs.readFileSync('.coverage-artifacts/current/mobile-summary.json', 'utf8')).total;
+          const currentWeb = JSON.parse(fs.readFileSync('.coverage-artifacts/current/web-summary.json', 'utf8')).total;
+
+          const hasBase = fs.existsSync('.coverage-artifacts/base/mobile-summary.json') && fs.existsSync('.coverage-artifacts/base/web-summary.json');
+          const baseMobile = hasBase ? JSON.parse(fs.readFileSync('.coverage-artifacts/base/mobile-summary.json', 'utf8')).total : null;
+          const baseWeb = hasBase ? JSON.parse(fs.readFileSync('.coverage-artifacts/base/web-summary.json', 'utf8')).total : null;
+
+          const maxDrop = Number(thresholds.maxDropFromBase ?? 0);
+          const failures = [];
+
+          function checkMinimum(scope, metric, current) {
+            const min = thresholds.minimums?.[scope]?.[metric];
+            if (typeof min === 'number' && current + 1e-6 < min) {
+              failures.push(`${scope}.${metric} is ${current.toFixed(2)}% < minimum ${min.toFixed(2)}%`);
+            }
+          }
+
+          function checkRegression(scope, metric, current, base) {
+            if (typeof base !== 'number') return;
+            const allowedFloor = base - maxDrop;
+            if (current + 1e-6 < allowedFloor) {
+              failures.push(`${scope}.${metric} regressed from ${base.toFixed(2)}% to ${current.toFixed(2)}% (max allowed drop ${maxDrop.toFixed(2)}%)`);
+            }
+          }
+
+          const metrics = ['lines', 'statements', 'functions', 'branches'];
+
+          for (const metric of metrics) {
+            checkMinimum('mobile', metric, Number(currentMobile?.[metric]?.pct ?? 0));
+            checkMinimum('web', metric, Number(currentWeb?.[metric]?.pct ?? 0));
+
+            if (hasBase) {
+              checkRegression('mobile', metric, Number(currentMobile?.[metric]?.pct ?? 0), Number(baseMobile?.[metric]?.pct ?? 0));
+              checkRegression('web', metric, Number(currentWeb?.[metric]?.pct ?? 0), Number(baseWeb?.[metric]?.pct ?? 0));
+            }
+          }
+
+          const report = [];
+          report.push('# Coverage Quality Report');
+          report.push('');
+          report.push(`- Event: ${process.env.GITHUB_EVENT_NAME}`);
+          report.push(`- Max drop from base allowed: ${maxDrop}%`);
+          report.push('');
+          report.push('## Current coverage');
+          report.push(`- Mobile lines: ${Number(currentMobile.lines.pct).toFixed(2)}%`);
+          report.push(`- Web lines: ${Number(currentWeb.lines.pct).toFixed(2)}%`);
+
+          if (hasBase) {
+            report.push('');
+            report.push('## Base branch comparison');
+            report.push(`- Mobile lines base: ${Number(baseMobile.lines.pct).toFixed(2)}%`);
+            report.push(`- Web lines base: ${Number(baseWeb.lines.pct).toFixed(2)}%`);
+          }
+
+          report.push('');
+          if (failures.length > 0) {
+            report.push('## Result: FAILED');
+            for (const f of failures) report.push(`- ${f}`);
+          } else {
+            report.push('## Result: PASSED');
+            report.push('- Coverage thresholds and regression gates satisfied.');
+          }
+
+          fs.writeFileSync('.coverage-artifacts/coverage-gate-report.md', report.join('\n'));
+
+          if (failures.length > 0) {
+            console.error(failures.join('\n'));
+            process.exit(1);
+          }
+          NODE
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-quality-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            .coverage-artifacts/current/mobile-summary.json
+            .coverage-artifacts/current/web-summary.json
+            .coverage-artifacts/current/mobile-lcov.info
+            .coverage-artifacts/current/web-lcov.info
+            .coverage-artifacts/coverage-gate-report.md
+
+      - name: Upload coverage to Codecov (mobile)
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: .coverage-artifacts/current/mobile-lcov.info
+          flags: mobile
+          fail_ci_if_error: false
+          verbose: false
+
+      - name: Upload coverage to Codecov (web)
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: .coverage-artifacts/current/web-lcov.info
+          flags: web
+          fail_ci_if_error: false
+          verbose: false
+
+      - name: Publish report to workflow summary
+        if: always()
+        shell: bash
+        run: cat .coverage-artifacts/coverage-gate-report.md >> "$GITHUB_STEP_SUMMARY"
