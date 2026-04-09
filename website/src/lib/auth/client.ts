@@ -3,6 +3,8 @@
 import { createAuthClient } from '@neondatabase/auth';
 import { BetterAuthReactAdapter } from '@neondatabase/auth/react';
 
+const FALLBACK_NEON_AUTH_DIRECT_URL = 'https://ep-falling-wind-aca65w0x.neonauth.sa-east-1.aws.neon.tech/neondb/auth';
+
 function resolveAuthBaseUrl(): string {
 	const envAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
 	if (envAppUrl) {
@@ -25,6 +27,36 @@ export const authClient = createAuthClient(resolveAuthBaseUrl(), {
 	adapter: BetterAuthReactAdapter(),
 });
 
+function resolveDirectAuthBaseUrl(): string {
+	const candidates = [
+		process.env.NEXT_PUBLIC_NEON_AUTH_DIRECT_URL,
+		process.env.NEXT_PUBLIC_NEON_AUTH_SERVICE_URL,
+		process.env.NEXT_PUBLIC_NEON_AUTH_BASE_URL,
+		process.env.NEXT_PUBLIC_NEON_AUTH_URL,
+	];
+
+	for (const raw of candidates) {
+		const candidate = raw?.trim();
+		if (!candidate) continue;
+
+		try {
+			const parsed = new URL(candidate);
+			if (parsed.pathname.startsWith('/api/auth')) {
+				continue;
+			}
+			const normalizedPath = parsed.pathname.replace(/\/+$/, '');
+			if (!normalizedPath || normalizedPath === '/') {
+				return parsed.origin;
+			}
+			return `${parsed.origin}${normalizedPath}`;
+		} catch {
+			return candidate.replace(/\/+$/, '');
+		}
+	}
+
+	return FALLBACK_NEON_AUTH_DIRECT_URL;
+}
+
 /**
  * directAuthClient points directly to the upstream Neon Auth service.
  * It MUST be used for OAuth sign-in flows (signIn.social) because
@@ -36,6 +68,6 @@ export const authClient = createAuthClient(resolveAuthBaseUrl(), {
  * authClient on the app domain and sending it as Authorization when calling
  * directAuthClient.linkSocial.
  */
-export const directAuthClient = createAuthClient('https://ep-falling-wind-aca65w0x.neonauth.sa-east-1.aws.neon.tech/neondb/auth', {
+export const directAuthClient = createAuthClient(resolveDirectAuthBaseUrl(), {
 	adapter: BetterAuthReactAdapter(),
 });
