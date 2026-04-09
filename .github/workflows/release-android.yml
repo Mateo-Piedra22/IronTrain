@@ -18,7 +18,6 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 240
     if: "!contains(github.event.head_commit.message, '[skip eas]')"
-    environment: staging
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
