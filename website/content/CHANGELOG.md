@@ -1,36 +1,85 @@
 # Changelog
 
 ## 2.5.0 (Unreleased)
-- **Sistema de SubTemas**: Posibilidad completa de diseñar, compartir y descargar subtemas para la aplicación.
+
+- **Página de Ajustes Web**: Lanzamiento de la nueva página de ajustes en el sitio web, permitiendo a los usuarios configurar sus preferencias de sincronización y cuenta desde cualquier dispositivo.
 - **Soporte para diferentes idiomas**: Posibilidad de elegir entre inglés y español.
 - **Conexión con múltiples dispositivos**: Posibilidad de conectar con múltiples dispositivos (relojes/bands compatibles).
 - **Vinculación con servicios de salud**: Posibilidad de vincular con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos.
 - **Configuración de la App**: Posibilidad de configurar la aplicación a través de una página web.
 
+## 2.2.0 (2026-04-09)
+
+### Comunidad y colaboración (IronSocial)
+
+- **Rutinas Compartidas de nueva generación**: se habilitó un sistema completo de colaboración con creación, edición y sincronización de rutinas compartidas, incluyendo comentarios, revisiones, historial de cambios y rollback.
+- **Invitaciones y roles**: ahora se pueden invitar miembros a espacios compartidos con manejo de decisiones, roles y remoción de participantes.
+- **Bandeja social más operable**: mejoras de inbox con acciones por lote y mejor lectura del estado de notificaciones.
+- **Perfil social ampliado**: nuevas señales de actividad y contexto (incluyendo días de entrenamiento) para comparar y seguir progreso de forma más clara.
+- **Perfil web más accionable**: se agregaron mejoras de visualización de actividad y acciones rápidas de amistad para una interacción social más directa.
+- **Política de amistad fortalecida**: se reforzó la lógica de solicitudes de amistad para una experiencia más consistente y segura.
+
+### Temas personalizados (Theme Marketplace + Theme Studio)
+
+- **Marketplace de temas funcional**: se habilitó base completa para publicar, explorar, instalar, valorar, reportar y exportar temas.
+- **Compartir por enlace**: nueva capacidad para compartir temas por el Marketplace.
+- **Theme Studio ampliado en app**: nueva pantalla dedicada y mejora de herramientas de edición, preview y gestión de variantes.
+- **Moderación administrativa de temas**: flujo completo para aprobar, rechazar, suspender y restaurar temas, con paneles y endpoints de control.
+- **Tracking de instalaciones**: se agregó seguimiento de instalación de temas para mejorar medición y optimización.
+- **Refinamiento visual de temas**: mejoras de previsualización por modo y ampliación de campos de branding para una personalización más consistente.
+
+### Cuenta, sesión y privacidad
+
+- **Autenticación web más estable**: mejora integral del proxy/auth bridge para reducir errores de sesión y problemas de enrutamiento.
+- **Flujos de cuenta expandidos**: pantallas de seguridad, recuperación y restablecimiento de contraseña.
+- **Sign-out robusto**: evolución a flujo dedicado (pantalla + endpoint interno) para cierre de sesión más fiable.
+- **Linking OAuth de Google más confiable**: mejoras en vinculación de cuenta con manejo de fallback, validación de sesión y mensajes de error más claros.
+- **Bridge app↔web más resiliente**: nuevo manejo de sesión bridge con validaciones adicionales para reducir cortes o redirecciones fallidas.
+- **Privacidad reforzada**: se sumaron endpoints para exportación de datos y desactivación de cuenta.
+
+### Sincronización y confiabilidad
+
+- **Sincronización más segura**: mejoras en push/pull/snapshot/status para contemplar mejor soft-delete y filtrado activo en rutinas/ejercicios.
+- **Menos inconsistencias en alta actividad**: endurecimiento de reglas y políticas de escritura/sincronización entre app y web.
+- **Monitoreo de salud de sync**: nuevas capacidades de observabilidad para diagnóstico operativo.
+
+### UX, feedback y estabilidad general
+
+- **Feedback sensorial unificado**: respuesta más consistente en acciones clave de la app.
+- **Mensajería y labels más claros**: ajustes de copy/UI en feed y flujo social.
+- **Sistema de notificaciones más robusto**: refactor para mejorar carga de módulos y reducir fallos en escenarios variables.
+- **Hardening general de plataforma**: mejoras de seguridad, middleware, observabilidad y operación en entorno productivo.
+- **Base técnica más actualizada**: actualización de dependencias clave y refuerzo de automatizaciones de CI/dependabot para mayor estabilidad operativa.
+
 ## 2.1.5 (2026-03-23)
+
 ### "Voluntad de Hierro" (Weather Bonus)
+
 - **Detección Automática**: Mejor integración con OpenWeather API para validar bonus por entrenar bajo lluvia, nieve, frío extremo (<3°C) o calor intenso (>30°C).
 - **Puntos Extra (+15 pts)**: Recompensa automática al finalizar entrenamientos en condiciones climáticas desafiantes.
-- **Historial de Detecciones**: 
-    - Nueva sección "Detecciones Recientes" en el modal de Clima para transparencia del usuario.
-    - Registro persistente (`weather_logs`) que incluye temperatura, viento, humedad y ubicación exacta del chequeo.
+- **Historial de Detecciones**:
+  - Nueva sección "Detecciones Recientes" en el modal de Clima para transparencia del usuario.
+  - Registro persistente (`weather_logs`) que incluye temperatura, viento, humedad y ubicación exacta del chequeo.
 - **Optimización de API**: Periodo de gracia de 20 minutos entre chequeos para minimizar llamadas a la API externa.
 
 ### IronScore & Streaks (Sistema de Puntuación)
+
 - **Cálculo Retroactivo**: `IronScoreService` ahora puede identificar y corregir puntajes faltantes en entrenamientos previos.
 - **Rachas Semanales Refinadas**:
-    - Evaluación estricta Lunes-Domingo.
-    - Multiplicadores progresivos: x1.1 (3 sem.), x1.25 (5 sem.), x1.5 (10 sem.).
-    - Nuevo: Los multiplicadores ahora se aplican también a los puntos por PRs y Clima.
+  - Evaluación estricta Lunes-Domingo.
+  - Multiplicadores progresivos: x1.1 (3 sem.), x1.25 (5 sem.), x1.5 (10 sem.).
+  - Nuevo: Los multiplicadores ahora se aplican también a los puntos por PRs y Clima.
 - **PRs (The Big 3)**: Bonus premium (+25 pts) para récords en Sentadilla, Banca y Peso Muerto.
 
 ### Interfaz de Usuario (App)
+
 - **Social Dashboard**:
-    - Integración de badges dinámicos para Eventos Globales ( multipliers activos) y "Voluntad de Hierro".
-    - Mejora en `ProfileCard` para mostrar la ubicación detectada o el estado del bonus en tiempo real.
+  - Integración de badges dinámicos para Eventos Globales ( multipliers activos) y "Voluntad de Hierro".
+  - Mejora en `ProfileCard` para mostrar la ubicación detectada o el estado del bonus en tiempo real.
 - **Modales de Detalle**: Rediseño de `WeatherBonusModal` y `GlobalEventModal` con estética técnica ("science-y") y datos precisos.
 
 ### Backend & Infraestructura
+
 - **Drizzle Schema**: Adición de la tabla `weather_logs` para monitoreo y auditoría de bonus.
 - **API History**: Nuevo endpoint `/api/social/weather-bonus/history` para alimentar la vista de detecciones recientes.
 - **Scoring Logic**: Unificación total de la librería de scoring en `website/src/lib/social-scoring.ts` para garantizar paridad entre App y Web.
@@ -38,75 +87,95 @@
 ## 2.1.4 (2026-03-21)
 
 ### Novedades y Funcionalidades Principales
+
 - **Bandeja de Entrada Social Mejorada**: Tu experiencia en la comunidad de IronTrain ahora es más fluida:
   - **Gestión de Actividad en Tiempo Real**: Notificaciones y actualizaciones del feed social más rápidas y fiables.
   - **Marca de "Leído"**: Ahora podés marcar tus notificaciones y actividades como vistas, permitiéndote mantener tu bandeja de entrada organizada.
+
 ### Nueva Pantalla de Ajustes
+
 - **Centralización de Preferencias**: Todo lo que necesitás configurar está ahora en una sola pantalla, más limpia y accesible.
 - **Control de Notificaciones**: Gestioná qué avisos querés recibir directamente desde los nuevos controles de configuración.
+
 ### Mejoras en la Gestión Interna
+
 - **Panel de Control**: Un nuevo sistema que nos permite gestionar actualizaciones y corregir problemas de contenido al instante sin que tengás que esperar a una nueva versión de la tienda.
 - **Anuncios Fiables**: Optimizamos el sistema de "Broadcast" para asegurar que siempre estés al día con las últimas noticias y cambios importantes.
+
 ### Conexión y Seguridad
+
 - **Puente de Autenticación**: Hemos pulido el "puente" de autenticación, asegurando que tu sesión sea mucho más estable y segura cuando navegás entre la aplicación y el portal web.
 
 ## 2.1.3 (2026-03-20)
 
 ### Comunidad y Feedback (Nuevo Centro de Mensajes)
+
 - **Reportes Inteligentes**: Hemos renovado por completo el sistema de Envío de Feedback. Ahora, cuando nos escribas por un error o sugerencia, recibiremos automáticamente detalles técnicos (como tu versión y tipo de celular) para resolver tus problemas mucho más rápido.
 - **Encuestas en Vivo**: Pronto verás pequeñas encuestas dentro de la app para que puedas votar sobre qué funciones querés que hagamos primero.
 - **Acceso Directo**: El botón de "Feedback" en Ajustes vuelve a estar operativo y conectado directamente con nuestro equipo de soporte.
 
 ### Novedades y Actualizaciones (Broadcast)
+
 - **Noticias al Instante**: Mejoramos la forma en que recibís las novedades ("Novedades y Cambios"). Ahora verás los anuncios y correcciones importantes al instante, incluso sin tener que descargar una actualización de la tienda para pequeños ajustes.
 - **Robustez Offline**: Si abrís la app sin internet por primera vez, verás igual todas las novedades que se incluyeron con la instalación. Tus "likes" a las actualizaciones ahora se guardan mejor.
 
 ### Privacidad y Rendimiento
+
 - **Limpieza de Datos**: Eliminamos sistemas antiguos de seguimiento y bases de datos obsoletas que ya no se usaban. Esto hace que la aplicación sea más liviana, ocupe menos espacio y respete aún más tu privacidad.
 - **Sincronización más Rápida**: Al limpiar procesos en segundo plano que ya no eran necesarios, el inicio de sesión y la carga de datos ahora son más directos.
 
 ### Correcciones y Mejoras Técnicas
+
 - **Sincronización Protegida**: Corregimos errores internos que podían afectar a tu historial de entrenamiento en casos muy específicos de mala conexión.
 - **Estabilidad General**: Actualizamos todos los servicios internos para asegurar que IronTrain siga funcionando perfectamente mientras seguimos creciendo.
 
 ## 2.1.2 (2026-03-19)
 
 ### Sincronización y Datos (Sync v2)
-  - **Sincronización Inicial Robusta**: Rediseño del flujo de login para usar Snapshots completos (pullCloudSnapshot / pushLocalSnapshot) en dispositivos nuevos, garantizando una recuperación de datos atómica y fiable.
-  - **Detección Inteligente de Datos**: Refinamiento en la lógica de diagnóstico para ignorar datos técnicos/boilerplate y centrarse exclusivamente en contenido real del usuario al detectar conflictos.
-  - **Gestión de Sesión y Auth**: Resolución de race conditions durante el inicio de sesión, asegurando que el token de autenticación esté presente antes de iniciar cualquier proceso de sincronización.
-  - **Consolidación de Snapshot**: Actualización del motor de respaldo para incluir las 18 tablas críticas del sistema, asegurando paridad total entre nube y dispositivo.
+
+- **Sincronización Inicial Robusta**: Rediseño del flujo de login para usar Snapshots completos (pullCloudSnapshot / pushLocalSnapshot) en dispositivos nuevos, garantizando una recuperación de datos atómica y fiable.
+- **Detección Inteligente de Datos**: Refinamiento en la lógica de diagnóstico para ignorar datos técnicos/boilerplate y centrarse exclusivamente en contenido real del usuario al detectar conflictos.
+- **Gestión de Sesión y Auth**: Resolución de race conditions durante el inicio de sesión, asegurando que el token de autenticación esté presente antes de iniciar cualquier proceso de sincronización.
+- **Consolidación de Snapshot**: Actualización del motor de respaldo para incluir las 18 tablas críticas del sistema, asegurando paridad total entre nube y dispositivo.
+
 ### Entrenamiento y Gestión
-  - **Nombres Automáticos de Sesión**: Implementación de generación de nombres descriptivos (ej. "Entrenamiento Lunes 19/03") para sesiones finalizadas sin título.
-  - **Edición de Historial**: Capacidad de edición inline para nombres y notas de entrenamientos pasados directamente desde el modal de historial.
-  - **Validación de Importación**: Nuevo sistema de validación que impide la importación de rutinas compartidas que no contienen ejercicios.
+
+- **Nombres Automáticos de Sesión**: Implementación de generación de nombres descriptivos (ej. "Entrenamiento Lunes 19/03") para sesiones finalizadas sin título.
+- **Edición de Historial**: Capacidad de edición inline para nombres y notas de entrenamientos pasados directamente desde el modal de historial.
+- **Validación de Importación**: Nuevo sistema de validación que impide la importación de rutinas compartidas que no contienen ejercicios.
+
 ### UI y Experiencia de Usuario (Explorador de Carga)
-  - **Nuevo SyncingOverlay**: Capa de interfaz tematizada que proporciona feedback visual en tiempo real y manejo de errores con reintento durante la sincronización inicial.
-  - **Calendario (DateStrip)**: Corrección de indicadores visuales (dots y bordes) y sincronización de píldoras de estado para reflejar con precisión las sesiones diarias.
-  - **Estilización Consistente**: Eliminación de colores estáticos en favor del sistema de temas global, asegurando una visualización perfecta en Modo Claro y Oscuro.
-  - **Accesos Directos de Análisis**: Restauración del acceso directo a la calculadora de calentamiento (Warmup Calculator).
+
+- **Nuevo SyncingOverlay**: Capa de interfaz tematizada que proporciona feedback visual en tiempo real y manejo de errores con reintento durante la sincronización inicial.
+- **Calendario (DateStrip)**: Corrección de indicadores visuales (dots y bordes) y sincronización de píldoras de estado para reflejar con precisión las sesiones diarias.
+- **Estilización Consistente**: Eliminación de colores estáticos en favor del sistema de temas global, asegurando una visualización perfecta en Modo Claro y Oscuro.
+- **Accesos Directos de Análisis**: Restauración del acceso directo a la calculadora de calentamiento (Warmup Calculator).
 
 ## 2.1.1 (2026-03-18)
 
-###  Social y Comunidad
+### Social y Comunidad
+
 - **Filtros de Feed**: Ahora son siempre visibles y mantienen su estado al cambiar entre las pestañas de la sección social, mejorando la navegación.
 - **Bandeja de Entrada**: Se corrigieron errores donde el conteo de notificaciones era incorrecto o estas desaparecían inesperadamente.
 - **Persistencia de Ubicación**: El indicador de ubicación ahora persiste correctamente y refleja el estado real del usuario tras recargar la aplicación.
 - **Refinamientos de UI**: Mejoras en `social.styles.ts` para el manejo de sombras y coherencia de bordes, optimizado tanto para el Modo Claro como para el Oscuro.
 
-###  Centro de PRs (Sala de Trofeos)
+### Centro de PRs (Sala de Trofeos)
+
 - **Selección Manual de Slots**: Se añadió un nuevo modal que permite seleccionar manualmente qué ejercicios específicos deseas seguir en la Sala de Trofeos.
 - **Gestión de Espacios**: Los usuarios pueden ahora limpiar los espacios manuales para volver a la detección automática de los "Big 3" (Sentadilla, Banca, Peso Muerto).
 - **Correcciones Visuales**: Se solucionó un error visual de "sombra interna" detectado en el badge de KG totales cuando se utiliza el tema claro.
 
-###  Análisis y Puntuación
-- **Sistema IronScore**: 
-    - Implementación de un proceso de cálculo retroactivo para otorgar puntos por entrenamientos completados en el pasado que no fueron procesados.
-    - Refinamiento de la lógica de detección de ejercicios principales para otorgar puntuaciones de recompensa más altas.
+### Análisis y Puntuación
+
+- **Sistema IronScore**:
+  - Implementación de un proceso de cálculo retroactivo para otorgar puntos por entrenamientos completados en el pasado que no fueron procesados.
+  - Refinamiento de la lógica de detección de ejercicios principales para otorgar puntuaciones de recompensa más altas.
 - **Gestión de Datos Atípicos**: Se corrigieron valores inconsistentes en `AnalysisService` donde duraciones extremadamente largas (por olvido de cronómetro) alteraban las estadísticas promedio.
 - **Utilidades de Tiempo**: Incorporación de `formatDuration` y un sistema de parseo flexible para manejar limpiamente distintos formatos de entrada de tiempo.
 
-###  Entrenamiento y Almacenamiento
+### Entrenamiento y Almacenamiento
+
 - **Robustez de Sincronización**: Se mejoró la lógica en `SyncService` para asegurar que las acciones sociales y los registros de entrenamiento se sincronicen sin pérdida de datos.
 - **Tienda de Entrenamiento (Store)**: Optimización en la actualización de estados para el seguimiento de Récords Personales (PR) durante las sesiones activas.
 - **Entrada de Series**: Refinamiento en `SetRowInput` para ofrecer una mejor respuesta visual al completar series de alta intensidad.
@@ -114,6 +183,7 @@
 ## 2.1.0 (2026-03-09)
 
 ### Nuevas Funcionalidades
+
 - **Nuevos Badges**: Se añadió un sistema de *badges* (insignias) personalizables para ejercicios, permitiendo indicar equipamiento, variación, posición y otros. Estos *badges* se pueden colocar en conjunto para mejorar y acortar los nombres de los ejercicios (ej: pasando de "Press Banca c/barra" a "Press" [banca] [barra]).
 - **IronSocial**: En base a los testeos y métricas de la versión 2.0.0, se rehizo en gran medida el sistema social. Se añadieron sistemas de comparación con amigos, se dejó el feed funcional y se activó el sistema de *likes* (kudos).
 - **Sistema de Puntos**: Se recreó el sistema de puntajes desde cero. Se amplió el sistema de rachas (pasó de diaria a semanal) y los puntos ya no se pierden. Además, se añadió un panel que permite activar puntos dobles y un multiplicador mayor **(ya activo)** cuando esté lloviendo en tu zona (mediante GPS no invasivo), a modo de motivación para entrenar.
@@ -122,12 +192,14 @@
 - **Marketplace de ejercicios**: Se amplió el /feed en la pagina principal, ahora se pueden obtener ejercicios precreados rapidamente.
 
 ### Correcciones de Errores
+
 - **Body Measures**: Se corrigió un error en el sistema de sincronización que impedía guardar cualquier registro en esta pestaña.
 - **Sistema de Notificaciones**: Se corrigieron y mejoraron algunos lanzadores que impedían que ciertos tipos de notificaciones persistentes y push se mostraran.
 - **Data Reload**: Se implementó una solución robusta para los fallos de recarga. Ahora, cuando el backend o la base de datos local reciben nuevos datos, se reflejan en el frontend sin necesidad de forzar una recarga (sujeto a mejoras en futuros parches).
 - **Calculadora 1RM**: Se corrigió un problema visual que hacía que la tabla de porcentajes no mostrara la columna de repeticiones. Adicionalmente, se mejoró el aspecto de esta tabla para hacerla más intuitiva.
 
 ### Mejoras y Trabajo Interno
+
 - **Firebase Cloud Messaging**: Se implementó esta plataforma para asegurar que las notificaciones importantes y los avisos lleguen a la aplicación incluso cuando está cerrada.
 - **Feedback**: Se mejoró el sistema de feedback. Ahora podés acceder a él y enviar tus reportes de bugs o ideas directamente desde *Settings*.
 - **Tema de la Aplicación**: Se prepararon las bases del sistema para cambiar el aspecto de la interfaz, sumar el modo oscuro y armar un subsistema para crear y compartir temas personalizados.
@@ -138,6 +210,7 @@
 **IMPORTANTE**: Cualquier bug, petición, mejora o idea que se te ocurra, podés enviárnosla mediante el sistema de feedback. Agradecemos mucho tu colaboración para seguir mejorando la aplicación.
 
 ## 2.0.0 (2026-03-04)
+
 - **Tu app ahora funciona sin internet y luego se actualiza sola**: Entrenas en el gimnasio, terminas y, sin tocar nada, los datos se suben al instante cuando hay señal. Si algo falla, el sistema reintenta hasta que todo quede igual en tu celular y en la nube.
 
 - **Entrás una vez y no volvés a poner usuario ni contraseña**: Abrís la app o la web, tu sesión sigue viva y tu historial ya está ahí. Si cerraste sesión por error, al volver a entrar se baja automáticamente todo lo tuyo sin perderte ni un peso levantado.
@@ -173,6 +246,7 @@
 - **Mas opciones de configuración**: Se añadieron más opciones de configuración en la sección de ajustes, como la posibilidad de activar/desactivar notificaciones, sonidos, establecer que dias entrenás (afecta a las rachas y recordatorios), entre otras.
 
 ## 1.3.6 (2026-02-25)
+
 - **Consistense Heatmap**: Se mejoró el heatmap de consistencia para solucionar un bug de desfasaje de dias.
 - **Copy Workout**: Se mejoró la funcionalidad de copiar entrenamiento para asemejar la vista de calendario y la visualización de ejercicios realizados en el día seleccionado.
 - **Interval Timer**: Se reparó un bug que impedía el correcto funcionamiento del temporizador de intervalos y se añadieron presets de tiempo para facilitar el uso.
@@ -181,11 +255,13 @@
 - **UI Improvements**: Se solucinaron incompatibilidades con la UI en la pestaña "Analytics" en dispositivos de pantalla pequeña.
 
 ## 1.3.5 (2026-02-22)
+
 - **Enterprise OS Notifications V2**: Migración a `@notifee/react-native` para notificaciones locales (Rest Timers) persistentes a nivel de sistema que sobreviven al Background State. Gestor de permisos Zero-Trust integrado `NotificationPermissionsService` y enrutamiento inteligente híbrido (In-App vs OS).
 - **In-App Notifications (Toasts)**: Reemplazo global de `Alert.alert` intrusivos por un moderno sistema de *Toasts* y *Banners* impulsado por Zustand.
 - **Proactive What's New**: Banner interactivo de actualización en la pantalla principal posterior a actualizaciones y *Badge* de notificación de `Novedades` en el diario de entrenamiento.
 
 ## 1.3.4 (2026-02-19)
+
 - **Robustez y Estabilidad Limit-Proof**: Se refactorizó el núcleo de renderizado (`AppLayout`, `Settings`) eliminando selectores inestables que causaban crashes críticos al inicio. Se implementó un manejo de errores robusto en todos los módulos de análisis para prevenir estados vacíos rotos.
 - **Visual & UX Polish**: Rediseño completo del sistema de navegación en Análisis (Tabs tipo píldora de alto contraste) y corrección de legibilidad en `DateStrip` y `AnalysisTools`. Ajustes de espaciado uniformes en todas las sub-secciones.
 - **Heatmap de Consistencia 2.0**: Nueva lógica de renderizado que soporta semanas parciales, alineación precisa de etiquetas de mes, coloreado distintivo para días vacíos (`iron[300]`) y auto-scroll inteligente a la fecha actual.
@@ -195,18 +271,22 @@
 - **Mejoras en el análisis de tendencias**: Se mejoró el análisis de tendencias para que sea más profesional y cómodo.
 
 ## 1.3.3 (2026-02-14)
+
 - **Corrección de Integridad de Datos**: Solución definitiva al cálculo erróneo de volúmenes en el módulo de análisis, asegurando precisión en reportes históricos.
 - **Refinamiento de UI**: Ajustes de espaciado crítico en el modal de "Interval Timer" para mejorar la usabilidad en dispositivos de pantalla pequeña.
 - **Sistema de Actualizaciones Optimizado**: Mejoras en el flujo de detección y notificación de nuevas versiones.
 
 ## 1.3.2 (2026-02-11)
+
 - **Interval Timer Re-engineering**: Rework completo del temporizador de intervalos, optimizando la precisión del cronómetro y la experiencia de usuario durante las sesiones.
 - **Algoritmo de Carga de Discos**: Refinamiento en la lógica de cálculo para sugerir combinaciones de discos más eficientes y realistas.
 
 ## 1.3.1 (2026-01-16)
+
 - **Compatibilidad Universal de UI**: Implementación sistemática de `SafeAreaView` en todos los modales y pantallas críticas para garantizar una visualización perfecta en dispositivos con notch e islas dinámicas.
 
 ## 1.3.0 (2026-01-16)
+
 - **Soporte Multi-Tipo de Ejercicio**: Arquitectura extendida para soportar ejercicios de `peso_repeticiones`, `solo_repeticiones`, `solo_peso` y `distancia_tiempo` con validación específica por tipo.
 - **Pipeline de Validación de Datos**: Sistema robusto de sanitización de inputs para prevenir la corrupción de datos en series atípicas.
 - **Métricas Avanzadas en Historial**: Visualización contextual de métricas según el tipo de ejercicio en el historial de rendimiento.
@@ -215,18 +295,21 @@
 - **Sincronización de Contenidos Web**: Scripts automatizados para mantener la web de descargas sincronizada con el repositorio.
 
 ## 1.2.0 (2026-01-15)
+
 - **Módulo de Ajustes Refactorizado**: Nueva arquitectura de configuración centralizada para mejorar la mantenibilidad y el acceso del usuario.
 - **Backup System v4**: Motor de importación/exportación reescrito para incluir categorías personalizadas y validación de esquema JSON estricta.
 - **Notificaciones de Update**: Sistema proactivo de alertas para nuevas versiones con opción de "silenciar" para usuarios avanzados.
 - **Gestión de Permisos**: Flujo de solicitud de permisos de notificaciones optimizado y menos intrusivo.
 
 ## 1.1.0 (2026-01-15)
+
 - **Backup System v3 (Transactional)**: Implementación de restauración transaccional con rollback automático en caso de fallo, garantizando la integridad de la base de datos.
 - **Factory Reset Protocol**: Opción de restablecimiento de fábrica seguro que limpia datos y configuraciones reiniciando las semillas de la base de datos.
 - **Daily Log "Ultra Pro"**: Visualización enriquecida del diario de entrenamiento con "Chips" de resumen (series/volumen/distancia) y tipado estricto.
 - **Consistencia de Idioma**: Unificación de terminología en español a través de toda la interfaz (tabs, modales, alertas).
 
 ## 1.0.0 (2026-01-15)
+
 - **Precision Timing Engine**: Motor de cronometraje de alta precisión sin "drift" temporal para descansos y duración de sesión.
 - **Sistema de Unidades Unificado**: Conversión bidireccional Kg/Lbs centralizada, aplicada consistentemente en UI y cálculos de persistencia.
 - **Migración de Inventario de Discos**: Actualización del esquema de base de datos para soportar claves primarias compuestas con unidades.

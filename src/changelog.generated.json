@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-07T21:55:15.249Z",
+  "generatedAt": "2026-04-09T16:22:11.672Z",
   "source": "docs/CHANGELOG.md",
   "releases": [
     {
@@ -7,11 +7,44 @@
       "date": null,
       "unreleased": true,
       "items": [
-        "**Sistema de SubTemas**: Posibilidad completa de diseñar, compartir y descargar subtemas para la aplicación.",
+        "**Página de Ajustes Web**: Lanzamiento de la nueva página de ajustes en el sitio web, permitiendo a los usuarios configurar sus preferencias de sincronización y cuenta desde cualquier dispositivo.",
         "**Soporte para diferentes idiomas**: Posibilidad de elegir entre inglés y español.",
         "**Conexión con múltiples dispositivos**: Posibilidad de conectar con múltiples dispositivos (relojes/bands compatibles).",
         "**Vinculación con servicios de salud**: Posibilidad de vincular con servicios de salud (Fitbit, Garmin, etc.) para sincronización de datos.",
         "**Configuración de la App**: Posibilidad de configurar la aplicación a través de una página web."
+      ]
+    },
+    {
+      "version": "2.2.0",
+      "date": "2026-04-09",
+      "unreleased": false,
+      "items": [
+        "**Rutinas Compartidas de nueva generación**: se habilitó un sistema completo de colaboración con creación, edición y sincronización de rutinas compartidas, incluyendo comentarios, revisiones, historial de cambios y rollback.",
+        "**Invitaciones y roles**: ahora se pueden invitar miembros a espacios compartidos con manejo de decisiones, roles y remoción de participantes.",
+        "**Bandeja social más operable**: mejoras de inbox con acciones por lote y mejor lectura del estado de notificaciones.",
+        "**Perfil social ampliado**: nuevas señales de actividad y contexto (incluyendo días de entrenamiento) para comparar y seguir progreso de forma más clara.",
+        "**Perfil web más accionable**: se agregaron mejoras de visualización de actividad y acciones rápidas de amistad para una interacción social más directa.",
+        "**Política de amistad fortalecida**: se reforzó la lógica de solicitudes de amistad para una experiencia más consistente y segura.",
+        "**Marketplace de temas funcional**: se habilitó base completa para publicar, explorar, instalar, valorar, reportar y exportar temas.",
+        "**Compartir por enlace**: nueva capacidad para compartir temas por el Marketplace.",
+        "**Theme Studio ampliado en app**: nueva pantalla dedicada y mejora de herramientas de edición, preview y gestión de variantes.",
+        "**Moderación administrativa de temas**: flujo completo para aprobar, rechazar, suspender y restaurar temas, con paneles y endpoints de control.",
+        "**Tracking de instalaciones**: se agregó seguimiento de instalación de temas para mejorar medición y optimización.",
+        "**Refinamiento visual de temas**: mejoras de previsualización por modo y ampliación de campos de branding para una personalización más consistente.",
+        "**Autenticación web más estable**: mejora integral del proxy/auth bridge para reducir errores de sesión y problemas de enrutamiento.",
+        "**Flujos de cuenta expandidos**: pantallas de seguridad, recuperación y restablecimiento de contraseña.",
+        "**Sign-out robusto**: evolución a flujo dedicado (pantalla + endpoint interno) para cierre de sesión más fiable.",
+        "**Linking OAuth de Google más confiable**: mejoras en vinculación de cuenta con manejo de fallback, validación de sesión y mensajes de error más claros.",
+        "**Bridge app↔web más resiliente**: nuevo manejo de sesión bridge con validaciones adicionales para reducir cortes o redirecciones fallidas.",
+        "**Privacidad reforzada**: se sumaron endpoints para exportación de datos y desactivación de cuenta.",
+        "**Sincronización más segura**: mejoras en push/pull/snapshot/status para contemplar mejor soft-delete y filtrado activo en rutinas/ejercicios.",
+        "**Menos inconsistencias en alta actividad**: endurecimiento de reglas y políticas de escritura/sincronización entre app y web.",
+        "**Monitoreo de salud de sync**: nuevas capacidades de observabilidad para diagnóstico operativo.",
+        "**Feedback sensorial unificado**: respuesta más consistente en acciones clave de la app.",
+        "**Mensajería y labels más claros**: ajustes de copy/UI en feed y flujo social.",
+        "**Sistema de notificaciones más robusto**: refactor para mejorar carga de módulos y reducir fallos en escenarios variables.",
+        "**Hardening general de plataforma**: mejoras de seguridad, middleware, observabilidad y operación en entorno productivo.",
+        "**Base técnica más actualizada**: actualización de dependencias clave y refuerzo de automatizaciones de CI/dependabot para mayor estabilidad operativa."
       ]
     },
     {
