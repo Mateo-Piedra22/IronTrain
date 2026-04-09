@@ -110,7 +110,34 @@ export async function GET(req: NextRequest) {
         // Also include full cookie header as fallback
         const forwardCookies = neonCookies || rawCookies;
 
+        const proxyBaseUrl = `${origin}/api/auth`;
+
         const linkSocialCandidates = [
+            {
+                url: `${proxyBaseUrl}/link-social`,
+                body: {
+                    provider: 'google',
+                    callbackURL: accountUrl.toString(),
+                    errorCallbackURL: errorUrl.toString(),
+                },
+                source: 'proxy',
+            },
+            {
+                url: `${proxyBaseUrl}/link-social/google`,
+                body: {
+                    callbackURL: accountUrl.toString(),
+                    errorCallbackURL: errorUrl.toString(),
+                },
+                source: 'proxy',
+            },
+            {
+                url: `${proxyBaseUrl}/link-social?provider=google`,
+                body: {
+                    callbackURL: accountUrl.toString(),
+                    errorCallbackURL: errorUrl.toString(),
+                },
+                source: 'proxy',
+            },
             {
                 url: `${NEON_AUTH_BASE_URL}/link-social`,
                 body: {
@@ -118,6 +145,7 @@ export async function GET(req: NextRequest) {
                     callbackURL: accountUrl.toString(),
                     errorCallbackURL: errorUrl.toString(),
                 },
+                source: 'upstream',
             },
             {
                 url: `${NEON_AUTH_BASE_URL}/link-social/google`,
@@ -125,6 +153,7 @@ export async function GET(req: NextRequest) {
                     callbackURL: accountUrl.toString(),
                     errorCallbackURL: errorUrl.toString(),
                 },
+                source: 'upstream',
             },
             {
                 url: `${NEON_AUTH_BASE_URL}/link-social?provider=google`,
@@ -132,6 +161,7 @@ export async function GET(req: NextRequest) {
                     callbackURL: accountUrl.toString(),
                     errorCallbackURL: errorUrl.toString(),
                 },
+                source: 'upstream',
             },
         ] as const;
 
@@ -139,11 +169,13 @@ export async function GET(req: NextRequest) {
             userId: session.user.id,
             callbackURL: accountUrl.toString(),
             neonAuthUrl: NEON_AUTH_BASE_URL,
+            proxyAuthUrl: proxyBaseUrl,
             candidateCount: linkSocialCandidates.length,
         });
 
         let neonResponse: Response | null = null;
         let selectedCandidate: string | null = null;
+        let selectedSource: 'proxy' | 'upstream' | null = null;
 
         for (const candidate of linkSocialCandidates) {
             const response = await fetch(candidate.url, {
@@ -165,6 +197,7 @@ export async function GET(req: NextRequest) {
 
             neonResponse = response;
             selectedCandidate = candidate.url;
+            selectedSource = candidate.source;
             break;
         }
 
@@ -194,6 +227,7 @@ export async function GET(req: NextRequest) {
             const inferredCode = inferNeonErrorCode(errorBody);
             console.error('[link-google] Neon Auth error:', {
                 endpoint: selectedCandidate,
+                source: selectedSource,
                 status: neonResponse.status,
                 statusText: neonResponse.statusText,
                 inferredCode,
@@ -201,6 +235,9 @@ export async function GET(req: NextRequest) {
             });
 
             if (neonResponse.status === 401 || neonResponse.status === 403) {
+                if (selectedSource === 'upstream') {
+                    return buildAccountRedirect(req, { error: 'oauth_link_upstream_unauthorized' });
+                }
                 return buildAccountRedirect(req, { error: 'oauth_link_no_session' });
             }
 
@@ -236,6 +273,7 @@ export async function GET(req: NextRequest) {
         console.info('[link-google] Redirecting to Google OAuth', {
             userId: session.user.id,
             endpoint: selectedCandidate,
+            source: selectedSource,
             setCookieCount: setCookies.length,
         });
 

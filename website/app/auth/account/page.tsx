@@ -38,6 +38,10 @@ function getOAuthLinkErrorMessage(authError: string): string | null {
         return 'Tu sesión expiró antes de iniciar la vinculación. Inicia sesión nuevamente e inténtalo otra vez.';
     }
 
+    if (authError.includes('oauth_link_upstream_unauthorized')) {
+        return 'No se pudo validar la sesión en el servicio de autenticación para vincular Google. Intenta nuevamente; si persiste, usa Sign In con Google y luego verifica el vínculo.';
+    }
+
     if (authError.includes('oauth_link_not_configured')) {
         return 'La vinculación con Google no está configurada correctamente en el servidor.';
     }
