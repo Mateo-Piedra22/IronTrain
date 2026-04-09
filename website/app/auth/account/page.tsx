@@ -8,6 +8,8 @@ import { authClient } from '../../../src/lib/auth/client';
 import { buildAuthBridgeCallbackUrl, buildAuthPageUrl, buildSocialLinkCallbackUrl, toAbsoluteAppUrl } from '../../../src/lib/auth/redirects';
 import { performSignOut } from '../../../src/lib/auth/signout';
 
+const GOOGLE_GSI_SRC = 'https://accounts.google.com/gsi/client';
+
 function getErrorMessage(error: unknown, fallback: string): string {
     if (error instanceof Error && error.message) {
         return error.message;
@@ -55,6 +57,100 @@ function getOAuthLinkErrorMessage(authError: string): string | null {
     }
 
     return null;
+}
+
+function getGoogleClientId(): string | null {
+    const value = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!value) return null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+}
+
+async function loadGoogleIdentityScript(): Promise<void> {
+    if (typeof window === 'undefined') {
+        throw new Error('Browser-only flow');
+    }
+
+    if ((window as any).google?.accounts?.id) {
+        return;
+    }
+
+    const existing = document.querySelector(`script[src="${GOOGLE_GSI_SRC}"]`) as HTMLScriptElement | null;
+    if (existing) {
+        await new Promise<void>((resolve, reject) => {
+            if ((window as any).google?.accounts?.id) {
+                resolve();
+                return;
+            }
+
+            const onLoad = () => resolve();
+            const onError = () => reject(new Error('No se pudo cargar Google Identity Services'));
+            existing.addEventListener('load', onLoad, { once: true });
+            existing.addEventListener('error', onError, { once: true });
+        });
+        return;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = GOOGLE_GSI_SRC;
+        script.async = true;
+        script.defer = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('No se pudo cargar Google Identity Services'));
+        document.head.appendChild(script);
+    });
+}
+
+async function requestGoogleIdToken(clientId: string): Promise<string> {
+    await loadGoogleIdentityScript();
+
+    const gsi = (window as any).google?.accounts?.id;
+    if (!gsi) {
+        throw new Error('Google Identity no está disponible');
+    }
+
+    return await new Promise<string>((resolve, reject) => {
+        let settled = false;
+        const timeout = window.setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            reject(new Error('No se pudo obtener credencial de Google (timeout)'));
+        }, 20000);
+
+        gsi.initialize({
+            client_id: clientId,
+            callback: (response: { credential?: string }) => {
+                if (settled) return;
+                const token = response?.credential;
+                if (!token) {
+                    settled = true;
+                    window.clearTimeout(timeout);
+                    reject(new Error('Google no devolvió credencial válida'));
+                    return;
+                }
+                settled = true;
+                window.clearTimeout(timeout);
+                resolve(token);
+            },
+        });
+
+        gsi.prompt((notification: {
+            isNotDisplayed?: () => boolean;
+            isSkippedMoment?: () => boolean;
+            isDismissedMoment?: () => boolean;
+        }) => {
+            if (settled) return;
+            const notDisplayed = Boolean(notification?.isNotDisplayed?.());
+            const skipped = Boolean(notification?.isSkippedMoment?.());
+            const dismissed = Boolean(notification?.isDismissedMoment?.());
+            if (notDisplayed || skipped || dismissed) {
+                settled = true;
+                window.clearTimeout(timeout);
+                reject(new Error('Google no mostró el prompt de credencial'));
+            }
+        });
+    });
 }
 
 async function reportOAuthLinkFailure(payload: {
@@ -500,16 +596,49 @@ export default function AccountSecurityPage() {
 
         setBusy('link-google');
 
-        // Navigate to the server-side link handler.
-        // This bypasses ALL cross-origin cookie issues by:
-        // 1. Server verifies session via app-domain cookies (first-party, reliable)
-        // 2. Server calls Neon Auth's link-social endpoint server-to-server
-        // 3. Server gets the Google OAuth URL and redirects the browser
-        // 4. Google callback goes to Neon Auth → links account → redirects to app
-        //
-        // This is a FULL PAGE NAVIGATION (not fetch), so the browser handles
-        // all cookies and redirects natively.
         try {
+            const authAny = authClient as any;
+            const linkSocial = authAny?.linkSocial;
+            const googleClientId = getGoogleClientId();
+
+            if (googleClientId && typeof linkSocial === 'function') {
+                try {
+                    const idToken = await requestGoogleIdToken(googleClientId);
+                    const { error: linkError } = await linkSocial({
+                        provider: 'google',
+                        idToken: { token: idToken },
+                        disableRedirect: true,
+                        callbackURL: socialLinkCallbackURL,
+                        errorCallbackURL: socialLinkErrorCallbackURL,
+                    });
+
+                    if (!linkError) {
+                        const linked = await refreshAccountStatus();
+                        if (linked) {
+                            setSuccess('Google vinculado correctamente. Ya puedes iniciar sesión con ambos métodos.');
+                            setError(null);
+                            setBusy(null);
+                            return;
+                        }
+                    } else {
+                        const rawError = String((linkError as any)?.code || (linkError as any)?.message || '').toLowerCase();
+                        const mapped = getOAuthLinkErrorMessage(rawError);
+                        if (mapped) {
+                            setError(mapped);
+                            setBusy(null);
+                            return;
+                        }
+                    }
+                } catch (idTokenError) {
+                    if (process.env.NODE_ENV === 'production') {
+                        console.info('[auth/account] Google ID token linking fallback failed, trying redirect flow', {
+                            message: getErrorMessage(idTokenError, 'unknown'),
+                        });
+                    }
+                }
+            }
+
+            // Fallback: server-side redirect linking flow.
             const linkUrl = new URL('/api/auth/link-google', window.location.origin);
             const currentRedirectUri = searchParams.get('redirectUri');
             if (currentRedirectUri) {
