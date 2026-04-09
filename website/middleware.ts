@@ -15,6 +15,14 @@ const NEON_AUTH_SESSION_VERIFIER_PARAM = 'neon_auth_session_verifier';
 const NEON_AUTH_BASE_URL = getNeonAuthServiceBaseUrl() || '';
 const CANONICAL_APP_ORIGIN = getCanonicalAppOrigin();
 const DEBUG_OAUTH_EXCHANGE = process.env.AUTH_DEBUG_OAUTH_EXCHANGE === '1';
+const NEON_AUTH_ORIGIN = (() => {
+    if (!NEON_AUTH_BASE_URL) return null;
+    try {
+        return new URL(NEON_AUTH_BASE_URL).origin;
+    } catch {
+        return null;
+    }
+})();
 
 function parseCookieNames(cookieHeader: string): string[] {
     if (!cookieHeader) return [];
@@ -161,6 +169,28 @@ function requireCSRF(req: NextRequest): NextResponse | null {
  * - Permissions-Policy
  */
 function addSecurityHeaders(response: NextResponse, pathname: string): NextResponse {
+    const connectSrcParts = [
+        "connect-src 'self'",
+        'https://api.openweathermap.org',
+        'https://assets.vercel.com',
+        'https://vercel-vitals.axiom.co',
+        'https://vercel.live',
+        'wss://vercel.live',
+        'https://*.neonauth.sa-east-1.aws.neon.tech',
+    ];
+    if (NEON_AUTH_ORIGIN) {
+        connectSrcParts.push(NEON_AUTH_ORIGIN);
+    }
+
+    const formActionParts = [
+        "form-action 'self'",
+        'https://accounts.google.com',
+        'https://*.neonauth.sa-east-1.aws.neon.tech',
+    ];
+    if (NEON_AUTH_ORIGIN) {
+        formActionParts.push(NEON_AUTH_ORIGIN);
+    }
+
     // Content-Security-Policy
     const csp = [
         "default-src 'self'",
@@ -168,12 +198,12 @@ function addSecurityHeaders(response: NextResponse, pathname: string): NextRespo
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "img-src 'self' data: https: blob:",
         "font-src 'self' https://fonts.gstatic.com",
-        "connect-src 'self' https://api.openweathermap.org https://assets.vercel.com https://vercel-vitals.axiom.co https://vercel.live wss://vercel.live https://*.neonauth.sa-east-1.aws.neon.tech",
+        connectSrcParts.join(' '),
         "frame-src 'none'",
         "frame-ancestors 'none'",
         "object-src 'none'",
         "base-uri 'self'",
-        "form-action 'self' https://accounts.google.com https://*.neonauth.sa-east-1.aws.neon.tech",
+        formActionParts.join(' '),
     ].join('; ');
     
     response.headers.set('Content-Security-Policy', csp);

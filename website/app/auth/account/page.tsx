@@ -638,13 +638,9 @@ export default function AccountSecurityPage() {
                 }
             }
 
-            // Fallback: server-side redirect linking flow.
-            const linkUrl = new URL('/api/auth/link-google', window.location.origin);
-            const currentRedirectUri = searchParams.get('redirectUri');
-            if (currentRedirectUri) {
-                linkUrl.searchParams.set('redirectUri', currentRedirectUri);
-            }
-            window.location.href = linkUrl.toString();
+            setError('No se pudo completar la vinculación desde Google Identity en este navegador. Verifica popups/cookies de terceros y reintenta.');
+            setBusy(null);
+            return;
         } catch (err) {
             console.error('[auth/account] linkGoogle navigation error:', err);
             setError('Error inesperado al vincular Google. Intenta nuevamente.');

@@ -1,43 +1,59 @@
 import { randomBytes } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { AlertTriangle, Check, ExternalLink, User } from 'lucide-react';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { db } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { getSafeMobileRedirectUri } from '../../../src/lib/auth/redirects';
-import { auth } from '../../../src/lib/auth/server';
 import { validateDisplayName, validateUsername } from '../../../src/lib/moderation';
 import { BridgeAppRedirect } from './BridgeAppRedirect';
 
 export const revalidate = 0;
 
 async function getAuthenticatedSession() {
-    let data: any = null;
+    const cookieStore = await cookies();
+    const headerStore = await headers();
+
+    const forwardedProto = headerStore.get('x-forwarded-proto');
+    const forwardedHost = headerStore.get('x-forwarded-host');
+    const host = forwardedHost || headerStore.get('host');
+    const envOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim();
+
+    const requestOrigin = host
+        ? `${forwardedProto || 'https'}://${host}`
+        : (envOrigin || 'http://localhost:3000');
+
     try {
-        const result = await auth.getSession();
-        data = result?.data ?? null;
+        const response = await fetch(`${requestOrigin}/api/auth/bridge-session`, {
+            method: 'GET',
+            headers: {
+                cookie: cookieStore.toString(),
+                'x-requested-with': 'XMLHttpRequest',
+            },
+            cache: 'no-store',
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const payload = await response.json().catch(() => null);
+        const user = payload?.session?.user;
+        if (!user?.id) {
+            return null;
+        }
+
+        return {
+            id: user.id,
+            email: user.email || null,
+            name: user.name || undefined,
+        };
     } catch (error) {
         console.error('[AuthBridge] auth.getSession failed:', error);
         return null;
     }
-
-    if (!data?.session || !data.user) return null;
-    const sessionData = data.session as { access_token?: string; token?: string } | null;
-    const token = sessionData?.access_token ?? sessionData?.token;
-    if (!token) return null;
-
-    // Neon Auth typically provides name in the user object
-    const user = data.user as any;
-    const name = user.name || user.full_name || user.fullName || user.displayName || user.display_name;
-
-    return {
-        id: data.user.id,
-        email: data.user.email,
-        name: name as string | undefined,
-        token
-    };
 }
 
 export default async function AuthBridgePage(props: { searchParams?: Promise<{ [key: string]: string | undefined }> }) {
