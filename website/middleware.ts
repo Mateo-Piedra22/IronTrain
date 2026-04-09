@@ -271,9 +271,9 @@ async function handleOAuthVerifierExchange(
             return buildFailureRedirect();
         }
 
-        // Build the get-session URL with the verifier parameter
-        const upstreamUrl = new URL(`${NEON_AUTH_BASE_URL}/get-session`);
-        upstreamUrl.searchParams.set(NEON_AUTH_SESSION_VERIFIER_PARAM, verifier);
+        const requestOrigin = request.nextUrl.origin;
+        const proxyUrl = new URL('/api/auth/get-session', requestOrigin);
+        proxyUrl.searchParams.set(NEON_AUTH_SESSION_VERIFIER_PARAM, verifier);
 
         const cookieHeader = request.headers.get('cookie') || '';
         const cookieNames = parseCookieNames(cookieHeader);
@@ -284,13 +284,14 @@ async function handleOAuthVerifierExchange(
             console.info('[middleware] OAuth verifier exchange start', {
                 requestHost,
                 requestPath,
-                upstreamHost: upstreamUrl.host,
+                proxyHost: proxyUrl.host,
+                upstreamHost: new URL(NEON_AUTH_BASE_URL).host,
                 cookieCount,
                 neonCookieCount,
             });
         }
 
-        const response = await fetch(upstreamUrl.toString(), {
+        const response = await fetch(proxyUrl.toString(), {
             method: 'GET',
             headers: {
                 'Cookie': cookieHeader,
@@ -303,7 +304,8 @@ async function handleOAuthVerifierExchange(
             console.error('[middleware] OAuth verifier exchange failed', {
                 requestHost,
                 requestPath,
-                upstreamHost: upstreamUrl.host,
+                proxyHost: proxyUrl.host,
+                upstreamHost: new URL(NEON_AUTH_BASE_URL).host,
                 status: response.status,
                 statusText: response.statusText,
                 cookieCount,
@@ -326,7 +328,8 @@ async function handleOAuthVerifierExchange(
             console.info('[middleware] OAuth verifier exchange success', {
                 requestHost,
                 requestPath,
-                upstreamHost: upstreamUrl.host,
+                proxyHost: proxyUrl.host,
+                upstreamHost: new URL(NEON_AUTH_BASE_URL).host,
                 status: response.status,
                 setCookieCount: setCookieHeaders.length,
                 setCookieNames,
@@ -376,7 +379,9 @@ export async function middleware(request: NextRequest) {
     // back to our domain with ?neon_auth_session_verifier=TOKEN.
     // We MUST exchange this for session cookies here.
     // ──────────────────────────────────────────────────────────
-    const verifier = nextUrl.searchParams.get(NEON_AUTH_SESSION_VERIFIER_PARAM);
+    const verifier = pathname.startsWith('/api/auth/')
+        ? null
+        : nextUrl.searchParams.get(NEON_AUTH_SESSION_VERIFIER_PARAM);
 
     if (verifier) {
         const exchangeResult = await handleOAuthVerifierExchange(request, verifier);
