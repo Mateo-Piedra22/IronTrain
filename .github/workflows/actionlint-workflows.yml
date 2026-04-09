@@ -1,0 +1,44 @@
+name: Workflow Lint
+
+on:
+  pull_request:
+    branches: [main, master]
+    paths:
+      - ".github/workflows/**"
+      - ".github/labeler.yml"
+  push:
+    branches: [main, master]
+    paths:
+      - ".github/workflows/**"
+      - ".github/labeler.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: actionlint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workflow-lint:
+    name: Workflow Lint (actionlint)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTIONLINT_VERSION=1.7.12
+          curl -sSL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" -o actionlint.tgz
+          tar -xzf actionlint.tgz actionlint
+          sudo mv actionlint /usr/local/bin/actionlint
+          actionlint -version
+
+      - name: Run actionlint
+        shell: bash
+        run: actionlint -color

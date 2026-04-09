@@ -1,0 +1,19 @@
+# Global owner fallback
+
+* @Mateo-Piedra22
+
+# App layers
+
+/app/ @Mateo-Piedra22
+/components/ @Mateo-Piedra22
+/constants/ @Mateo-Piedra22
+/src/ @Mateo-Piedra22
+/scripts/ @Mateo-Piedra22
+/website/ @Mateo-Piedra22
+
+# CI/CD and project governance
+
+/.github/ @Mateo-Piedra22
+/docs/ @Mateo-Piedra22
+/package.json @Mateo-Piedra22
+/tsconfig.json @Mateo-Piedra22

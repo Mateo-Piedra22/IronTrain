@@ -1,0 +1,112 @@
+name: Engineering Metrics
+
+on:
+  schedule:
+    - cron: "0 8 1,15 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: engineering-metrics-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  collect-metrics:
+    name: Engineering Metrics (Biweekly)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Compute metrics
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          owner_repo="${GITHUB_REPOSITORY}"
+          since="$(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ)"
+          today="$(date -u +%Y-%m-%d)"
+
+          runs_json="$(gh api "repos/${owner_repo}/actions/runs?per_page=100&created=>=${since}")"
+          prs_json="$(gh api "repos/${owner_repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100")"
+
+          mkdir -p docs/metrics
+          METRICS_SINCE="$since" RUNS_JSON="$runs_json" PRS_JSON="$prs_json" TODAY="$today" node - <<'NODE'
+          const fs = require('fs');
+
+          const since = new Date(process.env.METRICS_SINCE);
+          const runs = JSON.parse(process.env.RUNS_JSON).workflow_runs || [];
+          const prs = JSON.parse(process.env.PRS_JSON) || [];
+
+          function median(values) {
+            if (!values.length) return 0;
+            const sorted = [...values].sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            if (sorted.length % 2) return sorted[mid];
+            return (sorted[mid - 1] + sorted[mid]) / 2;
+          }
+
+          const completedRuns = runs.filter(r => r.status === 'completed' && r.created_at && r.updated_at);
+          const durationsMin = completedRuns.map(r => {
+            const start = new Date(r.created_at).getTime();
+            const end = new Date(r.updated_at).getTime();
+            return Math.max(0, (end - start) / 60000);
+          });
+
+          const failures = completedRuns.filter(r => r.conclusion === 'failure').length;
+          const success = completedRuns.filter(r => r.conclusion === 'success').length;
+          const cancelled = completedRuns.filter(r => r.conclusion === 'cancelled').length;
+          const totalCompleted = completedRuns.length;
+          const failRate = totalCompleted ? (failures / totalCompleted) * 100 : 0;
+          const flakyRuns = runs.filter(r => Number(r.run_attempt || 1) > 1).length;
+
+          const mergedPrs = prs.filter(pr => pr.merged_at && new Date(pr.merged_at) >= since);
+          const mergeHours = mergedPrs.map(pr => {
+            const created = new Date(pr.created_at).getTime();
+            const merged = new Date(pr.merged_at).getTime();
+            return Math.max(0, (merged - created) / 3600000);
+          });
+
+          const report = [];
+          report.push('# Engineering Metrics (Biweekly)');
+          report.push('');
+          report.push(`- Window start (UTC): ${since.toISOString()}`);
+          report.push(`- Generated at (UTC): ${new Date().toISOString()}`);
+          report.push('');
+          report.push('## CI metrics');
+          report.push(`- Completed runs: ${totalCompleted}`);
+          report.push(`- Success: ${success}`);
+          report.push(`- Failures: ${failures}`);
+          report.push(`- Cancelled: ${cancelled}`);
+          report.push(`- Fail rate: ${failRate.toFixed(2)}%`);
+          report.push(`- Median duration: ${median(durationsMin).toFixed(2)} min`);
+          report.push(`- Flaky indicator (run_attempt > 1): ${flakyRuns}`);
+          report.push('');
+          report.push('## PR throughput');
+          report.push(`- Merged PRs in window: ${mergedPrs.length}`);
+          report.push(`- Median time-to-merge: ${median(mergeHours).toFixed(2)} h`);
+          report.push('');
+          report.push('## Actions for review');
+          report.push('- Compare fail rate vs previous biweekly report');
+          report.push('- Review top flaky workflows and open remediation issues');
+          report.push('- Review PR lead time and identify bottlenecks');
+
+          const outPath = `docs/metrics/engineering-metrics-${process.env.TODAY}.md`;
+          fs.writeFileSync(outPath, report.join('\n'));
+          console.log(outPath);
+          NODE
+
+      - name: Upload metrics artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: engineering-metrics-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 90
+          path: docs/metrics/engineering-metrics-*.md
+
+      - name: Publish metrics summary
+        shell: bash
+        run: cat docs/metrics/engineering-metrics-*.md >> "$GITHUB_STEP_SUMMARY"

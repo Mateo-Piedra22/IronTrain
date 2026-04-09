@@ -20,8 +20,12 @@ concurrency:
 jobs:
   codeql:
     name: CodeQL Analysis
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 35
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
 
     steps:
       - name: Checkout
@@ -40,8 +44,10 @@ jobs:
 
   npm-audit:
     name: NPM Audit (prod deps)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 20
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -56,13 +62,100 @@ jobs:
       - name: Install dependencies (root)
         run: npm ci --legacy-peer-deps
 
-      - name: Audit root production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      - name: Audit root production dependencies (JSON)
+        run: npm audit --omit=dev --json > npm-audit-root.json || true
 
       - name: Install dependencies (website)
         working-directory: ./website
         run: npm ci
 
-      - name: Audit website production dependencies
+      - name: Audit website production dependencies (JSON)
         working-directory: ./website
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --omit=dev --json > ../npm-audit-website.json || true
+
+      - name: Enforce audit policy with expiring waivers
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+
+          const waiverFile = '.github/security/npm-audit-waivers.json';
+          const now = new Date();
+
+          const waiversDoc = fs.existsSync(waiverFile)
+            ? JSON.parse(fs.readFileSync(waiverFile, 'utf8'))
+            : { waivers: [] };
+
+          const waiverMap = new Map();
+          for (const waiver of (waiversDoc.waivers || [])) {
+            const key = String(waiver.id || '').trim();
+            const expiresAt = waiver.expiresAt ? new Date(waiver.expiresAt) : null;
+            if (!key || !expiresAt || Number.isNaN(expiresAt.getTime())) continue;
+            if (expiresAt < now) continue;
+            waiverMap.set(key, waiver);
+          }
+
+          function loadAudit(path) {
+            return JSON.parse(fs.readFileSync(path, 'utf8'));
+          }
+
+          function collectFindings(report, source) {
+            const findings = [];
+            const vulnerabilities = report.vulnerabilities || {};
+
+            for (const [pkg, vuln] of Object.entries(vulnerabilities)) {
+              const severity = String(vuln.severity || '').toLowerCase();
+              if (severity !== 'high' && severity !== 'critical') continue;
+
+              const advisoryIds = new Set();
+              const via = Array.isArray(vuln.via) ? vuln.via : [];
+              for (const entry of via) {
+                if (entry && typeof entry === 'object' && entry.source) {
+                  advisoryIds.add(String(entry.source));
+                }
+              }
+
+              if (advisoryIds.size === 0) {
+                findings.push({ source, pkg, severity, advisoryId: `pkg:${pkg}` });
+              } else {
+                for (const advisoryId of advisoryIds) {
+                  findings.push({ source, pkg, severity, advisoryId });
+                }
+              }
+            }
+
+            return findings;
+          }
+
+          const reports = [
+            { source: 'root', path: 'npm-audit-root.json' },
+            { source: 'website', path: 'npm-audit-website.json' }
+          ];
+
+          const findings = reports.flatMap(({ source, path }) => collectFindings(loadAudit(path), source));
+          const blocking = [];
+
+          for (const finding of findings) {
+            const directKey = `${finding.source}:${finding.advisoryId}`;
+            const globalKey = `*:${finding.advisoryId}`;
+            const packageKey = `${finding.source}:pkg:${finding.pkg}`;
+
+            const waiver = waiverMap.get(directKey) || waiverMap.get(globalKey) || waiverMap.get(packageKey);
+
+            if (!waiver) {
+              blocking.push(`${finding.source} ${finding.severity} ${finding.pkg} advisory=${finding.advisoryId} (no waiver)`);
+              continue;
+            }
+
+            if (!waiver.reason || String(waiver.reason).trim().length < 10) {
+              blocking.push(`${finding.source} ${finding.severity} ${finding.pkg} advisory=${finding.advisoryId} (waiver reason too short)`);
+            }
+          }
+
+          if (blocking.length > 0) {
+            console.error('Blocking npm audit findings:\n' + blocking.join('\n'));
+            process.exit(1);
+          }
+
+          console.log('npm audit policy passed (high/critical findings are either absent or validly waived).');
+          NODE

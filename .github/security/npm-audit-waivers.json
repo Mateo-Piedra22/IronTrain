@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "description": "Temporary waivers for npm audit findings. Each waiver must expire and include a reason.",
+  "waivers": []
+}

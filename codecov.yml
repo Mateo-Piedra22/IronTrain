@@ -1,0 +1,36 @@
+codecov:
+  require_ci_to_pass: true
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: true
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 0.5%
+      mobile:
+        flags: [mobile]
+        target: auto
+        threshold: 0.5%
+      web:
+        flags: [web]
+        target: auto
+        threshold: 0.5%
+    patch:
+      default:
+        target: auto
+        threshold: 1%
+
+flags:
+  mobile:
+    paths:
+      - app/
+      - components/
+      - src/
+  web:
+    paths:
+      - website/

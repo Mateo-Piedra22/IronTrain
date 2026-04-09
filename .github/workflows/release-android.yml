@@ -1,4 +1,4 @@
-name: Release Android APK
+name: Release Android Build
 
 on:
   push:
@@ -15,9 +15,10 @@ concurrency:
 
 jobs:
   build-and-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 240
     if: "!contains(github.event.head_commit.message, '[skip eas]')"
+    environment: staging
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
@@ -90,7 +91,7 @@ jobs:
           NODE
 
       - name: Setup Expo and EAS
-        uses: expo/expo-github-action@v8
+        uses: expo/expo-github-action@c7b66a9c327a43a8fa7c0158e7f30d6040d2481e
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
@@ -144,10 +145,58 @@ jobs:
           curl -L "${{ steps.artifact.outputs.apk_url }}" -o "${apk}"
           sha256sum "${apk}" | awk '{print $1}' > "IronTrain-${tag}.sha256.txt"
 
-      - name: Create GitHub Release and upload assets
-        uses: softprops/action-gh-release@v2
+      - name: Generate build metadata
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          apk="IronTrain-${tag}.apk"
+          checksum_file="IronTrain-${tag}.sha256.txt"
+          checksum="$(cat "$checksum_file")"
+          now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > "build-metadata-${tag}.json" <<JSON
+          {
+            "application": "IronTrain",
+            "platform": "android",
+            "tag": "${tag}",
+            "version": "${tag#v}",
+            "git": {
+              "sha": "${GITHUB_SHA}",
+              "ref": "${GITHUB_REF}",
+              "run_id": "${GITHUB_RUN_ID}",
+              "run_attempt": "${GITHUB_RUN_ATTEMPT}",
+              "repository": "${GITHUB_REPOSITORY}"
+            },
+            "build": {
+              "created_at_utc": "${now}",
+              "runner": "${RUNNER_NAME}",
+              "runner_os": "${RUNNER_OS}",
+              "runner_arch": "${RUNNER_ARCH}"
+            },
+            "artifact": {
+              "name": "${apk}",
+              "sha256": "${checksum}"
+            }
+          }
+          JSON
+
+      - name: Upload build package artifact
+        uses: actions/upload-artifact@v4
         with:
+          name: android-build-${{ github.ref_name }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            IronTrain-${{ github.ref_name }}.apk
+            IronTrain-${{ github.ref_name }}.sha256.txt
+            build-metadata-${{ github.ref_name }}.json
+
+      - name: Create draft prerelease and upload assets
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe
+        with:
+          draft: true
+          prerelease: true
           body: ${{ steps.changelog.outputs.body }}
           files: |
             IronTrain-${{ github.ref_name }}.apk
             IronTrain-${{ github.ref_name }}.sha256.txt
+            build-metadata-${{ github.ref_name }}.json

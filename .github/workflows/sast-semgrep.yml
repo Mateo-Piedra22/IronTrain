@@ -1,0 +1,60 @@
+name: SAST Semgrep
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+  schedule:
+    - cron: "30 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: sast-semgrep-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semgrep:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Semgrep
+        run: |
+          pip install --disable-pip-version-check --upgrade pip wheel
+          pip install --disable-pip-version-check "setuptools<81"
+          pip install --disable-pip-version-check semgrep==1.121.0
+
+      - name: Run Semgrep
+        shell: bash
+        run: |
+          set -euo pipefail
+          semgrep scan \
+            --config p/javascript \
+            --config p/typescript \
+            --severity ERROR \
+            --error \
+            --sarif \
+            --output semgrep.sarif
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
