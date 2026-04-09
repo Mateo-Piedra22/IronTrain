@@ -34,6 +34,13 @@ function parseCookieNames(cookieHeader: string): string[] {
         .filter(Boolean);
 }
 
+function hasSessionChallengeCookie(cookieNames: string[]): boolean {
+    return cookieNames.some((name) => {
+        const lower = name.toLowerCase();
+        return lower.includes('session_challenge') || lower.endsWith('.challenge');
+    });
+}
+
 function countLikelyNeonCookies(cookieNames: string[]): number {
     return cookieNames.filter((name) => {
         const lower = name.toLowerCase();
@@ -384,6 +391,17 @@ export async function middleware(request: NextRequest) {
         : nextUrl.searchParams.get(NEON_AUTH_SESSION_VERIFIER_PARAM);
 
     if (verifier) {
+        const cookieHeader = request.headers.get('cookie') || '';
+        const cookieNames = parseCookieNames(cookieHeader);
+        if (!hasSessionChallengeCookie(cookieNames)) {
+            const cleanUrl = nextUrl.clone();
+            cleanUrl.searchParams.delete(NEON_AUTH_SESSION_VERIFIER_PARAM);
+            if (!cleanUrl.searchParams.get('error')) {
+                cleanUrl.searchParams.set('error', 'state_mismatch');
+            }
+            return addSecurityHeaders(NextResponse.redirect(cleanUrl), pathname);
+        }
+
         const exchangeResult = await handleOAuthVerifierExchange(request, verifier);
         if (exchangeResult) {
             return addSecurityHeaders(exchangeResult, pathname);
