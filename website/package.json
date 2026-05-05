@@ -14,7 +14,7 @@
     "db:migrate:prod": "node scripts/db-migrate-prod.mjs"
   },
   "dependencies": {
-    "@neondatabase/auth": "^0.2.0-beta.1",
+    "@neondatabase/auth": "^0.3.0-beta",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
@@ -23,11 +23,11 @@
     "lucide-react": "^0.577.0",
     "next": "^15.5.15",
     "pg": "^8.16.3",
-    "posthog-js": "^1.372.3",
-    "posthog-node": "^5.30.6",
+    "posthog-js": "^1.372.8",
+    "posthog-node": "^5.33.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.19.17",
@@ -39,7 +39,7 @@
     "drizzle-kit": "^0.31.9",
     "eslint": "9.39.4",
     "eslint-config-next": "^15.5.15",
-    "postcss": "^8.5.12",
+    "postcss": "^8.5.14",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.2",
     "vitest": "3.2.4"
