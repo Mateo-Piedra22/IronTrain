@@ -23,14 +23,14 @@
     "lucide-react": "^0.577.0",
     "next": "^15.5.19",
     "pg": "^8.21.0",
-    "posthog-js": "^1.383.0",
-    "posthog-node": "^5.36.5",
+    "posthog-js": "^1.386.8",
+    "posthog-node": "^5.37.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^22.19.20",
+    "@types/node": "^22.19.21",
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.0.3",
