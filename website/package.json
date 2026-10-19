@@ -14,35 +14,35 @@
     "db:migrate:prod": "node scripts/db-migrate-prod.mjs"
   },
   "dependencies": {
-    "@neondatabase/auth": "^0.5.0-beta",
+    "@neondatabase/auth": "^0.6.0-beta",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.4",
     "firebase-admin": "^13.10.0",
     "jose": "^6.2.12",
     "lucide-react": "^0.577.0",
-    "next": "^15.5.27",
+    "next": "^15.5.28",
     "pg": "^8.23.1",
-    "posthog-js": "^1.438.7",
-    "posthog-node": "^5.55.1",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "zod": "^4.6.5"
+    "posthog-js": "^1.438.12",
+    "posthog-node": "^5.56.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@vitest/coverage-v8": "^5.0.3",
+    "@vitest/coverage-v8": "^5.0.5",
     "autoprefixer": "^10.6.1",
     "drizzle-kit": "^0.31.11",
     "eslint": "9.39.5",
-    "eslint-config-next": "^15.5.27",
-    "postcss": "^8.5.29",
+    "eslint-config-next": "^15.5.28",
+    "postcss": "^8.5.30",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.2",
-    "vitest": "5.0.3"
+    "vitest": "5.0.5"
   },
   "engines": {
     "node": "22.x"
