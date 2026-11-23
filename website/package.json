@@ -19,12 +19,12 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.4",
     "firebase-admin": "^13.10.0",
-    "jose": "^6.2.17",
+    "jose": "^6.2.18",
     "lucide-react": "^0.577.0",
     "next": "^15.5.29",
     "pg": "^8.23.1",
-    "posthog-js": "^1.449.0",
-    "posthog-node": "^5.73.0",
+    "posthog-js": "^1.453.2",
+    "posthog-node": "^5.74.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "zod": "^4.6.7"
@@ -34,15 +34,15 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@vitest/coverage-v8": "^5.1.0",
-    "autoprefixer": "^10.6.2",
+    "@vitest/coverage-v8": "^5.1.1",
+    "autoprefixer": "^10.7.0",
     "drizzle-kit": "^0.31.11",
     "eslint": "9.39.5",
     "eslint-config-next": "^15.5.29",
-    "postcss": "^8.5.32",
+    "postcss": "^8.5.33",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.2",
-    "vitest": "5.1.0"
+    "vitest": "5.1.1"
   },
   "engines": {
     "node": "22.x"
